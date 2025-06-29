@@ -1,0 +1,126 @@
+import api from './auth';
+
+// 获取用户的课表列表
+export const getTimetables = async () => {
+  try {
+    const response = await api.get('/api/timetables');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 创建新课表
+export const createTimetable = async (timetableData) => {
+  try {
+    const response = await api.post('/api/timetables', timetableData);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取单个课表详情
+export const getTimetable = async (timetableId) => {
+  try {
+    const response = await api.get(`/api/timetables/${timetableId}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取课表的课程数据
+export const getTimetableSchedules = async (timetableId, week = null) => {
+  try {
+    const url = week 
+      ? `/api/timetables/${timetableId}/schedules?week=${week}`
+      : `/api/timetables/${timetableId}/schedules`;
+    const response = await api.get(url);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 通过语音输入课程安排
+export const addScheduleByVoice = async (timetableId, audioData) => {
+  try {
+    const formData = new FormData();
+    formData.append('audio', audioData);
+    
+    const response = await api.post(
+      `/api/timetables/${timetableId}/schedules/voice`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 通过文本输入课程安排
+export const addScheduleByText = async (timetableId, textData) => {
+  try {
+    const response = await api.post(
+      `/api/timetables/${timetableId}/schedules/text`,
+      { text: textData }
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 删除课程安排
+export const deleteSchedule = async (timetableId, scheduleId) => {
+  try {
+    const response = await api.delete(
+      `/api/timetables/${timetableId}/schedules/${scheduleId}`
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 更新课程安排
+export const updateSchedule = async (timetableId, scheduleId, scheduleData) => {
+  try {
+    const response = await api.put(
+      `/api/timetables/${timetableId}/schedules/${scheduleId}`,
+      scheduleData
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 管理员功能：获取所有用户的课表
+export const getAllTimetables = async () => {
+  try {
+    const response = await api.get('/api/admin/timetables');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 管理员功能：合并课表
+export const mergeTimetables = async (timetableIds, mergedName) => {
+  try {
+    const response = await api.post('/api/admin/timetables/merge', {
+      timetableIds,
+      mergedName
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}; 

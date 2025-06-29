@@ -1,0 +1,280 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, Button, Input, message, Tabs, Space, Typography, Alert } from 'antd';
+import { MicrophoneOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getTimetable, addScheduleByVoice, addScheduleByText } from '../services/timetable';
+
+const { TextArea } = Input;
+const { Text } = Typography;
+
+const InputTimetable = ({ user }) => {
+  const [timetable, setTimetable] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [textInput, setTextInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('voice');
+  const [recordingTime, setRecordingTime] = useState(0);
+  
+  const mediaRecorderRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  
+  const navigate = useNavigate();
+  const { timetableId } = useParams();
+
+  useEffect(() => {
+    fetchTimetable();
+    return () => {
+      // 清理定时器
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, [timetableId]);
+
+  const fetchTimetable = async () => {
+    try {
+      const response = await getTimetable(timetableId);
+      if (response.success) {
+        setTimetable(response.data);
+      } else {
+        message.error(response.message || '获取课表失败');
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      message.error('获取课表失败，请检查网络连接');
+      navigate('/dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      // 开始计时
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+    } catch (error) {
+      message.error('无法访问麦克风，请检查权限设置');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      
+      // 处理录音数据
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        await submitVoiceInput(audioBlob);
+      };
+    }
+  };
+
+  const submitVoiceInput = async (audioBlob) => {
+    setSubmitting(true);
+    try {
+      const response = await addScheduleByVoice(timetableId, audioBlob);
+      if (response.success) {
+        message.success('语音录入成功！课程已添加到课表中');
+        setRecordingTime(0);
+        // 可以在这里刷新课表或跳转到查看页面
+      } else {
+        message.error(response.message || '语音处理失败');
+      }
+    } catch (error) {
+      message.error('语音录入失败，请重试');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitTextInput = async () => {
+    if (!textInput.trim()) {
+      message.warning('请输入课程安排信息');
+      return;
+    }
+    
+    setSubmitting(true);
+    try {
+      const response = await addScheduleByText(timetableId, textInput.trim());
+      if (response.success) {
+        message.success('文字录入成功！课程已添加到课表中');
+        setTextInput('');
+      } else {
+        message.error(response.message || '文字处理失败');
+      }
+    } catch (error) {
+      message.error('文字录入失败，请重试');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const voiceTabContent = (
+    <div className="voice-input-container">
+      <Alert
+        message="语音录入说明"
+        description="请清晰地说出课程安排，例如：'明天上午9点到10点，张同学上数学课'或'周一下午2点到3点，李同学上英语课'"
+        type="info"
+        showIcon
+        style={{ marginBottom: 24 }}
+      />
+      
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        {isRecording && (
+          <Text strong style={{ fontSize: '18px', color: '#ff4d4f' }}>
+            录音中... {formatTime(recordingTime)}
+          </Text>
+        )}
+      </div>
+      
+      <div style={{ textAlign: 'center' }}>
+        <Button
+          type={isRecording ? "danger" : "primary"}
+          icon={isRecording ? <StopOutlined /> : <MicrophoneOutlined />}
+          className="voice-button"
+          size="large"
+          loading={submitting}
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={submitting}
+        >
+          {isRecording ? '停止录音' : '开始录音'}
+        </Button>
+      </div>
+      
+      <div style={{ textAlign: 'center', marginTop: 16, color: '#666' }}>
+        {isRecording ? '点击停止录音按钮完成录入' : '点击麦克风按钮开始语音录入'}
+      </div>
+    </div>
+  );
+
+  const textTabContent = (
+    <div style={{ padding: '20px 0' }}>
+      <Alert
+        message="文字录入说明"
+        description="请输入课程安排信息，系统会自动识别学员姓名、时间和科目。例如：'张三同学周一上午9点到10点上数学课'"
+        type="info"
+        showIcon
+        style={{ marginBottom: 24 }}
+      />
+      
+      <TextArea
+        rows={6}
+        value={textInput}
+        onChange={(e) => setTextInput(e.target.value)}
+        placeholder="请输入课程安排信息，例如：&#10;张三同学明天上午9点到10点上数学课&#10;李四同学周三下午2点到3点上英语课&#10;&#10;您可以一次输入多个课程安排"
+        style={{ marginBottom: 16 }}
+      />
+      
+      <div style={{ textAlign: 'center' }}>
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          size="large"
+          loading={submitting}
+          onClick={submitTextInput}
+          disabled={!textInput.trim() || submitting}
+        >
+          提交录入
+        </Button>
+      </div>
+    </div>
+  );
+
+  const tabItems = [
+    {
+      key: 'voice',
+      label: '语音录入',
+      children: voiceTabContent,
+    },
+    {
+      key: 'text',
+      label: '文字录入',
+      children: textTabContent,
+    },
+  ];
+
+  if (loading) {
+    return <div>加载中...</div>;
+  }
+
+  return (
+    <div className="content-container">
+      <div style={{ marginBottom: 24 }}>
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={() => navigate('/dashboard')}
+          style={{ marginRight: 16 }}
+        >
+          返回
+        </Button>
+        <h1 className="page-title" style={{ display: 'inline' }}>
+          录入课表：{timetable?.name}
+        </h1>
+      </div>
+
+      <Card>
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
+          centered
+        />
+      </Card>
+
+      <Card style={{ marginTop: 24 }} title="快速操作">
+        <Space>
+          <Button 
+            onClick={() => navigate(`/view-timetable/${timetableId}`)}
+          >
+            查看课表
+          </Button>
+          <Button 
+            type="primary" 
+            onClick={() => navigate('/dashboard')}
+          >
+            返回首页
+          </Button>
+        </Space>
+      </Card>
+    </div>
+  );
+};
+
+export default InputTimetable; 
