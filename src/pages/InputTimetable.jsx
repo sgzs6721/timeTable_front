@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Input, message, Tabs, Space, Typography, Alert } from 'antd';
-import { MicrophoneOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined } from '@ant-design/icons';
+import { AudioOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, addScheduleByVoice, addScheduleByText } from '../services/timetable';
 
@@ -167,7 +167,7 @@ const InputTimetable = ({ user }) => {
       <div style={{ textAlign: 'center' }}>
         <Button
           type={isRecording ? "danger" : "primary"}
-          icon={isRecording ? <StopOutlined /> : <MicrophoneOutlined />}
+          icon={isRecording ? <StopOutlined /> : <AudioOutlined />}
           className="voice-button"
           size="large"
           loading={submitting}

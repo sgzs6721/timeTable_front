@@ -3,7 +3,7 @@ import api from './auth';
 // 获取用户的课表列表
 export const getTimetables = async () => {
   try {
-    const response = await api.get('/api/timetables');
+    const response = await api.get('/timetables');
     return response;
   } catch (error) {
     throw error;
@@ -13,7 +13,7 @@ export const getTimetables = async () => {
 // 创建新课表
 export const createTimetable = async (timetableData) => {
   try {
-    const response = await api.post('/api/timetables', timetableData);
+    const response = await api.post('/timetables', timetableData);
     return response;
   } catch (error) {
     throw error;
@@ -23,7 +23,7 @@ export const createTimetable = async (timetableData) => {
 // 获取单个课表详情
 export const getTimetable = async (timetableId) => {
   try {
-    const response = await api.get(`/api/timetables/${timetableId}`);
+    const response = await api.get(`/timetables/${timetableId}`);
     return response;
   } catch (error) {
     throw error;
@@ -34,8 +34,8 @@ export const getTimetable = async (timetableId) => {
 export const getTimetableSchedules = async (timetableId, week = null) => {
   try {
     const url = week 
-      ? `/api/timetables/${timetableId}/schedules?week=${week}`
-      : `/api/timetables/${timetableId}/schedules`;
+      ? `/timetables/${timetableId}/schedules?week=${week}`
+      : `/timetables/${timetableId}/schedules`;
     const response = await api.get(url);
     return response;
   } catch (error) {
@@ -50,7 +50,7 @@ export const addScheduleByVoice = async (timetableId, audioData) => {
     formData.append('audio', audioData);
     
     const response = await api.post(
-      `/api/timetables/${timetableId}/schedules/voice`,
+      `/timetables/${timetableId}/schedules/voice`,
       formData,
       {
         headers: {
@@ -68,7 +68,7 @@ export const addScheduleByVoice = async (timetableId, audioData) => {
 export const addScheduleByText = async (timetableId, textData) => {
   try {
     const response = await api.post(
-      `/api/timetables/${timetableId}/schedules/text`,
+      `/timetables/${timetableId}/schedules/text`,
       { text: textData }
     );
     return response;
@@ -81,7 +81,7 @@ export const addScheduleByText = async (timetableId, textData) => {
 export const deleteSchedule = async (timetableId, scheduleId) => {
   try {
     const response = await api.delete(
-      `/api/timetables/${timetableId}/schedules/${scheduleId}`
+      `/timetables/${timetableId}/schedules/${scheduleId}`
     );
     return response;
   } catch (error) {
@@ -93,7 +93,7 @@ export const deleteSchedule = async (timetableId, scheduleId) => {
 export const updateSchedule = async (timetableId, scheduleId, scheduleData) => {
   try {
     const response = await api.put(
-      `/api/timetables/${timetableId}/schedules/${scheduleId}`,
+      `/timetables/${timetableId}/schedules/${scheduleId}`,
       scheduleData
     );
     return response;
@@ -105,7 +105,7 @@ export const updateSchedule = async (timetableId, scheduleId, scheduleData) => {
 // 管理员功能：获取所有用户的课表
 export const getAllTimetables = async () => {
   try {
-    const response = await api.get('/api/admin/timetables');
+    const response = await api.get('/admin/timetables');
     return response;
   } catch (error) {
     throw error;
@@ -115,7 +115,7 @@ export const getAllTimetables = async () => {
 // 管理员功能：合并课表
 export const mergeTimetables = async (timetableIds, mergedName) => {
   try {
-    const response = await api.post('/api/admin/timetables/merge', {
+    const response = await api.post('/admin/timetables/merge', {
       timetableIds,
       mergedName
     });

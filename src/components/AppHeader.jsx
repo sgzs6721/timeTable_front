@@ -58,7 +58,16 @@ const AppHeader = ({ user, onLogout }) => {
         selectedKeys={[location.pathname]}
         items={menuItems}
         onClick={({ key }) => navigate(key)}
-        style={{ flex: 1, minWidth: 0, border: 'none' }}
+        style={{ 
+          flex: 1, 
+          minWidth: 0, 
+          border: 'none',
+          // 移动端隐藏菜单文字，只显示图标
+          '@media (max-width: 768px)': {
+            fontSize: '12px'
+          }
+        }}
+        overflowedIndicator={null}
       />
       <Dropdown
         menu={{ items: userMenuItems }}
@@ -67,7 +76,18 @@ const AppHeader = ({ user, onLogout }) => {
       >
         <Button type="text" style={{ height: 'auto', padding: '4px 8px' }}>
           <Avatar size="small" icon={<UserOutlined />} />
-          <span style={{ marginLeft: 8 }}>{user?.username}</span>
+          <span 
+            style={{ 
+              marginLeft: 8,
+              // 在小屏幕上隐藏用户名
+              '@media (max-width: 480px)': {
+                display: 'none'
+              }
+            }}
+            className="username-text"
+          >
+            {user?.username}
+          </span>
         </Button>
       </Dropdown>
     </Header>

@@ -38,6 +38,97 @@ code {
   padding: 0 24px;
 }
 
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .content-container {
+    margin: 16px auto;
+    padding: 0 16px;
+  }
+  
+  .page-title {
+    font-size: 20px !important;
+    margin-bottom: 16px !important;
+  }
+  
+  .layout-header {
+    padding: 0 16px !important;
+  }
+  
+  .voice-button {
+    width: 80px !important;
+    height: 80px !important;
+    font-size: 20px !important;
+  }
+  
+  .voice-input-container {
+    padding: 20px !important;
+  }
+  
+  .ant-table {
+    font-size: 12px;
+  }
+  
+  .ant-table-thead > tr > th {
+    padding: 8px 4px !important;
+    font-size: 12px;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 8px 4px !important;
+  }
+  
+  .time-slot {
+    min-height: 50px !important;
+    font-size: 11px;
+  }
+  
+  .student-name {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+    margin: 1px !important;
+  }
+  
+  .logo {
+    font-size: 16px !important;
+  }
+  
+  .ant-menu-horizontal {
+    font-size: 12px !important;
+  }
+  
+  .ant-menu-horizontal > .ant-menu-item {
+    padding: 0 8px !important;
+  }
+}
+
+/* 小屏幕设备适配 */
+@media (max-width: 480px) {
+  .username-text {
+    display: none !important;
+  }
+  
+  .logo {
+    font-size: 14px !important;
+  }
+  
+  .layout-header {
+    padding: 0 12px !important;
+  }
+  
+  .content-container {
+    padding: 0 12px !important;
+  }
+  
+  .ant-card {
+    margin: 8px 0 !important;
+  }
+  
+  .ant-btn-lg {
+    height: 36px !important;
+    font-size: 14px !important;
+  }
+}
+
 .page-title {
   font-size: 24px;
   font-weight: bold;
