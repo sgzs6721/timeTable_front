@@ -51,7 +51,19 @@ const AppHeader = ({ user, onLogout }) => {
 
   return (
     <Header className="layout-header">
-      <div className="logo">语音排课系统</div>
+      <div className="logo">
+        <img 
+          src="/logo.png" 
+          alt="飓风乒乓培训" 
+          style={{
+            height: '100px',
+            maxWidth: '400px',
+            objectFit: 'contain',
+            cursor: 'pointer'
+          }}
+          onClick={() => navigate('/dashboard')}
+        />
+      </div>
       <Menu
         theme="light"
         mode="horizontal"

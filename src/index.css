@@ -24,12 +24,24 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 120px;
 }
 
 .logo {
-  font-size: 20px;
-  font-weight: bold;
-  color: #1890ff;
+  display: flex;
+  align-items: center;
+  height: 120px;
+}
+
+.logo img {
+  max-height: 100px;
+  max-width: 400px;
+  object-fit: contain;
+  transition: opacity 0.3s ease;
+}
+
+.logo img:hover {
+  opacity: 0.8;
 }
 
 .content-container {
@@ -52,6 +64,7 @@ code {
   
   .layout-header {
     padding: 0 16px !important;
+    height: 100px !important;
   }
   
   .voice-button {
@@ -89,7 +102,12 @@ code {
   }
   
   .logo {
-    font-size: 16px !important;
+    height: 100px !important;
+  }
+  
+  .logo img {
+    max-height: 80px !important;
+    max-width: 300px !important;
   }
   
   .ant-menu-horizontal {
@@ -107,8 +125,17 @@ code {
     display: none !important;
   }
   
+  .layout-header {
+    height: 90px !important;
+  }
+  
   .logo {
-    font-size: 14px !important;
+    height: 90px !important;
+  }
+  
+  .logo img {
+    max-height: 70px !important;
+    max-width: 240px !important;
   }
   
   .layout-header {
@@ -121,11 +148,53 @@ code {
   
   .ant-card {
     margin: 8px 0 !important;
+    width: 90vw !important;
+    max-width: 380px !important;
+  }
+  
+  /* 登录页面logo移动端适配 */
+  .ant-card .ant-card-head {
+    padding: 16px 12px 8px !important;
+  }
+  
+  .ant-card .ant-card-head img {
+    height: 100px !important;
+    max-width: 300px !important;
+  }
+  
+  .ant-card .ant-card-head div[style*="fontSize"] {
+    font-size: 16px !important;
   }
   
   .ant-btn-lg {
     height: 36px !important;
     font-size: 14px !important;
+  }
+}
+
+/* 超小屏幕设备适配 */
+@media (max-width: 360px) {
+  .ant-card {
+    width: 95vw !important;
+    max-width: 340px !important;
+  }
+  
+  .ant-card .ant-card-head img {
+    height: 80px !important;
+    max-width: 250px !important;
+  }
+  
+  .logo img {
+    max-height: 60px !important;
+    max-width: 200px !important;
+  }
+  
+  .layout-header {
+    height: 80px !important;
+  }
+  
+  .logo {
+    height: 80px !important;
   }
 }
 

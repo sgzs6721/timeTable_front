@@ -42,13 +42,14 @@ const Dashboard = ({ user }) => {
 
   return (
     <div className="content-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 className="page-title">我的课表</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, position: 'relative' }}>
+        <h1 className="page-title" style={{ margin: 0 }}>我的课表</h1>
         <Button 
           type="primary" 
           icon={<PlusOutlined />} 
           size="large"
           onClick={handleCreateTimetable}
+          style={{ position: 'absolute', top: 0, right: 0 }}
         >
           创建新课表
         </Button>

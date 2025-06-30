@@ -70,9 +70,30 @@ const Login = ({ onLogin }) => {
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
     }}>
       <Card 
-        title="语音排课系统" 
-        style={{ width: 400, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-        headStyle={{ textAlign: 'center', fontSize: '24px', fontWeight: 'bold' }}
+        title={
+          <div style={{ textAlign: 'center' }}>
+            <img 
+              src="/logo.png" 
+              alt="飓风乒乓培训" 
+              style={{
+                height: '160px',
+                maxWidth: '560px',
+                objectFit: 'contain',
+                marginBottom: '12px'
+              }}
+            />
+            <div style={{
+              fontSize: '22px',
+              fontWeight: 'bold',
+              color: '#262626',
+              marginTop: '12px'
+            }}>
+              课程管理系统
+            </div>
+          </div>
+        }
+        style={{ width: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+        headStyle={{ textAlign: 'center', padding: '32px 24px 20px' }}
       >
         <Form
           name="login"
