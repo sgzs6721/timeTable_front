@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 在开发环境使用代理，生产环境使用完整URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? '/api' : 'http://localhost:8080');
+  (import.meta.env.DEV ? '/timetable/api' : 'http://localhost:8088/timetable/api');
 
 // 创建axios实例
 const api = axios.create({

@@ -19,10 +19,10 @@ export default defineConfig({
     port: 3000,
     host: true,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
+      '/timetable/api': {
+        target: 'http://localhost:8088',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // 不需要重写路径，直接转发
       },
     },
   },
