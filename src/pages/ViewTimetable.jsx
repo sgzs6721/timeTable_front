@@ -203,35 +203,19 @@ const ViewTimetable = ({ user }) => {
 
   return (
     <div className="content-container">
-      <div className="timetable-top-header">
-        <Button 
-          icon={<ArrowLeftOutlined />} 
-          onClick={() => navigate('/dashboard')}
-          className="back-icon-button"
-          size="large"
-          style={{ marginRight: '16px' }}
-        />
-        <h1 className="timetable-main-title" style={{ textAlign: 'center', flex: 1 }}>
-          {timetable?.name}
-        </h1>
-        <Button 
-          type="primary" 
-          icon={<EditOutlined />}
-          onClick={() => navigate(`/input-timetable/${timetableId}`)}
-          className="edit-top-button"
-          size="small"
-        >
-          录入课程
-        </Button>
-      </div>
-
       <Card 
         className="timetable-view-card"
         title={
-          <div className="card-header-simple">
+          <div className="card-header-simple" style={{ display: 'flex', alignItems: 'center' }}>
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate(-1)}
+              style={{ marginRight: '16px' }}
+            />
             <Space>
               <CalendarOutlined />
-              <span>课表详情</span>
+              <span>{timetable?.name}</span>
               {!timetable?.isWeekly && (
                 <span className="week-info">
                   第 {currentWeek} 周 / 共 {totalWeeks} 周
@@ -240,6 +224,17 @@ const ViewTimetable = ({ user }) => {
             </Space>
           </div>
         }
+        extra={
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={() => navigate(`/input-timetable/${timetableId}`)}
+            size="small"
+          >
+            录入课程
+          </Button>
+        }
+        bodyStyle={{ padding: 0 }}
       >
         <div className="compact-timetable-container">
           <Table
@@ -255,15 +250,13 @@ const ViewTimetable = ({ user }) => {
         </div>
 
         {!timetable?.isWeekly && totalWeeks > 1 && (
-          <div className="week-pagination">
+          <div className="week-pagination-container" style={{ padding: '16px' }}>
             <Pagination
               current={currentWeek}
               total={totalWeeks}
               pageSize={1}
               onChange={handleWeekChange}
-              showQuickJumper
-              showTotal={(total, range) => `第 ${range[0]} 周，共 ${total} 周`}
-              size="small"
+              simple
             />
           </div>
         )}
