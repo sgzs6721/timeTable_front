@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layout, Menu, Button, Dropdown, Avatar } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, SettingOutlined, HomeOutlined } from '@ant-design/icons';
 
 const { Header } = Layout;
 
@@ -13,10 +13,7 @@ const AppHeader = ({ user, onLogout }) => {
     {
       key: '/dashboard',
       label: '首页',
-    },
-    {
-      key: '/create-timetable',
-      label: '创建课表',
+      icon: <HomeOutlined />,
     },
   ];
 
@@ -51,57 +48,48 @@ const AppHeader = ({ user, onLogout }) => {
 
   return (
     <Header className="layout-header">
-      <div className="logo">
-        <img 
-          src="/logo.png" 
-          alt="飓风乒乓培训" 
-          style={{
-            height: '100px',
-            maxWidth: '400px',
-            objectFit: 'contain',
-            cursor: 'pointer'
-          }}
-          onClick={() => navigate('/dashboard')}
-        />
-      </div>
-      <Menu
-        theme="light"
-        mode="horizontal"
-        selectedKeys={[location.pathname]}
-        items={menuItems}
-        onClick={({ key }) => navigate(key)}
-        style={{ 
-          flex: 1, 
-          minWidth: 0, 
-          border: 'none',
-          // 移动端隐藏菜单文字，只显示图标
-          '@media (max-width: 768px)': {
-            fontSize: '12px'
-          }
-        }}
-        overflowedIndicator={null}
-      />
-      <Dropdown
-        menu={{ items: userMenuItems }}
-        placement="bottomRight"
-        trigger={['click']}
-      >
-        <Button type="text" style={{ height: 'auto', padding: '4px 8px' }}>
-          <Avatar size="small" icon={<UserOutlined />} />
-          <span 
+      <div className="header-content">
+        <div className="logo">
+          <img 
+            src="/logo.png" 
+            alt="飓风乒乓培训" 
+            className="logo-img"
+            onClick={() => navigate('/dashboard')}
+          />
+        </div>
+        <div className="header-nav">
+          <Menu
+            theme="light"
+            mode="horizontal"
+            selectedKeys={[location.pathname]}
+            items={menuItems}
+            onClick={({ key }) => navigate(key)}
+            className="nav-menu"
             style={{ 
-              marginLeft: 8,
-              // 在小屏幕上隐藏用户名
-              '@media (max-width: 480px)': {
-                display: 'none'
-              }
+              border: 'none',
+              flex: 1,
+              minWidth: 0,
+              justifyContent: 'center'
             }}
-            className="username-text"
-          >
-            {user?.username}
-          </span>
-        </Button>
-      </Dropdown>
+            overflowedIndicator={null}
+            disabledOverflow={true}
+          />
+          <div className="user-section">
+            <Dropdown
+              menu={{ items: userMenuItems }}
+              placement="bottomRight"
+              trigger={['click']}
+            >
+              <Button type="text" className="user-dropdown">
+                <Avatar size="small" icon={<UserOutlined />} />
+                <span className="username-text">
+                  {user?.username}
+                </span>
+              </Button>
+            </Dropdown>
+          </div>
+        </div>
+      </div>
     </Header>
   );
 };

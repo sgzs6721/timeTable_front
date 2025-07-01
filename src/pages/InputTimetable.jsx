@@ -13,7 +13,7 @@ const InputTimetable = ({ user }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('voice');
+  const [activeTab, setActiveTab] = useState('text');
   const [recordingTime, setRecordingTime] = useState(0);
   
   const mediaRecorderRef = useRef(null);
@@ -25,6 +25,7 @@ const InputTimetable = ({ user }) => {
 
   useEffect(() => {
     fetchTimetable();
+    setActiveTab('text'); // 默认选中文字录入
     return () => {
       // 清理定时器
       if (recordingTimerRef.current) {
@@ -146,16 +147,44 @@ const InputTimetable = ({ user }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const voiceTabContent = (
-    <div className="voice-input-container">
+  const textTabContent = (
+    <div style={{ padding: '20px 0' }}>
       <Alert
-        message="语音录入说明"
-        description="请清晰地说出课程安排，例如：'明天上午9点到10点，张同学上数学课'或'周一下午2点到3点，李同学上英语课'"
+        message="录入说明"
+        description="请选择录入时间（日期时间或星期时间），然后输入人名。系统会根据日期（星期）和时间将人名填入课表。"
         type="info"
         showIcon
         style={{ marginBottom: 24 }}
       />
-      
+      <TextArea
+        rows={6}
+        value={textInput}
+        onChange={(e) => setTextInput(e.target.value)}
+      />
+      <Button
+        type="primary"
+        icon={<SendOutlined />}
+        className="text-submit-button"
+        size="large"
+        loading={submitting}
+        onClick={submitTextInput}
+        disabled={submitting}
+        style={{ marginTop: 16, width: '100%', display: 'block', margin: '0 auto' }}
+      >
+        提交
+      </Button>
+    </div>
+  );
+
+  const voiceTabContent = (
+    <div className="voice-input-container">
+      <Alert
+        message="录入说明"
+        description="请选择录入时间（日期时间或星期时间），然后输入人名。系统会根据日期（星期）和时间将人名填入课表。"
+        type="info"
+        showIcon
+        style={{ marginBottom: 24 }}
+      />
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
         {isRecording && (
           <Text strong style={{ fontSize: '18px', color: '#ff4d4f' }}>
@@ -163,7 +192,6 @@ const InputTimetable = ({ user }) => {
           </Text>
         )}
       </div>
-      
       <div style={{ textAlign: 'center' }}>
         <Button
           type={isRecording ? "danger" : "primary"}
@@ -177,42 +205,8 @@ const InputTimetable = ({ user }) => {
           {isRecording ? '停止录音' : '开始录音'}
         </Button>
       </div>
-      
       <div style={{ textAlign: 'center', marginTop: 16, color: '#666' }}>
         {isRecording ? '点击停止录音按钮完成录入' : '点击麦克风按钮开始语音录入'}
-      </div>
-    </div>
-  );
-
-  const textTabContent = (
-    <div style={{ padding: '20px 0' }}>
-      <Alert
-        message="文字录入说明"
-        description="请输入课程安排信息，系统会自动识别学员姓名、时间和科目。例如：'张三同学周一上午9点到10点上数学课'"
-        type="info"
-        showIcon
-        style={{ marginBottom: 24 }}
-      />
-      
-      <TextArea
-        rows={6}
-        value={textInput}
-        onChange={(e) => setTextInput(e.target.value)}
-        placeholder="请输入课程安排信息，例如：&#10;张三同学明天上午9点到10点上数学课&#10;李四同学周三下午2点到3点上英语课&#10;&#10;您可以一次输入多个课程安排"
-        style={{ marginBottom: 16 }}
-      />
-      
-      <div style={{ textAlign: 'center' }}>
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          size="large"
-          loading={submitting}
-          onClick={submitTextInput}
-          disabled={!textInput.trim() || submitting}
-        >
-          提交录入
-        </Button>
       </div>
     </div>
   );
@@ -235,45 +229,27 @@ const InputTimetable = ({ user }) => {
   }
 
   return (
-    <div className="content-container">
-      <div style={{ marginBottom: 24 }}>
-        <Button 
-          icon={<ArrowLeftOutlined />} 
+    <Card
+      title={<div style={{ textAlign: 'center' }}>{timetable?.name}</div>}
+      extra={
+        <Button
+          icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/dashboard')}
-          style={{ marginRight: 16 }}
-        >
-          返回
-        </Button>
-        <h1 className="page-title" style={{ display: 'inline' }}>
-          录入课表：{timetable?.name}
-        </h1>
-      </div>
-
-      <Card>
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabItems}
-          centered
+          className="back-icon-button"
+          size="large"
+          style={{ marginRight: 'auto' }}
         />
-      </Card>
-
-      <Card style={{ marginTop: 24 }} title="快速操作">
-        <Space>
-          <Button 
-            onClick={() => navigate(`/view-timetable/${timetableId}`)}
-          >
-            查看课表
-          </Button>
-          <Button 
-            type="primary" 
-            onClick={() => navigate('/dashboard')}
-          >
-            返回首页
-          </Button>
-        </Space>
-      </Card>
-    </div>
+      }
+    >
+      <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
+        <Tabs.TabPane tab="文字录入" key="text">
+          {textTabContent}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={<span style={{ color: '#ccc' }}>语音录入 <AudioOutlined />（开发中）</span>} key="voice" disabled>
+          {voiceTabContent}
+        </Tabs.TabPane>
+      </Tabs>
+    </Card>
   );
 };
 

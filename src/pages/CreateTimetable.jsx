@@ -100,17 +100,6 @@ const CreateTimetable = ({ user }) => {
                 />
               </Form.Item>
 
-              <Form.Item
-                name="description"
-                label="课表描述"
-                help="可选，对课表的简单描述"
-              >
-                <Input.TextArea 
-                  rows={3} 
-                  placeholder="例如：用于春季学期的固定排课安排"
-                />
-              </Form.Item>
-
               {!isWeekly && (
                 <Form.Item
                   name="dateRange"

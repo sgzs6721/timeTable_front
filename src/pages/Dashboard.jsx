@@ -42,28 +42,29 @@ const Dashboard = ({ user }) => {
 
   return (
     <div className="content-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, position: 'relative' }}>
-        <h1 className="page-title" style={{ margin: 0 }}>我的课表</h1>
+      <div className="dashboard-header">
+        <h1 className="page-title">我的课表</h1>
         <Button 
           type="primary" 
           icon={<PlusOutlined />} 
           size="large"
           onClick={handleCreateTimetable}
-          style={{ position: 'absolute', top: 0, right: 0 }}
+          className="create-button"
         >
-          创建新课表
+          <span className="create-button-text">创建新课表</span>
         </Button>
       </div>
 
-      <Card>
+      <Card className="timetable-card">
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '50px 0' }}>
+          <div className="loading-container">
             <Spin size="large" />
           </div>
         ) : timetables.length === 0 ? (
           <Empty
             description="暂无课表"
             image={Empty.PRESENTED_IMAGE_SIMPLE}
+            className="empty-state"
           >
             <Button type="primary" onClick={handleCreateTimetable}>
               创建第一个课表
@@ -73,35 +74,39 @@ const Dashboard = ({ user }) => {
           <List
             itemLayout="horizontal"
             dataSource={timetables}
+            className="timetable-list"
             renderItem={(item) => (
               <List.Item
+                className="timetable-item"
                 actions={[
                   <Button 
                     type="text" 
                     icon={<EditOutlined />}
                     onClick={() => handleInputTimetable(item.id)}
+                    className="action-button"
                   >
-                    录入
+                    <span className="action-text">录入</span>
                   </Button>,
                   <Button 
                     type="text" 
                     icon={<EyeOutlined />}
                     onClick={() => handleViewTimetable(item.id)}
+                    className="action-button"
                   >
-                    查看
+                    <span className="action-text">查看</span>
                   </Button>,
                 ]}
               >
                 <List.Item.Meta
-                  avatar={<Avatar icon={<CalendarOutlined />} />}
-                  title={item.name}
+                  avatar={<Avatar icon={<CalendarOutlined />} className="timetable-avatar" />}
+                  title={<div className="timetable-title">{item.name}</div>}
                   description={
-                    <div>
-                      <div>类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}</div>
+                    <div className="timetable-description">
+                      <div className="timetable-type">类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}</div>
                       {!item.isWeekly && item.startDate && item.endDate && (
-                        <div>时间: {item.startDate} 至 {item.endDate}</div>
+                        <div className="timetable-time">时间: {item.startDate} 至 {item.endDate}</div>
                       )}
-                      <div>创建时间: {new Date(item.createdAt).toLocaleDateString()}</div>
+                      <div className="timetable-created">创建时间: {new Date(item.createdAt).toLocaleDateString()}</div>
                     </div>
                   }
                 />
@@ -112,11 +117,10 @@ const Dashboard = ({ user }) => {
       </Card>
 
       {user?.role === 'admin' && (
-        <Card style={{ marginTop: 24 }} title="管理员功能">
+        <Card className="admin-card" title="管理员功能">
           <Button 
             type="primary" 
             onClick={() => navigate('/admin')}
-            style={{ marginRight: 16 }}
           >
             进入管理面板
           </Button>

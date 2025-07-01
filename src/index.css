@@ -17,194 +17,450 @@ code {
   background-color: #f5f5f5;
 }
 
+/* Header 样式 */
 .layout-header {
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 0 24px;
+  height: 120px;
+}
+
+.header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 120px;
+  height: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .logo {
   display: flex;
   align-items: center;
   height: 120px;
+  flex-shrink: 0;
 }
 
-.logo img {
-  max-height: 100px;
+.logo-img {
+  height: 100px;
   max-width: 400px;
   object-fit: contain;
+  cursor: pointer;
   transition: opacity 0.3s ease;
 }
 
-.logo img:hover {
+.logo-img:hover {
   opacity: 0.8;
 }
 
+.header-nav {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: space-between;
+  margin-left: 24px;
+  min-width: 0;
+}
+
+.nav-menu {
+  border: none !important;
+  flex: 1;
+  max-width: 300px;
+  overflow: visible !important;
+}
+
+.nav-menu .ant-menu-overflow {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.nav-menu .ant-menu-overflow-item {
+  flex-shrink: 0 !important;
+  display: flex !important;
+}
+
+.nav-menu .ant-menu-overflow-item-rest {
+  display: none !important;
+}
+
+.nav-menu .ant-menu-item {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0 !important;
+}
+
+.nav-menu .ant-menu-submenu-arrow,
+.nav-menu .ant-menu-overflow-item-suffix {
+  display: none !important;
+}
+
+.user-section {
+  margin-left: 16px;
+  flex-shrink: 0;
+}
+
+.user-dropdown {
+  height: auto;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+}
+
+.username-text {
+  margin-left: 8px;
+}
+
+/* Dashboard 样式 */
 .content-container {
   max-width: 1200px;
   margin: 24px auto;
   padding: 0 24px;
 }
 
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .content-container {
-    margin: 16px auto;
-    padding: 0 16px;
-  }
-  
-  .page-title {
-    font-size: 20px !important;
-    margin-bottom: 16px !important;
-  }
-  
-  .layout-header {
-    padding: 0 16px !important;
-    height: 100px !important;
-  }
-  
-  .voice-button {
-    width: 80px !important;
-    height: 80px !important;
-    font-size: 20px !important;
-  }
-  
-  .voice-input-container {
-    padding: 20px !important;
-  }
-  
-  .ant-table {
-    font-size: 12px;
-  }
-  
-  .ant-table-thead > tr > th {
-    padding: 8px 4px !important;
-    font-size: 12px;
-  }
-  
-  .ant-table-tbody > tr > td {
-    padding: 8px 4px !important;
-  }
-  
-  .time-slot {
-    min-height: 50px !important;
-    font-size: 11px;
-  }
-  
-  .student-name {
-    font-size: 10px !important;
-    padding: 1px 4px !important;
-    margin: 1px !important;
-  }
-  
-  .logo {
-    height: 100px !important;
-  }
-  
-  .logo img {
-    max-height: 80px !important;
-    max-width: 300px !important;
-  }
-  
-  .ant-menu-horizontal {
-    font-size: 12px !important;
-  }
-  
-  .ant-menu-horizontal > .ant-menu-item {
-    padding: 0 8px !important;
-  }
-}
-
-/* 小屏幕设备适配 */
-@media (max-width: 480px) {
-  .username-text {
-    display: none !important;
-  }
-  
-  .layout-header {
-    height: 90px !important;
-  }
-  
-  .logo {
-    height: 90px !important;
-  }
-  
-  .logo img {
-    max-height: 70px !important;
-    max-width: 240px !important;
-  }
-  
-  .layout-header {
-    padding: 0 12px !important;
-  }
-  
-  .content-container {
-    padding: 0 12px !important;
-  }
-  
-  .ant-card {
-    margin: 8px 0 !important;
-    width: 90vw !important;
-    max-width: 380px !important;
-  }
-  
-  /* 登录页面logo移动端适配 */
-  .ant-card .ant-card-head {
-    padding: 16px 12px 8px !important;
-  }
-  
-  .ant-card .ant-card-head img {
-    height: 100px !important;
-    max-width: 300px !important;
-  }
-  
-  .ant-card .ant-card-head div[style*="fontSize"] {
-    font-size: 16px !important;
-  }
-  
-  .ant-btn-lg {
-    height: 36px !important;
-    font-size: 14px !important;
-  }
-}
-
-/* 超小屏幕设备适配 */
-@media (max-width: 360px) {
-  .ant-card {
-    width: 95vw !important;
-    max-width: 340px !important;
-  }
-  
-  .ant-card .ant-card-head img {
-    height: 80px !important;
-    max-width: 250px !important;
-  }
-  
-  .logo img {
-    max-height: 60px !important;
-    max-width: 200px !important;
-  }
-  
-  .layout-header {
-    height: 80px !important;
-  }
-  
-  .logo {
-    height: 80px !important;
-  }
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .page-title {
   font-size: 24px;
   font-weight: bold;
-  margin-bottom: 24px;
+  margin: 0;
   color: #262626;
 }
 
+.create-button {
+  white-space: nowrap;
+}
+
+.create-button-text {
+  margin-left: 4px;
+}
+
+.timetable-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.loading-container {
+  text-align: center;
+  padding: 50px 0;
+}
+
+.empty-state {
+  padding: 40px 20px;
+}
+
+.timetable-list .timetable-item {
+  padding: 16px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.timetable-list .timetable-item:last-child {
+  border-bottom: none;
+}
+
+.timetable-avatar {
+  background-color: #1890ff;
+}
+
+.timetable-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  text-align: left !important;
+  display: block;
+  margin-left: 0 !important;
+  align-self: flex-start;
+}
+
+.timetable-description {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.timetable-type, .timetable-time, .timetable-created {
+  margin-bottom: 4px;
+}
+
+.timetable-type {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.action-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-card {
+  margin-top: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 移动端适配 (768px 以下) */
+@media (max-width: 768px) {
+  .layout-header {
+    padding: 0 16px;
+    height: 100px;
+  }
+  
+  .header-content {
+    gap: 8px;
+  }
+  
+  .logo {
+    height: 100px;
+  }
+  
+  .logo-img {
+    max-height: 80px;
+    max-width: 200px;
+  }
+  
+  .header-nav {
+    margin-left: 8px;
+  }
+  
+  .nav-menu {
+    font-size: 12px;
+    max-width: none !important;
+    min-width: 160px;
+  }
+  
+  .nav-menu .ant-menu-item {
+    padding: 0 6px !important;
+    font-size: 12px;
+    min-width: 60px;
+  }
+  
+  .nav-menu .ant-menu-item .anticon {
+    font-size: 14px;
+    margin-right: 4px;
+  }
+  
+  .content-container {
+    margin: 16px auto;
+    padding: 0 16px;
+  }
+  
+  .dashboard-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .page-title {
+    font-size: 18px;
+    text-align: left;
+    flex-shrink: 0;
+  }
+  
+  .create-button {
+    height: 36px;
+    font-size: 14px;
+    padding: 0 12px;
+    flex-shrink: 0;
+  }
+  
+  .create-button-text {
+    margin-left: 2px;
+  }
+  
+  .timetable-card {
+    margin: 0 -4px;
+  }
+  
+  .timetable-list .timetable-item {
+    padding: 12px 0;
+  }
+  
+  .timetable-title {
+    font-size: 15px;
+  }
+  
+  .timetable-description {
+    font-size: 13px;
+  }
+  
+  .action-text {
+    display: none;
+  }
+  
+  .action-button {
+    min-width: 40px;
+    padding: 4px 8px;
+  }
+}
+
+/* 小屏幕设备适配 (480px 以下) */
+@media (max-width: 480px) {
+  .layout-header {
+    height: 90px;
+    padding: 0 12px;
+  }
+  
+  .header-content {
+    gap: 6px;
+  }
+  
+  .logo {
+    height: 90px;
+  }
+  
+  .logo-img {
+    max-height: 70px;
+    max-width: 160px;
+  }
+  
+  .username-text {
+    display: none;
+  }
+  
+  .header-nav {
+    margin-left: 6px;
+  }
+  
+  .nav-menu {
+    max-width: none !important;
+    min-width: 140px;
+    font-size: 11px;
+  }
+  
+  .nav-menu .ant-menu-item {
+    padding: 0 4px !important;
+    font-size: 11px;
+    min-width: 50px;
+  }
+  
+  .nav-menu .ant-menu-item .anticon {
+    font-size: 12px;
+    margin-right: 2px;
+  }
+  
+  .content-container {
+    padding: 0 12px;
+  }
+  
+  .page-title {
+    font-size: 18px;
+  }
+  
+  .create-button {
+    height: 44px;
+    font-size: 15px;
+  }
+  
+  .create-button-text {
+    margin-left: 2px;
+  }
+  
+  .timetable-card {
+    margin: 0 -8px;
+    border-radius: 8px;
+  }
+  
+  .timetable-list .timetable-item {
+    padding: 10px 12px;
+  }
+  
+  .timetable-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  
+  .timetable-title {
+    font-size: 16px;
+  }
+  
+  .timetable-description {
+    font-size: 12px;
+  }
+  
+  .action-button {
+    min-width: 36px;
+    padding: 2px 6px;
+  }
+}
+
+/* 超小屏幕设备适配 (360px 以下) */
+@media (max-width: 360px) {
+  .layout-header {
+    height: 80px;
+    padding: 0 8px;
+  }
+  
+  .header-content {
+    gap: 4px;
+  }
+  
+  .logo {
+    height: 80px;
+  }
+  
+  .logo-img {
+    max-height: 60px;
+    max-width: 120px;
+  }
+  
+  .header-nav {
+    margin-left: 4px;
+  }
+  
+  .nav-menu {
+    max-width: none !important;
+    min-width: 120px;
+    font-size: 10px;
+  }
+  
+  .nav-menu .ant-menu-item {
+    padding: 0 3px !important;
+    font-size: 10px;
+    min-width: 45px;
+  }
+  
+  .nav-menu .ant-menu-item .anticon {
+    font-size: 11px;
+    margin-right: 1px;
+  }
+  
+  .page-title {
+    font-size: 16px;
+  }
+  
+  .create-button {
+    height: 40px;
+    font-size: 14px;
+  }
+  
+  .timetable-card {
+    margin: 0 -4px;
+  }
+  
+  .timetable-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  
+  .action-button {
+    min-width: 32px;
+    padding: 2px 4px;
+  }
+}
+
+/* 其他通用样式 */
 .voice-input-container {
   text-align: center;
   padding: 40px;
@@ -223,7 +479,7 @@ code {
 .timetable-container {
   background: #fff;
   border-radius: 8px;
-  padding: 24px;
+  padding: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -250,4 +506,482 @@ code {
   border-radius: 4px;
   margin: 2px;
   display: inline-block;
+}
+
+/* 课表查看页面样式 */
+.timetable-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 6px;
+}
+
+.back-icon-button {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 36px;
+  height: 36px;
+}
+
+.timetable-main-title {
+  font-size: 16px;
+  margin: 0;
+  text-align: center;
+  flex: 1;
+}
+
+.edit-top-button {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.timetable-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.timetable-title {
+  font-size: 18px;
+  text-align: center;
+}
+
+.back-button {
+  align-self: flex-start;
+}
+
+.card-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.edit-button {
+  width: 100%;
+}
+
+.timetable-view-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.card-header-simple {
+  display: flex;
+  align-items: center;
+}
+
+.week-info {
+  font-size: 14px;
+  color: #666;
+  font-weight: normal;
+}
+
+.edit-button {
+  flex-shrink: 0;
+}
+
+.compact-timetable-container {
+  overflow-x: auto;
+}
+
+.compact-timetable {
+  min-width: 400px;
+}
+
+.compact-timetable .ant-table-thead > tr > th {
+  padding: 6px 4px;
+  font-size: 12px;
+  text-align: center;
+  background: #fafafa;
+  border: 1px solid #e8e8e8;
+}
+
+.compact-timetable .ant-table-tbody > tr > td {
+  padding: 2px;
+  text-align: center;
+  border: 1px solid #e8e8e8;
+  vertical-align: middle;
+}
+
+.timetable-time-column {
+  background: #f5f5f5 !important;
+  width: 40px;
+  height: 30px;
+}
+
+.time-cell {
+  font-size: 11px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.2;
+}
+
+.time-part {
+  display: block;
+}
+
+.day-header {
+  text-align: center;
+}
+
+.day-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.day-date {
+  font-size: 10px;
+  color: #666;
+  font-weight: normal;
+  margin-top: 2px;
+}
+
+.time-slot-compact {
+  min-height: 35px;
+  max-height: 35px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1px;
+  overflow: hidden;
+}
+
+.student-tag-compact {
+  font-size: 10px;
+  padding: 1px 3px;
+  background: #1890ff;
+  color: white;
+  border-radius: 3px;
+  cursor: pointer;
+  margin: 1px 0;
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-all;
+  overflow: hidden;
+  display: block;
+}
+
+.student-tag-compact:hover {
+  background: #40a9ff;
+}
+
+.course-detail {
+  font-size: 13px;
+}
+
+.course-detail div {
+  margin-bottom: 4px;
+}
+
+.week-pagination {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.info-card {
+  margin-top: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.info-content {
+  color: #666;
+  font-size: 14px;
+}
+
+.info-content div {
+  margin-bottom: 4px;
+}
+
+/* 移动端表格样式 */
+@media (max-width: 768px) {
+  .voice-button {
+    width: 80px;
+    height: 80px;
+    font-size: 20px;
+  }
+  
+  .voice-input-container {
+    padding: 20px;
+  }
+  
+  .ant-table {
+    font-size: 12px;
+  }
+  
+  .ant-table-thead > tr > th {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 8px 4px;
+  }
+  
+  .time-slot {
+    min-height: 50px;
+    font-size: 11px;
+  }
+  
+  .student-name {
+    font-size: 10px;
+    padding: 1px 4px;
+    margin: 1px;
+  }
+  
+  /* 课表查看页面移动端优化 */
+  .timetable-top-header {
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  
+  .back-icon-button {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .timetable-main-title {
+    font-size: 16px;
+    margin: 0;
+    flex: 1;
+    text-align: left;
+  }
+  
+  .edit-top-button {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  
+  .timetable-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .timetable-title {
+    font-size: 18px;
+    text-align: center;
+  }
+  
+  .back-button {
+    align-self: flex-start;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .edit-button {
+    width: 100%;
+  }
+  
+  .compact-timetable {
+    min-width: 380px;
+  }
+  
+  .compact-timetable .ant-table-thead > tr > th {
+    padding: 4px 2px;
+    font-size: 11px;
+  }
+  
+  .compact-timetable .ant-table-tbody > tr > td {
+    padding: 1px;
+  }
+  
+  .time-cell {
+    font-size: 10px;
+  }
+  
+  .day-name {
+    font-size: 11px;
+  }
+  
+  .day-date {
+    font-size: 9px;
+  }
+  
+  .time-slot-compact {
+    min-height: 32px;
+    max-height: 32px;
+  }
+  
+  .student-tag-compact {
+    font-size: 9px;
+    padding: 1px 2px;
+  }
+  
+  .info-content {
+    font-size: 13px;
+  }
+}
+
+/* 小屏幕设备适配 (480px 以下) */
+@media (max-width: 480px) {
+  .layout-header {
+    height: 90px;
+    padding: 0 12px;
+  }
+  
+  .header-content {
+    gap: 6px;
+  }
+  
+  .logo {
+    height: 90px;
+  }
+  
+  .logo-img {
+    max-height: 70px;
+    max-width: 160px;
+  }
+  
+  .username-text {
+    display: none;
+  }
+  
+  .header-nav {
+    margin-left: 6px;
+  }
+  
+  .nav-menu {
+    max-width: none !important;
+    min-width: 140px;
+    font-size: 11px;
+  }
+  
+  .nav-menu .ant-menu-item {
+    padding: 0 4px !important;
+    font-size: 11px;
+    min-width: 50px;
+  }
+  
+  .nav-menu .ant-menu-item .anticon {
+    font-size: 12px;
+    margin-right: 2px;
+  }
+  
+  .content-container {
+    padding: 0 12px;
+  }
+  
+  .page-title {
+    font-size: 18px;
+  }
+  
+  .create-button {
+    height: 44px;
+    font-size: 15px;
+  }
+  
+  .create-button-text {
+    margin-left: 2px;
+  }
+  
+  .timetable-card {
+    margin: 0 -8px;
+    border-radius: 8px;
+  }
+  
+  .timetable-list .timetable-item {
+    padding: 10px 12px;
+  }
+  
+  .timetable-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  
+  .timetable-title {
+    font-size: 16px;
+  }
+  
+  .timetable-description {
+    font-size: 12px;
+  }
+  
+  .action-button {
+    min-width: 36px;
+    padding: 2px 6px;
+  }
+  
+  /* 课表查看页面小屏优化 */
+  .timetable-top-header {
+    margin-bottom: 10px;
+    gap: 6px;
+  }
+  
+  .back-icon-button {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .timetable-main-title {
+    font-size: 14px;
+    margin: 0;
+    flex: 1;
+    text-align: left;
+  }
+  
+  .edit-top-button {
+    height: 26px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+  
+  .compact-timetable {
+    min-width: 360px;
+  }
+  
+  .compact-timetable .ant-table-thead > tr > th {
+    padding: 3px 1px;
+    font-size: 10px;
+  }
+  
+  .time-cell {
+    font-size: 9px;
+  }
+  
+  .day-name {
+    font-size: 10px;
+  }
+  
+  .day-date {
+    font-size: 8px;
+  }
+  
+  .time-slot-compact {
+    min-height: 30px;
+    max-height: 30px;
+  }
+  
+  .student-tag-compact {
+    font-size: 8px;
+    padding: 1px;
+  }
+}
+
+.text-submit-button {
+  width: 100%;
+  display: block;
+  margin: 0 auto;
 } 

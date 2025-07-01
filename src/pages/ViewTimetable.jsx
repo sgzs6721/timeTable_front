@@ -104,8 +104,15 @@ const ViewTimetable = ({ user }) => {
         dataIndex: 'time',
         key: 'time',
         fixed: 'left',
-        width: 120,
-        render: (time) => <strong>{time}</strong>
+        width: 60,
+        className: 'timetable-time-column',
+        render: (time) => (
+          <div className="time-cell">
+            {time.split('-').map((t, i) => (
+              <div key={i} className="time-part">{t}</div>
+            ))}
+          </div>
+        )
       },
     ];
 
@@ -114,9 +121,9 @@ const ViewTimetable = ({ user }) => {
       if (weekDates) {
         const currentDate = weekDates.start.add(index, 'day');
         title = (
-          <div>
-            <div>{day.label}</div>
-            <div style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
+          <div className="day-header">
+            <div className="day-name">{day.label}</div>
+            <div className="day-date">
               {currentDate.format('MM-DD')}
             </div>
           </div>
@@ -127,38 +134,32 @@ const ViewTimetable = ({ user }) => {
         title,
         dataIndex: day.key,
         key: day.key,
-        width: 150,
+        width: 45,
+        className: 'timetable-day-column',
         render: (students) => (
-          <div className="time-slot" style={{ minHeight: '60px', padding: '4px' }}>
+          <div className="time-slot-compact">
             {students && students.length > 0 ? (
               students.map((student, idx) => (
                 <Popover
                   key={idx}
                   title="课程详情"
                   content={
-                    <div>
+                    <div className="course-detail">
                       <div><strong>学员：</strong>{student.studentName}</div>
                       <div><strong>科目：</strong>{student.subject || '未指定'}</div>
                       <div><strong>时间：</strong>{student.startTime} - {student.endTime}</div>
                       {student.note && <div><strong>备注：</strong>{student.note}</div>}
                     </div>
                   }
-                  trigger="hover"
+                  trigger="click"
+                  placement="top"
                 >
-                  <Tag 
-                    color="blue" 
-                    style={{ 
-                      marginBottom: '2px',
-                      cursor: 'pointer',
-                      maxWidth: '100%',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      display: 'block'
-                    }}
-                  >
-                    {student.studentName}
-                  </Tag>
+                  <div className="student-tag-compact">
+                    {student.studentName.length > 3 ? 
+                      student.studentName.substring(0, 3) : 
+                      student.studentName
+                    }
+                  </div>
                 </Popover>
               ))
             ) : null}
@@ -202,55 +203,59 @@ const ViewTimetable = ({ user }) => {
 
   return (
     <div className="content-container">
-      <div style={{ marginBottom: 24 }}>
+      <div className="timetable-top-header">
         <Button 
           icon={<ArrowLeftOutlined />} 
           onClick={() => navigate('/dashboard')}
-          style={{ marginRight: 16 }}
-        >
-          返回
-        </Button>
-        <h1 className="page-title" style={{ display: 'inline' }}>
+          className="back-icon-button"
+          size="large"
+          style={{ marginRight: '16px' }}
+        />
+        <h1 className="timetable-main-title" style={{ textAlign: 'center', flex: 1 }}>
           {timetable?.name}
         </h1>
+        <Button 
+          type="primary" 
+          icon={<EditOutlined />}
+          onClick={() => navigate(`/input-timetable/${timetableId}`)}
+          className="edit-top-button"
+          size="small"
+        >
+          录入课程
+        </Button>
       </div>
 
       <Card 
+        className="timetable-view-card"
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card-header-simple">
             <Space>
               <CalendarOutlined />
               <span>课表详情</span>
               {!timetable?.isWeekly && (
-                <span style={{ fontSize: '14px', color: '#666' }}>
+                <span className="week-info">
                   第 {currentWeek} 周 / 共 {totalWeeks} 周
                 </span>
               )}
             </Space>
-            <Button 
-              type="primary" 
-              icon={<EditOutlined />}
-              onClick={() => navigate(`/input-timetable/${timetableId}`)}
-            >
-              录入课程
-            </Button>
           </div>
         }
       >
-        <div className="timetable-container">
+        <div className="compact-timetable-container">
           <Table
             columns={generateColumns()}
             dataSource={generateTableData()}
             pagination={false}
             loading={loading}
-            scroll={{ x: 1000 }}
-            size="middle"
+            size="small"
             bordered
+            className="compact-timetable"
+            scroll={{ x: 'max-content' }}
           />
         </div>
 
         {!timetable?.isWeekly && totalWeeks > 1 && (
-          <div style={{ marginTop: 24, textAlign: 'center' }}>
+          <div className="week-pagination">
             <Pagination
               current={currentWeek}
               total={totalWeeks}
@@ -258,16 +263,17 @@ const ViewTimetable = ({ user }) => {
               onChange={handleWeekChange}
               showQuickJumper
               showTotal={(total, range) => `第 ${range[0]} 周，共 ${total} 周`}
+              size="small"
             />
           </div>
         )}
       </Card>
 
-      <Card style={{ marginTop: 24 }} title="说明">
-        <div style={{ color: '#666', fontSize: '14px' }}>
-          <div>• 点击学员姓名可查看课程详细信息</div>
-          <div>• {timetable?.isWeekly ? '这是周固定课表，每周重复' : '这是日期范围课表，可通过分页查看不同周次'}</div>
-          <div>• 如需添加或修改课程，请点击"录入课程"按钮</div>
+      <Card className="info-card" title="使用说明">
+        <div className="info-content">
+          <div>• 点击学员姓名查看课程详细信息</div>
+          <div>• {timetable?.isWeekly ? '周固定课表，每周重复' : '日期范围课表，可切换周次查看'}</div>
+          <div>• 点击"录入课程"添加或修改课程安排</div>
         </div>
       </Card>
     </div>
