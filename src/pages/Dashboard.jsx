@@ -41,17 +41,18 @@ const Dashboard = ({ user }) => {
   };
 
   return (
-    <div className="content-container">
+    <div className="content-container" style={{ maxWidth: '900px' }}>
       <div className="dashboard-header">
-        <h1 className="page-title">我的课表</h1>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          size="large"
+        <h1 className="page-title" style={{ marginLeft: '36px' }}>我的课表</h1>
+        <Button
+          type="link"
+          icon={<PlusOutlined />}
           onClick={handleCreateTimetable}
-          className="create-button"
+          style={{ textDecoration: 'none' }}
+          onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+          onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
         >
-          <span className="create-button-text">创建新课表</span>
+          创建课表
         </Button>
       </div>
 
@@ -80,35 +81,37 @@ const Dashboard = ({ user }) => {
                 className="timetable-item"
                 style={{ marginBottom: '16px' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '16px' }}>
+                  <Avatar
+                    size="large"
+                    icon={<CalendarOutlined />}
+                    style={{ backgroundColor: item.isWeekly ? '#1890ff' : '#52c41a' }}
+                  />
                   <div style={{ flex: 1 }}>
-                    <List.Item.Meta
-                      avatar={<Avatar size="small" icon={<CalendarOutlined />} className="timetable-avatar" />}
-                      title={<div className="timetable-title" style={{ fontSize: '14px', marginBottom: '0' }}>{item.name}</div>}
-                      description={
-                        <div className="timetable-description" style={{ fontSize: '12px', lineHeight: '1.2' }}>
-                          <div className="timetable-type">类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}</div>
-                          {!item.isWeekly && item.startDate && item.endDate && (
-                            <div className="timetable-time" style={{ whiteSpace: 'nowrap' }}>时间: {item.startDate} 至 {item.endDate}</div>
-                          )}
-                          <div className="timetable-created">创建时间: {new Date(item.createdAt).toLocaleDateString()}</div>
-                        </div>
-                      }
-                    />
+                    <div className="timetable-title" style={{ fontSize: '14px', marginBottom: '4px' }}>{item.name}</div>
+                    <div className="timetable-description" style={{ fontSize: '12px', lineHeight: '1.4' }}>
+                      <div className="timetable-type">类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}</div>
+                      {!item.isWeekly && item.startDate && item.endDate && (
+                        <div className="timetable-time" style={{ whiteSpace: 'nowrap' }}>时间: {item.startDate} 至 {item.endDate}</div>
+                      )}
+                      <div className="timetable-created">创建时间: {new Date(item.createdAt).toLocaleDateString()}</div>
+                    </div>
                   </div>
-                  <div>
-                    <Button 
-                      type="text" 
-                      icon={<EditOutlined />}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <Button
+                      type="text"
                       onClick={() => handleInputTimetable(item.id)}
-                      className="action-button"
-                    />
-                    <Button 
-                      type="text" 
-                      icon={<EyeOutlined />}
+                      style={{ color: '#237804' }}
+                    >
+                      录入课表
+                    </Button>
+                    <Button
+                      type="text"
                       onClick={() => handleViewTimetable(item.id)}
-                      className="action-button"
-                    />
+                      style={{ color: '#ad6800' }}
+                    >
+                      查看课表
+                    </Button>
                   </div>
                 </div>
               </List.Item>

@@ -54,19 +54,8 @@ const CreateTimetable = ({ user }) => {
         <Col xs={24} sm={20} md={16} lg={12} xl={10}>
           <Card
             title={
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                <Button
-                  icon={<ArrowLeftOutlined />}
-                  onClick={handleBack}
-                  style={{ position: 'absolute', left: 0 }}
-                  type="text"
-                >
-                  返回
-                </Button>
-                <span>
-                  <CalendarOutlined style={{ marginRight: 8 }} />
-                  创建课表
-                </span>
+              <div style={{ textAlign: 'center' }}>
+                创建课表
               </div>
             }
           >
@@ -117,15 +106,27 @@ const CreateTimetable = ({ user }) => {
 
               <div style={{ marginTop: 32 }}>
                 <Form.Item>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={loading}
-                    block
-                    size="large"
-                  >
-                    创建课表
-                  </Button>
+                  <div style={{ display: 'flex', gap: '16px' }}>
+                    <Button
+                      type="default"
+                      danger
+                      onClick={handleBack}
+                      size="large"
+                      style={{ flex: 1 }}
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={loading}
+                      block
+                      size="large"
+                      style={{ flex: 1 }}
+                    >
+                      创建
+                    </Button>
+                  </div>
                 </Form.Item>
               </div>
             </Form>
@@ -139,8 +140,8 @@ const CreateTimetable = ({ user }) => {
               color: '#666'
             }}>
               <div style={{ fontWeight: 'bold', marginBottom: 8 }}>📝 说明：</div>
-              <div>• <strong>周固定课表：</strong>适用于每周重复的固定课程安排</div>
-              <div>• <strong>日期范围课表：</strong>适用于有明确开始和结束时间的课程安排</div>
+              <div><strong>周固定课表：</strong>适用于每周重复的固定课程安排</div>
+              <div><strong>日期范围课表：</strong>适用于有开始和结束时间的课程安排</div>
             </div>
           </Card>
         </Col>

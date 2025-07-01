@@ -3,6 +3,7 @@ import { Form, Input, Button, Card, message, Divider } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { login } from '../services/auth';
+import logo from '../assets/logo.png';
 
 const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
@@ -38,10 +39,10 @@ const Login = ({ onLogin }) => {
         title={
           <div style={{ textAlign: 'center' }}>
             <img 
-              src="/logo.png" 
+              src={logo} 
               alt="飓风乒乓培训" 
               style={{
-                height: '160px',
+                height: '60px',
                 maxWidth: '560px',
                 objectFit: 'contain',
                 marginBottom: '0px'
@@ -58,7 +59,7 @@ const Login = ({ onLogin }) => {
           </div>
         }
         style={{ width: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-        headStyle={{ textAlign: 'center', padding: '32px 24px 8px' }}
+        headStyle={{ textAlign: 'center', padding: '16px 24px 8px' }}
       >
         <Form
           name="login"

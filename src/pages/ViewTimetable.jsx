@@ -203,16 +203,10 @@ const ViewTimetable = ({ user }) => {
 
   return (
     <div className="content-container">
-      <Card 
+      <Card
         className="timetable-view-card"
         title={
           <div className="card-header-simple" style={{ display: 'flex', alignItems: 'center' }}>
-            <Button
-              type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate(-1)}
-              style={{ marginRight: '16px' }}
-            />
             <Space>
               <CalendarOutlined />
               <span>{timetable?.name}</span>
@@ -225,15 +219,19 @@ const ViewTimetable = ({ user }) => {
           </div>
         }
         extra={
-          <Button
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => navigate(`/input-timetable/${timetableId}`)}
-            size="small"
-          >
-            录入课程
-          </Button>
+          <Space>
+            <Button
+              type="link"
+              onClick={() => navigate('/dashboard')}
+              style={{ textDecoration: 'none' }}
+              onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+              onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+            >
+              返回
+            </Button>
+          </Space>
         }
+        headStyle={{ borderBottom: 'none' }}
         bodyStyle={{ padding: 0 }}
       >
         <div className="compact-timetable-container">

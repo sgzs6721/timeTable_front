@@ -161,18 +161,29 @@ const InputTimetable = ({ user }) => {
         value={textInput}
         onChange={(e) => setTextInput(e.target.value)}
       />
-      <Button
-        type="primary"
-        icon={<SendOutlined />}
-        className="text-submit-button"
-        size="large"
-        loading={submitting}
-        onClick={submitTextInput}
-        disabled={submitting}
-        style={{ width: '100%', display: 'block', marginTop: '16px' }}
-      >
-        提交
-      </Button>
+      <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
+        <Button
+          type="default"
+          danger
+          onClick={() => navigate('/dashboard')}
+          size="large"
+          style={{ flex: 1 }}
+        >
+          返回
+        </Button>
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          className="text-submit-button"
+          size="large"
+          loading={submitting}
+          onClick={submitTextInput}
+          disabled={submitting}
+          style={{ flex: 1 }}
+        >
+          提交
+        </Button>
+      </div>
     </div>
   );
 
@@ -229,27 +240,34 @@ const InputTimetable = ({ user }) => {
   }
 
   return (
-    <Card
-      title={<div style={{ textAlign: 'center' }}>{timetable?.name}</div>}
-      extra={
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/dashboard')}
-          className="back-icon-button"
-          size="large"
-          style={{ marginRight: 'auto' }}
-        />
-      }
-    >
-      <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
-        <Tabs.TabPane tab="文字录入" key="text">
-          {textTabContent}
-        </Tabs.TabPane>
-        <Tabs.TabPane tab={<span style={{ color: '#ccc' }}>语音录入 <AudioOutlined />（开发中）</span>} key="voice" disabled>
-          {voiceTabContent}
-        </Tabs.TabPane>
-      </Tabs>
-    </Card>
+    <div className="content-container" style={{ maxWidth: '900px' }}>
+      <div 
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'center',
+          alignItems: 'center', 
+          marginBottom: '24px'
+        }}
+      >
+        <Typography.Title 
+          level={4} 
+          style={{ margin: 0 }}
+        >
+          {timetable?.name}
+        </Typography.Title>
+      </div>
+      
+      <Card>
+        <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
+          <Tabs.TabPane tab="文字录入" key="text">
+            {textTabContent}
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={<span style={{ color: '#ccc' }}>语音录入 <AudioOutlined />（开发中）</span>} key="voice" disabled>
+            {voiceTabContent}
+          </Tabs.TabPane>
+        </Tabs>
+      </Card>
+    </div>
   );
 };
 
