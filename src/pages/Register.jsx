@@ -3,6 +3,7 @@ import { Form, Input, Button, Card, message, Divider } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { register } from '../services/auth';
+import logo from '../assets/logo.png';
 
 const Register = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
@@ -31,12 +32,34 @@ const Register = ({ onLogin }) => {
       justifyContent: 'center', 
       alignItems: 'center', 
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '24px'
     }}>
       <Card 
-        title="用户注册" 
-        style={{ width: 400, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-        headStyle={{ textAlign: 'center', fontSize: '24px', fontWeight: 'bold' }}
+        title={
+          <div style={{ textAlign: 'center' }}>
+            <img 
+              src={logo} 
+              alt="飓风乒乓培训" 
+              style={{
+                height: '60px',
+                maxWidth: '560px',
+                objectFit: 'contain',
+                marginBottom: '0px'
+              }}
+            />
+            <div style={{
+              fontSize: '22px',
+              fontWeight: 'bold',
+              color: '#262626',
+              marginTop: '4px'
+            }}>
+              新用户注册
+            </div>
+          </div>
+        }
+        style={{ width: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+        headStyle={{ textAlign: 'center', padding: '16px 24px 8px' }}
       >
         <Form
           name="register"
