@@ -78,7 +78,7 @@ const Dashboard = ({ user }) => {
             renderItem={(item) => (
               <List.Item
                 className="timetable-item"
-                style={{ paddingTop: '0px', paddingBottom: '0px' }}
+                style={{ marginBottom: '16px' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                   <div style={{ flex: 1 }}>
