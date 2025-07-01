@@ -18,7 +18,7 @@ const CreateTimetable = ({ user }) => {
     try {
       const timetableData = {
         name: values.name,
-        isWeekly: values.isWeekly || false,
+        type: values.isWeekly ? 'WEEKLY' : 'DATE_RANGE',
         startDate: values.isWeekly ? null : values.dateRange?.[0]?.format('YYYY-MM-DD'),
         endDate: values.isWeekly ? null : values.dateRange?.[1]?.format('YYYY-MM-DD'),
       };
