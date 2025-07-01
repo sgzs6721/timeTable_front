@@ -82,19 +82,27 @@ const Dashboard = ({ user }) => {
                 style={{ marginBottom: '16px' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '16px' }}>
-                  <Avatar
-                    size="large"
-                    icon={<CalendarOutlined />}
-                    style={{ backgroundColor: item.isWeekly ? '#1890ff' : '#52c41a' }}
-                  />
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: item.isWeekly
+                        ? 'linear-gradient(135deg, #40a9ff 0%, #1890ff 100%)'
+                        : 'linear-gradient(135deg, #73d13d 0%, #52c41a 100%)'
+                    }}
+                  >
+                    <CalendarOutlined style={{ fontSize: '20px', color: '#fff' }} />
+                  </div>
                   <div style={{ flex: 1 }}>
                     <div className="timetable-title" style={{ fontSize: '14px', marginBottom: '4px' }}>{item.name}</div>
-                    <div className="timetable-description" style={{ fontSize: '12px', lineHeight: '1.4' }}>
-                      <div className="timetable-type">类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}</div>
-                      {!item.isWeekly && item.startDate && item.endDate && (
-                        <div className="timetable-time" style={{ whiteSpace: 'nowrap' }}>时间: {item.startDate} 至 {item.endDate}</div>
-                      )}
-                      <div className="timetable-created">创建时间: {new Date(item.createdAt).toLocaleDateString()}</div>
+                    <div className="timetable-description" style={{ fontSize: '12px', color: '#888' }}>
+                      类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}<br />
+                      {!item.isWeekly && `时间: ${item.startDate} 至 ${item.endDate}`}<br />
+                      创建时间: {new Date(item.createdAt).toLocaleDateString()}
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
