@@ -50,24 +50,23 @@ const CreateTimetable = ({ user }) => {
 
   return (
     <div className="content-container">
-      <div style={{ marginBottom: 24 }}>
-        <Button 
-          icon={<ArrowLeftOutlined />} 
-          onClick={handleBack}
-          style={{ marginRight: 16 }}
-        >
-          返回
-        </Button>
-        <h1 className="page-title" style={{ display: 'inline' }}>创建新课表</h1>
-      </div>
-
       <Row justify="center">
         <Col xs={24} sm={20} md={16} lg={12} xl={10}>
-          <Card 
+          <Card
             title={
-              <div style={{ textAlign: 'center' }}>
-                <CalendarOutlined style={{ marginRight: 8 }} />
-                课表信息
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                <Button
+                  icon={<ArrowLeftOutlined />}
+                  onClick={handleBack}
+                  style={{ position: 'absolute', left: 0 }}
+                  type="text"
+                >
+                  返回
+                </Button>
+                <span>
+                  <CalendarOutlined style={{ marginRight: 8 }} />
+                  创建课表
+                </span>
               </div>
             }
           >
