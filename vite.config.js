@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 // 定义API主机常量
 const LOCAL_API_HOST = 'http://localhost:8088';
 const REMOTE_API_HOST = 'http://timetable.devtesting.top'; // 可根据实际情况修改
+// 开发环境使用远程服务器
+const CURRENT_API_HOST = REMOTE_API_HOST;
 
 // 配置代理日志记录函数
 const configureProxyLogs = (proxy) => {
@@ -39,13 +41,13 @@ export default defineConfig({
     cors: true,
     proxy: {
       '/api': {
-        target: LOCAL_API_HOST,
+        target: CURRENT_API_HOST,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
         configure: configureProxyLogs
       },
       '/timetable/api': {
-        target: LOCAL_API_HOST,
+        target: CURRENT_API_HOST,
         changeOrigin: true,
         secure: false,
         configure: configureProxyLogs

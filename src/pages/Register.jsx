@@ -60,13 +60,12 @@ const Register = ({ onLogin }) => {
           <Form.Item
             name="email"
             rules={[
-              { required: true, message: '请输入邮箱!' },
               { type: 'email', message: '请输入有效的邮箱地址!' }
             ]}
           >
             <Input 
               prefix={<MailOutlined />} 
-              placeholder="邮箱" 
+              placeholder="邮箱（选填）" 
             />
           </Form.Item>
 

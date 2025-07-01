@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Divider, Space, Alert } from 'antd';
-import { UserOutlined, LockOutlined, BugOutlined, CrownOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, message, Divider } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { login, loginWithTestAccount, loginWithAdminTestAccount } from '../services/auth';
+import { login } from '../services/auth';
 
 const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
-  const [adminTestLoading, setAdminTestLoading] = useState(false);
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -24,40 +22,6 @@ const Login = ({ onLogin }) => {
       message.error('登录失败，请检查网络连接');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // 测试账号登录
-  const handleTestLogin = async () => {
-    setTestLoading(true);
-    try {
-      const response = await loginWithTestAccount();
-      if (response.success) {
-        localStorage.setItem('token', response.data.token);
-        onLogin(response.data.user);
-        message.success(response.message);
-      }
-    } catch (error) {
-      message.error('测试账号登录失败');
-    } finally {
-      setTestLoading(false);
-    }
-  };
-
-  // 管理员测试账号登录
-  const handleAdminTestLogin = async () => {
-    setAdminTestLoading(true);
-    try {
-      const response = await loginWithAdminTestAccount();
-      if (response.success) {
-        localStorage.setItem('token', response.data.token);
-        onLogin(response.data.user);
-        message.success(response.message);
-      }
-    } catch (error) {
-      message.error('管理员测试账号登录失败');
-    } finally {
-      setAdminTestLoading(false);
     }
   };
 
@@ -132,41 +96,6 @@ const Login = ({ onLogin }) => {
               登录
             </Button>
           </Form.Item>
-
-          <Divider>开发测试</Divider>
-          
-          <Alert
-            message="开发调试模式"
-            description="以下测试账号仅用于前端开发调试，后端联调完成后将删除"
-            type="info"
-            showIcon
-            style={{ marginBottom: 16, fontSize: '12px' }}
-          />
-
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Button 
-              icon={<BugOutlined />}
-              loading={testLoading}
-              onClick={handleTestLogin}
-              block
-              size="large"
-              style={{ height: '40px' }}
-            >
-              使用普通测试账号登录
-            </Button>
-            
-            <Button 
-              icon={<CrownOutlined />}
-              loading={adminTestLoading}
-              onClick={handleAdminTestLogin}
-              block
-              size="large"
-              type="dashed"
-              style={{ height: '40px' }}
-            >
-              使用管理员测试账号登录
-            </Button>
-          </Space>
 
           <Divider>还没有账号？</Divider>
           
