@@ -78,38 +78,39 @@ const Dashboard = ({ user }) => {
             renderItem={(item) => (
               <List.Item
                 className="timetable-item"
-                actions={[
-                  <Button 
-                    type="text" 
-                    icon={<EditOutlined />}
-                    onClick={() => handleInputTimetable(item.id)}
-                    className="action-button"
-                  >
-                    <span className="action-text">录入</span>
-                  </Button>,
-                  <Button 
-                    type="text" 
-                    icon={<EyeOutlined />}
-                    onClick={() => handleViewTimetable(item.id)}
-                    className="action-button"
-                  >
-                    <span className="action-text">查看</span>
-                  </Button>,
-                ]}
+                style={{ paddingTop: '0px', paddingBottom: '0px' }}
               >
-                <List.Item.Meta
-                  avatar={<Avatar icon={<CalendarOutlined />} className="timetable-avatar" />}
-                  title={<div className="timetable-title">{item.name}</div>}
-                  description={
-                    <div className="timetable-description">
-                      <div className="timetable-type">类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}</div>
-                      {!item.isWeekly && item.startDate && item.endDate && (
-                        <div className="timetable-time">时间: {item.startDate} 至 {item.endDate}</div>
-                      )}
-                      <div className="timetable-created">创建时间: {new Date(item.createdAt).toLocaleDateString()}</div>
-                    </div>
-                  }
-                />
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  <div style={{ flex: 1 }}>
+                    <List.Item.Meta
+                      avatar={<Avatar size="small" icon={<CalendarOutlined />} className="timetable-avatar" />}
+                      title={<div className="timetable-title" style={{ fontSize: '14px', marginBottom: '0' }}>{item.name}</div>}
+                      description={
+                        <div className="timetable-description" style={{ fontSize: '12px', lineHeight: '1.2' }}>
+                          <div className="timetable-type">类型: {item.isWeekly ? '周固定课表' : '日期范围课表'}</div>
+                          {!item.isWeekly && item.startDate && item.endDate && (
+                            <div className="timetable-time" style={{ whiteSpace: 'nowrap' }}>时间: {item.startDate} 至 {item.endDate}</div>
+                          )}
+                          <div className="timetable-created">创建时间: {new Date(item.createdAt).toLocaleDateString()}</div>
+                        </div>
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Button 
+                      type="text" 
+                      icon={<EditOutlined />}
+                      onClick={() => handleInputTimetable(item.id)}
+                      className="action-button"
+                    />
+                    <Button 
+                      type="text" 
+                      icon={<EyeOutlined />}
+                      onClick={() => handleViewTimetable(item.id)}
+                      className="action-button"
+                    />
+                  </div>
+                </div>
               </List.Item>
             )}
           />

@@ -169,7 +169,7 @@ const InputTimetable = ({ user }) => {
         loading={submitting}
         onClick={submitTextInput}
         disabled={submitting}
-        style={{ marginTop: 16, width: '100%', display: 'block', margin: '0 auto' }}
+        style={{ width: '100%', display: 'block', marginTop: '16px' }}
       >
         提交
       </Button>

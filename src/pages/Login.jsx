@@ -31,7 +31,8 @@ const Login = ({ onLogin }) => {
       justifyContent: 'center', 
       alignItems: 'center', 
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '24px'
     }}>
       <Card 
         title={
@@ -43,21 +44,21 @@ const Login = ({ onLogin }) => {
                 height: '160px',
                 maxWidth: '560px',
                 objectFit: 'contain',
-                marginBottom: '12px'
+                marginBottom: '0px'
               }}
             />
             <div style={{
               fontSize: '22px',
               fontWeight: 'bold',
               color: '#262626',
-              marginTop: '12px'
+              marginTop: '4px'
             }}>
-              课程管理系统
+              课表管理系统
             </div>
           </div>
         }
         style={{ width: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-        headStyle={{ textAlign: 'center', padding: '32px 24px 20px' }}
+        headStyle={{ textAlign: 'center', padding: '32px 24px 8px' }}
       >
         <Form
           name="login"
@@ -97,7 +98,7 @@ const Login = ({ onLogin }) => {
             </Button>
           </Form.Item>
 
-          <Divider>还没有账号？</Divider>
+          <Divider style={{ margin: '12px 0' }}>还没有账号？</Divider>
           
           <div style={{ textAlign: 'center' }}>
             <Link to="/register">

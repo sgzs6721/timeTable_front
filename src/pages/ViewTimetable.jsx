@@ -261,14 +261,6 @@ const ViewTimetable = ({ user }) => {
           </div>
         )}
       </Card>
-
-      <Card className="info-card" title="使用说明">
-        <div className="info-content">
-          <div>• 点击学员姓名查看课程详细信息</div>
-          <div>• {timetable?.isWeekly ? '周固定课表，每周重复' : '日期范围课表，可切换周次查看'}</div>
-          <div>• 点击"录入课程"添加或修改课程安排</div>
-        </div>
-      </Card>
     </div>
   );
 };

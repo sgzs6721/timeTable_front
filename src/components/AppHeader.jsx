@@ -10,11 +10,11 @@ const AppHeader = ({ user, onLogout }) => {
   const location = useLocation();
 
   const menuItems = [
-    {
-      key: '/dashboard',
-      label: '首页',
-      icon: <HomeOutlined />,
-    },
+    // {
+    //   key: '/dashboard',
+    //   label: '首页',
+    //   icon: <HomeOutlined />,
+    // },
   ];
 
   if (user?.role === 'admin') {
@@ -25,19 +25,19 @@ const AppHeader = ({ user, onLogout }) => {
   }
 
   const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: '个人信息',
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: '设置',
-    },
-    {
-      type: 'divider',
-    },
+    // {
+    //   key: 'profile',
+    //   icon: <UserOutlined />,
+    //   label: '个人信息',
+    // },
+    // {
+    //   key: 'settings',
+    //   icon: <SettingOutlined />,
+    //   label: '设置',
+    // },
+    // {
+    //   type: 'divider',
+    // },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
@@ -55,6 +55,7 @@ const AppHeader = ({ user, onLogout }) => {
             alt="飓风乒乓培训" 
             className="logo-img"
             onClick={() => navigate('/dashboard')}
+            style={{ height: '270px' }}
           />
         </div>
         <div className="header-nav">
@@ -80,11 +81,11 @@ const AppHeader = ({ user, onLogout }) => {
               placement="bottomRight"
               trigger={['click']}
             >
-              <Button type="text" className="user-dropdown">
-                <Avatar size="small" icon={<UserOutlined />} />
-                <span className="username-text">
+              <Button type="text" className="user-dropdown" style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ marginRight: '8px' }}>
                   {user?.username}
                 </span>
+                <Avatar size="small" icon={<UserOutlined />} />
               </Button>
             </Dropdown>
           </div>
