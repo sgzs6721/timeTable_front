@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, message, Divider } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { register } from '../services/auth';
 
@@ -54,18 +54,6 @@ const Register = ({ onLogin }) => {
             <Input 
               prefix={<UserOutlined />} 
               placeholder="用户名" 
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="email"
-            rules={[
-              { type: 'email', message: '请输入有效的邮箱地址!' }
-            ]}
-          >
-            <Input 
-              prefix={<MailOutlined />} 
-              placeholder="邮箱（选填）" 
             />
           </Form.Item>
 
