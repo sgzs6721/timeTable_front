@@ -8,6 +8,7 @@ import CreateTimetable from './pages/CreateTimetable';
 import InputTimetable from './pages/InputTimetable';
 import ViewTimetable from './pages/ViewTimetable';
 import AdminPanel from './pages/AdminPanel';
+import ConfirmSchedulePage from './pages/ConfirmSchedulePage';
 import AppHeader from './components/AppHeader';
 import './App.css';
 
@@ -16,6 +17,7 @@ const { Content } = Layout;
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [textInputValue, setTextInputValue] = useState('');
 
   useEffect(() => {
     // 检查本地存储中是否有用户信息
@@ -72,11 +74,15 @@ function App() {
             />
             <Route 
               path="/input-timetable/:timetableId" 
-              element={user ? <InputTimetable user={user} /> : <Navigate to="/login" />} 
+              element={user ? <InputTimetable user={user} textInputValue={textInputValue} setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />} 
             />
             <Route 
               path="/view-timetable/:timetableId" 
               element={user ? <ViewTimetable user={user} /> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/timetables/:timetableId/confirm-schedule" 
+              element={user ? <ConfirmSchedulePage setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />} 
             />
             <Route 
               path="/admin" 

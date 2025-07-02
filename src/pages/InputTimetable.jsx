@@ -7,11 +7,10 @@ import { getTimetable, addScheduleByVoice, addScheduleByText } from '../services
 const { TextArea } = Input;
 const { Text } = Typography;
 
-const InputTimetable = ({ user }) => {
+const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   const [timetable, setTimetable] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const [textInput, setTextInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('text');
   const [recordingTime, setRecordingTime] = useState(0);
@@ -120,19 +119,19 @@ const InputTimetable = ({ user }) => {
   };
 
   const submitTextInput = async () => {
-    if (!textInput.trim()) {
+    if (!textInputValue.trim()) {
       message.warning('请输入课程安排信息');
       return;
     }
     
     setSubmitting(true);
     try {
-      const response = await addScheduleByText(timetableId, textInput.trim());
-      if (response.success) {
-        message.success('文字录入成功！课程已添加到课表中');
-        setTextInput('');
+      const response = await addScheduleByText(timetableId, textInputValue.trim());
+      if (response.success && response.data && response.data.length > 0) {
+        message.success('文本解析成功！请确认排课信息。');
+        navigate(`/timetables/${timetableId}/confirm-schedule`, { state: { data: response.data } });
       } else {
-        message.error(response.message || '文字处理失败');
+        message.error(response.message || '无法从文本中解析出有效的排课信息');
       }
     } catch (error) {
       message.error('文字录入失败，请重试');
@@ -158,8 +157,8 @@ const InputTimetable = ({ user }) => {
       />
       <TextArea
         rows={6}
-        value={textInput}
-        onChange={(e) => setTextInput(e.target.value)}
+        value={textInputValue}
+        onChange={(e) => setTextInputValue(e.target.value)}
       />
       <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
         <Button

@@ -43,6 +43,32 @@ export const getTimetableSchedules = async (timetableId, week = null) => {
   }
 };
 
+// 创建新排课
+export const createSchedule = async (timetableId, scheduleData) => {
+  try {
+    const response = await api.post(
+        `/timetables/${timetableId}/schedules`,
+        scheduleData
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 批量创建新排课
+export const createSchedulesBatch = async (timetableId, schedulesData) => {
+  try {
+    const response = await api.post(
+      `/timetables/${timetableId}/schedules/batch`,
+      schedulesData
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 通过语音输入课程安排
 export const addScheduleByVoice = async (timetableId, audioData) => {
   try {
