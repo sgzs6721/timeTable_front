@@ -136,31 +136,40 @@ const ViewTimetable = ({ user }) => {
         key: day.key,
         width: 45,
         className: 'timetable-day-column',
+        onCell: () => ({
+          style: { padding: '0px' }
+        }),
         render: (students) => (
-          <div className="time-slot-compact">
+          <div style={{
+            height: '100%',
+            minHeight: '48px',
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%'
+          }}>
             {students && students.length > 0 ? (
               students.map((student, idx) => (
-                <Popover
+                <div
                   key={idx}
-                  title="课程详情"
-                  content={
-                    <div className="course-detail">
-                      <div><strong>学员：</strong>{student.studentName}</div>
-                      <div><strong>科目：</strong>{student.subject || '未指定'}</div>
-                      <div><strong>时间：</strong>{student.startTime} - {student.endTime}</div>
-                      {student.note && <div><strong>备注：</strong>{student.note}</div>}
-                    </div>
-                  }
-                  trigger="click"
-                  placement="top"
+                  style={{
+                    backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#333',
+                    fontSize: '12px',
+                    wordBreak: 'break-word',
+                    lineHeight: '1.2',
+                    borderTop: idx > 0 ? '1px solid #fff' : 'none'
+                  }}
+                  title={`${student.studentName} - ${student.subject || '未指定'}\n时间: ${student.startTime.substring(0,5)}-${student.endTime.substring(0,5)}`}
                 >
-                  <div className="student-tag-compact">
-                    {student.studentName.length > 3 ? 
-                      student.studentName.substring(0, 3) : 
-                      student.studentName
-                    }
-                  </div>
-                </Popover>
+                  {student.studentName.length > 4 ? 
+                    student.studentName.substring(0, 3) + '…' : 
+                    student.studentName
+                  }
+                </div>
               ))
             ) : null}
           </div>
@@ -182,8 +191,8 @@ const ViewTimetable = ({ user }) => {
       weekDays.forEach((day) => {
         // 过滤出当前时间段和星期的课程
         const daySchedules = schedules.filter(schedule => {
-          const scheduleTime = `${schedule.startTime}-${schedule.endTime}`;
-          return schedule.dayOfWeek === day.key && scheduleTime === timeSlot;
+          const scheduleTime = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
+          return schedule.dayOfWeek.toLowerCase() === day.key && scheduleTime === timeSlot;
         });
 
         rowData[day.key] = daySchedules;
@@ -196,6 +205,18 @@ const ViewTimetable = ({ user }) => {
   const handleWeekChange = (week) => {
     setCurrentWeek(week);
   };
+
+  const colorPalette = [
+    '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF', 
+    '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC', 
+    '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
+  ];
+  
+  const studentColorMap = new Map();
+  const allStudentNames = [...new Set(schedules.map(s => s.studentName).filter(Boolean))];
+  allStudentNames.forEach((name, index) => {
+    studentColorMap.set(name, colorPalette[index % colorPalette.length]);
+  });
 
   if (loading && !timetable) {
     return <div>加载中...</div>;

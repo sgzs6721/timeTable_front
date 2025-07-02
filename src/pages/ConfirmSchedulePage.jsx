@@ -6,18 +6,18 @@ import { DeleteOutlined } from '@ant-design/icons';
 import './ConfirmSchedulePage.css';
 
 const ConfirmSchedulePage = ({ setTextInputValue }) => {
+  const [schedules, setSchedules] = useState([]);
+  const [loading, setLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { timetableId } = useParams();
-  const [schedules, setSchedules] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (location.state && location.state.data) {
       setSchedules(location.state.data);
     } else {
-      // 如果没有数据，可能直接访问了此页面，重定向回课表页
-      navigate(`/timetables/${timetableId}`);
+      // If no data, maybe direct access, redirect to the previous page or a safe default
+      navigate(`/input-timetable/${timetableId}`);
     }
   }, [location.state, navigate, timetableId]);
 
@@ -28,12 +28,16 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
   };
 
   const handleDelete = (index) => {
-    const newSchedules = [...schedules];
-    newSchedules.splice(index, 1);
+    const newSchedules = schedules.filter((_, i) => i !== index);
     setSchedules(newSchedules);
   };
 
   const handleConfirm = async () => {
+    if (schedules.length === 0) {
+      message.warn('没有可添加的排课信息。');
+      return;
+    }
+
     setLoading(true);
     try {
       const schedulesToCreate = schedules.map(schedule => {
@@ -41,9 +45,9 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
         return {
           studentName: schedule.studentName,
           dayOfWeek: schedule.dayOfWeek,
-          scheduleDate: schedule.date,
-          startTime: startTime,
-          endTime: endTime,
+          scheduleDate: schedule.date, // This can be null if not provided
+          startTime: startTime ? `${startTime}:00` : null,
+          endTime: endTime ? `${endTime}:00` : null,
           note: '通过文本识别创建',
         };
       });
@@ -53,7 +57,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
       if (response && response.success) {
         message.success('排课已成功添加！');
         setTextInputValue(''); // Clear the input in App.jsx
-        navigate(`/timetables/${timetableId}`);
+        navigate(`/view-timetable/${timetableId}`);
       } else {
         message.error(response.message || '创建排课失败，请检查后端返回。');
       }
@@ -104,6 +108,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
                 <td>
                   <input
                     type="text"
+                    placeholder="YYYY-MM-DD"
                     value={schedule.date || ''}
                     onChange={(e) => handleInputChange(index, 'date', e.target.value)}
                   />
