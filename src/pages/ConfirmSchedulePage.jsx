@@ -27,17 +27,14 @@ const formatDayOfWeekForDisplay = (dayOfWeek) => {
 const parseDayOfWeekFromInput = (input) => {
   if (!input) return null;
   const trimmedInput = input.trim();
-  // First, check our comprehensive map for all formats (numbers, Chinese chars)
   const mappedValue = dayOfWeekInputMap[trimmedInput] || dayOfWeekInputMap[trimmedInput.toUpperCase()];
   if (mappedValue) {
     return mappedValue;
   }
-  // If no match, it might be in the canonical format already (e.g., 'MONDAY')
   const upperInput = trimmedInput.toUpperCase();
   if (dayOfWeekMap[upperInput]) {
     return upperInput;
   }
-  // Return the original input, uppercased, as a last resort
   return upperInput;
 };
 
@@ -47,7 +44,7 @@ const formatDateForDisplay = (dateStr) => {
   if (dateParts.length === 3) {
     const month = parseInt(dateParts[1], 10);
     const day = parseInt(dateParts[2], 10);
-    return `${month}-${day}`;
+    return `${month}.${day}`;
   }
   return dateStr;
 };
@@ -99,7 +96,6 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
       }));
       setSchedules(formattedSchedules);
     } else {
-      // If no data, maybe direct access, redirect to the previous page or a safe default
       navigate(`/input-timetable/${timetableId}`);
     }
   }, [location.state, navigate, timetableId]);
@@ -139,7 +135,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
       
       if (response && response.success) {
         message.success('排课已成功添加！');
-        setTextInputValue(''); // Clear the input in App.jsx
+        setTextInputValue('');
         navigate(`/view-timetable/${timetableId}`);
       } else {
         message.error(response.message || '创建排课失败，请检查后端返回。');
@@ -153,7 +149,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
   };
 
   const handleCancel = () => {
-    navigate(-1); // Go back to the previous page to modify
+    navigate(-1);
   };
 
   return (
@@ -194,7 +190,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
                   <td>
                     <input
                       type="text"
-                      placeholder="YYYY-MM-DD"
+                      placeholder="M.D"
                       value={schedule.date || ''}
                       onChange={(e) => handleInputChange(index, 'date', e.target.value)}
                     />
@@ -237,4 +233,4 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
   );
 };
 
-export default ConfirmSchedulePage; 
+export default ConfirmSchedulePage;
