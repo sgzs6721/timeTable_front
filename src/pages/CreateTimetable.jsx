@@ -11,6 +11,7 @@ const CreateTimetable = ({ user }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [isWeekly, setIsWeekly] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const navigate = useNavigate();
 
   const datePickerWrapperRef = useRef(null);
@@ -86,15 +87,20 @@ const CreateTimetable = ({ user }) => {
 
   // 处理日期选择器打开事件
   const handleDatePickerOpenChange = (open) => {
+    setDatePickerOpen(open);
     if (open) {
-      // 在移动端，当日期选择器打开时，滚动到顶部并禁用页面滚动
+      // 在移动端，确保日期选择器可见
       if (window.innerWidth <= 768) {
-        document.body.style.overflow = 'hidden';
-        window.scrollTo(0, 0);
+        // 滚动到日期选择器位置，确保弹出层可见
+        setTimeout(() => {
+          if (datePickerWrapperRef.current) {
+            datePickerWrapperRef.current.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        }, 100);
       }
-    } else {
-      // 恢复页面滚动
-      document.body.style.overflow = 'auto';
     }
   };
 
@@ -151,19 +157,20 @@ const CreateTimetable = ({ user }) => {
                     { required: !isWeekly, message: '请选择课表的时间范围!' }
                   ]}
                 >
-                  <div ref={datePickerWrapperRef}>
+                  <div ref={datePickerWrapperRef} style={{ position: 'relative' }}>
                     <RangePicker
                       style={{ width: '100%' }}
                       placeholder={['开始日期', '结束日期']}
                       disabledDate={(current) => current && current < dayjs().startOf('day')}
-                      getPopupContainer={(trigger) => datePickerWrapperRef.current || trigger.ownerDocument.body}
+                      getPopupContainer={() => datePickerWrapperRef.current}
                       popupClassName="mobile-friendly-rangepicker"
                       inputReadOnly={true}
+                      open={datePickerOpen}
                       onOpenChange={handleDatePickerOpenChange}
                       dropdownStyle={{
-                        width: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%',
-                        minWidth: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%',
-                        maxWidth: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%'
+                        width: '100%',
+                        minWidth: '100%',
+                        maxWidth: '100%'
                       }}
                     />
                   </div>
