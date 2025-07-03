@@ -84,6 +84,20 @@ const CreateTimetable = ({ user }) => {
     }
   };
 
+  // 处理日期选择器打开事件
+  const handleDatePickerOpenChange = (open) => {
+    if (open) {
+      // 在移动端，当日期选择器打开时，滚动到顶部并禁用页面滚动
+      if (window.innerWidth <= 768) {
+        document.body.style.overflow = 'hidden';
+        window.scrollTo(0, 0);
+      }
+    } else {
+      // 恢复页面滚动
+      document.body.style.overflow = 'auto';
+    }
+  };
+
   const handleBack = () => {
     navigate('/dashboard');
   };
@@ -144,6 +158,8 @@ const CreateTimetable = ({ user }) => {
                       disabledDate={(current) => current && current < dayjs().startOf('day')}
                       getPopupContainer={(trigger) => datePickerWrapperRef.current || trigger.ownerDocument.body}
                       popupClassName="mobile-friendly-rangepicker"
+                      inputReadOnly={true}
+                      onOpenChange={handleDatePickerOpenChange}
                       dropdownStyle={{
                         width: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%',
                         minWidth: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%',

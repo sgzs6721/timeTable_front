@@ -1058,6 +1058,29 @@ code {
   .mobile-friendly-rangepicker .ant-picker-date-panel {
     width: 100% !important;
   }
+
+  /* 移动端日期选择器弹出层优化 */
+  .mobile-friendly-rangepicker .ant-picker-dropdown {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 9999 !important;
+    max-height: 80vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* 添加遮罩层 */
+  .mobile-friendly-rangepicker .ant-picker-dropdown::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: -1;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1068,4 +1091,28 @@ code {
   .mobile-friendly-rangepicker .ant-picker-panel {
     width: 100% !important;
   }
+
+  /* 小屏幕设备的特殊处理 */
+  .mobile-friendly-rangepicker .ant-picker-dropdown {
+    position: fixed !important;
+    top: 10% !important;
+    left: 5% !important;
+    right: 5% !important;
+    width: 90% !important;
+    max-width: 90% !important;
+    transform: none !important;
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* 防止键盘弹出时的样式问题 */
+.mobile-friendly-rangepicker input {
+  caret-color: transparent !important;
+  cursor: pointer !important;
+}
+
+.mobile-friendly-rangepicker input:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px #1890ff40 !important;
 }
