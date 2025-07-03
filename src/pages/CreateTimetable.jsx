@@ -1,5 +1,5 @@
 import React, { useState, useLayoutEffect, useRef } from 'react';
-import { Card, Form, Input, Switch, DatePicker, Button, message, Row, Col } from 'antd';
+import { Card, Form, Input, Switch, DatePicker, Button, message, Row, Col, Modal } from 'antd';
 import { CalendarOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { createTimetable } from '../services/timetable';
@@ -7,11 +7,24 @@ import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
+// 检测是否为微信浏览器
+const isWeChatBrowser = () => {
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('micromessenger');
+};
+
+// 检测是否为移动端
+const isMobile = () => {
+  return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 const CreateTimetable = ({ user }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [isWeekly, setIsWeekly] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [tempDateRange, setTempDateRange] = useState(null);
   const navigate = useNavigate();
 
   const datePickerWrapperRef = useRef(null);
@@ -108,6 +121,42 @@ const CreateTimetable = ({ user }) => {
     navigate('/dashboard');
   };
 
+  // 处理日期选择（微信浏览器兼容）
+  const handleDateRangeClick = () => {
+    if (isWeChatBrowser() || isMobile()) {
+      setShowDateModal(true);
+    } else {
+      setDatePickerOpen(true);
+    }
+  };
+
+  // 处理模态框中的日期确认
+  const handleDateModalOk = () => {
+    if (tempDateRange && tempDateRange.length === 2) {
+      form.setFieldsValue({ dateRange: tempDateRange });
+    }
+    setShowDateModal(false);
+    setTempDateRange(null);
+  };
+
+  // 处理模态框取消
+  const handleDateModalCancel = () => {
+    setShowDateModal(false);
+    setTempDateRange(null);
+  };
+
+  // 处理原生日期输入
+  const handleNativeDateChange = (type, value) => {
+    const currentRange = form.getFieldValue('dateRange') || [null, null];
+    if (type === 'start') {
+      const newRange = [value ? dayjs(value) : null, currentRange[1]];
+      form.setFieldsValue({ dateRange: newRange });
+    } else {
+      const newRange = [currentRange[0], value ? dayjs(value) : null];
+      form.setFieldsValue({ dateRange: newRange });
+    }
+  };
+
   return (
     <div className="content-container">
       <Row justify="center">
@@ -157,23 +206,89 @@ const CreateTimetable = ({ user }) => {
                     { required: !isWeekly, message: '请选择课表的时间范围!' }
                   ]}
                 >
-                  <div ref={datePickerWrapperRef} style={{ position: 'relative' }}>
-                    <RangePicker
-                      style={{ width: '100%' }}
-                      placeholder={['开始日期', '结束日期']}
-                      disabledDate={(current) => current && current < dayjs().startOf('day')}
-                      getPopupContainer={() => datePickerWrapperRef.current}
-                      popupClassName="mobile-friendly-rangepicker"
-                      inputReadOnly={true}
-                      open={datePickerOpen}
-                      onOpenChange={handleDatePickerOpenChange}
-                      dropdownStyle={{
-                        width: '100%',
-                        minWidth: '100%',
-                        maxWidth: '100%'
-                      }}
-                    />
-                  </div>
+                  {isWeChatBrowser() ? (
+                    // 微信浏览器使用原生日期输入
+                    <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>开始日期</div>
+                          <input
+                            type="date"
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid #d9d9d9',
+                              borderRadius: '6px',
+                              fontSize: '14px'
+                            }}
+                            min={dayjs().format('YYYY-MM-DD')}
+                            onChange={(e) => handleNativeDateChange('start', e.target.value)}
+                            value={form.getFieldValue('dateRange')?.[0]?.format('YYYY-MM-DD') || ''}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>结束日期</div>
+                          <input
+                            type="date"
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid #d9d9d9',
+                              borderRadius: '6px',
+                              fontSize: '14px'
+                            }}
+                            min={form.getFieldValue('dateRange')?.[0]?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')}
+                            onChange={(e) => handleNativeDateChange('end', e.target.value)}
+                            value={form.getFieldValue('dateRange')?.[1]?.format('YYYY-MM-DD') || ''}
+                          />
+                        </div>
+                      </div>
+                      <div style={{
+                        padding: '8px 12px',
+                        background: '#f0f8ff',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        color: '#666'
+                      }}>
+                        💡 微信浏览器优化：使用原生日期选择器
+                      </div>
+                    </div>
+                  ) : isMobile() ? (
+                    // 其他移动端使用点击触发的方案
+                    <div>
+                      <Input
+                        placeholder="点击选择日期范围"
+                        readOnly
+                        onClick={handleDateRangeClick}
+                        value={
+                          form.getFieldValue('dateRange')
+                            ? `${form.getFieldValue('dateRange')[0]?.format('YYYY-MM-DD')} 至 ${form.getFieldValue('dateRange')[1]?.format('YYYY-MM-DD')}`
+                            : ''
+                        }
+                        suffix={<CalendarOutlined />}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </div>
+                  ) : (
+                    // 桌面端使用原来的 RangePicker
+                    <div ref={datePickerWrapperRef} style={{ position: 'relative' }}>
+                      <RangePicker
+                        style={{ width: '100%' }}
+                        placeholder={['开始日期', '结束日期']}
+                        disabledDate={(current) => current && current < dayjs().startOf('day')}
+                        getPopupContainer={() => datePickerWrapperRef.current}
+                        popupClassName="mobile-friendly-rangepicker"
+                        inputReadOnly={true}
+                        open={datePickerOpen}
+                        onOpenChange={handleDatePickerOpenChange}
+                        dropdownStyle={{
+                          width: '100%',
+                          minWidth: '100%',
+                          maxWidth: '100%'
+                        }}
+                      />
+                    </div>
+                  )}
                 </Form.Item>
               )}
 
@@ -219,6 +334,50 @@ const CreateTimetable = ({ user }) => {
           </Card>
         </Col>
       </Row>
+
+      {/* 微信浏览器兼容的日期选择模态框 */}
+      <Modal
+        title="选择课表时间范围"
+        open={showDateModal}
+        onOk={handleDateModalOk}
+        onCancel={handleDateModalCancel}
+        width="90%"
+        style={{ top: 20 }}
+        styles={{
+          body: {
+            padding: '20px',
+            maxHeight: '70vh',
+            overflowY: 'auto'
+          }
+        }}
+        okText="确定"
+        cancelText="取消"
+      >
+        <div style={{ padding: '10px 0' }}>
+          <RangePicker
+            style={{ width: '100%' }}
+            placeholder={['开始日期', '结束日期']}
+            disabledDate={(current) => current && current < dayjs().startOf('day')}
+            value={tempDateRange}
+            onChange={setTempDateRange}
+            size="large"
+            inputReadOnly={false}
+            getPopupContainer={(trigger) => trigger.parentNode}
+          />
+        </div>
+        <div style={{
+          marginTop: 16,
+          padding: 12,
+          background: '#f0f8ff',
+          borderRadius: 4,
+          fontSize: '12px',
+          color: '#666'
+        }}>
+          <div>💡 提示：请选择课表的开始日期和结束日期</div>
+          <div>• 开始日期不能早于今天</div>
+          <div>• 结束日期必须晚于开始日期</div>
+        </div>
+      </Modal>
     </div>
   );
 };
