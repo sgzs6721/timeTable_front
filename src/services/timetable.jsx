@@ -33,7 +33,7 @@ export const getTimetable = async (timetableId) => {
 // 获取课表的课程数据
 export const getTimetableSchedules = async (timetableId, week = null) => {
   try {
-    const url = week 
+    const url = week
       ? `/timetables/${timetableId}/schedules?week=${week}`
       : `/timetables/${timetableId}/schedules`;
     const response = await api.get(url);
@@ -56,11 +56,37 @@ export const createSchedule = async (timetableId, scheduleData) => {
   }
 };
 
+// 检查排课冲突
+export const checkScheduleConflicts = async (timetableId, schedulesData) => {
+  try {
+    const response = await api.post(
+      `/timetables/${timetableId}/schedules/batch/check-conflicts`,
+      schedulesData
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 批量创建新排课
 export const createSchedulesBatch = async (timetableId, schedulesData) => {
   try {
     const response = await api.post(
       `/timetables/${timetableId}/schedules/batch`,
+      schedulesData
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 强制批量创建新排课（忽略冲突）
+export const createSchedulesBatchForce = async (timetableId, schedulesData) => {
+  try {
+    const response = await api.post(
+      `/timetables/${timetableId}/schedules/batch/force`,
       schedulesData
     );
     return response;
@@ -75,7 +101,7 @@ export const addScheduleByVoice = async (timetableId, audioData, type) => {
     const formData = new FormData();
     formData.append('audio', audioData);
     formData.append('type', type);
-    
+
     const response = await api.post(
       `/timetables/${timetableId}/schedules/voice`,
       formData,
@@ -171,4 +197,4 @@ export const mergeTimetables = async (timetableIds, mergedName) => {
   } catch (error) {
     throw error;
   }
-}; 
+};
