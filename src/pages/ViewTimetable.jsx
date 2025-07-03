@@ -188,11 +188,22 @@ const ViewTimetable = ({ user }) => {
         time: timeSlot,
       };
 
-      weekDays.forEach((day) => {
+      weekDays.forEach((day, dayIndex) => {
         // 过滤出当前时间段和星期的课程
         const daySchedules = schedules.filter(schedule => {
           const scheduleTime = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
-          return schedule.dayOfWeek.toLowerCase() === day.key && scheduleTime === timeSlot;
+          if (scheduleTime !== timeSlot) return false;
+
+          if (timetable.isWeekly) {
+            // For weekly timetables, match by dayOfWeek
+            return schedule.dayOfWeek && schedule.dayOfWeek.toLowerCase() === day.key;
+          } else {
+            // For date-range timetables, match by the actual date
+            if (!schedule.scheduleDate) return false;
+            const scheduleDay = dayjs(schedule.scheduleDate).day(); // Sunday is 0, Monday is 1...
+            const targetDay = (dayIndex + 1) % 7; // Our weekDays array starts with Monday as 0. Let's align.
+            return scheduleDay === targetDay;
+          }
         });
 
         rowData[day.key] = daySchedules;

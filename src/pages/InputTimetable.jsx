@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Input, message, Tabs, Space, Typography, Alert, Spin } from 'antd';
+import { Card, Button, Input, message, Tabs, Space, Typography, Alert, Spin, Radio } from 'antd';
 import { AudioOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { getTimetable, addScheduleByVoice, addScheduleByText } from '../services/timetable';
+import { getTimetable, addScheduleByVoice, addScheduleByText, addScheduleByFormat } from '../services/timetable';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -14,6 +14,7 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('text');
+  const [parser, setParser] = useState('format'); // 'ai' or 'format'
   const [recordingTime, setRecordingTime] = useState(0);
   
   const mediaRecorderRef = useRef(null);
@@ -107,11 +108,12 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     setSubmitting(true);
     try {
       const type = timetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE';
+      // Voice input should probably always use AI parser, or you can add a switch for it too.
+      // For now, it defaults to 'ai' as per existing logic.
       const response = await addScheduleByVoice(timetableId, audioBlob, type);
       if (response.success) {
         message.success('语音录入成功！课程已添加到课表中');
         setRecordingTime(0);
-        // 可以在这里刷新课表或跳转到查看页面
       } else {
         message.error(response.message || '语音处理失败');
       }
@@ -131,7 +133,14 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     setSubmitting(true);
     try {
       const type = timetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE';
-      const response = await addScheduleByText(timetableId, textInputValue.trim(), type);
+      
+      let response;
+      if (parser === 'ai') {
+        response = await addScheduleByText(timetableId, textInputValue.trim(), type, parser);
+      } else {
+        response = await addScheduleByFormat(timetableId, textInputValue.trim(), type);
+      }
+
       if (response.success && response.data && response.data.length > 0) {
         message.success('文本解析成功！请确认排课信息。');
         navigate(`/timetables/${timetableId}/confirm-schedule`, { state: { data: response.data, timetableType: type } });
@@ -151,11 +160,31 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const aiDescription = "请选择录入时间（日期时间或星期时间），然后输入人名。系统会根据日期（星期）和时间将人名填入课表。";
+  const formatDescriptionWeekly = "格式解析说明 (周课表):\n姓名, 周一/周二至周五/二-五, 3-4/15:00~16:00/3(3点-4点)";
+  const formatDescriptionDateRange = "格式解析说明 (日期课表):\n姓名, 8月14日~8月16日/8.14-16, 3-4/15:00~16:00";
+
+  const description = parser === 'ai' 
+    ? aiDescription 
+    : timetable?.isWeekly ? formatDescriptionWeekly : formatDescriptionDateRange;
+
   const textTabContent = (
     <div style={{ padding: '20px 0' }}>
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <Typography.Text>解析模式:</Typography.Text>
+        <Radio.Group
+          onChange={(e) => setParser(e.target.value)}
+          value={parser}
+          buttonStyle="solid"
+        >
+          <Radio.Button value="format">格式解析</Radio.Button>
+          <Radio.Button value="ai" disabled>AI解析</Radio.Button>
+        </Radio.Group>
+      </div>
+
       <Alert
         message="录入说明"
-        description="请选择录入时间（日期时间或星期时间），然后输入人名。系统会根据日期（星期）和时间将人名填入课表。"
+        description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{description}</pre>}
         type="info"
         showIcon
         style={{ marginBottom: 24 }}

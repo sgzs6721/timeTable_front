@@ -92,11 +92,24 @@ export const addScheduleByVoice = async (timetableId, audioData, type) => {
 };
 
 // 通过文本输入课程安排
-export const addScheduleByText = async (timetableId, text, type) => {
+export const addScheduleByText = async (timetableId, text, type, parser = 'ai') => {
   try {
     const response = await api.post(
       `/timetables/${timetableId}/schedules/text`,
-      { text, type }
+      { text, type, parser }
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 通过格式化文本输入课程安排
+export const addScheduleByFormat = async (timetableId, text, type) => {
+  try {
+    const response = await api.post(
+      `/timetables/${timetableId}/schedules/format`,
+      { text, type, parser: 'format' }
     );
     return response;
   } catch (error) {
