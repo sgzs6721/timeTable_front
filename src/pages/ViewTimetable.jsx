@@ -5,12 +5,23 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule } from '../services/timetable';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import weekday from 'dayjs/plugin/weekday';
+import localeData from 'dayjs/plugin/localeData';
+
 dayjs.extend(isBetween);
+dayjs.extend(weekday);
+dayjs.extend(localeData);
+
+// 设置周一为一周的开始
+dayjs.locale({
+  ...dayjs.Ls.en,
+  weekStart: 1
+});
 
 const SchedulePopoverContent = ({ schedule, onDelete, timetable }) => (
   <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
     <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>学生:</strong> {schedule.studentName}</p>
-    
+
     {timetable.isWeekly ? (
       <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {schedule.dayOfWeek}</p>
     ) : (
@@ -20,10 +31,10 @@ const SchedulePopoverContent = ({ schedule, onDelete, timetable }) => (
     <p style={{ margin: '4px 0', textAlign: 'left' }}>
       <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
     </p>
-    <Button 
-      type="primary" 
-      danger 
-      onClick={onDelete} 
+    <Button
+      type="primary"
+      danger
+      onClick={onDelete}
       style={{ marginTop: '12px', alignSelf: 'center' }}
       size="small"
     >
@@ -39,7 +50,7 @@ const ViewTimetable = ({ user }) => {
   const [currentWeek, setCurrentWeek] = useState(1);
   const [totalWeeks, setTotalWeeks] = useState(1);
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
-  
+
   const navigate = useNavigate();
   const { timetableId } = useParams();
   const location = useLocation();
@@ -69,9 +80,9 @@ const ViewTimetable = ({ user }) => {
 
   useEffect(() => {
     if (timetable) {
-      fetchAllSchedules();
+      fetchSchedules();
     }
-  }, [timetable]);
+  }, [timetable, currentWeek]); // 添加currentWeek依赖，当周数变化时重新获取数据
 
   const fetchTimetable = async () => {
     try {
@@ -81,9 +92,14 @@ const ViewTimetable = ({ user }) => {
         setTimetable(timetableData);
         if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
           const start = dayjs(timetableData.startDate);
-          const firstDayOfFirstWeek = start.startOf('week').add(1, 'day');
           const end = dayjs(timetableData.endDate);
-          const weeks = Math.ceil(end.diff(firstDayOfFirstWeek, 'day') / 7);
+
+          // 找到起始日期所在周的周一（与后端逻辑一致）
+          const anchorMonday = start.startOf('week');
+
+          // 计算总周数
+          const totalDays = end.diff(anchorMonday, 'day') + 1;
+          const weeks = Math.ceil(totalDays / 7);
           setTotalWeeks(weeks > 0 ? weeks : 1);
         }
       } else {
@@ -96,10 +112,12 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
-  const fetchAllSchedules = async () => {
+  const fetchSchedules = async () => {
     setLoading(true);
     try {
-      const response = await getTimetableSchedules(timetableId);
+      // 对于日期范围课表，按周获取数据；对于周固定课表，获取所有数据
+      const week = timetable && !timetable.isWeekly ? currentWeek : null;
+      const response = await getTimetableSchedules(timetableId, week);
       if (response.success) {
         setAllSchedules(response.data);
       } else {
@@ -118,7 +136,7 @@ const ViewTimetable = ({ user }) => {
       if (response.success) {
         message.success('删除成功');
         setOpenPopoverKey(null);
-        fetchAllSchedules();
+        fetchSchedules();
       } else {
         message.error(response.message || '删除失败');
       }
@@ -130,37 +148,27 @@ const ViewTimetable = ({ user }) => {
   // Get the date range for the current week based on Monday as the first day
   const getCurrentWeekDates = () => {
     if (!timetable || timetable.isWeekly) return { start: null, end: null };
-    
+
     const startDate = dayjs(timetable.startDate);
-    const firstDayOfFirstWeek = startDate.startOf('week').add(1, 'day'); // Monday
-    const weekStart = firstDayOfFirstWeek.add(currentWeek - 1, 'week');
+
+    // 找到起始日期所在周的周一（与后端逻辑一致）
+    const anchorMonday = startDate.startOf('week');
+
+    // 计算当前周的开始和结束日期
+    const weekStart = anchorMonday.add(currentWeek - 1, 'week');
     const weekEnd = weekStart.add(6, 'day');
-    
+
     return { start: weekStart, end: weekEnd };
   };
 
-  // Memoize the calculation of current week's schedules
+  // 由于我们现在按周获取数据，所以直接使用allSchedules
   const currentWeekSchedules = useMemo(() => {
-    if (!timetable || allSchedules.length === 0) {
-      return [];
-    }
-
-    if (timetable.isWeekly) {
-      // For weekly timetables, filter by week_number if needed, or show all
-      return allSchedules.filter(s => s.weekNumber === null || s.weekNumber === currentWeek);
-    }
-
-    // For date-range timetables, filter by calculated date range
-    const { start, end } = getCurrentWeekDates();
-    return allSchedules.filter(schedule => {
-      const scheduleDate = dayjs(schedule.scheduleDate);
-      return scheduleDate.isBetween(start, end, 'day', '[]');
-    });
-  }, [allSchedules, currentWeek, timetable]);
+    return allSchedules || [];
+  }, [allSchedules]);
 
   const generateColumns = () => {
     const weekDates = getCurrentWeekDates();
-    
+
     const columns = [
       {
         title: '时间',
@@ -181,7 +189,7 @@ const ViewTimetable = ({ user }) => {
 
     weekDays.forEach((day, index) => {
       let title = day.label;
-      if (weekDates) {
+      if (weekDates && weekDates.start) {
         const currentDate = weekDates.start.add(index, 'day');
         title = (
           <div className="day-header">
@@ -284,7 +292,17 @@ const ViewTimetable = ({ user }) => {
 
     currentWeekSchedules.forEach(schedule => {
       const timeKey = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
-      const dayKey = timetable.isWeekly ? schedule.dayOfWeek.toLowerCase() : dayjs(schedule.scheduleDate).format('dddd').toLowerCase();
+
+      let dayKey;
+      if (timetable.isWeekly) {
+        dayKey = schedule.dayOfWeek.toLowerCase();
+      } else {
+        // 对于日期范围课表，根据日期计算星期几
+        const scheduleDate = dayjs(schedule.scheduleDate);
+        const dayIndex = scheduleDate.day(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        dayKey = dayNames[dayIndex];
+      }
 
       if (!groupedSchedules[timeKey]) {
         groupedSchedules[timeKey] = {};
@@ -317,11 +335,11 @@ const ViewTimetable = ({ user }) => {
   };
 
   const colorPalette = [
-    '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF', 
-    '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC', 
+    '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF',
+    '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC',
     '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
   ];
-  
+
   const studentColorMap = new Map();
   const allStudentNames = [...new Set(allSchedules.map(s => s.studentName).filter(Boolean))];
   allStudentNames.forEach((name, index) => {
@@ -394,4 +412,4 @@ const ViewTimetable = ({ user }) => {
   );
 };
 
-export default ViewTimetable; 
+export default ViewTimetable;
