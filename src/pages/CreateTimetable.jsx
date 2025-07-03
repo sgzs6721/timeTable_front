@@ -81,12 +81,37 @@ const CreateTimetable = ({ user }) => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
+      console.log('表单提交值:', values);
+      console.log('微信浏览器本地日期值:', nativeDateValues);
+
+      // 对于微信浏览器，如果表单中的dateRange为空，使用本地状态
+      let startDate = null;
+      let endDate = null;
+
+      if (!values.isWeekly) {
+        if (values.dateRange && values.dateRange[0] && values.dateRange[1]) {
+          // 表单中有正确的日期范围
+          startDate = values.dateRange[0].format('YYYY-MM-DD');
+          endDate = values.dateRange[1].format('YYYY-MM-DD');
+        } else if (isWeChatBrowser() && nativeDateValues.start && nativeDateValues.end) {
+          // 微信浏览器使用本地状态
+          startDate = nativeDateValues.start;
+          endDate = nativeDateValues.end;
+        } else {
+          message.error('请选择课表时间范围');
+          setLoading(false);
+          return;
+        }
+      }
+
       const timetableData = {
         name: values.name,
         type: values.isWeekly ? 'WEEKLY' : 'DATE_RANGE',
-        startDate: values.isWeekly ? null : values.dateRange?.[0]?.format('YYYY-MM-DD'),
-        endDate: values.isWeekly ? null : values.dateRange?.[1]?.format('YYYY-MM-DD'),
+        startDate,
+        endDate,
       };
+
+      console.log('发送的课表数据:', timetableData);
 
       const response = await createTimetable(timetableData);
       if (response.success) {
@@ -96,6 +121,7 @@ const CreateTimetable = ({ user }) => {
         message.error(response.message || '创建失败');
       }
     } catch (error) {
+      console.error('创建课表错误:', error);
       message.error('创建失败，请检查网络连接');
     } finally {
       setLoading(false);
@@ -230,7 +256,26 @@ const CreateTimetable = ({ user }) => {
                   name="dateRange"
                   label="课表时间范围"
                   rules={[
-                    { required: !isWeekly, message: '请选择课表的时间范围!' }
+                    {
+                      required: !isWeekly,
+                      validator: (_, value) => {
+                        if (isWeekly) return Promise.resolve();
+
+                        // 对于微信浏览器，检查本地状态
+                        if (isWeChatBrowser()) {
+                          if (nativeDateValues.start && nativeDateValues.end) {
+                            return Promise.resolve();
+                          }
+                          return Promise.reject(new Error('请选择课表的时间范围!'));
+                        }
+
+                        // 对于其他浏览器，检查表单值
+                        if (value && value.length === 2 && value[0] && value[1]) {
+                          return Promise.resolve();
+                        }
+                        return Promise.reject(new Error('请选择课表的时间范围!'));
+                      }
+                    }
                   ]}
                 >
                   {isWeChatBrowser() ? (
