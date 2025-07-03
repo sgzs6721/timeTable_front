@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, List, Avatar, message, Empty, Spin, Tag } from 'antd';
-import { PlusOutlined, CalendarOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
+import { Card, Button, List, Avatar, message, Empty, Spin, Tag, Modal } from 'antd';
+import { PlusOutlined, CalendarOutlined, EditOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables } from '../services/timetable';
+import { getTimetables, deleteTimetable } from '../services/timetable';
 
 const Dashboard = ({ user }) => {
   const [timetables, setTimetables] = useState([]);
@@ -38,6 +38,29 @@ const Dashboard = ({ user }) => {
 
   const handleViewTimetable = (timetableId) => {
     navigate(`/view-timetable/${timetableId}`);
+  };
+
+  const handleDeleteTimetable = (timetableId) => {
+    Modal.confirm({
+      title: '确定要删除这个课表吗？',
+      content: '删除后，所有相关的课程安排也会被永久删除，无法恢复。',
+      okText: '确定删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await deleteTimetable(timetableId);
+          if (response.success) {
+            message.success('课表删除成功');
+            fetchTimetables();
+          } else {
+            message.error(response.message || '删除失败');
+          }
+        } catch (error) {
+          message.error('删除失败，请检查网络连接');
+        }
+      },
+    });
   };
 
   return (
@@ -105,20 +128,28 @@ const Dashboard = ({ user }) => {
                       创建时间: {new Date(item.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <Button
                       type="text"
                       onClick={() => handleInputTimetable(item)}
-                      style={{ color: '#237804' }}
+                      style={{ color: '#237804', padding: '1px 0', margin: 0, height: 'auto' }}
                     >
                       录入课表
                     </Button>
                     <Button
                       type="text"
                       onClick={() => handleViewTimetable(item.id)}
-                      style={{ color: '#ad6800' }}
+                      style={{ color: '#ad6800', padding: '1px 0', margin: 0, height: 'auto' }}
                     >
                       查看课表
+                    </Button>
+                    <Button
+                      type="text"
+                      danger
+                      onClick={() => handleDeleteTimetable(item.id)}
+                      style={{ padding: '1px 0', margin: 0, height: 'auto' }}
+                    >
+                      删除课表
                     </Button>
                   </div>
                 </div>

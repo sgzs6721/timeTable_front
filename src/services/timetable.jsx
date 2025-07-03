@@ -117,6 +117,16 @@ export const addScheduleByFormat = async (timetableId, text, type) => {
   }
 };
 
+// 删除课表
+export const deleteTimetable = async (timetableId) => {
+  try {
+    const response = await api.delete(`/timetables/${timetableId}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 删除课程安排
 export const deleteSchedule = async (timetableId, scheduleId) => {
   try {
