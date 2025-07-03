@@ -70,10 +70,11 @@ export const createSchedulesBatch = async (timetableId, schedulesData) => {
 };
 
 // 通过语音输入课程安排
-export const addScheduleByVoice = async (timetableId, audioData) => {
+export const addScheduleByVoice = async (timetableId, audioData, type) => {
   try {
     const formData = new FormData();
     formData.append('audio', audioData);
+    formData.append('type', type);
     
     const response = await api.post(
       `/timetables/${timetableId}/schedules/voice`,
@@ -91,11 +92,11 @@ export const addScheduleByVoice = async (timetableId, audioData) => {
 };
 
 // 通过文本输入课程安排
-export const addScheduleByText = async (timetableId, textData) => {
+export const addScheduleByText = async (timetableId, text, type) => {
   try {
     const response = await api.post(
       `/timetables/${timetableId}/schedules/text`,
-      { text: textData }
+      { text, type }
     );
     return response;
   } catch (error) {

@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Input, message, Tabs, Space, Typography, Alert } from 'antd';
-import { AudioOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Card, Button, Input, message, Tabs, Space, Typography, Alert, Spin } from 'antd';
+import { AudioOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined, EditOutlined } from '@ant-design/icons';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getTimetable, addScheduleByVoice, addScheduleByText } from '../services/timetable';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 
 const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
-  const [timetable, setTimetable] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const [timetable, setTimetable] = useState(location.state?.timetable || null);
+  const [loading, setLoading] = useState(!location.state?.timetable);
   const [isRecording, setIsRecording] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('text');
@@ -23,7 +24,9 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   const { timetableId } = useParams();
 
   useEffect(() => {
-    fetchTimetable();
+    if (!timetable) {
+      fetchTimetable();
+    }
     setActiveTab('text'); // 默认选中文字录入
     return () => {
       // 清理定时器
@@ -103,7 +106,8 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   const submitVoiceInput = async (audioBlob) => {
     setSubmitting(true);
     try {
-      const response = await addScheduleByVoice(timetableId, audioBlob);
+      const type = timetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE';
+      const response = await addScheduleByVoice(timetableId, audioBlob, type);
       if (response.success) {
         message.success('语音录入成功！课程已添加到课表中');
         setRecordingTime(0);
@@ -126,10 +130,11 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     
     setSubmitting(true);
     try {
-      const response = await addScheduleByText(timetableId, textInputValue.trim());
+      const type = timetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE';
+      const response = await addScheduleByText(timetableId, textInputValue.trim(), type);
       if (response.success && response.data && response.data.length > 0) {
         message.success('文本解析成功！请确认排课信息。');
-        navigate(`/timetables/${timetableId}/confirm-schedule`, { state: { data: response.data } });
+        navigate(`/timetables/${timetableId}/confirm-schedule`, { state: { data: response.data, timetableType: type } });
       } else {
         message.error(response.message || '无法从文本中解析出有效的排课信息');
       }
@@ -235,33 +240,32 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   ];
 
   if (loading) {
-    return <div>加载中...</div>;
+    return (
+      <div className="loading-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" />
+      </div>
+    );
   }
 
   return (
     <div className="content-container" style={{ maxWidth: '900px' }}>
-      <div 
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'center',
-          alignItems: 'center', 
-          marginBottom: '24px'
-        }}
+      <Card
+        title={
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '12px' }}>
+            <h1 className="page-title" style={{ margin: 0, fontSize: '22px' }}>{timetable?.name}</h1>
+            {timetable && (
+              <Text type="secondary" style={{ fontSize: '14px', color: '#888', fontWeight: 400 }}>
+                {timetable.isWeekly ? '周固定课表' : '日期范围课表'}
+              </Text>
+            )}
+          </div>
+        }
       >
-        <Typography.Title 
-          level={4} 
-          style={{ margin: 0 }}
-        >
-          {timetable?.name}
-        </Typography.Title>
-      </div>
-      
-      <Card>
         <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
-          <Tabs.TabPane tab="文字录入" key="text">
+          <Tabs.TabPane tab={<span><EditOutlined /> 文字录入</span>} key="text">
             {textTabContent}
           </Tabs.TabPane>
-          <Tabs.TabPane tab={<span style={{ color: '#ccc' }}>语音录入 <AudioOutlined />（开发中）</span>} key="voice" disabled>
+          <Tabs.TabPane tab={<span style={{ color: '#ccc' }}> <AudioOutlined /> 语音录入 </span>} key="voice" disabled>
             {voiceTabContent}
           </Tabs.TabPane>
         </Tabs>

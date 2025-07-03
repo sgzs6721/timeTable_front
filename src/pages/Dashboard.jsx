@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, List, Avatar, message, Empty, Spin } from 'antd';
+import { Card, Button, List, Avatar, message, Empty, Spin, Tag } from 'antd';
 import { PlusOutlined, CalendarOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getTimetables } from '../services/timetable';
@@ -32,8 +32,8 @@ const Dashboard = ({ user }) => {
     navigate('/create-timetable');
   };
 
-  const handleInputTimetable = (timetableId) => {
-    navigate(`/input-timetable/${timetableId}`);
+  const handleInputTimetable = (timetable) => {
+    navigate(`/input-timetable/${timetable.id}`, { state: { timetable } });
   };
 
   const handleViewTimetable = (timetableId) => {
@@ -108,7 +108,7 @@ const Dashboard = ({ user }) => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <Button
                       type="text"
-                      onClick={() => handleInputTimetable(item.id)}
+                      onClick={() => handleInputTimetable(item)}
                       style={{ color: '#237804' }}
                     >
                       录入课表
