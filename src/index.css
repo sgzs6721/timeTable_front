@@ -987,7 +987,84 @@ code {
   line-height: 1.5;
 }
 
-/* Responsive styles for DatePicker RangePicker popup */
+/* Responsive styles for DatePicker popup */
+.mobile-friendly-datepicker .ant-picker-dropdown {
+  width: 100% !important;
+  min-width: 280px !important;
+  max-width: 100% !important;
+}
+
+/* 移动端DatePicker优化 */
+@media (max-width: 768px) {
+  .mobile-friendly-datepicker .ant-picker-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    z-index: 9999 !important;
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+    margin-top: 4px !important;
+    box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05) !important;
+  }
+}
+
+/* 小屏幕设备的DatePicker处理 */
+@media (max-width: 480px) {
+  .mobile-friendly-datepicker .ant-picker-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+    max-height: 50vh !important;
+    overflow-y: auto !important;
+    margin-top: 4px !important;
+  }
+}
+
+/* DatePicker输入框优化 */
+.mobile-friendly-datepicker input {
+  caret-color: transparent !important;
+  cursor: pointer !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+}
+
+.mobile-friendly-datepicker input:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px #1890ff40 !important;
+}
+
+/* DatePicker移动端触摸优化 */
+@media (max-width: 768px) {
+  .mobile-friendly-datepicker .ant-picker-cell {
+    padding: 8px 0 !important;
+    height: 40px !important;
+    line-height: 24px !important;
+  }
+
+  .mobile-friendly-datepicker .ant-picker-cell-inner {
+    min-height: 24px !important;
+    line-height: 24px !important;
+  }
+
+  .mobile-friendly-datepicker .ant-picker-header {
+    padding: 8px 12px !important;
+  }
+
+  .mobile-friendly-datepicker .ant-picker-header button {
+    min-height: 32px !important;
+    padding: 4px 8px !important;
+  }
+}
+
+/* 保留原有的RangePicker样式以防其他地方使用 */
 .mobile-friendly-rangepicker {
   width: var(--rangepicker-width, 100%) !important;
   min-width: var(--rangepicker-width, 100%) !important;
