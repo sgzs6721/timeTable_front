@@ -24,7 +24,6 @@ const CreateTimetable = ({ user }) => {
   const [isWeekly, setIsWeekly] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
-  const [tempDateRange, setTempDateRange] = useState(null);
   const navigate = useNavigate();
 
   const datePickerWrapperRef = useRef(null);
@@ -130,19 +129,17 @@ const CreateTimetable = ({ user }) => {
     }
   };
 
-  // 处理模态框中的日期确认
-  const handleDateModalOk = () => {
-    if (tempDateRange && tempDateRange.length === 2) {
-      form.setFieldsValue({ dateRange: tempDateRange });
+  // 处理模态框中的日期选择（直接填入，不需要确认）
+  const handleModalDateChange = (dates) => {
+    if (dates && dates.length === 2) {
+      form.setFieldsValue({ dateRange: dates });
+      setShowDateModal(false);
     }
-    setShowDateModal(false);
-    setTempDateRange(null);
   };
 
   // 处理模态框取消
   const handleDateModalCancel = () => {
     setShowDateModal(false);
-    setTempDateRange(null);
   };
 
   // 处理原生日期输入
@@ -250,7 +247,7 @@ const CreateTimetable = ({ user }) => {
                         fontSize: '12px',
                         color: '#666'
                       }}>
-                        💡 微信浏览器优化：使用原生日期选择器
+                        💡 微信浏览器优化：点击日期框直接选择
                       </div>
                     </div>
                   ) : isMobile() ? (
@@ -335,11 +332,10 @@ const CreateTimetable = ({ user }) => {
         </Col>
       </Row>
 
-      {/* 微信浏览器兼容的日期选择模态框 */}
+      {/* 移动端日期选择模态框 */}
       <Modal
         title="选择课表时间范围"
         open={showDateModal}
-        onOk={handleDateModalOk}
         onCancel={handleDateModalCancel}
         width="90%"
         style={{ top: 20 }}
@@ -350,19 +346,18 @@ const CreateTimetable = ({ user }) => {
             overflowY: 'auto'
           }
         }}
-        okText="确定"
-        cancelText="取消"
+        footer={null}
       >
         <div style={{ padding: '10px 0' }}>
           <RangePicker
             style={{ width: '100%' }}
             placeholder={['开始日期', '结束日期']}
             disabledDate={(current) => current && current < dayjs().startOf('day')}
-            value={tempDateRange}
-            onChange={setTempDateRange}
+            onChange={handleModalDateChange}
             size="large"
             inputReadOnly={false}
             getPopupContainer={(trigger) => trigger.parentNode}
+            autoFocus
           />
         </div>
         <div style={{
@@ -373,9 +368,9 @@ const CreateTimetable = ({ user }) => {
           fontSize: '12px',
           color: '#666'
         }}>
-          <div>💡 提示：请选择课表的开始日期和结束日期</div>
+          <div>💡 提示：选择日期范围后将自动填入</div>
           <div>• 开始日期不能早于今天</div>
-          <div>• 结束日期必须晚于开始日期</div>
+          <div>• 选择完成后会自动关闭</div>
         </div>
       </Modal>
     </div>
