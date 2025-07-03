@@ -120,9 +120,7 @@ export const addScheduleByFormat = async (timetableId, text, type) => {
 // 删除课程安排
 export const deleteSchedule = async (timetableId, scheduleId) => {
   try {
-    const response = await api.delete(
-      `/timetables/${timetableId}/schedules/${scheduleId}`
-    );
+    const response = await api.delete(`/timetables/${timetableId}/schedules/${scheduleId}`);
     return response;
   } catch (error) {
     throw error;

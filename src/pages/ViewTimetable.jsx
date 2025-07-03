@@ -1,9 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, message, Pagination, Space, Tag, Popover } from 'antd';
 import { ArrowLeftOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules } from '../services/timetable';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { getTimetable, getTimetableSchedules, deleteSchedule } from '../services/timetable';
 import dayjs from 'dayjs';
+
+const SchedulePopoverContent = ({ schedule, onDelete, timetable }) => (
+  <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
+    <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>学生:</strong> {schedule.studentName}</p>
+    
+    {timetable.isWeekly ? (
+      <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {schedule.dayOfWeek}</p>
+    ) : (
+      <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>日期:</strong> {schedule.scheduleDate}</p>
+    )}
+
+    <p style={{ margin: '4px 0', textAlign: 'left' }}>
+      <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
+    </p>
+    <Button 
+      type="primary" 
+      danger 
+      onClick={onDelete} 
+      style={{ marginTop: '12px', alignSelf: 'center' }}
+      size="small"
+    >
+      删除
+    </Button>
+  </div>
+);
 
 const ViewTimetable = ({ user }) => {
   const [timetable, setTimetable] = useState(null);
@@ -11,9 +36,11 @@ const ViewTimetable = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [totalWeeks, setTotalWeeks] = useState(1);
+  const [openPopoverKey, setOpenPopoverKey] = useState(null);
   
   const navigate = useNavigate();
   const { timetableId } = useParams();
+  const location = useLocation();
 
   // 时间段定义
   const timeSlots = [
@@ -83,6 +110,21 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
+  const handleDeleteSchedule = async (scheduleId) => {
+    try {
+      const response = await deleteSchedule(timetableId, scheduleId);
+      if (response.success) {
+        message.success('删除成功');
+        setOpenPopoverKey(null);
+        fetchSchedules(); // Refresh the view
+      } else {
+        message.error(response.message || '删除失败');
+      }
+    } catch (error) {
+      message.error('操作失败，请重试');
+    }
+  };
+
   // 获取当前周的日期范围
   const getCurrentWeekDates = () => {
     if (!timetable || timetable.isWeekly) return null;
@@ -139,41 +181,76 @@ const ViewTimetable = ({ user }) => {
         onCell: () => ({
           style: { padding: '0px' }
         }),
-        render: (students) => (
-          <div style={{
-            height: '100%',
-            minHeight: '48px',
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%'
-          }}>
-            {students && students.length > 0 ? (
-              students.map((student, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#333',
-                    fontSize: '12px',
-                    wordBreak: 'break-word',
-                    lineHeight: '1.2',
-                    borderTop: idx > 0 ? '1px solid #fff' : 'none'
-                  }}
-                  title={`${student.studentName} - ${student.subject || '未指定'}\n时间: ${student.startTime.substring(0,5)}-${student.endTime.substring(0,5)}`}
-                >
-                  {student.studentName.length > 4 ? 
-                    student.studentName.substring(0, 3) + '…' : 
-                    student.studentName
-                  }
+        render: (students, record) => {
+          if (!students || students.length === 0) {
+            return null;
+          }
+
+          const cellKey = `${day.key}-${record.key}`;
+
+          const handleOpenChange = (newOpen) => {
+            setOpenPopoverKey(newOpen ? cellKey : null);
+          };
+
+          const popoverContent = (
+            <div>
+              {students.map((student, idx) => (
+                <div key={student.id}>
+                  <SchedulePopoverContent
+                    schedule={student}
+                    onDelete={() => handleDeleteSchedule(student.id)}
+                    timetable={timetable}
+                  />
+                  {idx < students.length - 1 && <hr style={{ margin: '8px 0' }} />}
                 </div>
-              ))
-            ) : null}
-          </div>
-        ),
+              ))}
+            </div>
+          );
+
+          return (
+            <Popover
+              placement="rightTop"
+              title={null}
+              content={popoverContent}
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={handleOpenChange}
+            >
+              <div style={{
+                height: '100%',
+                minHeight: '48px',
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%',
+                cursor: 'pointer'
+              }}>
+                {students.map((student, idx) => (
+                  <div
+                    key={student.id}
+                    style={{
+                      backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#333',
+                      fontSize: '12px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.2',
+                      borderTop: idx > 0 ? '1px solid #fff' : 'none',
+                    }}
+                    title={`点击查看详情或删除`}
+                  >
+                    {student.studentName.length > 4 ?
+                      student.studentName.substring(0, 3) + '…' :
+                      student.studentName
+                    }
+                  </div>
+                ))}
+              </div>
+            </Popover>
+          );
+        },
       });
     });
 
