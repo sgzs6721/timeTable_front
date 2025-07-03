@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
 import { Card, Form, Input, Switch, DatePicker, Button, message, Row, Col } from 'antd';
 import { CalendarOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,46 @@ const CreateTimetable = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [isWeekly, setIsWeekly] = useState(false);
   const navigate = useNavigate();
+
+  const datePickerWrapperRef = useRef(null);
+  const [datePickerWidth, setDatePickerWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const updateWidth = () => {
+      if (datePickerWrapperRef.current) {
+        const width = datePickerWrapperRef.current.offsetWidth;
+        setDatePickerWidth(width);
+
+        // 动态设置CSS变量来控制弹出框宽度
+        document.documentElement.style.setProperty('--rangepicker-width', `${width}px`);
+
+        // 同时设置到body上，确保弹出框能够获取到
+        document.body.style.setProperty('--rangepicker-width', `${width}px`);
+      }
+    };
+
+    // 延迟执行以确保DOM完全渲染
+    const timer = setTimeout(updateWidth, 100);
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', updateWidth);
+
+    // 监听DOM变化，确保在表单项显示/隐藏时重新计算
+    const observer = new MutationObserver(updateWidth);
+    if (datePickerWrapperRef.current) {
+      observer.observe(datePickerWrapperRef.current, {
+        attributes: true,
+        childList: true,
+        subtree: true
+      });
+    }
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateWidth);
+      observer.disconnect();
+    };
+  }, [isWeekly]); // 添加isWeekly依赖，当切换时重新计算宽度
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -58,6 +98,7 @@ const CreateTimetable = ({ user }) => {
                 创建课表
               </div>
             }
+            styles={{ body: { overflow: 'visible' } }}
           >
             <Form
               form={form}
@@ -96,11 +137,20 @@ const CreateTimetable = ({ user }) => {
                     { required: !isWeekly, message: '请选择课表的时间范围!' }
                   ]}
                 >
-                  <RangePicker
-                    style={{ width: '100%' }}
-                    placeholder={['开始日期', '结束日期']}
-                    disabledDate={(current) => current && current < dayjs().startOf('day')}
-                  />
+                  <div ref={datePickerWrapperRef}>
+                    <RangePicker
+                      style={{ width: '100%' }}
+                      placeholder={['开始日期', '结束日期']}
+                      disabledDate={(current) => current && current < dayjs().startOf('day')}
+                      getPopupContainer={(trigger) => datePickerWrapperRef.current || trigger.ownerDocument.body}
+                      popupClassName="mobile-friendly-rangepicker"
+                      dropdownStyle={{
+                        width: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%',
+                        minWidth: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%',
+                        maxWidth: datePickerWidth > 0 ? `${datePickerWidth}px` : '100%'
+                      }}
+                    />
+                  </div>
                 </Form.Item>
               )}
 
@@ -131,10 +181,10 @@ const CreateTimetable = ({ user }) => {
               </div>
             </Form>
 
-            <div style={{ 
-              marginTop: 24, 
-              padding: 16, 
-              background: '#f6f8fa', 
+            <div style={{
+              marginTop: 24,
+              padding: 16,
+              background: '#f6f8fa',
               borderRadius: 6,
               fontSize: '13px',
               color: '#666'
@@ -150,4 +200,4 @@ const CreateTimetable = ({ user }) => {
   );
 };
 
-export default CreateTimetable; 
+export default CreateTimetable;

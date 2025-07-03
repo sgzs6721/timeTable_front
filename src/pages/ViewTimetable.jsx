@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Button, Table, message, Pagination, Space, Tag, Popover } from 'antd';
 import { ArrowLeftOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule } from '../services/timetable';
 import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+dayjs.extend(isBetween);
 
 const SchedulePopoverContent = ({ schedule, onDelete, timetable }) => (
   <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
@@ -32,7 +34,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, timetable }) => (
 
 const ViewTimetable = ({ user }) => {
   const [timetable, setTimetable] = useState(null);
-  const [schedules, setSchedules] = useState([]);
+  const [allSchedules, setAllSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [totalWeeks, setTotalWeeks] = useState(1);
@@ -67,21 +69,22 @@ const ViewTimetable = ({ user }) => {
 
   useEffect(() => {
     if (timetable) {
-      fetchSchedules();
+      fetchAllSchedules();
     }
-  }, [timetable, currentWeek]);
+  }, [timetable]);
 
   const fetchTimetable = async () => {
     try {
       const response = await getTimetable(timetableId);
       if (response.success) {
-        setTimetable(response.data);
-        // 计算总周数
-        if (!response.data.isWeekly && response.data.startDate && response.data.endDate) {
-          const start = dayjs(response.data.startDate);
-          const end = dayjs(response.data.endDate);
-          const weeks = Math.ceil(end.diff(start, 'day') / 7);
-          setTotalWeeks(weeks);
+        const timetableData = response.data;
+        setTimetable(timetableData);
+        if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
+          const start = dayjs(timetableData.startDate);
+          const firstDayOfFirstWeek = start.startOf('week').add(1, 'day');
+          const end = dayjs(timetableData.endDate);
+          const weeks = Math.ceil(end.diff(firstDayOfFirstWeek, 'day') / 7);
+          setTotalWeeks(weeks > 0 ? weeks : 1);
         }
       } else {
         message.error(response.message || '获取课表失败');
@@ -93,13 +96,12 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
-  const fetchSchedules = async () => {
+  const fetchAllSchedules = async () => {
     setLoading(true);
     try {
-      const week = timetable?.isWeekly ? null : currentWeek;
-      const response = await getTimetableSchedules(timetableId, week);
+      const response = await getTimetableSchedules(timetableId);
       if (response.success) {
-        setSchedules(response.data);
+        setAllSchedules(response.data);
       } else {
         message.error(response.message || '获取课程安排失败');
       }
@@ -116,7 +118,7 @@ const ViewTimetable = ({ user }) => {
       if (response.success) {
         message.success('删除成功');
         setOpenPopoverKey(null);
-        fetchSchedules(); // Refresh the view
+        fetchAllSchedules();
       } else {
         message.error(response.message || '删除失败');
       }
@@ -125,18 +127,37 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
-  // 获取当前周的日期范围
+  // Get the date range for the current week based on Monday as the first day
   const getCurrentWeekDates = () => {
-    if (!timetable || timetable.isWeekly) return null;
+    if (!timetable || timetable.isWeekly) return { start: null, end: null };
     
     const startDate = dayjs(timetable.startDate);
-    const weekStart = startDate.add((currentWeek - 1) * 7, 'day');
+    const firstDayOfFirstWeek = startDate.startOf('week').add(1, 'day'); // Monday
+    const weekStart = firstDayOfFirstWeek.add(currentWeek - 1, 'week');
     const weekEnd = weekStart.add(6, 'day');
     
     return { start: weekStart, end: weekEnd };
   };
 
-  // 生成表格列
+  // Memoize the calculation of current week's schedules
+  const currentWeekSchedules = useMemo(() => {
+    if (!timetable || allSchedules.length === 0) {
+      return [];
+    }
+
+    if (timetable.isWeekly) {
+      // For weekly timetables, filter by week_number if needed, or show all
+      return allSchedules.filter(s => s.weekNumber === null || s.weekNumber === currentWeek);
+    }
+
+    // For date-range timetables, filter by calculated date range
+    const { start, end } = getCurrentWeekDates();
+    return allSchedules.filter(schedule => {
+      const scheduleDate = dayjs(schedule.scheduleDate);
+      return scheduleDate.isBetween(start, end, 'day', '[]');
+    });
+  }, [allSchedules, currentWeek, timetable]);
+
   const generateColumns = () => {
     const weekDates = getCurrentWeekDates();
     
@@ -257,37 +278,38 @@ const ViewTimetable = ({ user }) => {
     return columns;
   };
 
-  // 生成表格数据
   const generateTableData = () => {
-    return timeSlots.map((timeSlot, index) => {
+    const data = [];
+    const groupedSchedules = {};
+
+    currentWeekSchedules.forEach(schedule => {
+      const timeKey = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
+      const dayKey = timetable.isWeekly ? schedule.dayOfWeek.toLowerCase() : dayjs(schedule.scheduleDate).format('dddd').toLowerCase();
+
+      if (!groupedSchedules[timeKey]) {
+        groupedSchedules[timeKey] = {};
+      }
+      if (!groupedSchedules[timeKey][dayKey]) {
+        groupedSchedules[timeKey][dayKey] = [];
+      }
+      groupedSchedules[timeKey][dayKey].push(schedule);
+    });
+
+    timeSlots.forEach((timeSlot, index) => {
       const rowData = {
         key: index,
         time: timeSlot,
       };
 
       weekDays.forEach((day, dayIndex) => {
-        // 过滤出当前时间段和星期的课程
-        const daySchedules = schedules.filter(schedule => {
-          const scheduleTime = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
-          if (scheduleTime !== timeSlot) return false;
-
-          if (timetable.isWeekly) {
-            // For weekly timetables, match by dayOfWeek
-            return schedule.dayOfWeek && schedule.dayOfWeek.toLowerCase() === day.key;
-          } else {
-            // For date-range timetables, match by the actual date
-            if (!schedule.scheduleDate) return false;
-            const scheduleDay = dayjs(schedule.scheduleDate).day(); // Sunday is 0, Monday is 1...
-            const targetDay = (dayIndex + 1) % 7; // Our weekDays array starts with Monday as 0. Let's align.
-            return scheduleDay === targetDay;
-          }
-        });
-
+        const daySchedules = groupedSchedules[timeSlot]?.[day.key] || [];
         rowData[day.key] = daySchedules;
       });
 
-      return rowData;
+      data.push(rowData);
     });
+
+    return data;
   };
 
   const handleWeekChange = (week) => {
@@ -301,7 +323,7 @@ const ViewTimetable = ({ user }) => {
   ];
   
   const studentColorMap = new Map();
-  const allStudentNames = [...new Set(schedules.map(s => s.studentName).filter(Boolean))];
+  const allStudentNames = [...new Set(allSchedules.map(s => s.studentName).filter(Boolean))];
   allStudentNames.forEach((name, index) => {
     studentColorMap.set(name, colorPalette[index % colorPalette.length]);
   });
