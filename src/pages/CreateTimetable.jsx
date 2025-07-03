@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
 import { Card, Form, Input, Switch, DatePicker, Button, message, Row, Col, Modal } from 'antd';
 import { CalendarOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,7 @@ const CreateTimetable = ({ user }) => {
   const [isWeekly, setIsWeekly] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
+  const [nativeDateValues, setNativeDateValues] = useState({ start: '', end: '' });
   const navigate = useNavigate();
 
   const datePickerWrapperRef = useRef(null);
@@ -65,6 +66,17 @@ const CreateTimetable = ({ user }) => {
       observer.disconnect();
     };
   }, [isWeekly]); // 添加isWeekly依赖，当切换时重新计算宽度
+
+  // 同步表单值到本地状态（用于微信浏览器兼容）
+  useEffect(() => {
+    const dateRange = form.getFieldValue('dateRange');
+    if (dateRange && Array.isArray(dateRange)) {
+      setNativeDateValues({
+        start: dateRange[0] ? dateRange[0].format('YYYY-MM-DD') : '',
+        end: dateRange[1] ? dateRange[1].format('YYYY-MM-DD') : ''
+      });
+    }
+  }, [form]);
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -144,14 +156,32 @@ const CreateTimetable = ({ user }) => {
 
   // 处理原生日期输入
   const handleNativeDateChange = (type, value) => {
+    console.log('微信浏览器日期选择:', type, value);
+
     const currentRange = form.getFieldValue('dateRange') || [null, null];
+
+    // 立即更新本地状态
+    const newNativeValues = {
+      ...nativeDateValues,
+      [type]: value
+    };
+    setNativeDateValues(newNativeValues);
+
+    // 更新表单值
     if (type === 'start') {
       const newRange = [value ? dayjs(value) : null, currentRange[1]];
       form.setFieldsValue({ dateRange: newRange });
+      console.log('更新开始日期到表单:', newRange);
     } else {
       const newRange = [currentRange[0], value ? dayjs(value) : null];
       form.setFieldsValue({ dateRange: newRange });
+      console.log('更新结束日期到表单:', newRange);
     }
+
+    // 强制重新渲染
+    setTimeout(() => {
+      form.validateFields(['dateRange']);
+    }, 0);
   };
 
   return (
@@ -210,6 +240,7 @@ const CreateTimetable = ({ user }) => {
                         <div style={{ flex: 1 }}>
                           <div style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>开始日期</div>
                           <input
+                            key={`start-${nativeDateValues.start}`}
                             type="date"
                             style={{
                               width: '100%',
@@ -220,12 +251,13 @@ const CreateTimetable = ({ user }) => {
                             }}
                             min={dayjs().format('YYYY-MM-DD')}
                             onChange={(e) => handleNativeDateChange('start', e.target.value)}
-                            value={form.getFieldValue('dateRange')?.[0]?.format('YYYY-MM-DD') || ''}
+                            value={nativeDateValues.start}
                           />
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>结束日期</div>
                           <input
+                            key={`end-${nativeDateValues.end}`}
                             type="date"
                             style={{
                               width: '100%',
@@ -234,9 +266,9 @@ const CreateTimetable = ({ user }) => {
                               borderRadius: '6px',
                               fontSize: '14px'
                             }}
-                            min={form.getFieldValue('dateRange')?.[0]?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')}
+                            min={nativeDateValues.start || dayjs().format('YYYY-MM-DD')}
                             onChange={(e) => handleNativeDateChange('end', e.target.value)}
-                            value={form.getFieldValue('dateRange')?.[1]?.format('YYYY-MM-DD') || ''}
+                            value={nativeDateValues.end}
                           />
                         </div>
                       </div>
