@@ -1,22 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Button, Table, message, Pagination, Space, Tag, Popover } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Button, Table, message, Pagination, Space, Tag, Popover, Spin } from 'antd';
+import { LeftOutlined, CalendarOutlined, RightOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule } from '../services/timetable';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import weekday from 'dayjs/plugin/weekday';
 import localeData from 'dayjs/plugin/localeData';
+import './ViewTimetable.css';
 
 dayjs.extend(isBetween);
 dayjs.extend(weekday);
 dayjs.extend(localeData);
-
-// 设置周一为一周的开始
-dayjs.locale({
-  ...dayjs.Ls.en,
-  weekStart: 1
-});
+dayjs.locale({ ...dayjs.Ls.en, weekStart: 1 });
 
 const SchedulePopoverContent = ({ schedule, onDelete, timetable }) => (
   <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
@@ -53,7 +49,6 @@ const ViewTimetable = ({ user }) => {
 
   const navigate = useNavigate();
   const { timetableId } = useParams();
-  const location = useLocation();
 
   // 时间段定义
   const timeSlots = [
@@ -73,6 +68,28 @@ const ViewTimetable = ({ user }) => {
     { key: 'saturday', label: '周六' },
     { key: 'sunday', label: '周日' },
   ];
+
+  // Swipe handling
+  const touchStartRef = React.useRef(null);
+
+  const handleTouchStart = (e) => {
+    touchStartRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartRef.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const delta = touchEndX - touchStartRef.current;
+    const threshold = 50; // px
+    if (Math.abs(delta) > threshold) {
+      if (delta < 0 && currentWeek < totalWeeks) {
+        setCurrentWeek(currentWeek + 1);
+      } else if (delta > 0 && currentWeek > 1) {
+        setCurrentWeek(currentWeek - 1);
+      }
+    }
+    touchStartRef.current = null;
+  };
 
   useEffect(() => {
     fetchTimetable();
@@ -174,8 +191,6 @@ const ViewTimetable = ({ user }) => {
         title: '时间',
         dataIndex: 'time',
         key: 'time',
-        fixed: 'left',
-        width: 60,
         className: 'timetable-time-column',
         render: (time) => (
           <div className="time-cell">
@@ -205,7 +220,6 @@ const ViewTimetable = ({ user }) => {
         title,
         dataIndex: day.key,
         key: day.key,
-        width: 45,
         className: 'timetable-day-column',
         onCell: () => ({
           style: { padding: '0px' }
@@ -347,67 +361,68 @@ const ViewTimetable = ({ user }) => {
   });
 
   if (loading && !timetable) {
-    return <div>加载中...</div>;
+    return (
+      <div className="page-container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
+        <Spin size="large" />
+      </div>
+    );
   }
 
   return (
-    <div className="content-container">
-      <Card
-        className="timetable-view-card"
-        title={
-          <div className="card-header-simple" style={{ display: 'flex', alignItems: 'center' }}>
-            <Space>
-              <CalendarOutlined />
-              <span>{timetable?.name}</span>
-              {!timetable?.isWeekly && (
-                <span className="week-info">
-                  第 {currentWeek} 周 / 共 {totalWeeks} 周
-                </span>
-              )}
-            </Space>
-          </div>
-        }
-        extra={
-          <Space>
-            <Button
-              type="link"
-              onClick={() => navigate('/dashboard')}
-              style={{ textDecoration: 'none' }}
-              onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-              onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-            >
-              返回
-            </Button>
-          </Space>
-        }
-        headStyle={{ borderBottom: 'none' }}
-        bodyStyle={{ padding: 0 }}
-      >
-        <div className="compact-timetable-container">
-          <Table
-            columns={generateColumns()}
-            dataSource={generateTableData()}
-            pagination={false}
-            loading={loading}
-            size="small"
-            bordered
-            className="compact-timetable"
-            scroll={{ x: 'max-content' }}
+    <div className="page-container" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <Button
+          type="text"
+          onClick={() => navigate('/dashboard')}
+          icon={<LeftOutlined style={{ fontSize: 24 }} />}
+          style={{ marginRight: '1rem' }}
+        />
+        <Space align="center" size="large">
+          <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
+          <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
+          {!timetable?.isWeekly && (
+            <Tag color="purple">
+              第 {currentWeek} 周 / 共 {totalWeeks} 周
+            </Tag>
+          )}
+        </Space>
+      </div>
+      
+      <div className="compact-timetable-container">
+        <Table
+          columns={generateColumns()}
+          dataSource={generateTableData()}
+          pagination={false}
+          loading={loading}
+          size="small"
+          bordered
+          className="compact-timetable"
+        />
+      </div>
+
+      {!timetable?.isWeekly && totalWeeks > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
+          <Pagination
+            current={currentWeek}
+            total={totalWeeks}
+            pageSize={1}
+            onChange={handleWeekChange}
+            simple
+            itemRender={(page, type) => {
+              if (type === 'prev') {
+                return <LeftOutlined style={{ fontSize: 20 }} />;
+              }
+              if (type === 'next') {
+                return <RightOutlined style={{ fontSize: 20 }} />;
+              }
+              if (type === 'page') {
+                return <span style={{ fontSize: 16 }}>{page}</span>;
+              }
+              return page;
+            }}
           />
         </div>
-
-        {!timetable?.isWeekly && totalWeeks > 1 && (
-          <div className="week-pagination-container" style={{ padding: '16px' }}>
-            <Pagination
-              current={currentWeek}
-              total={totalWeeks}
-              pageSize={1}
-              onChange={handleWeekChange}
-              simple
-            />
-          </div>
-        )}
-      </Card>
+      )}
     </div>
   );
 };

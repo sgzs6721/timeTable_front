@@ -1,0 +1,36 @@
+.page-container {
+  position: relative;
+  max-width: 900px; /* 稍微增大宽度以适应不同页面的内容 */
+  margin: 0 auto;
+  padding: 1.5rem 2rem; /* 调整内边距 */
+  background-color: #f9f9f9;
+  border-radius: 0 0 12px 12px; /* 增大圆角以匹配更宽的布局 */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08); /* 调整阴影 */
+  padding-top: 2rem;
+}
+
+.page-container::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, #8a2be2, #4b0082); /* 紫色渐变 */
+}
+
+.page-container h1 {
+  font-size: 1.75rem; /* Smaller unified heading */
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .page-container {
+    max-width: none; /* Remove width constraint on mobile */
+    margin: 0; /* Remove auto side margins */
+    padding: 1.5rem 10px; /* Maintain vertical padding, 10px horizontal padding */
+  }
+  .page-container h1 {
+    font-size: 1.5rem; /* smaller title on mobile */
+  }
+} 

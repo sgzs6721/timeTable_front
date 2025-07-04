@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, message, Modal, Form, Input, Select, Space, Tag } from 'antd';
-import { UserOutlined, CalendarOutlined, MergeOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Button, message, Modal, Form, Input, Select, Space, Tag } from 'antd';
+import { UserOutlined, CalendarOutlined, MergeOutlined, EyeOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables, mergeTimetables } from '../services/timetable';
 
@@ -149,43 +149,43 @@ const AdminPanel = ({ user }) => {
     .join('、');
 
   return (
-    <div className="content-container">
-      <h1 className="page-title">管理员面板</h1>
+    <div className="page-container">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h1 style={{ margin: 0 }}>管理员面板</h1>
+        <Button onClick={() => navigate('/dashboard')} icon={<ArrowLeftOutlined />}>
+          返回
+        </Button>
+      </div>
+      
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '16px' }}>
+        <span style={{ fontSize: '14px', color: '#666' }}>
+          已选择 {selectedTimetables.length} 个课表
+        </span>
+        <Button 
+          type="primary" 
+          icon={<MergeOutlined />}
+          onClick={handleMergeTimetables}
+          disabled={selectedTimetables.length < 2}
+        >
+          合并选中课表
+        </Button>
+      </div>
 
-      <Card 
-        title="所有用户课表"
-        extra={
-          <Space>
-            <span style={{ fontSize: '14px', color: '#666' }}>
-              已选择 {selectedTimetables.length} 个课表
-            </span>
-            <Button 
-              type="primary" 
-              icon={<MergeOutlined />}
-              onClick={handleMergeTimetables}
-              disabled={selectedTimetables.length < 2}
-            >
-              合并选中课表
-            </Button>
-          </Space>
-        }
-      >
-        <Table
-          columns={columns}
-          dataSource={allTimetables}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => 
-              `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
-          }}
-          rowSelection={rowSelection}
-          scroll={{ x: 1000 }}
-        />
-      </Card>
+      <Table
+        columns={columns}
+        dataSource={allTimetables}
+        rowKey="id"
+        loading={loading}
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => 
+            `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+        }}
+        rowSelection={rowSelection}
+        scroll={{ x: 1000 }}
+      />
 
       <Modal
         title="合并课表"

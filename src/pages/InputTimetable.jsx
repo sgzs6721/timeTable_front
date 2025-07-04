@@ -1,26 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Input, message, Tabs, Space, Typography, Alert, Spin, Radio } from 'antd';
-import { AudioOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined, EditOutlined } from '@ant-design/icons';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Button, Input, message, Tabs, Space, Typography, Alert, Spin, Radio } from 'antd';
+import { AudioOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, addScheduleByVoice, addScheduleByText, addScheduleByFormat } from '../services/timetable';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 
 const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
-  const location = useLocation();
-  const [timetable, setTimetable] = useState(location.state?.timetable || null);
-  const [loading, setLoading] = useState(!location.state?.timetable);
+  const [timetable, setTimetable] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('text');
-  const [parser, setParser] = useState('format'); // 'ai' or 'format'
+  const [parser, setParser] = useState('format');
   const [recordingTime, setRecordingTime] = useState(0);
-  
+
   const mediaRecorderRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const audioChunksRef = useRef([]);
-  
+
   const navigate = useNavigate();
   const { timetableId } = useParams();
 
@@ -38,6 +37,7 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   }, [timetableId]);
 
   const fetchTimetable = async () => {
+    setLoading(true);
     try {
       const response = await getTimetable(timetableId);
       if (response.success) {
@@ -255,50 +255,34 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     </div>
   );
 
-  const tabItems = [
-    {
-      key: 'voice',
-      label: '语音录入',
-      children: voiceTabContent,
-    },
-    {
-      key: 'text',
-      label: '文字录入',
-      children: textTabContent,
-    },
+  const items = [
+    { key: 'text', label: '文字录入', children: textTabContent },
+    { key: 'voice', label: '语音录入', children: voiceTabContent, disabled: true },
   ];
 
   if (loading) {
     return (
-      <div className="loading-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div className="page-container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
         <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div className="content-container" style={{ maxWidth: '900px' }}>
-      <Card
-        title={
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '12px' }}>
-            <h1 className="page-title" style={{ margin: 0, fontSize: '22px' }}>{timetable?.name}</h1>
-            {timetable && (
-              <Text type="secondary" style={{ fontSize: '14px', color: '#888', fontWeight: 400 }}>
-                {timetable.isWeekly ? '周固定课表' : '日期范围课表'}
-              </Text>
-            )}
-          </div>
-        }
-      >
-        <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
-          <Tabs.TabPane tab={<span><EditOutlined /> 文字录入</span>} key="text">
-            {textTabContent}
-          </Tabs.TabPane>
-          <Tabs.TabPane tab={<span style={{ color: '#ccc' }}> <AudioOutlined /> 语音录入 </span>} key="voice" disabled>
-            {voiceTabContent}
-          </Tabs.TabPane>
-        </Tabs>
-      </Card>
+    <div className="page-container">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
+        <Space align="center" size="large">
+          <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
+          <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
+        </Space>
+      </div>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={items}
+        size="large"
+        centered
+      />
     </div>
   );
 };

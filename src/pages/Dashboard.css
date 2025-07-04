@@ -1,0 +1,90 @@
+/* Dashboard.css */
+
+.timetable-list .ant-list-items {
+  padding-inline-start: 0 !important; /* Reset default list padding */
+}
+
+.timetable-list .ant-list-item {
+  transition: background-color 0.3s, box-shadow 0.3s;
+  background: #fff;
+  padding: 0;
+  border-radius: 8px;
+  margin-bottom: 10px; /* Reduced spacing between cards */
+  border: 1px solid #f0f0f0;
+}
+
+.timetable-list .ant-list-item:hover {
+  background-color: #f9f9f9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: transparent;
+}
+
+.timetable-list .ant-list-item .ant-list-item-meta {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 10px 10px 16px; /* Increase left padding to 16px */
+  box-sizing: border-box;
+}
+
+.timetable-list .ant-list-item .ant-list-item-meta .ant-list-item-meta-avatar {
+  margin-right: 20px;
+}
+
+.timetable-item-meta .ant-list-item-meta-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.timetable-item-meta .ant-list-item-meta-title {
+  margin-bottom: 0.5em !important;
+}
+
+.timetable-list .ant-list-item .ant-list-item-action {
+  padding: 0 10px 10px 10px !important; /* Only bottom padding 10px */
+  margin-bottom: 0 !important; /* Remove margin-bottom */
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+/* 响应式布局 for Mobile */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 1rem 5px; /* Reduce horizontal padding to 5px for wider cards */
+  }
+
+  .timetable-list .ant-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0; /* Remove all padding */
+    width: 100%; /* Ensure card takes full width */
+    margin: 0 0 10px 0; /* Only bottom margin */
+  }
+
+  .timetable-list .ant-list-item .ant-list-item-meta {
+    width: 100%;
+    margin-bottom: 0;
+    padding: 10px 10px 10px 16px; /* Increase left padding to 16px */
+  }
+
+  .timetable-list .ant-list-item .ant-list-item-meta-avatar {
+    margin-right: 16px;
+    margin-bottom: 0;
+  }
+
+  .timetable-list .ant-list-item .ant-list-item-action {
+    margin-left: 0;
+    padding: 0 10px 10px 10px !important; /* Only bottom padding 10px */
+    margin-bottom: 0 !important; /* Remove margin-bottom */
+    border-top: 1px solid #f0f0f0;
+  }
+}
+
+/* Also ensure desktop has proper spacing */
+@media (min-width: 769px) {
+  .page-container {
+    padding: 2rem 10px; /* Set horizontal padding to 10px for desktop too */
+  }
+}

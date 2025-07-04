@@ -161,17 +161,40 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
         const conflictResult = conflictResponse.data;
 
         if (conflictResult.hasConflicts) {
+          // 过滤掉"学生冲突"
+          const filteredConflicts = conflictResult.conflicts.filter(
+            c => c.conflictType !== 'STUDENT_TIME_CONFLICT'
+          );
+
+          // 如果过滤后没有其他冲突了，则认为操作成功
+          if (filteredConflicts.length === 0) {
+            const createdCount = conflictResult.createdSchedules ? conflictResult.createdSchedules.length : 0;
+            if (createdCount > 0) {
+              message.success(`已成功创建 ${createdCount} 个无冲突排课，学生冲突项已被忽略。`);
+            } else {
+              message.info('所有新排课均因学生冲突而被忽略。');
+            }
+            if (setTextInputValue) setTextInputValue('');
+            navigate(`/view-timetable/${timetableId}`);
+            return;
+          }
+
+          const updatedConflictResult = {
+            ...conflictResult,
+            conflicts: filteredConflicts,
+          };
+
           // 有冲突，显示冲突信息
-          setConflicts(conflictResult);
+          setConflicts(updatedConflictResult);
           setShowConflictModal(true);
 
           // 如果有部分成功创建的排课，显示提示
-          if (conflictResult.createdSchedules && conflictResult.createdSchedules.length > 0) {
-            message.info(`已成功创建 ${conflictResult.createdSchedules.length} 个排课，${conflictResult.conflicts.length} 个排课存在冲突`);
+          if (updatedConflictResult.createdSchedules && updatedConflictResult.createdSchedules.length > 0) {
+            message.info(`已成功创建 ${updatedConflictResult.createdSchedules.length} 个排课，${updatedConflictResult.conflicts.length} 个排课存在冲突`);
           }
 
           // 初始化选中状态：默认全选
-          setSelectedConflicts(new Set(conflictResult.conflicts.map((_, index) => index)));
+          setSelectedConflicts(new Set(updatedConflictResult.conflicts.map((_, index) => index)));
           return;
         } else {
           // 没有冲突，全部创建成功
@@ -287,9 +310,9 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
   };
 
   return (
-    <div className="confirm-schedule-container">
+    <div className="page-container">
       <h2>确认排课信息</h2>
-      <p>请检查以下由AI识别的排课信息，您可以直接在表格中进行修改。</p>
+      <p>请检查以排课信息，您可以直接在表格中进行修改。</p>
       <div className="schedule-table-container">
         <table className="schedule-table">
           <thead>
@@ -298,7 +321,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
               {timetableType === 'WEEKLY' && <th>星期</th>}
               {timetableType === 'DATE_RANGE' && <th>日期</th>}
               <th>时间</th>
-              <th>操作</th>
+              <th className="action-cell">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -343,7 +366,6 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
                     danger
                     icon={<DeleteOutlined />}
                     onClick={() => handleDelete(index)}
-                    className="delete-btn-small"
                   />
                 </td>
               </tr>
@@ -370,7 +392,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
           <div style={{ textAlign: 'center' }}>
             <Space>
               <WarningOutlined style={{ color: '#faad14' }} />
-              <Text strong>发现排课冲突</Text>
+              <Text strong style={{ fontSize: '18px' }}>发现排课冲突</Text>
             </Space>
           </div>
         }
@@ -389,7 +411,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
             loading={loading}
             disabled={selectedConflicts.size === 0}
           >
-            强制覆盖选中项 ({selectedConflicts.size})
+            覆盖 ({selectedConflicts.size})
           </Button>,
         ]}
       >
@@ -417,46 +439,56 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
               </Space>
             </div>
 
-            <List
-              size="small"
-              dataSource={conflicts.conflicts}
-              renderItem={(conflict, index) => (
-                <List.Item>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Space align="start">
-                      <Checkbox
-                        checked={selectedConflicts.has(index)}
-                        onChange={(e) => handleConflictSelection(index, e.target.checked)}
-                      />
-                      <div>
-                        <Text>
-                          <Tag color={conflict.conflictType === 'STUDENT_TIME_CONFLICT' ? 'red' : 'orange'}>
-                            {conflict.conflictType === 'STUDENT_TIME_CONFLICT' ? '学生冲突' :
-                             conflict.conflictType === 'TIME_SLOT_CONFLICT' ? '时间冲突' : '新排课冲突'}
-                          </Tag>
-                          {conflict.conflictDescription}
-                        </Text>
-
-                        {conflict.existingSchedule && (
-                          <Text type="secondary" style={{ fontSize: '12px' }}>
-                            现有课程：{conflict.existingSchedule.studentName} -
-                            {conflict.existingSchedule.startTime}-{conflict.existingSchedule.endTime}
-                            {conflict.existingSchedule.scheduleDate && ` (${conflict.existingSchedule.scheduleDate})`}
-                            {conflict.existingSchedule.dayOfWeek && ` (${convertDayOfWeekToChinese(conflict.existingSchedule.dayOfWeek)})`}
-                          </Text>
-                        )}
-                      </div>
+            <div style={{ marginBottom: '4px' }}>
+              <List
+                size="small"
+                dataSource={conflicts.conflicts}
+                renderItem={(conflict, index) => (
+                  <List.Item>
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Space align="start">
+                        <Checkbox
+                          checked={selectedConflicts.has(index)}
+                          onChange={(e) => handleConflictSelection(index, e.target.checked)}
+                        />
+                        <div>
+                          <div>
+                            <Tag color={'red'}>
+                              时间冲突
+                            </Tag>
+                          </div>
+                          {conflict.existingSchedule && (
+                            <div style={{ marginTop: '8px' }}>
+                              <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
+                                现有课程：
+                                <span style={{ color: '#faad14', fontWeight: 'bold' }}>{conflict.existingSchedule.studentName}</span>
+                                {` - ${conflict.existingSchedule.startTime}-${conflict.existingSchedule.endTime}`}
+                                {conflict.existingSchedule.scheduleDate && ` (${conflict.existingSchedule.scheduleDate})`}
+                                {conflict.existingSchedule.dayOfWeek && ` (${convertDayOfWeekToChinese(conflict.existingSchedule.dayOfWeek)})`}
+                              </Text>
+                            </div>
+                          )}
+                          {conflict.newSchedule && (
+                            <div style={{ marginTop: '4px' }}>
+                              <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
+                                新建课程：
+                                <span style={{ color: '#52c41a', fontWeight: 'bold' }}>{conflict.newSchedule.studentName}</span>
+                                ，是否覆盖
+                              </Text>
+                            </div>
+                          )}
+                        </div>
+                      </Space>
                     </Space>
-                  </Space>
-                </List.Item>
-              )}
-            />
+                  </List.Item>
+                )}
+              />
+            </div>
 
             <Alert
-              message="选择操作"
-              description={`请勾选需要强制覆盖的冲突项，然后点击"强制覆盖选中项"。${conflicts.createdSchedules && conflicts.createdSchedules.length > 0 ? '无冲突的排课已成功创建，' : ''}强制覆盖规则：如果是不同学员的时间冲突，将删除原有课程并添加新课程；如果是同一学员的重复时间，将保留原有课程并添加新课程。`}
+              message={<Text strong>选择操作</Text>}
+              description={`请勾选需要覆盖的冲突项，然后点击"覆盖"。${conflicts.createdSchedules && conflicts.createdSchedules.length > 0 ? '无冲突的排课已成功创建，' : ''}覆盖规则：如果是不同学员的时间冲突，将删除原有课程并添加新课程。`}
               type="info"
-              style={{ marginTop: 16 }}
             />
           </div>
         )}
