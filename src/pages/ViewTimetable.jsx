@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Button, Table, message, Pagination, Space, Tag, Popover, Spin } from 'antd';
+import { Button, Table, message, Pagination, Space, Tag, Popover, Spin, Input } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, deleteSchedule } from '../services/timetable';
+import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule } from '../services/timetable';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import weekday from 'dayjs/plugin/weekday';
 import localeData from 'dayjs/plugin/localeData';
+import EditScheduleModal from '../components/EditScheduleModal';
 import './ViewTimetable.css';
 
 dayjs.extend(isBetween);
@@ -14,30 +15,74 @@ dayjs.extend(weekday);
 dayjs.extend(localeData);
 dayjs.locale({ ...dayjs.Ls.en, weekStart: 1 });
 
-const SchedulePopoverContent = ({ schedule, onDelete, timetable }) => (
-  <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
-    <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>学生:</strong> {schedule.studentName}</p>
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, timetable }) => {
+  const [name, setName] = React.useState(schedule.studentName);
 
-    {timetable.isWeekly ? (
-      <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {schedule.dayOfWeek}</p>
-    ) : (
-      <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>日期:</strong> {schedule.scheduleDate}</p>
-    )}
+  return (
+    <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ margin: '4px 0', textAlign: 'left' }}>
+        <strong>学生:</strong>
+        <Input
+          size="small"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ marginTop: 4 }}
+        />
+      </div>
 
-    <p style={{ margin: '4px 0', textAlign: 'left' }}>
-      <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
-    </p>
-    <Button
-      type="primary"
-      danger
-      onClick={onDelete}
-      style={{ marginTop: '12px', alignSelf: 'center' }}
-      size="small"
-    >
-      删除
-    </Button>
-  </div>
-);
+      {timetable.isWeekly ? (
+        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {schedule.dayOfWeek}</p>
+      ) : (
+        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>日期:</strong> {schedule.scheduleDate}</p>
+      )}
+
+      <p style={{ margin: '4px 0', textAlign: 'left' }}>
+        <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
+      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+        <Button
+          type="default"
+          size="small"
+          onClick={() => onUpdateName(name)}
+          style={{ marginRight: '8px' }}
+        >
+          修改
+        </Button>
+        <Button
+          type="primary"
+          danger
+          onClick={onDelete}
+          size="small"
+        >
+          删除
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const NewSchedulePopoverContent = ({ onAdd }) => {
+  const [name, setName] = React.useState('');
+
+  return (
+    <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
+      <Input
+        size="small"
+        placeholder="学生姓名"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <Button
+        type="primary"
+        size="small"
+        style={{ marginTop: 8, alignSelf: 'flex-end' }}
+        onClick={() => onAdd(name)}
+      >
+        添加
+      </Button>
+    </div>
+  );
+};
 
 const ViewTimetable = ({ user }) => {
   const [timetable, setTimetable] = useState(null);
@@ -46,6 +91,8 @@ const ViewTimetable = ({ user }) => {
   const [currentWeek, setCurrentWeek] = useState(1);
   const [totalWeeks, setTotalWeeks] = useState(1);
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState(null);
 
   const navigate = useNavigate();
   const { timetableId } = useParams();
@@ -162,6 +209,29 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
+  // 更新学生姓名
+  const handleSaveStudentName = async (scheduleObj, newName) => {
+    if (!newName || newName.trim() === '') {
+      message.warning('学生姓名不能为空');
+      return;
+    }
+    const payload = {
+      studentName: newName.trim(),
+    };
+    try {
+      const response = await updateSchedule(timetableId, scheduleObj.id, payload);
+      if (response.success) {
+        message.success('修改成功');
+        setOpenPopoverKey(null);
+        fetchSchedules();
+      } else {
+        message.error(response.message || '修改失败');
+      }
+    } catch (error) {
+      message.error('操作失败，请重试');
+    }
+  };
+
   // Get the date range for the current week based on Monday as the first day
   const getCurrentWeekDates = () => {
     if (!timetable || timetable.isWeekly) return { start: null, end: null };
@@ -226,9 +296,69 @@ const ViewTimetable = ({ user }) => {
         }),
         render: (students, record) => {
           if (!students || students.length === 0) {
-            return null;
-          }
+            // 空单元格：提供插入排课功能
+            const cellKey = `${day.key}-${record.key}`;
 
+            const handleOpenChange = (newOpen) => {
+              setOpenPopoverKey(newOpen ? cellKey : null);
+            };
+
+            const handleAddSchedule = async (studentName) => {
+              const trimmedName = studentName.trim();
+              if (!trimmedName) {
+                message.warning('学生姓名不能为空');
+                return;
+              }
+
+              const [startTimeStr, endTimeStr] = record.time.split('-');
+              const startTime = `${startTimeStr}:00`;
+              const endTime = `${endTimeStr}:00`;
+
+              let scheduleDate = null;
+              if (!timetable.isWeekly && weekDates && weekDates.start) {
+                const currentDate = weekDates.start.add(index, 'day');
+                scheduleDate = currentDate.format('YYYY-MM-DD');
+              }
+
+              const payload = {
+                studentName: trimmedName,
+                dayOfWeek: day.key.toUpperCase(),
+                startTime,
+                endTime,
+                note: '手动添加',
+              };
+
+              if (scheduleDate) {
+                payload.scheduleDate = scheduleDate;
+              }
+
+              try {
+                const resp = await createSchedule(timetableId, payload);
+                if (resp.success) {
+                  message.success('添加成功');
+                  setOpenPopoverKey(null);
+                  fetchSchedules();
+                } else {
+                  message.error(resp.message || '添加失败');
+                }
+              } catch (err) {
+                message.error('网络错误，添加失败');
+              }
+            };
+
+            return (
+              <Popover
+                placement="rightTop"
+                title={null}
+                content={<NewSchedulePopoverContent onAdd={handleAddSchedule} />}
+                trigger="click"
+                open={openPopoverKey === cellKey}
+                onOpenChange={handleOpenChange}
+              >
+                <div style={{ height: '48px', cursor: 'pointer' }} />
+              </Popover>
+            );
+          }
           const cellKey = `${day.key}-${record.key}`;
 
           const handleOpenChange = (newOpen) => {
@@ -242,6 +372,7 @@ const ViewTimetable = ({ user }) => {
                   <SchedulePopoverContent
                     schedule={student}
                     onDelete={() => handleDeleteSchedule(student.id)}
+                    onUpdateName={(newName) => handleSaveStudentName(student, newName)}
                     timetable={timetable}
                   />
                   {idx < students.length - 1 && <hr style={{ margin: '8px 0' }} />}
@@ -423,6 +554,23 @@ const ViewTimetable = ({ user }) => {
           />
         </div>
       )}
+
+      {/* 旧的弹窗保留，以便未来编辑更多字段（当前未使用） */}
+      <EditScheduleModal
+        visible={editModalVisible}
+        schedule={editingSchedule}
+        timetable={timetable}
+        onCancel={() => {
+          setEditModalVisible(false);
+          setEditingSchedule(null);
+        }}
+        onOk={(data) => {
+          // 新增全量编辑的保存逻辑
+          if (editingSchedule) {
+            handleSaveStudentName({ ...editingSchedule, ...data }, data.studentName);
+          }
+        }}
+      />
     </div>
   );
 };
