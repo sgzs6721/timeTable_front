@@ -504,7 +504,7 @@ const ViewTimetable = ({ user }) => {
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
         <Button
           type="text"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(-1)}
           icon={<LeftOutlined style={{ fontSize: 24 }} />}
           style={{ marginRight: '1rem' }}
         />

@@ -10,6 +10,7 @@ import ViewTimetable from './pages/ViewTimetable';
 import AdminPanel from './pages/AdminPanel';
 import ConfirmSchedulePage from './pages/ConfirmSchedulePage';
 import AppHeader from './components/AppHeader';
+import MergePreview from './pages/MergePreview';
 import './App.css';
 
 const { Content } = Layout;
@@ -86,7 +87,11 @@ function App() {
             />
             <Route 
               path="/admin" 
-              element={user && user.role === 'admin' ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />} 
+              element={user && user.role?.toUpperCase() === 'ADMIN' ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />} 
+            />
+            <Route 
+              path="/preview-merge" 
+              element={user ? <MergePreview user={user} /> : <Navigate to="/login" />} 
             />
             <Route 
               path="/" 

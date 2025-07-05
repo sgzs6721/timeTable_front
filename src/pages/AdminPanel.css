@@ -1,0 +1,15 @@
+.ant-table-thead > tr > th {
+  text-align: center;
+}
+
+.ant-table {
+  width: 100%;
+}
+
+.ant-table-container table {
+  table-layout: auto;
+}
+
+.admin-table th {
+  text-align: center !important;
+} 

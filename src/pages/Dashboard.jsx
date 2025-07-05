@@ -125,12 +125,6 @@ const Dashboard = ({ user }) => {
           )}
         />
       )}
-
-      {user && user.role === 'admin' && (
-        <div style={{ marginTop: '24px' }}>
-          <Button onClick={handleAdminPanel}>管理面板</Button>
-        </div>
-      )}
     </div>
   );
 };

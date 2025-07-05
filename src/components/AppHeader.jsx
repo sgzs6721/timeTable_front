@@ -18,13 +18,6 @@ const AppHeader = ({ user, onLogout }) => {
     // },
   ];
 
-  if (user?.role === 'admin') {
-    menuItems.push({
-      key: '/admin',
-      label: '管理面板',
-    });
-  }
-
   const userMenuItems = [
     // {
     //   key: 'profile',
@@ -46,6 +39,15 @@ const AppHeader = ({ user, onLogout }) => {
       onClick: onLogout,
     },
   ];
+
+  if (user?.role?.toUpperCase() === 'ADMIN') {
+    userMenuItems.unshift({
+      key: 'admin',
+      icon: <SettingOutlined />,
+      label: '管理员',
+      onClick: () => navigate('/admin'),
+    }, { type: 'divider' });
+  }
 
   return (
     <Header className="layout-header">
