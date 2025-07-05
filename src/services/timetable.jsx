@@ -186,6 +186,18 @@ export const getAllTimetables = async () => {
   }
 };
 
+// 管理员功能：批量获取课表信息（包含用户信息）- 用于合并预览
+export const getBatchTimetablesInfo = async (timetableIds) => {
+  try {
+    const response = await api.post('/admin/timetables/batch-info', {
+      timetableIds
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 管理员功能：合并课表
 export const mergeTimetables = async (timetableIds, mergedName) => {
   try {

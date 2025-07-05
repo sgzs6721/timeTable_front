@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Typography, Card, Tag, Tooltip, Checkbox } from 'antd';
-import { UserOutlined, CalendarOutlined, MergeOutlined, EyeOutlined, ArrowLeftOutlined, LeftOutlined } from '@ant-design/icons';
+import { UserOutlined, CalendarOutlined, MergeOutlined, EyeOutlined, ArrowLeftOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables } from '../services/timetable';
 import './AdminPanel.css';
@@ -177,7 +177,7 @@ const AdminPanel = ({ user }) => {
         </div>
       </div>
       
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '16px' }}>
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: '14px', color: '#666' }}>
           已选择 {selectedTimetables.length} 个课表
         </span>
@@ -197,39 +197,68 @@ const AdminPanel = ({ user }) => {
         loading={loading}
         rowKey="id"
         rowSelection={rowSelection}
-        pagination={{
-          showSizeChanger: false,
-          showQuickJumper: false,
-          showTotal: false,
-          style: { display: 'none' }
-        }}
+        pagination={false}
       />
 
-      {/* 自定义分页组件 */}
-      <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <div style={{ marginBottom: '8px', color: '#666' }}>
+      {/* 周导航样式的分页 */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        marginTop: '16px',
+        gap: '16px'
+      }}>
+        <Button
+          type="text"
+          icon={<LeftOutlined />}
+          disabled={true}
+          style={{ 
+            fontSize: '14px',
+            width: '28px',
+            height: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            border: '1px solid #d9d9d9',
+            color: '#bfbfbf'
+          }}
+        />
+        <Tag 
+          color="blue" 
+          style={{ 
+            fontSize: '14px', 
+            padding: '4px 12px',
+            margin: 0
+          }}
+        >
           第 1-{Math.min(10, allTimetables.length)} 条，共 {allTimetables.length} 条记录
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-          <Button size="small" disabled>
-            &lt;
-          </Button>
-          <Button type="primary" size="small">
-            1
-          </Button>
-          <Button size="small" disabled>
-            &gt;
-          </Button>
-        </div>
+        </Tag>
+        <Button
+          type="text"
+          icon={<RightOutlined />}
+          disabled={true}
+          style={{ 
+            fontSize: '14px',
+            width: '28px',
+            height: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            border: '1px solid #d9d9d9',
+            color: '#bfbfbf'
+          }}
+        />
       </div>
 
       <Card style={{ marginTop: 24 }} title="管理员统计">
         <div style={{ textAlign: 'center' }}>
-          {/* 第一行：总课表数、用户数、总课程数 */}
+          {/* 单行显示：总课表数、用户数、周固定课表、日期范围课表 */}
           <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-around',
-            marginBottom: '32px'
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '16px'
           }}>
             <div>
               <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#1890ff' }}>
@@ -239,23 +268,10 @@ const AdminPanel = ({ user }) => {
             </div>
             <div>
               <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#52c41a' }}>
-                {new Set(allTimetables.map(t => t.userName)).size}
+                {new Set(allTimetables.map(t => t.username)).size}
               </div>
               <div style={{ color: '#666', marginTop: '8px' }}>用户数</div>
             </div>
-            <div>
-              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#faad14' }}>
-                {allTimetables.reduce((sum, t) => sum + (t.courseCount || 0), 0)}
-              </div>
-              <div style={{ color: '#666', marginTop: '8px' }}>总课程数</div>
-            </div>
-          </div>
-          
-          {/* 第二行：周固定课表、日期范围课表 */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-around'
-          }}>
             <div>
               <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#722ed1' }}>
                 {allTimetables.filter(t => t.isWeekly === true).length}

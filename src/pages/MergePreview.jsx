@@ -1,16 +1,35 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Button, Table, message, Space, Tag, Spin } from 'antd';
-import { LeftOutlined, CalendarOutlined } from '@ant-design/icons';
+import { Button, Table, message, Space, Tag, Spin, Pagination } from 'antd';
+import { LeftOutlined, CalendarOutlined, LeftCircleOutlined, RightCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules } from '../services/timetable';
+import { getTimetable, getTimetableSchedules, getBatchTimetablesInfo } from '../services/timetable';
 import dayjs from 'dayjs';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+import localeData from 'dayjs/plugin/localeData';
 import './ViewTimetable.css';
+
+// 扩展 dayjs 插件
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
+dayjs.extend(weekOfYear);
+dayjs.extend(localeData);
+
+// 设置周一为一周的开始
+dayjs.locale({
+  ...dayjs.Ls.en,
+  weekStart: 1
+});
 
 const MergePreview = ({ user }) => {
   const [mergedTimetable, setMergedTimetable] = useState(null);
   const [allSchedules, setAllSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timetableNames, setTimetableNames] = useState([]);
+  const [timetablesData, setTimetablesData] = useState([]);
+  const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
+  const [weeksList, setWeeksList] = useState([]);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -24,7 +43,7 @@ const MergePreview = ({ user }) => {
     '18:00-19:00', '19:00-20:00'
   ];
 
-  // 星期定义
+  // 星期定义 - 确保顺序和dayjs的映射一致
   const weekDays = [
     { key: 'monday', label: '周一' },
     { key: 'tuesday', label: '周二' },
@@ -44,6 +63,28 @@ const MergePreview = ({ user }) => {
     fetchMergedData();
   }, [idsParam]);
 
+  // 生成周列表
+  const generateWeeksList = (startDate, endDate) => {
+    const start = dayjs(startDate);
+    const end = dayjs(endDate);
+    const weeks = [];
+    
+    // 找到开始日期所在周的周一
+    let currentWeekStart = start.startOf('week'); // 现在已经设置了weekStart: 1，所以这里会正确找到周一
+    
+    while (currentWeekStart.isBefore(end) || currentWeekStart.isSame(end)) {
+      const weekEnd = currentWeekStart.add(6, 'day');
+      weeks.push({
+        start: currentWeekStart.format('YYYY-MM-DD'),
+        end: weekEnd.format('YYYY-MM-DD'),
+        label: `${currentWeekStart.format('MM/DD')} - ${weekEnd.format('MM/DD')}`
+      });
+      currentWeekStart = currentWeekStart.add(1, 'week');
+    }
+    
+    return weeks;
+  };
+
   const fetchMergedData = async () => {
     try {
       const ids = idsParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
@@ -53,39 +94,85 @@ const MergePreview = ({ user }) => {
         return;
       }
 
-      // 并行获取所有课表信息和排课数据
-      const timetablePromises = ids.map(id => getTimetable(id));
+      // 并行获取课表信息（包含用户信息）和排课数据
+      const timetableInfoPromise = getBatchTimetablesInfo(ids);
       const schedulePromises = ids.map(id => getTimetableSchedules(id));
 
-      const [timetableResults, scheduleResults] = await Promise.all([
-        Promise.all(timetablePromises),
+      const [timetableInfoResult, scheduleResults] = await Promise.all([
+        timetableInfoPromise,
         Promise.all(schedulePromises)
       ]);
 
-      // 检查所有请求是否成功
-      const failedTimetables = timetableResults.filter(result => !result.success);
-      const failedSchedules = scheduleResults.filter(result => !result.success);
+      // 检查请求是否成功
+      if (!timetableInfoResult.success) {
+        message.error('获取课表信息失败');
+        navigate(-1);
+        return;
+      }
 
-      if (failedTimetables.length > 0 || failedSchedules.length > 0) {
+      const failedSchedules = scheduleResults.filter(result => !result.success);
+      if (failedSchedules.length > 0) {
         message.error('获取课表数据失败');
         navigate(-1);
         return;
       }
 
-      const timetables = timetableResults.map(result => result.data);
+      const timetables = timetableInfoResult.data;
       const schedules = scheduleResults.map(result => result.data);
+
+      // 检查课表类型是否一致
+      const firstType = timetables[0]?.isWeekly;
+      const allSameType = timetables.every(table => table.isWeekly === firstType);
+      
+      if (!allSameType) {
+        message.error('只能合并相同类型的课表');
+        navigate(-1);
+        return;
+      }
 
       // 合并所有排课数据
       const mergedSchedules = schedules.flat();
 
-      // 使用第一个课表作为基础信息，修改名称
+      // 创建合并后的课表信息
       const baseTimetable = { ...timetables[0] };
       const names = timetables.map(t => t.name);
-      baseTimetable.name = `合并预览: ${names.join(' + ')}`;
+      baseTimetable.name = `合并预览`; // 修改标题
+      
+      // 如果是日期范围课表，合并日期范围并生成周列表
+      if (!baseTimetable.isWeekly) {
+        const allStartDates = timetables
+          .map(t => t.startDate)
+          .filter(date => date)
+          .map(date => dayjs(date));
+        
+        const allEndDates = timetables
+          .map(t => t.endDate)
+          .filter(date => date)
+          .map(date => dayjs(date));
+        
+        if (allStartDates.length > 0 && allEndDates.length > 0) {
+          const mergedStartDate = allStartDates.reduce((min, date) => 
+            date.isBefore(min) ? date : min
+          ).format('YYYY-MM-DD');
+          
+          const mergedEndDate = allEndDates.reduce((max, date) => 
+            date.isAfter(max) ? date : max
+          ).format('YYYY-MM-DD');
+
+          baseTimetable.startDate = mergedStartDate;
+          baseTimetable.endDate = mergedEndDate;
+          
+          // 生成周列表
+          const weeks = generateWeeksList(mergedStartDate, mergedEndDate);
+          setWeeksList(weeks);
+          setCurrentWeekIndex(0);
+        }
+      }
 
       setMergedTimetable(baseTimetable);
       setAllSchedules(mergedSchedules);
       setTimetableNames(names);
+      setTimetablesData(timetables); // 现在包含了username字段
     } catch (error) {
       message.error('获取数据失败，请检查网络连接');
       navigate(-1);
@@ -111,58 +198,86 @@ const MergePreview = ({ user }) => {
       },
     ];
 
-    weekDays.forEach((day) => {
+    // 统一按星期几显示
+    weekDays.forEach((day, index) => {
+      const currentWeek = weeksList[currentWeekIndex];
+      let columnTitle = day.label;
+      
+      // 如果是日期范围课表，在星期几下方显示具体日期
+      if (!mergedTimetable?.isWeekly && currentWeek) {
+        const weekStart = dayjs(currentWeek.start);
+        // 直接使用 index，因为 weekDays 的顺序就是周一(0)到周日(6)
+        const currentDate = weekStart.add(index, 'day');
+        
+        columnTitle = (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
+              {day.label}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {currentDate.format('MM/DD')}
+            </div>
+          </div>
+        );
+      }
+      
       columns.push({
-        title: day.label,
+        title: columnTitle,
         dataIndex: day.key,
         key: day.key,
         className: 'timetable-day-column',
         onCell: () => ({
           style: { padding: '0px' }
         }),
-        render: (students) => {
-          if (!students || students.length === 0) {
-            return <div style={{ height: '48px' }} />;
-          }
-
-          return (
-            <div style={{
-              height: '100%',
-              minHeight: '48px',
-              display: 'flex',
-              flexDirection: 'column',
-              width: '100%'
-            }}>
-              {students.map((student, idx) => (
-                <div
-                  key={`${student.id}-${idx}`}
-                  style={{
-                    backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#333',
-                    fontSize: '12px',
-                    wordBreak: 'break-word',
-                    lineHeight: '1.2',
-                    borderTop: idx > 0 ? '1px solid #fff' : 'none',
-                  }}
-                  title={`${student.studentName} (来自: ${student.sourceTimetable || '未知'})`}
-                >
-                  {student.studentName.length > 4 ?
-                    student.studentName.substring(0, 3) + '…' :
-                    student.studentName
-                  }
-                </div>
-              ))}
-            </div>
-          );
-        },
+        render: (students) => renderStudentCell(students),
       });
     });
 
     return columns;
+  };
+
+  // 渲染学生单元格
+  const renderStudentCell = (students) => {
+    if (!students || students.length === 0) {
+      return <div style={{ height: '48px' }} />;
+    }
+
+    return (
+      <div style={{
+        height: '100%',
+        minHeight: '48px',
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%'
+      }}>
+        {students.map((student, idx) => (
+          <div
+            key={`${student.id}-${idx}`}
+            style={{
+              backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#333',
+              fontSize: '12px',
+              wordBreak: 'break-word',
+              lineHeight: '1.2',
+              borderTop: idx > 0 ? '1px solid #fff' : 'none',
+              padding: '2px',
+            }}
+            title={`${student.studentName} (来自: ${student.sourceTimetable || '未知'})${
+              student.scheduleDate ? ` - ${student.scheduleDate}` : ''
+            }`}
+          >
+            {student.studentName.length > 4 ?
+              student.studentName.substring(0, 3) + '…' :
+              student.studentName
+            }
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const generateTableData = () => {
@@ -185,18 +300,48 @@ const MergePreview = ({ user }) => {
       sourceTimetable: timetableIdToNameMap.get(schedule.timetableId) || '未知'
     }));
 
-    schedulesWithSource.forEach(schedule => {
+    // 过滤当前周的课程
+    let filteredSchedules = schedulesWithSource;
+    if (!mergedTimetable?.isWeekly && weeksList[currentWeekIndex]) {
+      const currentWeek = weeksList[currentWeekIndex];
+      const weekStart = dayjs(currentWeek.start);
+      const weekEnd = dayjs(currentWeek.end);
+      
+      filteredSchedules = schedulesWithSource.filter(schedule => {
+        if (schedule.scheduleDate) {
+          const scheduleDate = dayjs(schedule.scheduleDate);
+          return scheduleDate.isSameOrAfter(weekStart) && scheduleDate.isSameOrBefore(weekEnd);
+        }
+        return false;
+      });
+    }
+
+    filteredSchedules.forEach(schedule => {
       const timeKey = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
 
       let dayKey;
       if (mergedTimetable?.isWeekly) {
+        // 周固定课表：使用dayOfWeek字段
         dayKey = schedule.dayOfWeek.toLowerCase();
       } else {
-        // 对于日期范围课表，根据日期计算星期几
-        const scheduleDate = dayjs(schedule.scheduleDate);
-        const dayIndex = scheduleDate.day();
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        dayKey = dayNames[dayIndex];
+        // 日期范围课表：根据scheduleDate计算星期几
+        if (schedule.scheduleDate) {
+          const scheduleDate = dayjs(schedule.scheduleDate);
+          const dayIndex = scheduleDate.day(); // 0=Sunday, 1=Monday, ... 6=Saturday
+          // 映射到我们的星期几key
+          const dayKeyMapping = {
+            0: 'sunday',    // 周日
+            1: 'monday',    // 周一
+            2: 'tuesday',   // 周二
+            3: 'wednesday', // 周三
+            4: 'thursday',  // 周四
+            5: 'friday',    // 周五
+            6: 'saturday'   // 周六
+          };
+          dayKey = dayKeyMapping[dayIndex];
+        } else {
+          return;
+        }
       }
 
       if (!groupedSchedules[timeKey]) {
@@ -254,24 +399,73 @@ const MergePreview = ({ user }) => {
           icon={<LeftOutlined style={{ fontSize: 24 }} />}
           style={{ marginRight: '1rem' }}
         />
-        <Space align="center" size="large">
-          <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
-          <h1 style={{ margin: 0 }}>{mergedTimetable?.name}</h1>
-          <Tag color="orange">预览模式</Tag>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
+            <h1 style={{ margin: 0 }}>{mergedTimetable?.name}</h1>
+          </div>
           <Tag color={mergedTimetable?.isWeekly ? 'blue' : 'green'}>
             {mergedTimetable?.isWeekly ? '周固定课表' : '日期范围课表'}
           </Tag>
-        </Space>
+        </div>
       </div>
 
       <div style={{ marginBottom: '1rem', padding: '12px', background: '#f6f8fa', borderRadius: '6px' }}>
         <div style={{ fontSize: '14px', color: '#666' }}>
-          <strong>合并来源：</strong>{timetableNames.join('、')}
+          <strong>合并来源：</strong>
+          {timetablesData.map((table, index) => (
+            <span key={table.id}>
+              {table.name}
+              {table.username && (
+                <span style={{ color: '#999' }}>
+                  ({table.username})
+                </span>
+              )}
+              {index < timetablesData.length - 1 && '、'}
+            </span>
+          ))}
         </div>
-        <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
-          此为预览模式，不会保存到数据库。包含 {allSchedules.length} 个课程安排。
-        </div>
+        {!mergedTimetable?.isWeekly && mergedTimetable?.startDate && mergedTimetable?.endDate && (
+          <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+            日期范围：{mergedTimetable.startDate} 至 {mergedTimetable.endDate}，包含 {allSchedules.length} 个课程
+          </div>
+        )}
+        {mergedTimetable?.isWeekly && (
+          <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+            包含 {allSchedules.length} 个课程安排
+          </div>
+        )}
       </div>
+
+      {/* 日期范围课表的周导航 */}
+      {!mergedTimetable?.isWeekly && weeksList.length > 0 && (
+        <div style={{ 
+          marginBottom: '1rem', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <Button
+            type="text"
+            icon={<LeftCircleOutlined />}
+            disabled={currentWeekIndex === 0}
+            onClick={() => setCurrentWeekIndex(currentWeekIndex - 1)}
+          />
+          <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
+            第 {currentWeekIndex + 1} 周: {weeksList[currentWeekIndex]?.label}
+          </Tag>
+          <Button
+            type="text"
+            icon={<RightCircleOutlined />}
+            disabled={currentWeekIndex === weeksList.length - 1}
+            onClick={() => setCurrentWeekIndex(currentWeekIndex + 1)}
+          />
+          <span style={{ fontSize: '12px', color: '#666' }}>
+            共 {weeksList.length} 周
+          </span>
+        </div>
+      )}
       
       <div className="compact-timetable-container">
         <Table
