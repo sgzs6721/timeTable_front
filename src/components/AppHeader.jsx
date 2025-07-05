@@ -19,19 +19,15 @@ const AppHeader = ({ user, onLogout }) => {
   ];
 
   const userMenuItems = [
-    // {
-    //   key: 'profile',
-    //   icon: <UserOutlined />,
-    //   label: '个人信息',
-    // },
-    // {
-    //   key: 'settings',
-    //   icon: <SettingOutlined />,
-    //   label: '设置',
-    // },
-    // {
-    //   type: 'divider',
-    // },
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: '个人账号',
+      onClick: () => navigate('/profile'),
+    },
+    {
+      type: 'divider',
+    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,

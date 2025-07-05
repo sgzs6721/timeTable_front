@@ -65,4 +65,34 @@ export const validateToken = async () => {
   }
 };
 
+// 更新用户资料
+export const updateProfile = async (profileData) => {
+  try {
+    const response = await api.put('/auth/profile', profileData);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 更新密码
+export const updatePassword = async (passwordData) => {
+  try {
+    const response = await api.put('/auth/password', passwordData);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 注销账号（软删除）
+export const deactivateAccount = async () => {
+  try {
+    const response = await api.delete('/auth/deactivate');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export default api; 

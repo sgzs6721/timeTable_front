@@ -11,6 +11,7 @@ import AdminPanel from './pages/AdminPanel';
 import ConfirmSchedulePage from './pages/ConfirmSchedulePage';
 import AppHeader from './components/AppHeader';
 import MergePreview from './pages/MergePreview';
+import UserProfile from './pages/UserProfile';
 import './App.css';
 
 const { Content } = Layout;
@@ -92,6 +93,10 @@ function App() {
             <Route 
               path="/preview-merge" 
               element={user ? <MergePreview user={user} /> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/profile" 
+              element={user ? <UserProfile user={user} /> : <Navigate to="/login" />} 
             />
             <Route 
               path="/" 

@@ -1,0 +1,250 @@
+.user-profile-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.user-profile-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+  background: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-profile-header h2 {
+  margin: 0 0 0 16px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.user-profile-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.profile-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-card .ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.profile-card .ant-card-head .ant-card-head-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.profile-card .ant-card-head-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #262626;
+  text-align: center;
+  width: 100%;
+}
+
+.profile-card .ant-form-item-label > label {
+  font-weight: 500;
+  color: #595959;
+}
+
+.account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-info-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  border: 1px solid #f0f0f0;
+}
+
+.username-input-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.username-input {
+  flex: 1;
+}
+
+.action-button {
+  flex-shrink: 0;
+  width: 120px;
+}
+
+/* 确保更新密码按钮居中 */
+.profile-card .ant-form-item[style*="text-align: center"] .action-button {
+  margin: 0 auto;
+  display: block;
+}
+
+.bottom-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 0;
+}
+
+.bottom-button {
+  flex: 1;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.back-button-bottom {
+  background: #f0f0f0 !important;
+  border: 1px solid #d9d9d9 !important;
+  color: #595959 !important;
+}
+
+.back-button-bottom:hover {
+  background: #e6e6e6 !important;
+  border-color: #bfbfbf !important;
+  color: #404040 !important;
+}
+
+.deactivate-button {
+  background: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  color: white !important;
+}
+
+.deactivate-button:hover {
+  background: #ff7875 !important;
+  border-color: #ff7875 !important;
+  color: white !important;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 500;
+  color: #595959;
+  min-width: 100px;
+}
+
+.info-value {
+  color: #262626;
+  font-weight: 400;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.ant-input,
+.ant-input-password {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s;
+}
+
+.ant-input:focus,
+.ant-input-password:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+@media (max-width: 768px) {
+  .user-profile-container {
+    padding: 16px;
+  }
+  
+  .user-profile-header {
+    padding: 12px 16px;
+  }
+  
+  .user-profile-header h2 {
+    font-size: 20px;
+  }
+  
+  .info-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .info-label {
+    min-width: auto;
+  }
+}
+
+/* 专门的密码更新按钮样式 */
+.password-update-button {
+  display: block !important;
+  margin: 0 auto !important;
+  width: 120px !important;
+}
+
+/* 确保底部按钮文字正确显示 */
+.bottom-actions .ant-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.bottom-actions .ant-btn-dangerous {
+  background: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  color: white !important;
+}
+
+.bottom-actions .ant-btn-dangerous:hover {
+  background: #ff7875 !important;
+  border-color: #ff7875 !important;
+  color: white !important;
+}
+
+.bottom-actions .ant-btn-dangerous:focus {
+  background: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  color: white !important;
+}
+
+.bottom-actions .ant-btn-dangerous:active {
+  background: #d9363e !important;
+  border-color: #d9363e !important;
+  color: white !important;
+}
