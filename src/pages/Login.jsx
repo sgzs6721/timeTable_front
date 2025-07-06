@@ -36,31 +36,29 @@ const Login = ({ onLogin }) => {
       padding: '24px'
     }}>
       <Card 
-        title={
-          <div style={{ textAlign: 'center' }}>
-            <img 
-              src={logo} 
-              alt="飓风乒乓培训" 
-              style={{
-                height: '60px',
-                maxWidth: '560px',
-                objectFit: 'contain',
-                marginBottom: '0px'
-              }}
-            />
-            <div style={{
-              fontSize: '22px',
-              fontWeight: 'bold',
-              color: '#262626',
-              marginTop: '4px'
-            }}>
-              课表管理系统
-            </div>
-          </div>
-        }
         style={{ width: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-        headStyle={{ textAlign: 'center', padding: '16px 24px 8px' }}
       >
+        <div style={{ 
+          marginBottom: '24px'
+        }}>
+          <img 
+            src={logo} 
+            alt="飓风乒乓培训" 
+            style={{
+              height: '40px',
+            }}
+          />
+          <div style={{
+            fontSize: '22px',
+            fontWeight: 'bold',
+            color: '#262626',
+            textAlign: 'center',
+            marginTop: '16px'
+          }}>
+            课表管理系统
+          </div>
+        </div>
+
         <Form
           name="login"
           initialValues={{ remember: true }}
