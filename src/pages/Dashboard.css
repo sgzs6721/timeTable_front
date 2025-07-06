@@ -78,13 +78,18 @@
 
   .timetable-list .ant-list-item .ant-list-item-action {
     margin-left: 0 !important;
-    padding: 10px 10px 10px 10px !important;
+    padding: 10px 0 !important;
     margin-bottom: 0 !important;
     border-top: 1px solid #f0f0f0;
     width: 100%;
     display: flex;
     justify-content: center;
-    gap: 24px;
+    align-items: center;
+  }
+
+  .timetable-list .ant-list-item .ant-list-item-action > li {
+    flex: 1;
+    text-align: center;
   }
 }
 
