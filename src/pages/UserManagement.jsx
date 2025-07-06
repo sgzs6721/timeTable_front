@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Tag, Modal, Select, Input } from 'antd';
-import { UserOutlined, CrownOutlined, KeyOutlined } from '@ant-design/icons';
-import { getAllUsers, updateUserRole, resetUserPassword } from '../services/admin';
+import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { getAllUsers, updateUserRole, resetUserPassword, deleteUser } from '../services/admin';
 
 const { Option } = Select;
 
@@ -43,6 +43,29 @@ const UserManagement = () => {
     setEditingUser(user);
     setNewPassword('');
     setPasswordModalVisible(true);
+  };
+
+  const handleDeleteUser = (user) => {
+    Modal.confirm({
+      title: `确定要删除用户 ${user.username} 吗？`,
+      content: '此操作将软删除用户，用户数据仍会保留，但用户将无法登录。此操作不可逆。',
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await deleteUser(user.id);
+          if (response.success) {
+            message.success('用户删除成功');
+            fetchUsers();
+          } else {
+            message.error(response.message || '删除用户失败');
+          }
+        } catch (error) {
+          message.error('删除用户失败，请检查网络连接');
+        }
+      },
+    });
   };
 
   const handleUpdateRole = async () => {
@@ -130,7 +153,7 @@ const UserManagement = () => {
       width: 120,
       align: 'center',
       render: (_, record) => (
-        <Space size="middle">
+        <Space size="small">
           <Button 
             type="text" 
             icon={<CrownOutlined />}
@@ -144,6 +167,17 @@ const UserManagement = () => {
             onClick={() => handleResetPassword(record)}
             title="重置密码"
             style={{ fontSize: '16px', color: '#fa8c16' }}
+          />
+          <Button
+            type="text"
+            icon={<DeleteOutlined />}
+            onClick={() => handleDeleteUser(record)}
+            title="删除用户"
+            disabled={record.role === 'ADMIN'}
+            style={{
+              fontSize: '16px',
+              color: record.role === 'ADMIN' ? undefined : '#f5222d',
+            }}
           />
         </Space>
       ),

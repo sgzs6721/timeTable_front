@@ -40,6 +40,16 @@ export const resetUserPassword = async (userId, password) => {
   }
 };
 
+// 软删除用户
+export const deleteUser = async (userId) => {
+  try {
+    const response = await api.delete(`/admin/users/${userId}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 合并课表
 export const mergeTimetables = async (mergeData) => {
   try {
