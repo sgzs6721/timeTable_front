@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Button, Table, message, Pagination, Space, Tag, Popover, Spin, Input } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined } from '@ant-design/icons';
+import { Button, Table, message, Pagination, Space, Tag, Popover, Spin, Input, Modal } from 'antd';
+import { LeftOutlined, CalendarOutlined, RightOutlined, ExportOutlined, CopyOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule } from '../services/timetable';
 import dayjs from 'dayjs';
@@ -15,7 +15,7 @@ dayjs.extend(weekday);
 dayjs.extend(localeData);
 dayjs.locale({ ...dayjs.Ls.en, weekStart: 1 });
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, timetable }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable }) => {
   const [name, setName] = React.useState(schedule.studentName);
 
   return (
@@ -41,10 +41,16 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, timetable })
       </p>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
         <Button
-          type="default"
+            type="primary"
+            size="small"
+            onClick={() => onExport(schedule.studentName)}
+        >
+            导出
+        </Button>
+        <Button
           size="small"
           onClick={() => onUpdateName(name)}
-          style={{ marginRight: '8px' }}
+          style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
         >
           修改
         </Button>
@@ -93,6 +99,8 @@ const ViewTimetable = ({ user }) => {
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [exportContent, setExportContent] = useState('');
 
   const navigate = useNavigate();
   const { timetableId } = useParams();
@@ -229,6 +237,58 @@ const ViewTimetable = ({ user }) => {
       }
     } catch (error) {
       message.error('操作失败，请重试');
+    }
+  };
+
+  const handleExportStudentSchedule = async (studentName) => {
+    try {
+      message.loading({ content: '正在导出全部课时...', key: 'exporting' });
+      
+      let schedulesToExport;
+      if (timetable && !timetable.isWeekly) {
+        const response = await getTimetableSchedules(timetableId);
+        if (response.success) {
+          schedulesToExport = response.data;
+        } else {
+          message.destroy('exporting');
+          message.error(response.message || '获取全部课程安排失败');
+          return;
+        }
+      } else {
+        schedulesToExport = allSchedules;
+      }
+
+      const studentSchedules = schedulesToExport.filter(s => s.studentName === studentName);
+      message.destroy('exporting');
+
+      if (studentSchedules.length === 0) {
+        message.info('该学生在整个课表中没有排课');
+        return;
+      }
+
+      let content = '';
+      if (timetable.isWeekly) {
+        content = `${studentName} 的周课表安排如下：\n`;
+        const sortedSchedules = [...studentSchedules].sort((a, b) => {
+          const dayA = weekDays.findIndex(d => d.label === a.dayOfWeek);
+          const dayB = weekDays.findIndex(d => d.label === b.dayOfWeek);
+          if (dayA !== dayB) return dayA - dayB;
+          return a.startTime.localeCompare(b.startTime);
+        });
+        content += sortedSchedules.map(s => `${s.dayOfWeek} ${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`).join('\n');
+      } else {
+        content = `${studentName} 的课表安排如下：\n`;
+        const sortedSchedules = [...studentSchedules].sort((a, b) => {
+          if (a.scheduleDate !== b.scheduleDate) return dayjs(a.scheduleDate).diff(dayjs(b.scheduleDate));
+          return a.startTime.localeCompare(b.startTime);
+        });
+        content += sortedSchedules.map(s => `${s.scheduleDate} ${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`).join('\n');
+      }
+      setExportContent(content);
+      setExportModalVisible(true);
+    } catch (error) {
+      message.destroy('exporting');
+      message.error('导出失败，请检查网络连接');
     }
   };
 
@@ -373,6 +433,7 @@ const ViewTimetable = ({ user }) => {
                     schedule={student}
                     onDelete={() => handleDeleteSchedule(student.id)}
                     onUpdateName={(newName) => handleSaveStudentName(student, newName)}
+                    onExport={handleExportStudentSchedule}
                     timetable={timetable}
                   />
                   {idx < students.length - 1 && <hr style={{ margin: '8px 0' }} />}
@@ -555,22 +616,46 @@ const ViewTimetable = ({ user }) => {
         </div>
       )}
 
-      {/* 旧的弹窗保留，以便未来编辑更多字段（当前未使用） */}
-      <EditScheduleModal
-        visible={editModalVisible}
-        schedule={editingSchedule}
-        timetable={timetable}
-        onCancel={() => {
-          setEditModalVisible(false);
-          setEditingSchedule(null);
-        }}
-        onOk={(data) => {
-          // 新增全量编辑的保存逻辑
-          if (editingSchedule) {
-            handleSaveStudentName({ ...editingSchedule, ...data }, data.studentName);
-          }
-        }}
-      />
+      <Modal
+        title="导出学生课时"
+        open={exportModalVisible}
+        onCancel={() => setExportModalVisible(false)}
+        footer={[
+          <Button
+            key="copy"
+            icon={<CopyOutlined />}
+            onClick={() => {
+              navigator.clipboard.writeText(exportContent);
+              message.success('已复制到剪贴板');
+            }}
+          >
+            复制
+          </Button>,
+          <Button key="close" onClick={() => setExportModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+      >
+        <pre style={{ whiteSpace: 'pre-wrap', maxHeight: '400px', overflowY: 'auto' }}>{exportContent}</pre>
+      </Modal>
+
+      {editingSchedule && (
+        <EditScheduleModal
+          visible={editModalVisible}
+          schedule={editingSchedule}
+          timetable={timetable}
+          onCancel={() => {
+            setEditModalVisible(false);
+            setEditingSchedule(null);
+          }}
+          onOk={(data) => {
+            // 新增全量编辑的保存逻辑
+            if (editingSchedule) {
+              handleSaveStudentName({ ...editingSchedule, ...data }, data.studentName);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

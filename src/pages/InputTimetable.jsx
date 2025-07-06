@@ -161,8 +161,8 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   };
 
   const aiDescription = "请选择录入时间（日期时间或星期时间），然后输入人名。系统会根据日期（星期）和时间将人名填入课表。";
-  const formatDescriptionWeekly = "格式解析说明 (周课表):\n姓名, 周一/周二至周五/二-五, 3-4/15:00~16:00/3(3点-4点)";
-  const formatDescriptionDateRange = "格式解析说明 (日期课表):\n姓名, 8月14日~8月16日/8.14-16, 3-4/15:00~16:00";
+  const formatDescriptionWeekly = "格式解析说明 (周课表):\n每个学员占一行，可批量录入\n姓名, 周一/周二至周五/二-五, 3-4/15:00~16:00/3(3点-4点)";
+  const formatDescriptionDateRange = "格式解析说明 (日期课表):\n每个学员占一行，可批量录入\n姓名, 8月14日~8月16日/8.14-16, 3-4/15:00~16:00";
 
   const description = parser === 'ai' 
     ? aiDescription 
@@ -200,19 +200,18 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
           danger
           onClick={() => navigate('/dashboard')}
           size="large"
-          style={{ flex: 1 }}
+          style={{ flex: 1, height: '40px' }}
         >
           返回
         </Button>
         <Button
           type="primary"
-          icon={<SendOutlined />}
           className="text-submit-button"
           size="large"
           loading={submitting}
           onClick={submitTextInput}
           disabled={submitting}
-          style={{ flex: 1 }}
+          style={{ flex: 1, height: '40px' }}
         >
           提交
         </Button>

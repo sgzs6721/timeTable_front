@@ -175,7 +175,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
               message.info('所有新排课均因学生冲突而被忽略。');
             }
             if (setTextInputValue) setTextInputValue('');
-            navigate(`/view-timetable/${timetableId}`);
+            navigate(`/view-timetable/${timetableId}`, { replace: true });
             return;
           }
 
@@ -201,7 +201,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
           const createdCount = conflictResult.createdSchedules ? conflictResult.createdSchedules.length : schedulesToCreate.length;
           message.success(`排课创建成功！共创建 ${createdCount} 个排课`);
           if (setTextInputValue) setTextInputValue('');
-          navigate(`/view-timetable/${timetableId}`);
+          navigate(`/view-timetable/${timetableId}`, { replace: true });
           return;
         }
       }
@@ -224,7 +224,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
       if (response && response.success) {
         message.success('排课已成功添加！');
         if (setTextInputValue) setTextInputValue('');
-        navigate(`/view-timetable/${timetableId}`);
+        navigate(`/view-timetable/${timetableId}`, { replace: true });
       } else {
         message.error(response.message || '创建排课失败，请检查后端返回。');
       }
@@ -273,7 +273,7 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
         message.success(successMessage);
         if (setTextInputValue) setTextInputValue('');
         setShowConflictModal(false);
-        navigate(`/view-timetable/${timetableId}`);
+        navigate(`/view-timetable/${timetableId}`, { replace: true });
       } else {
         message.error(response.message || '强制创建排课失败。');
       }

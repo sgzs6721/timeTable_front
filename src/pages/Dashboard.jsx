@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Tag, Modal } from 'antd';
-import { PlusOutlined, CalendarOutlined } from '@ant-design/icons';
+import { PlusOutlined, CalendarOutlined, CopyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables, deleteTimetable } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules } from '../services/timetable';
+import dayjs from 'dayjs';
 import './Dashboard.css';
 
 const Dashboard = ({ user }) => {
   const [timetables, setTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
+  const [todaysCoursesContent, setTodaysCoursesContent] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +26,51 @@ const Dashboard = ({ user }) => {
     };
     fetchTimetables();
   }, []);
+
+  const handleShowTodaysCourses = async (timetable) => {
+    try {
+      message.loading({ content: '正在查询今日课程...', key: 'todays_courses' });
+      const response = await getTimetableSchedules(timetable.id);
+      
+      if (!response.success) {
+        message.destroy('todays_courses');
+        message.error(response.message || '获取课程安排失败');
+        return;
+      }
+
+      const allSchedules = response.data;
+      let todaysSchedules = [];
+      let header = '';
+
+      if (timetable.isWeekly) {
+        const weekDayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        const todayDayOfWeek = weekDayMap[dayjs().day()];
+        todaysSchedules = allSchedules.filter(s => s.dayOfWeek === todayDayOfWeek);
+        header = `${timetable.name} - 今日课程 (${todayDayOfWeek}):\n`;
+      } else {
+        const todayDate = dayjs().format('YYYY-MM-DD');
+        todaysSchedules = allSchedules.filter(s => s.scheduleDate === todayDate);
+        header = `${timetable.name} - 今日课程 (${todayDate}):\n`;
+      }
+
+      message.destroy('todays_courses');
+
+      if (todaysSchedules.length === 0) {
+        message.info('今天没有安排课程');
+        return;
+      }
+
+      const sortedSchedules = todaysSchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const content = header + sortedSchedules.map(s => `${s.studentName} ${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`).join('\n');
+      
+      setTodaysCoursesContent(content);
+      setTodaysCoursesModalVisible(true);
+
+    } catch (error) {
+      message.destroy('todays_courses');
+      message.error('查询失败，请检查网络连接');
+    }
+  };
 
   const handleDeleteTimetable = (id) => {
     Modal.confirm({
@@ -87,6 +135,7 @@ const Dashboard = ({ user }) => {
           renderItem={(item) => (
             <List.Item
               actions={[
+                <Button type="link" onClick={() => handleShowTodaysCourses(item)}>今日课程</Button>,
                 <Button type="link" onClick={() => handleInputTimetable(item)}>录入</Button>,
                 <Button type="link" onClick={() => handleViewTimetable(item.id)}>查看</Button>,
                 <Button type="link" danger onClick={() => handleDeleteTimetable(item.id)}>删除</Button>,
@@ -116,20 +165,44 @@ const Dashboard = ({ user }) => {
                   </div>
                 }
                 description={
-                  <div style={{ color: '#888', fontSize: '12px' }}>
-                    {item.isWeekly ? (
-                      <div>星期一至星期日</div>
-                    ) : (
-                      <div>{`${item.startDate} 至 ${item.endDate}`}</div>
-                    )}
-                    <div>创建于: {new Date(item.createdAt).toLocaleDateString()}</div>
-                  </div>
+                  <>
+                    <div style={{ color: '#888', fontSize: '12px' }}>
+                      {item.isWeekly ? (
+                        <div>星期一至星期日</div>
+                      ) : (
+                        <div>{`${item.startDate} 至 ${item.endDate}`}</div>
+                      )}
+                      <div>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</div>
+                    </div>
+                  </>
                 }
               />
             </List.Item>
           )}
         />
       )}
+      <Modal
+        title="今日课程安排"
+        open={todaysCoursesModalVisible}
+        onCancel={() => setTodaysCoursesModalVisible(false)}
+        footer={[
+          <Button
+            key="copy"
+            icon={<CopyOutlined />}
+            onClick={() => {
+              navigator.clipboard.writeText(todaysCoursesContent);
+              message.success('已复制到剪贴板');
+            }}
+          >
+            复制
+          </Button>,
+          <Button key="close" onClick={() => setTodaysCoursesModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+      >
+        <pre style={{ whiteSpace: 'pre-wrap', maxHeight: '400px', overflowY: 'auto' }}>{todaysCoursesContent}</pre>
+      </Modal>
     </div>
   );
 };
