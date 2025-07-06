@@ -125,11 +125,16 @@ const UserManagement = () => {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
-      align: 'center',
-      render: (text) => (
+      align: 'left',
+      onHeaderCell: () => ({
+        style: { textAlign: 'center' },
+      }),
+      render: (text, record) => (
         <Space>
-          <UserOutlined />
-          <span>{text}</span>
+          {record.role === 'ADMIN' 
+            ? <CrownOutlined style={{ color: '#f5222d' }} /> 
+            : <UserOutlined style={{ color: '#1890ff' }} />}
+          <span style={{ fontWeight: 'bold' }}>{text}</span>
         </Space>
       ),
     },
@@ -141,7 +146,6 @@ const UserManagement = () => {
       render: (role) => (
         <Tag 
           color={role === 'ADMIN' ? 'red' : 'blue'} 
-          icon={role === 'ADMIN' ? <CrownOutlined /> : <UserOutlined />}
           style={{ minWidth: '80px', textAlign: 'center' }}
         >
           {role === 'ADMIN' ? '管理员' : '普通用户'}
@@ -154,7 +158,7 @@ const UserManagement = () => {
       align: 'center',
       render: (_, record) => (
         <div className="actions-container">
-          <Space size={4}>
+          <Space size={0}>
             <Button 
               type="text" 
               className="action-button"
@@ -203,6 +207,7 @@ const UserManagement = () => {
           showQuickJumper: true,
           showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
         }}
+        scroll={{ x: 'max-content' }}
       />
 
       {/* 修改权限Modal */}
@@ -220,7 +225,6 @@ const UserManagement = () => {
             <p><strong>当前角色：</strong>
               <Tag 
                 color={editingUser.role === 'ADMIN' ? 'red' : 'blue'} 
-                icon={editingUser.role === 'ADMIN' ? <CrownOutlined /> : <UserOutlined />}
                 style={{ marginLeft: 8 }}
               >
                 {editingUser.role === 'ADMIN' ? '管理员' : '普通用户'}

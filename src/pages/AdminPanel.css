@@ -12,4 +12,41 @@
 
 .admin-table th {
   text-align: center !important;
+}
+
+.page-container-mobile-admin {
+  padding: 0;
+}
+
+.mobile-tabs-container {
+  background-color: #fff;
+  padding: 10px 0 20px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  min-height: calc(100vh - 200px);
+  margin-bottom: 0;
+  border-radius: 0;
+}
+
+.mobile-tabs-container .ant-tabs-content {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.mobile-tabs-container .ant-tabs-nav {
+  padding-left: 16px;
+}
+
+.with-gradient-border {
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(to right, #8a2be2, #ff69b4);
+  border-image-slice: 1;
+}
+
+.desktop-tabs {
+  background-color: #fff;
+  padding: 10px 20px 20px 20px;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  min-height: calc(100vh - 200px);
+  margin-bottom: 0;
 } 

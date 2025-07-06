@@ -1,26 +1,17 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Tabs, Button, Space } from 'antd';
-import { UserOutlined, CalendarOutlined, LeftOutlined, CrownOutlined } from '@ant-design/icons';
+import { CalendarOutlined, LeftOutlined, CrownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
 import TimetableManagement from './TimetableManagement';
 import './AdminPanel.css';
 
 const AdminPanel = ({ user }) => {
-  const [activeTab, setActiveTab] = useState('users');
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const navigate = useNavigate();
 
   const tabItems = [
-    {
-      key: 'users',
-      label: (
-        <Space>
-          <CrownOutlined />
-          <span>权限管理</span>
-        </Space>
-      ),
-      children: <UserManagement />,
-    },
     {
       key: 'timetables',
       label: (
@@ -31,50 +22,76 @@ const AdminPanel = ({ user }) => {
       ),
       children: <TimetableManagement user={user} />,
     },
+    {
+      key: 'users',
+      label: (
+        <Space>
+          <CrownOutlined />
+          <span>权限管理</span>
+        </Space>
+      ),
+      children: <UserManagement />,
+    },
   ];
 
-  return (
-    <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
+  const renderTabBar = (props, DefaultTabBar) => (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', position: 'relative', marginTop: '1rem', marginBottom: '1rem'}}>
         <Button
-          type="text"
           onClick={() => navigate('/dashboard')}
           icon={<LeftOutlined />}
+          shape="circle"
           style={{ 
             position: 'absolute',
-            left: 0,
-            fontSize: '20px',
-            width: '40px',
-            height: '40px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '8px',
-            color: '#666'
+            left: 20,
+            top: '50%',
+            transform: 'translateY(-50%)',
           }}
         />
         <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
           <Space align="center" size="large">
-            <CrownOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
-            <h1 style={{ margin: 0 }}>管理员面板</h1>
+            <h1 style={{ margin: 0, fontSize: '22px' }}>管理员面板</h1>
           </Space>
         </div>
       </div>
-      
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-        size="large"
-        style={{ 
-          backgroundColor: '#fff',
-          padding: '10px 20px 20px 20px',
-          borderRadius: '8px 8px 0 0',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          minHeight: 'calc(100vh - 200px)',
-          marginBottom: 0
+      <DefaultTabBar {...props} />
+    </div>
+  );
+
+  const DesktopHeader = () => (
+    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
+      <Button
+        onClick={() => navigate('/dashboard')}
+        icon={<LeftOutlined />}
+        shape="circle"
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
         }}
       />
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <Space align="center" size="large">
+          <CrownOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
+          <h1 style={{ margin: 0 }}>管理员面板</h1>
+        </Space>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={isMobile ? "page-container-mobile-admin" : "page-container"}>
+      {!isMobile && <DesktopHeader />}
+      <div className={isMobile ? "mobile-tabs-container with-gradient-border" : ""}>
+        <Tabs
+          defaultActiveKey="timetables"
+          items={tabItems}
+          size="large"
+          renderTabBar={isMobile ? renderTabBar : undefined}
+          className={!isMobile ? "desktop-tabs with-gradient-border" : ""}
+        />
+      </div>
     </div>
   );
 };
