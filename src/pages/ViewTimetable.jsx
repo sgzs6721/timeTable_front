@@ -177,6 +177,7 @@ const ViewTimetable = ({ user }) => {
         if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
           const start = dayjs(timetableData.startDate);
           const end = dayjs(timetableData.endDate);
+          const today = dayjs();
 
           // 找到起始日期所在周的周一（与后端逻辑一致）
           const anchorMonday = start.startOf('week');
@@ -185,6 +186,23 @@ const ViewTimetable = ({ user }) => {
           const totalDays = end.diff(anchorMonday, 'day') + 1;
           const weeks = Math.ceil(totalDays / 7);
           setTotalWeeks(weeks > 0 ? weeks : 1);
+
+          // 计算当前应该显示的周数
+          let targetWeek = 1; // 默认第一周
+
+          // 检查今天是否在课表日期范围内
+          if (today.isSameOrAfter(start) && today.isSameOrBefore(end)) {
+            // 计算今天是第几周
+            const daysSinceAnchor = today.diff(anchorMonday, 'day');
+            const weekNumber = Math.floor(daysSinceAnchor / 7) + 1;
+            
+            // 确保周数在有效范围内
+            if (weekNumber >= 1 && weekNumber <= weeks) {
+              targetWeek = weekNumber;
+            }
+          }
+
+          setCurrentWeek(targetWeek);
         }
       } else {
         message.error(response.message || '获取课表失败');
@@ -831,10 +849,10 @@ const ViewTimetable = ({ user }) => {
             type="text"
             onClick={() => currentWeek > 1 && handleWeekChange(currentWeek - 1)}
             disabled={currentWeek <= 1}
-            icon={<LeftOutlined style={{ fontSize: 16 }} />}
+            icon={<LeftOutlined style={{ fontSize: 14 }} />}
             style={{ 
-              width: 40,
-              height: 40,
+              width: 32,
+              height: 32,
               borderRadius: '50%',
               border: '1px solid #d9d9d9',
               display: 'flex',
@@ -849,10 +867,10 @@ const ViewTimetable = ({ user }) => {
             type="text"
             onClick={() => currentWeek < totalWeeks && handleWeekChange(currentWeek + 1)}
             disabled={currentWeek >= totalWeeks}
-            icon={<RightOutlined style={{ fontSize: 16 }} />}
+            icon={<RightOutlined style={{ fontSize: 14 }} />}
             style={{ 
-              width: 40,
-              height: 40,
+              width: 32,
+              height: 32,
               borderRadius: '50%',
               border: '1px solid #d9d9d9',
               display: 'flex',
