@@ -1,18 +1,24 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button, Table, message, Pagination, Space, Tag, Popover, Spin, Input, Modal } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined, ExportOutlined, CopyOutlined } from '@ant-design/icons';
+import { LeftOutlined, CalendarOutlined, RightOutlined, ExportOutlined, CopyOutlined, LeftCircleOutlined, RightCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule } from '../services/timetable';
+import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch } from '../services/timetable';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import weekday from 'dayjs/plugin/weekday';
 import localeData from 'dayjs/plugin/localeData';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
 import EditScheduleModal from '../components/EditScheduleModal';
 import './ViewTimetable.css';
 
 dayjs.extend(isBetween);
 dayjs.extend(weekday);
 dayjs.extend(localeData);
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
+dayjs.extend(weekOfYear);
 dayjs.locale({ ...dayjs.Ls.en, weekStart: 1 });
 
 const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable }) => {
@@ -101,6 +107,12 @@ const ViewTimetable = ({ user }) => {
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exportContent, setExportContent] = useState('');
+  
+  // 多选功能状态
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedCells, setSelectedCells] = useState(new Set());
+  const [batchScheduleModalVisible, setBatchScheduleModalVisible] = useState(false);
+  const [batchStudentName, setBatchStudentName] = useState('');
 
   const navigate = useNavigate();
   const { timetableId } = useParams();
@@ -292,6 +304,133 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
+  // 多选功能处理函数
+  const toggleMultiSelectMode = () => {
+    const newMode = !multiSelectMode;
+    setMultiSelectMode(newMode);
+    setSelectedCells(new Set()); // 切换模式时总是清空选择
+    setOpenPopoverKey(null);
+    
+    // 如果是进入多选模式，显示提示
+    if (newMode) {
+      message.info('已进入多选模式，点击空白单元格进行选择');
+    }
+  };
+
+  const handleCellSelection = (cellKey, dayIndex, timeIndex) => {
+    if (!multiSelectMode) return;
+    
+    const newSelectedCells = new Set(selectedCells);
+    if (newSelectedCells.has(cellKey)) {
+      newSelectedCells.delete(cellKey);
+    } else {
+      newSelectedCells.add(cellKey);
+    }
+    setSelectedCells(newSelectedCells);
+  };
+
+  // 获取当前页面的选择数量
+  const getCurrentPageSelectionCount = useCallback(() => {
+    if (!multiSelectMode || selectedCells.size === 0) return 0;
+    
+    const currentPagePrefix = timetable?.isWeekly ? 'weekly' : `week-${currentWeek}`;
+    let count = 0;
+    
+    selectedCells.forEach(cellKey => {
+      if (cellKey.startsWith(currentPagePrefix)) {
+        count++;
+      }
+    });
+    
+    return count;
+  }, [multiSelectMode, selectedCells, timetable?.isWeekly, currentWeek]);
+
+  const openBatchScheduleModal = () => {
+    if (selectedCells.size === 0) {
+      message.warning('请先选择要排课的时间段');
+      return;
+    }
+    setBatchScheduleModalVisible(true);
+  };
+
+  const handleBatchSchedule = async () => {
+    if (!batchStudentName.trim()) {
+      message.warning('请输入学生姓名');
+      return;
+    }
+
+    const weekDates = getCurrentWeekDates();
+    const schedulesToCreate = [];
+
+    Array.from(selectedCells).forEach(cellKey => {
+      // 解析新的cellKey格式：pagePrefix-dayKey-timeIndex
+      const parts = cellKey.split('-');
+      let dayKey, timeIndex, weekNum;
+      
+      if (timetable.isWeekly) {
+        // 周固定课表：weekly-dayKey-timeIndex
+        [, dayKey, timeIndex] = parts;
+      } else {
+        // 日期范围课表：week-weekNum-dayKey-timeIndex
+        [, weekNum, dayKey, timeIndex] = parts;
+      }
+      
+      const dayIndex = weekDays.findIndex(day => day.key === dayKey);
+      const timeSlot = timeSlots[parseInt(timeIndex)];
+      const [startTimeStr, endTimeStr] = timeSlot.split('-');
+      const startTime = `${startTimeStr}:00`;
+      const endTime = `${endTimeStr}:00`;
+
+      let scheduleDate = null;
+      if (!timetable.isWeekly) {
+        // 对于日期范围课表，使用cellKey中的周数信息计算日期
+        const targetWeek = weekNum ? parseInt(weekNum) : currentWeek;
+        const startDate = dayjs(timetable.startDate);
+        const anchorMonday = startDate.startOf('week');
+        const weekStart = anchorMonday.add(targetWeek - 1, 'week');
+        const currentDate = weekStart.add(dayIndex, 'day');
+        scheduleDate = currentDate.format('YYYY-MM-DD');
+      }
+
+      const payload = {
+        studentName: batchStudentName.trim(),
+        dayOfWeek: dayKey.toUpperCase(),
+        startTime,
+        endTime,
+        note: '批量添加',
+      };
+
+      if (scheduleDate) {
+        payload.scheduleDate = scheduleDate;
+      }
+
+      schedulesToCreate.push(payload);
+    });
+
+    try {
+      const response = await createSchedulesBatch(timetableId, schedulesToCreate);
+      if (response.success) {
+        message.success(`成功添加 ${schedulesToCreate.length} 个课程安排`);
+        setBatchScheduleModalVisible(false);
+        setBatchStudentName('');
+        setSelectedCells(new Set());
+        setMultiSelectMode(false);
+        fetchSchedules();
+      } else {
+        message.error(response.message || '批量添加失败');
+      }
+    } catch (error) {
+      message.error('网络错误，批量添加失败');
+    }
+  };
+
+  const cancelBatchSchedule = () => {
+    setBatchScheduleModalVisible(false);
+    setBatchStudentName('');
+  };
+
+
+
   // Get the date range for the current week based on Monday as the first day
   const getCurrentWeekDates = () => {
     if (!timetable || timetable.isWeekly) return { start: null, end: null };
@@ -356,11 +495,22 @@ const ViewTimetable = ({ user }) => {
         }),
         render: (students, record) => {
           if (!students || students.length === 0) {
-            // 空单元格：提供插入排课功能
-            const cellKey = `${day.key}-${record.key}`;
+            // 空单元格：提供插入排课功能或多选功能
+            const pagePrefix = timetable?.isWeekly ? 'weekly' : `week-${currentWeek}`;
+            const cellKey = `${pagePrefix}-${day.key}-${record.key}`;
+            const isSelected = selectedCells.has(cellKey);
+
+            const handleCellClick = (e) => {
+              if (multiSelectMode) {
+                e.stopPropagation();
+                handleCellSelection(cellKey, index, record.key);
+              }
+            };
 
             const handleOpenChange = (newOpen) => {
-              setOpenPopoverKey(newOpen ? cellKey : null);
+              if (!multiSelectMode) {
+                setOpenPopoverKey(newOpen ? cellKey : null);
+              }
             };
 
             const handleAddSchedule = async (studentName) => {
@@ -406,6 +556,30 @@ const ViewTimetable = ({ user }) => {
               }
             };
 
+            if (multiSelectMode) {
+              // 多选模式下的空白单元格
+              return (
+                <div 
+                  style={{ 
+                    height: '48px', 
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? '#e6f7ff' : 'transparent',
+                    border: isSelected ? '2px solid #1890ff' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px',
+                    color: isSelected ? '#1890ff' : '#ccc'
+                  }}
+                  onClick={handleCellClick}
+                  title={isSelected ? '点击取消选择' : '点击选择'}
+                >
+                  {isSelected ? '✓' : ''}
+                </div>
+              );
+            }
+
+            // 普通模式下的空白单元格
             return (
               <Popover
                 placement="rightTop"
@@ -562,22 +736,81 @@ const ViewTimetable = ({ user }) => {
 
   return (
     <div className="page-container" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <Button
           type="text"
           onClick={() => navigate(-1)}
-          icon={<LeftOutlined style={{ fontSize: 24 }} />}
-          style={{ marginRight: '1rem' }}
+          icon={<LeftOutlined style={{ fontSize: 20 }} />}
+          style={{ 
+            position: 'absolute',
+            left: 0,
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: '1px solid #d9d9d9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
         />
-        <Space align="center" size="large">
-          <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
-          <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
-          {!timetable?.isWeekly && (
-            <Tag color="purple">
-              第 {currentWeek} 周 / 共 {totalWeeks} 周
-            </Tag>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center' 
+        }}>
+          <Space align="center" size="large">
+            <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
+            <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
+          </Space>
+        </div>
+      </div>
+
+      {/* 多选功能控制区域 */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '1rem',
+        padding: '8px 12px',
+        backgroundColor: multiSelectMode ? '#f0f9ff' : '#fafafa',
+        borderRadius: '6px',
+        border: multiSelectMode ? '1px solid #bae7ff' : '1px solid #f0f0f0'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Button 
+            type={multiSelectMode ? 'default' : 'default'}
+            size="small"
+            onClick={toggleMultiSelectMode}
+            style={multiSelectMode ? { 
+              backgroundColor: '#fff2f0', 
+              borderColor: '#ffccc7', 
+              color: '#cf1322' 
+            } : {}}
+          >
+            {multiSelectMode ? '退出多选' : '多选排课'}
+          </Button>
+          
+          {multiSelectMode && (
+            <span style={{ fontSize: '14px', color: '#666' }}>
+              {timetable?.isWeekly ? (
+                `已选择 ${selectedCells.size} 个时间段`
+              ) : (
+                `总计选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
+              )}
+            </span>
           )}
-        </Space>
+        </div>
+
+        {multiSelectMode && selectedCells.size > 0 && (
+          <Button 
+            type="primary"
+            size="small"
+            onClick={openBatchScheduleModal}
+          >
+            批量排课
+          </Button>
+        )}
       </div>
       
       <div className="compact-timetable-container">
@@ -593,24 +826,38 @@ const ViewTimetable = ({ user }) => {
       </div>
 
       {!timetable?.isWeekly && totalWeeks > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-          <Pagination
-            current={currentWeek}
-            total={totalWeeks}
-            pageSize={1}
-            onChange={handleWeekChange}
-            simple
-            itemRender={(page, type) => {
-              if (type === 'prev') {
-                return <LeftOutlined style={{ fontSize: 20 }} />;
-              }
-              if (type === 'next') {
-                return <RightOutlined style={{ fontSize: 20 }} />;
-              }
-              if (type === 'page') {
-                return <span style={{ fontSize: 16 }}>{page}</span>;
-              }
-              return page;
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.5rem', gap: '1rem' }}>
+          <Button
+            type="text"
+            onClick={() => currentWeek > 1 && handleWeekChange(currentWeek - 1)}
+            disabled={currentWeek <= 1}
+            icon={<LeftOutlined style={{ fontSize: 16 }} />}
+            style={{ 
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: '1px solid #d9d9d9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          />
+          <Tag color="purple" style={{ fontSize: '14px', padding: '4px 12px' }}>
+            第 {currentWeek} 周 / 共 {totalWeeks} 周
+          </Tag>
+          <Button
+            type="text"
+            onClick={() => currentWeek < totalWeeks && handleWeekChange(currentWeek + 1)}
+            disabled={currentWeek >= totalWeeks}
+            icon={<RightOutlined style={{ fontSize: 16 }} />}
+            style={{ 
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: '1px solid #d9d9d9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           />
         </div>
@@ -656,6 +903,69 @@ const ViewTimetable = ({ user }) => {
           }}
         />
       )}
+
+      {/* 批量排课模态框 */}
+      <Modal
+        title="批量排课"
+        open={batchScheduleModalVisible}
+        onOk={handleBatchSchedule}
+        onCancel={cancelBatchSchedule}
+        okText="确认排课"
+        cancelText="取消"
+        width={400}
+      >
+        <div style={{ marginBottom: '16px' }}>
+          <p style={{ marginBottom: '8px', color: '#666' }}>
+            将为以下 {selectedCells.size} 个时间段批量排课：
+          </p>
+          <div style={{ 
+            maxHeight: '120px', 
+            overflowY: 'auto', 
+            backgroundColor: '#f5f5f5', 
+            padding: '8px', 
+            borderRadius: '4px',
+            fontSize: '12px'
+          }}>
+                         {Array.from(selectedCells).map(cellKey => {
+               // 解析cellKey格式
+               const parts = cellKey.split('-');
+               let dayKey, timeIndex, weekNum, displayText;
+               
+               if (timetable?.isWeekly) {
+                 // 周固定课表：weekly-dayKey-timeIndex
+                 [, dayKey, timeIndex] = parts;
+                 const dayLabel = weekDays.find(day => day.key === dayKey)?.label;
+                 const timeSlot = timeSlots[parseInt(timeIndex)];
+                 displayText = `${dayLabel} ${timeSlot}`;
+               } else {
+                 // 日期范围课表：week-weekNum-dayKey-timeIndex
+                 [, weekNum, dayKey, timeIndex] = parts;
+                 const dayLabel = weekDays.find(day => day.key === dayKey)?.label;
+                 const timeSlot = timeSlots[parseInt(timeIndex)];
+                 displayText = `第${weekNum}周 ${dayLabel} ${timeSlot}`;
+               }
+               
+               return (
+                 <div key={cellKey} style={{ marginBottom: '4px' }}>
+                   {displayText}
+                 </div>
+               );
+             })}
+          </div>
+        </div>
+        
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+            学生姓名：
+          </label>
+          <Input
+            value={batchStudentName}
+            onChange={(e) => setBatchStudentName(e.target.value)}
+            placeholder="请输入学生姓名"
+            onPressEnter={handleBatchSchedule}
+          />
+        </div>
+      </Modal>
     </div>
   );
 };
