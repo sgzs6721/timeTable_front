@@ -1,0 +1,10 @@
+.action-button {
+  padding: 4px !important;
+}
+
+.actions-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+} 

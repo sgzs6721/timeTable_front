@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Tag, Modal, Select, Input } from 'antd';
 import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getAllUsers, updateUserRole, resetUserPassword, deleteUser } from '../services/admin';
+import './UserManagement.css';
 
 const { Option } = Select;
 
@@ -150,36 +151,40 @@ const UserManagement = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 120,
       align: 'center',
       render: (_, record) => (
-        <Space size="small">
-          <Button 
-            type="text" 
-            icon={<CrownOutlined />}
-            onClick={() => handleEditRole(record)}
-            title="变更权限"
-            style={{ fontSize: '16px', color: '#722ed1' }}
-          />
-          <Button 
-            type="text" 
-            icon={<KeyOutlined />}
-            onClick={() => handleResetPassword(record)}
-            title="重置密码"
-            style={{ fontSize: '16px', color: '#fa8c16' }}
-          />
-          <Button
-            type="text"
-            icon={<DeleteOutlined />}
-            onClick={() => handleDeleteUser(record)}
-            title="删除用户"
-            disabled={record.role === 'ADMIN'}
-            style={{
-              fontSize: '16px',
-              color: record.role === 'ADMIN' ? undefined : '#f5222d',
-            }}
-          />
-        </Space>
+        <div className="actions-container">
+          <Space size={4}>
+            <Button 
+              type="text" 
+              className="action-button"
+              icon={<CrownOutlined />}
+              onClick={() => handleEditRole(record)}
+              title="变更权限"
+              style={{ fontSize: '16px', color: '#722ed1' }}
+            />
+            <Button 
+              type="text" 
+              className="action-button"
+              icon={<KeyOutlined />}
+              onClick={() => handleResetPassword(record)}
+              title="重置密码"
+              style={{ fontSize: '16px', color: '#fa8c16' }}
+            />
+            <Button
+              type="text"
+              className="action-button"
+              icon={<DeleteOutlined />}
+              onClick={() => handleDeleteUser(record)}
+              title="删除用户"
+              disabled={record.role === 'ADMIN'}
+              style={{
+                fontSize: '16px',
+                color: record.role === 'ADMIN' ? undefined : '#f5222d',
+              }}
+            />
+          </Space>
+        </div>
       ),
     },
   ];
