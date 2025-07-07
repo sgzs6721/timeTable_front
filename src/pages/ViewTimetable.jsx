@@ -117,6 +117,45 @@ const ViewTimetable = ({ user }) => {
   const navigate = useNavigate();
   const { timetableId } = useParams();
 
+  // 兼容移动端的复制函数
+  const copyToClipboard = async (text) => {
+    try {
+      // 优先使用现代 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        message.success('已复制到剪贴板');
+        return;
+      }
+      
+      // 移动端兼容方案
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      
+      // 在移动端，需要先聚焦再选择
+      textArea.focus();
+      textArea.select();
+      textArea.setSelectionRange(0, textArea.value.length);
+      
+      // 尝试复制
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        message.success('已复制到剪贴板');
+      } else {
+        throw new Error('复制失败');
+      }
+    } catch (error) {
+      // 如果所有方法都失败，提示用户手动复制
+      message.warning('复制失败，请长按选择文本手动复制');
+      console.error('复制失败:', error);
+    }
+  };
+
   // 时间段定义
   const timeSlots = [
     '09:00-10:00', '10:00-11:00', '11:00-12:00',
@@ -889,10 +928,7 @@ const ViewTimetable = ({ user }) => {
           <Button
             key="copy"
             icon={<CopyOutlined />}
-            onClick={() => {
-              navigator.clipboard.writeText(exportContent);
-              message.success('已复制到剪贴板');
-            }}
+            onClick={() => copyToClipboard(exportContent)}
           >
             复制
           </Button>,
