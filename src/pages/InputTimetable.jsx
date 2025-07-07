@@ -250,9 +250,11 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
         message={
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>录入说明</span>
-            <Tag color={timetable.isWeekly ? 'blue' : 'green'}>
-              {timetable.isWeekly ? '周固定课表' : '日期范围课表'}
-            </Tag>
+            {timetable && (
+              <Tag color={timetable.isWeekly ? 'blue' : 'green'}>
+                {timetable.isWeekly ? '周固定课表' : '日期范围课表'}
+              </Tag>
+            )}
           </div>
         }
         description={
