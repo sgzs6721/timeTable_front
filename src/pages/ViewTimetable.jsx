@@ -853,7 +853,7 @@ const ViewTimetable = ({ user }) => {
               {timetable?.isWeekly ? (
                 `已选择 ${selectedCells.size} 个时间段`
               ) : (
-                `总计选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
+                `共选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
               )}
             </span>
           )}
