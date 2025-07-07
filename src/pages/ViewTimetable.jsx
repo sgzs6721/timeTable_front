@@ -73,7 +73,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
   );
 };
 
-const NewSchedulePopoverContent = ({ onAdd }) => {
+const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
   const [name, setName] = React.useState('');
 
   return (
@@ -84,14 +84,18 @@ const NewSchedulePopoverContent = ({ onAdd }) => {
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <Button
-        type="primary"
-        size="small"
-        style={{ marginTop: 8, alignSelf: 'flex-end' }}
-        onClick={() => onAdd(name)}
-      >
-        添加
-      </Button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+        <Button size="small" onClick={onCancel} style={{ marginRight: 8 }}>
+          取消
+        </Button>
+        <Button
+          type="primary"
+          size="small"
+          onClick={() => onAdd(name)}
+        >
+          添加
+        </Button>
+      </div>
     </div>
   );
 };
@@ -641,8 +645,13 @@ const ViewTimetable = ({ user }) => {
               <Popover
                 placement="rightTop"
                 title={null}
-                content={<NewSchedulePopoverContent onAdd={handleAddSchedule} />}
-                trigger="click"
+                content={
+                  <NewSchedulePopoverContent
+                    onAdd={(studentName) => handleAddSchedule(studentName, day, time)}
+                    onCancel={() => handleOpenChange(false)}
+                  />
+                }
+                trigger={multiSelectMode ? "contextMenu" : "click"}
                 open={openPopoverKey === cellKey}
                 onOpenChange={handleOpenChange}
               >
