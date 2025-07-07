@@ -153,6 +153,16 @@ export const deleteTimetable = async (timetableId) => {
   }
 };
 
+// 更新课表
+export const updateTimetable = async (timetableId, timetableData) => {
+  try {
+    const response = await api.put(`/timetables/${timetableId}`, timetableData);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 删除课程安排
 export const deleteSchedule = async (timetableId, scheduleId) => {
   try {

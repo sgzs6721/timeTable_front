@@ -647,7 +647,7 @@ const ViewTimetable = ({ user }) => {
                 title={null}
                 content={
                   <NewSchedulePopoverContent
-                    onAdd={(studentName) => handleAddSchedule(studentName, day, time)}
+                    onAdd={(studentName) => handleAddSchedule(studentName)}
                     onCancel={() => handleOpenChange(false)}
                   />
                 }

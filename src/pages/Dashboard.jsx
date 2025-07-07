@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input } from 'antd';
-import { PlusOutlined, CalendarOutlined, CopyOutlined } from '@ant-design/icons';
+import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable } from '../services/timetable';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import './Dashboard.css';
@@ -100,6 +100,10 @@ const Dashboard = ({ user }) => {
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
+  
+  // 编辑课表名称相关状态
+  const [editingTimetableId, setEditingTimetableId] = useState(null);
+  const [editingTimetableName, setEditingTimetableName] = useState('');
   
   const navigate = useNavigate();
 
@@ -307,6 +311,63 @@ const Dashboard = ({ user }) => {
 
   const handleAdminPanel = () => {
     navigate('/admin');
+  };
+
+  // 开始编辑课表名称
+  const handleStartEditTimetableName = (timetableId, currentName) => {
+    setEditingTimetableId(timetableId);
+    setEditingTimetableName(currentName);
+  };
+
+  // 保存课表名称
+  const handleSaveTimetableName = async (timetableId) => {
+    if (!editingTimetableName.trim()) {
+      message.warning('课表名称不能为空');
+      return;
+    }
+    
+    try {
+      // 获取当前课表的完整信息
+      const currentTimetable = timetables.find(t => t.id === timetableId);
+      if (!currentTimetable) {
+        message.error('找不到对应的课表');
+        return;
+      }
+      
+      // 构造完整的更新请求，保持其他字段不变，只修改name
+      const updateData = {
+        name: editingTimetableName.trim(),
+        description: currentTimetable.description || '',
+        type: currentTimetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE',
+        startDate: currentTimetable.startDate || null,
+        endDate: currentTimetable.endDate || null
+      };
+      
+      const response = await updateTimetable(timetableId, updateData);
+      
+      if (response.success) {
+        message.success('课表名称修改成功');
+        // 更新本地数据
+        setTimetables(timetables.map(item => 
+          item.id === timetableId 
+            ? { ...item, name: editingTimetableName.trim() }
+            : item
+        ));
+        // 重置编辑状态
+        setEditingTimetableId(null);
+        setEditingTimetableName('');
+      } else {
+        message.error(response.message || '修改失败');
+      }
+    } catch (error) {
+      message.error('修改失败，请检查网络连接');
+    }
+  };
+
+  // 取消编辑课表名称
+  const handleCancelEditTimetableName = () => {
+    setEditingTimetableId(null);
+    setEditingTimetableName('');
   };
 
   const getColumns = (colorMap) => [
@@ -725,21 +786,61 @@ const Dashboard = ({ user }) => {
                 }
                 title={
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <a onClick={() => handleViewTimetable(item.id)}>{item.name}</a>
-                    <Tag color={item.isWeekly ? 'blue' : 'green'}>
-                      {item.isWeekly ? '周固定课表' : '日期范围课表'}
-                    </Tag>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {editingTimetableId === item.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Input
+                            size="small"
+                            value={editingTimetableName}
+                            onChange={(e) => setEditingTimetableName(e.target.value)}
+                            onPressEnter={() => handleSaveTimetableName(item.id)}
+                            style={{ width: '200px' }}
+                            autoFocus
+                          />
+                          <Button 
+                            type="text" 
+                            size="small" 
+                            icon={<CheckOutlined />}
+                            onClick={() => handleSaveTimetableName(item.id)}
+                            style={{ color: '#52c41a' }}
+                          />
+                          <Button 
+                            type="text" 
+                            size="small" 
+                            icon={<CloseOutlined />}
+                            onClick={handleCancelEditTimetableName}
+                            style={{ color: '#ff4d4f' }}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <Button 
+                            type="text" 
+                            size="small" 
+                            icon={<EditOutlined />}
+                            onClick={() => handleStartEditTimetableName(item.id, item.name)}
+                            style={{ color: '#8c8c8c', padding: '0 4px' }}
+                          />
+                          <a onClick={() => handleViewTimetable(item.id)}>{item.name}</a>
+                        </>
+                      )}
+                    </div>
                   </div>
                 }
                 description={
                   <>
-                    <div style={{ color: '#888', fontSize: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
                       {item.isWeekly ? (
                         <div>星期一至星期日</div>
                       ) : (
                         <div>{`${item.startDate} 至 ${item.endDate}`}</div>
                       )}
-                      <div>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</div>
+                      <Tag color={item.isWeekly ? 'blue' : 'green'}>
+                        {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                      </Tag>
+                    </div>
+                    <div style={{ color: '#888', fontSize: '12px' }}>
+                      创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}
                     </div>
                   </>
                 }

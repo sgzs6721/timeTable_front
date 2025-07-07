@@ -22,7 +22,8 @@ code {
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 0 24px;
-  height: 60px;
+  height: 45px !important;
+  line-height: 45px !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -32,12 +33,12 @@ code {
   margin-left: 36px;
   display: flex;
   align-items: center;
-  height: 60px;
+  height: 45px;
   flex-shrink: 0;
 }
 
 .logo-img {
-  height: 40px;
+  height: 35px;
   max-width: 400px;
   object-fit: contain;
   cursor: pointer;
@@ -207,7 +208,8 @@ code {
 @media (max-width: 768px) {
   .layout-header {
     padding: 0 16px;
-    height: 100px;
+    height: 67px !important;
+    line-height: 67px !important;
   }
 
   .header-content {
@@ -215,11 +217,11 @@ code {
   }
 
   .logo {
-    height: 100px;
+    height: 67px;
   }
 
   .logo-img {
-    max-height: 80px;
+    max-height: 53px;
     max-width: 200px;
   }
 
@@ -303,7 +305,8 @@ code {
 /* 小屏幕设备适配 (480px 以下) */
 @media (max-width: 480px) {
   .layout-header {
-    height: 90px;
+    height: 60px !important;
+    line-height: 60px !important;
     padding: 0 12px;
   }
 
@@ -312,11 +315,11 @@ code {
   }
 
   .logo {
-    height: 90px;
+    height: 60px;
   }
 
   .logo-img {
-    max-height: 70px;
+    max-height: 47px;
     max-width: 160px;
   }
 
@@ -394,7 +397,8 @@ code {
 /* 超小屏幕设备适配 (360px 以下) */
 @media (max-width: 360px) {
   .layout-header {
-    height: 80px;
+    height: 53px !important;
+    line-height: 53px !important;
     padding: 0 8px;
   }
 
@@ -403,11 +407,11 @@ code {
   }
 
   .logo {
-    height: 80px;
+    height: 53px;
   }
 
   .logo-img {
-    max-height: 60px;
+    max-height: 40px;
     max-width: 120px;
   }
 
