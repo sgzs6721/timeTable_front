@@ -1,10 +1,85 @@
 import React, { useState, useEffect } from 'react';
-import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag } from 'antd';
+import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule } from '../services/timetable';
 import dayjs from 'dayjs';
+import EditScheduleModal from '../components/EditScheduleModal';
 import './Dashboard.css';
+
+// 新增的组件，用于添加新课程
+const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
+  const [name, setName] = React.useState('');
+
+  return (
+    <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
+      <Input
+        size="small"
+        placeholder="学生姓名"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+        <Button size="small" onClick={onCancel} style={{ marginRight: 8 }}>
+          取消
+        </Button>
+        <Button
+          type="primary"
+          size="small"
+          onClick={() => onAdd(name)}
+        >
+          添加
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// 新增的组件，用于修改现有课程
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, timetable }) => {
+  const [name, setName] = React.useState(schedule.studentName);
+
+  return (
+    <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ margin: '4px 0', textAlign: 'left' }}>
+        <strong>学生:</strong>
+        <Input
+          size="small"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ marginTop: 4 }}
+        />
+      </div>
+
+      {timetable.isWeekly ? (
+        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {schedule.dayOfWeek}</p>
+      ) : (
+        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>日期:</strong> {schedule.scheduleDate}</p>
+      )}
+
+      <p style={{ margin: '4px 0', textAlign: 'left' }}>
+        <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
+      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+        <Button
+          size="small"
+          onClick={() => onUpdateName(name)}
+          style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
+        >
+          修改
+        </Button>
+        <Button
+          type="primary"
+          danger
+          onClick={onDelete}
+          size="small"
+        >
+          删除
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 const Dashboard = ({ user }) => {
   const [timetables, setTimetables] = useState([]);
@@ -18,6 +93,14 @@ const Dashboard = ({ user }) => {
   const [tomorrowsSchedulesForCopy, setTomorrowsSchedulesForCopy] = useState([]);
   const [modalSubTitleTomorrow, setModalSubTitleTomorrow] = useState('');
   const [studentColorMap, setStudentColorMap] = useState({});
+  
+  // 新增状态用于管理弹窗功能
+  const [currentTimetable, setCurrentTimetable] = useState(null);
+  const [allSchedulesData, setAllSchedulesData] = useState([]);
+  const [openPopoverKey, setOpenPopoverKey] = useState(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState(null);
+  
   const navigate = useNavigate();
 
   // 兼容移动端的复制函数
@@ -85,6 +168,10 @@ const Dashboard = ({ user }) => {
       }
       const allSchedules = response.data;
       
+      // 保存当前课表信息和所有课程数据
+      setCurrentTimetable(timetable);
+      setAllSchedulesData(allSchedules);
+      
       const newStudentColorMap = { ...studentColorMap };
       let localColorIndex = Object.keys(newStudentColorMap).length;
       const localLightColorPalette = ['#f6ffed', '#e6f7ff', '#fff7e6', '#fff0f6', '#f9f0ff', '#f0f5ff' ];
@@ -139,8 +226,10 @@ const Dashboard = ({ user }) => {
             key: i / 2,
             time1: leftSlot.displayTime,
             studentName1: leftSchedule ? leftSchedule.studentName : '',
+            schedule1: leftSchedule || null,
             time2: rightSlot ? rightSlot.displayTime : '',
             studentName2: rightSchedule ? rightSchedule.studentName : '',
+            schedule2: rightSchedule || null,
           });
         }
         return { tableData, schedulesForCopy: sortedSchedules, subTitle };
@@ -237,10 +326,58 @@ const Dashboard = ({ user }) => {
       onCell: (record) => ({
         style: { 
           backgroundColor: record.studentName1 ? colorMap[record.studentName1] : undefined,
-          padding: '1px'
+          padding: '1px',
+          cursor: 'pointer'
         }
       }),
-      render: (text) => text || '',
+      render: (text, record) => {
+        const cellKey = `today-1-${record.key}`;
+        const targetDate = dayjs();
+        
+        if (!text) {
+          // 空白单元格 - 添加功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <NewSchedulePopoverContent
+                  onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time1)}
+                  onCancel={() => setOpenPopoverKey(null)}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ height: '32px', width: '100%', cursor: 'pointer' }} />
+            </Popover>
+          );
+        } else {
+          // 非空白单元格 - 修改功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <SchedulePopoverContent
+                  schedule={record.schedule1}
+                  onDelete={() => handleDeleteSchedule(record.schedule1.id)}
+                  onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
+                  timetable={currentTimetable}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ cursor: 'pointer', padding: '8px 4px' }}>
+                {text}
+              </div>
+            </Popover>
+          );
+        }
+      },
     },
     {
       title: '时间',
@@ -258,12 +395,284 @@ const Dashboard = ({ user }) => {
       onCell: (record) => ({
         style: { 
           backgroundColor: record.studentName2 ? colorMap[record.studentName2] : undefined,
-          padding: '1px'
+          padding: '1px',
+          cursor: 'pointer'
         }
       }),
-      render: (text) => text || '',
+      render: (text, record) => {
+        const cellKey = `today-2-${record.key}`;
+        const targetDate = dayjs();
+        
+        if (!text) {
+          // 空白单元格 - 添加功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <NewSchedulePopoverContent
+                  onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time2)}
+                  onCancel={() => setOpenPopoverKey(null)}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ height: '32px', width: '100%', cursor: 'pointer' }} />
+            </Popover>
+          );
+        } else {
+          // 非空白单元格 - 修改功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <SchedulePopoverContent
+                  schedule={record.schedule2}
+                  onDelete={() => handleDeleteSchedule(record.schedule2.id)}
+                  onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
+                  timetable={currentTimetable}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ cursor: 'pointer', padding: '8px 4px' }}>
+                {text}
+              </div>
+            </Popover>
+          );
+        }
+      },
     },
   ];
+
+  const getColumnsForTomorrow = (colorMap) => [
+    {
+      title: '时间',
+      dataIndex: 'time1',
+      key: 'time1',
+      width: '25%',
+      align: 'center',
+    },
+    {
+      title: '学员',
+      dataIndex: 'studentName1',
+      key: 'studentName1',
+      width: '25%',
+      align: 'center',
+      onCell: (record) => ({
+        style: { 
+          backgroundColor: record.studentName1 ? colorMap[record.studentName1] : undefined,
+          padding: '1px',
+          cursor: 'pointer'
+        }
+      }),
+      render: (text, record) => {
+        const cellKey = `tomorrow-1-${record.key}`;
+        const targetDate = dayjs().add(1, 'day');
+        
+        if (!text) {
+          // 空白单元格 - 添加功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <NewSchedulePopoverContent
+                  onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time1)}
+                  onCancel={() => setOpenPopoverKey(null)}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ height: '32px', width: '100%', cursor: 'pointer' }} />
+            </Popover>
+          );
+        } else {
+          // 非空白单元格 - 修改功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <SchedulePopoverContent
+                  schedule={record.schedule1}
+                  onDelete={() => handleDeleteSchedule(record.schedule1.id)}
+                  onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
+                  timetable={currentTimetable}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ cursor: 'pointer', padding: '8px 4px' }}>
+                {text}
+              </div>
+            </Popover>
+          );
+        }
+      },
+    },
+    {
+      title: '时间',
+      dataIndex: 'time2',
+      key: 'time2',
+      width: '25%',
+      align: 'center',
+    },
+    {
+      title: '学员',
+      dataIndex: 'studentName2',
+      key: 'studentName2',
+      width: '25%',
+      align: 'center',
+      onCell: (record) => ({
+        style: { 
+          backgroundColor: record.studentName2 ? colorMap[record.studentName2] : undefined,
+          padding: '1px',
+          cursor: 'pointer'
+        }
+      }),
+      render: (text, record) => {
+        const cellKey = `tomorrow-2-${record.key}`;
+        const targetDate = dayjs().add(1, 'day');
+        
+        if (!text) {
+          // 空白单元格 - 添加功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <NewSchedulePopoverContent
+                  onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time2)}
+                  onCancel={() => setOpenPopoverKey(null)}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ height: '32px', width: '100%', cursor: 'pointer' }} />
+            </Popover>
+          );
+        } else {
+          // 非空白单元格 - 修改功能
+          return (
+            <Popover
+              placement="top"
+              title={null}
+              content={
+                <SchedulePopoverContent
+                  schedule={record.schedule2}
+                  onDelete={() => handleDeleteSchedule(record.schedule2.id)}
+                  onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
+                  timetable={currentTimetable}
+                />
+              }
+              trigger="click"
+              open={openPopoverKey === cellKey}
+              onOpenChange={(open) => setOpenPopoverKey(open ? cellKey : null)}
+            >
+              <div style={{ cursor: 'pointer', padding: '8px 4px' }}>
+                {text}
+              </div>
+            </Popover>
+          );
+        }
+      },
+    },
+  ];
+
+  // 新增处理函数
+  const handleAddSchedule = async (studentName, targetDate, displayTime) => {
+    if (!studentName || !studentName.trim()) {
+      message.warning('学生姓名不能为空');
+      return;
+    }
+
+    const [startHour, endHour] = displayTime.split('-');
+    const startTime = `${startHour.padStart(2, '0')}:00:00`;
+    const endTime = `${endHour.padStart(2, '0')}:00:00`;
+
+    let payload = {
+      studentName: studentName.trim(),
+      startTime,
+      endTime,
+      note: '手动添加',
+    };
+
+    if (currentTimetable.isWeekly) {
+      const weekDayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      const dayOfWeek = weekDayMap[targetDate.day()];
+      payload.dayOfWeek = dayOfWeek;
+    } else {
+      payload.scheduleDate = targetDate.format('YYYY-MM-DD');
+      // 为日期范围课表计算星期几
+      const weekDayMap = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+      payload.dayOfWeek = weekDayMap[targetDate.day()];
+    }
+
+    try {
+      const response = await createSchedule(currentTimetable.id, payload);
+      if (response.success) {
+        message.success('添加成功');
+        setOpenPopoverKey(null);
+        // 重新获取课程数据
+        handleShowTodaysCourses(currentTimetable);
+      } else {
+        message.error(response.message || '添加失败');
+      }
+    } catch (error) {
+      message.error('网络错误，添加失败');
+    }
+  };
+
+  const handleUpdateSchedule = async (schedule, newName) => {
+    if (!newName || newName.trim() === '') {
+      message.warning('学生姓名不能为空');
+      return;
+    }
+
+    try {
+      const response = await updateSchedule(currentTimetable.id, schedule.id, {
+        studentName: newName.trim(),
+      });
+      if (response.success) {
+        message.success('修改成功');
+        setOpenPopoverKey(null);
+        // 重新获取课程数据
+        handleShowTodaysCourses(currentTimetable);
+      } else {
+        message.error(response.message || '修改失败');
+      }
+    } catch (error) {
+      message.error('操作失败，请重试');
+    }
+  };
+
+  const handleDeleteSchedule = async (scheduleId) => {
+    try {
+      const response = await deleteSchedule(currentTimetable.id, scheduleId);
+      if (response.success) {
+        message.success('删除成功');
+        setOpenPopoverKey(null);
+        // 重新获取课程数据
+        handleShowTodaysCourses(currentTimetable);
+      } else {
+        message.error(response.message || '删除失败');
+      }
+    } catch (error) {
+      message.error('操作失败，请重试');
+    }
+  };
 
   return (
     <div className="page-container">
@@ -346,7 +755,12 @@ const Dashboard = ({ user }) => {
           </div>
         }
         open={todaysCoursesModalVisible}
-        onCancel={() => setTodaysCoursesModalVisible(false)}
+        onCancel={() => {
+          setTodaysCoursesModalVisible(false);
+          setCurrentTimetable(null);
+          setAllSchedulesData([]);
+          setOpenPopoverKey(null);
+        }}
         width={600}
         footer={null}
       >
@@ -381,7 +795,7 @@ const Dashboard = ({ user }) => {
               pagination={false}
               bordered
               size="small"
-              columns={getColumns(studentColorMap)}
+              columns={getColumnsForTomorrow(studentColorMap)}
             />
             <div style={{ textAlign: 'right', marginTop: '10px' }}>
               <Button
@@ -401,13 +815,38 @@ const Dashboard = ({ user }) => {
           <Button
             danger
             type="primary"
-            onClick={() => setTodaysCoursesModalVisible(false)}
+            onClick={() => {
+              setTodaysCoursesModalVisible(false);
+              setCurrentTimetable(null);
+              setAllSchedulesData([]);
+              setOpenPopoverKey(null);
+            }}
             style={{ minWidth: '100px' }}
           >
             关闭
           </Button>
         </div>
       </Modal>
+
+      {/* 编辑课程模态框 */}
+      {editingSchedule && (
+        <EditScheduleModal
+          visible={editModalVisible}
+          schedule={editingSchedule}
+          timetable={currentTimetable}
+          onCancel={() => {
+            setEditModalVisible(false);
+            setEditingSchedule(null);
+          }}
+          onOk={(data) => {
+            if (editingSchedule) {
+              handleUpdateSchedule(editingSchedule, data.studentName);
+              setEditModalVisible(false);
+              setEditingSchedule(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
