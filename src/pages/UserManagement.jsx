@@ -165,7 +165,7 @@ const UserManagement = () => {
               icon={<CrownOutlined />}
               onClick={() => handleEditRole(record)}
               title="变更权限"
-              style={{ fontSize: '16px', color: '#722ed1' }}
+              style={{ fontSize: '16px', color: '#722ed1', padding: '0 6px' }}
             />
             <Button 
               type="text" 
@@ -173,7 +173,7 @@ const UserManagement = () => {
               icon={<KeyOutlined />}
               onClick={() => handleResetPassword(record)}
               title="重置密码"
-              style={{ fontSize: '16px', color: '#fa8c16' }}
+              style={{ fontSize: '16px', color: '#fa8c16', padding: '0 6px' }}
             />
             <Button
               type="text"
@@ -185,6 +185,7 @@ const UserManagement = () => {
               style={{
                 fontSize: '16px',
                 color: record.role === 'ADMIN' ? undefined : '#f5222d',
+                padding: '0 6px'
               }}
             />
           </Space>

@@ -727,8 +727,20 @@ const Dashboard = ({ user }) => {
     }
   };
 
-  const colorPaletteAvatar = ['#f9f0ff','#e6f7ff','#fff7e6','#f6ffed','#fff0f6','#f0f5ff','#fffbe6','#fcf4ff'];
-  const getAvatarColor = (id) => colorPaletteAvatar[id % colorPaletteAvatar.length];
+  // 颜色组：主色和浅色背景
+  const colorPairs = [
+    { main: '#722ED1', bg: '#f9f0ff' }, // 紫
+    { main: '#1890ff', bg: '#e6f7ff' }, // 蓝
+    { main: '#52c41a', bg: '#f6ffed' }, // 绿
+    { main: '#faad14', bg: '#fffbe6' }, // 橙
+    { main: '#eb2f96', bg: '#fff0f6' }, // 粉
+    { main: '#fa541c', bg: '#fff7e6' }, // 橘
+    { main: '#13c2c2', bg: '#e6fffb' }, // 青
+    { main: '#531dab', bg: '#f4f0ff' }, // 深紫
+  ];
+  // 图标主色循环
+  const iconColors = ['#722ED1','#1890ff','#52c41a','#faad14','#eb2f96','#fa541c','#13c2c2','#531dab'];
+  const getIconColor = (id) => iconColors[id % iconColors.length];
 
   return (
     <div className="page-container">
@@ -767,15 +779,15 @@ const Dashboard = ({ user }) => {
               <List.Item.Meta
                 className="timetable-item-meta"
                 avatar={
-                  <div style={{ marginLeft: 12 }}>
+                  <div style={{ margin: 12 }}>
                   <Avatar
                     shape="square"
                     size={48}
                     icon={<CalendarOutlined />}
                     style={{
-                      backgroundColor: getAvatarColor(item.id),
-                      color: '#2f54eb',
-                      border: '1px solid #d3adf7',
+                      backgroundColor: '#f9f0ff',
+                      color: getIconColor(item.id),
+                      border: '1px solid #e0d7f7',
                       borderRadius: '8px'
                     }}
                   />
@@ -832,9 +844,14 @@ const Dashboard = ({ user }) => {
                       ) : (
                         <div>{`${item.startDate} 至 ${item.endDate}`}</div>
                       )}
-                      <Tag style={{ backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }}>
-                        {item.isWeekly ? '周固定课表' : '日期范围课表'}
-                      </Tag>
+                       <Tag
+                         style={item.isWeekly
+                           ? { backgroundColor: '#e6f7ff', borderColor: 'transparent', color: '#1890ff' }
+                           : { backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }
+                         }
+                       >
+                          {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                        </Tag>
                     </div>
                     <div style={{ color: '#888', fontSize: '12px' }}>
                       创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}

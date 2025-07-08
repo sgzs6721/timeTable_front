@@ -59,10 +59,15 @@ const TimetableManagement = ({ user }) => {
       key: 'name',
       render: (text, record) => (
         <div>
-          <Space>
-            <CalendarOutlined style={{ color: '#2f54eb', backgroundColor: getAvatarColor(record.id), padding:4, borderRadius:4 }} />
-            <a onClick={() => navigate(`/view-timetable/${record.id}`)}>{text}</a>
-          </Space>
+          {(() => {
+            const nameColors = ['#10239e','#ad6800','#006d75','#237804','#9e1068','#a8071a','#391085','#0050b3'];
+            const keyVal = (record.username || record.userName || '')
+              .split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
+            const color = nameColors[keyVal % nameColors.length];
+            return (
+              <a style={{ color }} onClick={() => navigate(`/view-timetable/${record.id}`)}>{text}</a>
+            );
+          })()}
           <div style={{ marginTop: 4 }}>
             <Tag style={{ backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }}>
               {record.isWeekly ? '周固定课表' : '日期范围课表'}
