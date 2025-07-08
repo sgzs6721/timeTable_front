@@ -49,6 +49,9 @@ const TimetableManagement = ({ user }) => {
     navigate(`/preview-merge?ids=${selectedTimetables.join(',')}`);
   };
 
+  const colorPaletteAvatar = ['#f9f0ff','#e6f7ff','#fff7e6','#f6ffed','#fff0f6','#f0f5ff','#fffbe6','#fcf4ff'];
+  const getAvatarColor = (id)=> colorPaletteAvatar[id % colorPaletteAvatar.length];
+
   const columns = [
     {
       title: '课表名称',
@@ -57,11 +60,11 @@ const TimetableManagement = ({ user }) => {
       render: (text, record) => (
         <div>
           <Space>
-            <CalendarOutlined />
+            <CalendarOutlined style={{ color: '#2f54eb', backgroundColor: getAvatarColor(record.id), padding:4, borderRadius:4 }} />
             <a onClick={() => navigate(`/view-timetable/${record.id}`)}>{text}</a>
           </Space>
           <div style={{ marginTop: 4 }}>
-            <Tag color={record.isWeekly ? 'blue' : 'green'}>
+            <Tag style={{ backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }}>
               {record.isWeekly ? '周固定课表' : '日期范围课表'}
             </Tag>
           </div>

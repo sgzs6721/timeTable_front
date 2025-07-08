@@ -36,18 +36,18 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
 };
 
 // 新增的组件，用于修改现有课程
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, timetable }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, timetable }) => {
   const [name, setName] = React.useState(schedule.studentName);
 
   return (
-    <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ margin: '4px 0', textAlign: 'left' }}>
+    <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', textAlign: 'left', gap: 4 }}>
         <strong>学生:</strong>
         <Input
           size="small"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={{ marginTop: 4 }}
+          style={{ flex: 1 }}
         />
       </div>
 
@@ -61,21 +61,9 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, timetable })
         <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
       </p>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-        <Button
-          size="small"
-          onClick={() => onUpdateName(name)}
-          style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
-        >
-          修改
-        </Button>
-        <Button
-          type="primary"
-          danger
-          onClick={onDelete}
-          size="small"
-        >
-          删除
-        </Button>
+        <Button size="small" onClick={onCancel}>取消</Button>
+        <Button type="primary" danger size="small" onClick={onDelete}>删除</Button>
+        <Button size="small" onClick={() => onUpdateName(name)} style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}>修改</Button>
       </div>
     </div>
   );
@@ -425,6 +413,7 @@ const Dashboard = ({ user }) => {
                   schedule={record.schedule1}
                   onDelete={() => handleDeleteSchedule(record.schedule1.id)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
+                  onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
                 />
               }
@@ -494,6 +483,7 @@ const Dashboard = ({ user }) => {
                   schedule={record.schedule2}
                   onDelete={() => handleDeleteSchedule(record.schedule2.id)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
+                  onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
                 />
               }
@@ -566,6 +556,7 @@ const Dashboard = ({ user }) => {
                   schedule={record.schedule1}
                   onDelete={() => handleDeleteSchedule(record.schedule1.id)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
+                  onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
                 />
               }
@@ -635,6 +626,7 @@ const Dashboard = ({ user }) => {
                   schedule={record.schedule2}
                   onDelete={() => handleDeleteSchedule(record.schedule2.id)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
+                  onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
                 />
               }
@@ -735,6 +727,9 @@ const Dashboard = ({ user }) => {
     }
   };
 
+  const colorPaletteAvatar = ['#f9f0ff','#e6f7ff','#fff7e6','#f6ffed','#fff0f6','#f0f5ff','#fffbe6','#fcf4ff'];
+  const getAvatarColor = (id) => colorPaletteAvatar[id % colorPaletteAvatar.length];
+
   return (
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>
@@ -772,17 +767,19 @@ const Dashboard = ({ user }) => {
               <List.Item.Meta
                 className="timetable-item-meta"
                 avatar={
+                  <div style={{ marginLeft: 12 }}>
                   <Avatar
                     shape="square"
                     size={48}
                     icon={<CalendarOutlined />}
                     style={{
-                      backgroundColor: item.isWeekly ? '#e6f7ff' : '#f6ffed',
-                      color: item.isWeekly ? '#1890ff' : '#52c41a',
-                      border: `1px solid ${item.isWeekly ? '#91d5ff' : '#b7eb8f'}`,
+                      backgroundColor: getAvatarColor(item.id),
+                      color: '#2f54eb',
+                      border: '1px solid #d3adf7',
                       borderRadius: '8px'
                     }}
                   />
+                  </div>
                 }
                 title={
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -835,7 +832,7 @@ const Dashboard = ({ user }) => {
                       ) : (
                         <div>{`${item.startDate} 至 ${item.endDate}`}</div>
                       )}
-                      <Tag color={item.isWeekly ? 'blue' : 'green'}>
+                      <Tag style={{ backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }}>
                         {item.isWeekly ? '周固定课表' : '日期范围课表'}
                       </Tag>
                     </div>

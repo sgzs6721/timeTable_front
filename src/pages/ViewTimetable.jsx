@@ -25,14 +25,14 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
   const [name, setName] = React.useState(schedule.studentName);
 
   return (
-    <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ margin: '4px 0', textAlign: 'left' }}>
+    <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', textAlign: 'left', gap: 4 }}>
         <strong>学生:</strong>
         <Input
           size="small"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={{ marginTop: 4 }}
+          style={{ flex: 1 }}
         />
       </div>
 
