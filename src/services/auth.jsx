@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// 直接使用远程服务器地址，不使用代理
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://timetable.devtesting.top/timetable/api';
+// 使用环境变量配置API地址，如果没有配置则使用默认地址
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8088/timetable/api';
 
 // 创建axios实例
 const api = axios.create({

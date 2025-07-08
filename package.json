@@ -20,10 +20,11 @@
     "vite": "^4.4.5"
   },
   "scripts": {
-    "dev": "vite",
+    "preview": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production"
   },
   "browserslist": {
     "production": [
