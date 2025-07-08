@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layout, Menu, Button, Dropdown, Avatar } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, SettingOutlined, HomeOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, SettingOutlined, HomeOutlined, InboxOutlined } from '@ant-design/icons';
 import logo from '../assets/logo.png';
 
 const { Header } = Layout;
@@ -20,8 +20,14 @@ const AppHeader = ({ user, onLogout }) => {
 
   const userMenuItems = [
     {
+      key: 'archived',
+      icon: <InboxOutlined />, 
+      label: '归档课表',
+      onClick: () => navigate('/archived-timetables'),
+    },
+    {
       key: 'profile',
-      icon: <UserOutlined />,
+      icon: <UserOutlined />, 
       label: '个人账号',
       onClick: () => navigate('/profile'),
     },
@@ -30,7 +36,7 @@ const AppHeader = ({ user, onLogout }) => {
     },
     {
       key: 'logout',
-      icon: <LogoutOutlined />,
+      icon: <LogoutOutlined />, 
       label: '退出登录',
       onClick: onLogout,
     },
