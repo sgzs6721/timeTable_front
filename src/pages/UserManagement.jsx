@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, message, Space, Tag, Modal, Select, Input } from 'antd';
+import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip } from 'antd';
 import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getAllUsers, updateUserRole, resetUserPassword, deleteUser } from '../services/admin';
 import './UserManagement.css';
@@ -129,14 +129,19 @@ const UserManagement = () => {
       onHeaderCell: () => ({
         style: { textAlign: 'center' },
       }),
-      render: (text, record) => (
-        <Space>
-          {record.role === 'ADMIN' 
-            ? <CrownOutlined style={{ color: '#f5222d' }} /> 
-            : <UserOutlined style={{ color: '#1890ff' }} />}
-          <span style={{ fontWeight: 'bold' }}>{text}</span>
-        </Space>
-      ),
+      render: (text, record) => {
+        const showText = text && text.length > 7 ? text.slice(0, 7) + '…' : text;
+        return (
+          <Space>
+            {record.role === 'ADMIN' 
+              ? <CrownOutlined style={{ color: '#f5222d' }} /> 
+              : <UserOutlined style={{ color: '#1890ff' }} />}
+            <Tooltip title={text} placement="topLeft" mouseEnterDelay={0.2}>
+              <span style={{ fontWeight: 'bold' }}>{showText}</span>
+            </Tooltip>
+          </Space>
+        );
+      },
     },
     {
       title: '当前角色',

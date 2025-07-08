@@ -823,14 +823,14 @@ const Dashboard = ({ user }) => {
                         </div>
                       ) : (
                         <>
+                          <a onClick={() => handleViewTimetable(item.id)} style={{ fontWeight: 600, fontSize: 17 }}>{item.name}</a>
                           <Button 
                             type="text" 
                             size="small" 
                             icon={<EditOutlined />}
                             onClick={() => handleStartEditTimetableName(item.id, item.name)}
-                            style={{ color: '#8c8c8c', padding: '0 4px' }}
+                            style={{ color: '#8c8c8c', padding: '0 4px', marginLeft: 2 }}
                           />
-                          <a onClick={() => handleViewTimetable(item.id)}>{item.name}</a>
                         </>
                       )}
                     </div>

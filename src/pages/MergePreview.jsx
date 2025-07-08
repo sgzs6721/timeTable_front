@@ -392,18 +392,19 @@ const MergePreview = ({ user }) => {
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div style={{ position: 'relative', marginBottom: '1.5rem', minHeight: 48, display: 'flex', alignItems: 'center' }}>
         <Button
-          type="text"
+          type="default"
+          shape="circle"
           onClick={() => navigate(-1)}
-          icon={<LeftOutlined style={{ fontSize: 24 }} />}
-          style={{ marginRight: '1rem' }}
+          icon={<LeftOutlined style={{ fontSize: 20 }} />}
+          style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)' }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
-            <h1 style={{ margin: 0 }}>{mergedTimetable?.name}</h1>
-          </div>
+        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <CalendarOutlined style={{ fontSize: '22px', color: '#8a2be2' }} />
+          <h1 style={{ margin: 0, fontSize: 22, textAlign: 'center', whiteSpace: 'nowrap' }}>{mergedTimetable?.name}</h1>
+        </div>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
           <Tag color={mergedTimetable?.isWeekly ? 'blue' : 'green'}>
             {mergedTimetable?.isWeekly ? '周固定课表' : '日期范围课表'}
           </Tag>
@@ -453,7 +454,7 @@ const MergePreview = ({ user }) => {
             onClick={() => setCurrentWeekIndex(currentWeekIndex - 1)}
           />
           <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
-            第 {currentWeekIndex + 1} 周: {weeksList[currentWeekIndex]?.label}
+            第{currentWeekIndex + 1}周，共{weeksList.length}周: {weeksList[currentWeekIndex]?.label}
           </Tag>
           <Button
             type="text"
@@ -461,9 +462,6 @@ const MergePreview = ({ user }) => {
             disabled={currentWeekIndex === weeksList.length - 1}
             onClick={() => setCurrentWeekIndex(currentWeekIndex + 1)}
           />
-          <span style={{ fontSize: '12px', color: '#666' }}>
-            共 {weeksList.length} 周
-          </span>
         </div>
       )}
       

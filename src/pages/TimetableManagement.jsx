@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, message, Space, Tag, Tooltip } from 'antd';
+import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin } from 'antd';
 import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables } from '../services/admin';
@@ -8,6 +8,7 @@ const TimetableManagement = ({ user }) => {
   const [allTimetables, setAllTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTimetables, setSelectedTimetables] = useState([]);
+  const [batchMode, setBatchMode] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -132,16 +133,6 @@ const TimetableManagement = ({ user }) => {
     },
   ];
 
-  const rowSelection = {
-    selectedRowKeys: selectedTimetables,
-    onChange: (selectedRowKeys) => {
-      setSelectedTimetables(selectedRowKeys);
-    },
-    getCheckboxProps: (record) => ({
-      disabled: false,
-    }),
-  };
-
   // 检查是否可以合并（类型一致）
   const checkCanMerge = () => {
     if (selectedTimetables.length < 2) return false;
@@ -151,35 +142,105 @@ const TimetableManagement = ({ user }) => {
     return selectedData.every(table => table.isWeekly === firstType);
   };
 
+  // 进入/退出批量操作模式
+  const handleBatchMode = () => {
+    setBatchMode(true);
+  };
+  const handleCancelBatchMode = () => {
+    setBatchMode(false);
+    setSelectedTimetables([]);
+  };
+
   return (
     <div>
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '14px', color: '#666' }}>
-          已选择 {selectedTimetables.length} 个课表
-        </span>
-        <Button 
-          type="primary" 
-          icon={<MergeOutlined />}
-          onClick={handleMergeTimetables}
-          disabled={selectedTimetables.length < 2 || !checkCanMerge()}
-        >
-          合并选中课表
-        </Button>
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: batchMode ? 'space-between' : 'flex-start', alignItems: 'center' }}>
+        {batchMode ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <Button size="small" style={{ marginRight: 16 }} onClick={handleCancelBatchMode}>取消批量</Button>
+              <span style={{ fontSize: '14px', color: '#666' }}>
+                已选择 {selectedTimetables.length} 个课表
+              </span>
+            </div>
+            <Button 
+              type="primary" 
+              icon={<MergeOutlined />}
+              onClick={handleMergeTimetables}
+              disabled={selectedTimetables.length < 2 || !checkCanMerge()}
+              size="small"
+            >
+              合并选中课表
+            </Button>
+          </>
+        ) : (
+          <Button type="primary" size="small" icon={<MergeOutlined />} onClick={handleBatchMode} style={{ padding: '0 8px', height: 26, fontSize: 13 }}>
+            批量操作
+          </Button>
+        )}
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={allTimetables}
-        loading={loading}
-        rowKey="id"
-        rowSelection={rowSelection}
-        pagination={{
-          pageSize: 10,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
-        }}
-      />
+      {loading ? <Spin /> : (
+        <List
+          dataSource={allTimetables}
+          renderItem={item => {
+            const nameColors = ['#10239e','#ad6800','#006d75','#237804','#9e1068','#a8071a','#391085','#0050b3'];
+            const keyVal = (item.username || item.userName || '').split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
+            const color = nameColors[keyVal % nameColors.length];
+            const checked = selectedTimetables.includes(item.id);
+            return (
+              <List.Item
+                style={{
+                  border: '1px solid #f0f0f0',
+                  borderRadius: 10,
+                  marginBottom: 16,
+                  padding: 18,
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#fff',
+                }}
+              >
+                {batchMode && (
+                  <Checkbox
+                    checked={checked}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setSelectedTimetables([...selectedTimetables, item.id]);
+                      } else {
+                        setSelectedTimetables(selectedTimetables.filter(id => id !== item.id));
+                      }
+                    }}
+                    style={{ marginRight: 16 }}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <a style={{ color, fontWeight: 600, fontSize: 17 }} onClick={() => navigate(`/view-timetable/${item.id}`)}>{item.name}</a>
+                    <Tag style={{ backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1', marginLeft: 8, minWidth: 90, textAlign: 'center' }}>
+                      {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                    </Tag>
+                  </div>
+                  {/* 用户+日期+课程数量同一行，和标题有间距 */}
+                  <div style={{ display: 'flex', alignItems: 'center', marginTop: 10, marginBottom: 0 }}>
+                    <div style={{ color: '#888', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span><UserOutlined /> {item.username || item.user?.username || item.userName || `ID:${item.userId || '-'}`}</span>
+                      <span style={{ marginLeft: 10 }}>
+                        {item.isWeekly ? '每周重复' : `${item.startDate} 至 ${item.endDate}`}
+                      </span>
+                    </div>
+                  </div>
+                  {/* 第三行：创建日期+课程数量，同一行，普通文本 */}
+                  <div style={{ color: '#888', fontSize: 13, marginTop: 2, display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <span>
+                      创建日期：{item.createdAt ? (item.createdAt.length > 10 ? item.createdAt.slice(0, 10) : item.createdAt) : ''}
+                    </span>
+                    <span>{item.scheduleCount || 0} 个课程</span>
+                  </div>
+                </div>
+              </List.Item>
+            );
+          }}
+        />
+      )}
     </div>
   );
 };
