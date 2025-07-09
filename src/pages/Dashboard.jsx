@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu } from 'antd';
-import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi } from '../services/timetable';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import './Dashboard.css';
@@ -71,9 +71,22 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, ti
 
 // 活动课表标识组件
 const ActiveBadge = () => (
-  <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', alignItems: 'center', zIndex: 2 }}>
-    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#52c41a', display: 'inline-block', marginRight: 4, boxShadow: '0 0 4px #52c41a' }} />
-    <span style={{ color: '#52c41a', fontWeight: 600, fontSize: 13 }}>活动</span>
+  <div style={{
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 18,
+    height: 18,
+    background: '#389e0d',
+    borderTopLeftRadius: '8px',
+    borderBottomRightRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '1px 1px 4px rgba(0,0,0,0.15)',
+    zIndex: 1
+  }}>
+    <StarFilled style={{ color: 'white', fontSize: '10px' }} />
   </div>
 );
 
@@ -167,8 +180,19 @@ const Dashboard = ({ user }) => {
       okText: '设为活动课表',
       cancelText: '取消',
       onOk: async () => {
-        // TODO: 调用后端接口设为活动课表
-        message.success('已设为活动课表');
+        try {
+          message.loading({ content: '正在更新...', key: 'active' });
+          const res = await setActiveTimetable(id);
+          if (res.success) {
+            // 更新本地状态：全部课表 isActive = false, 该课表 = true
+            setTimetables(prev => prev.map(t => ({ ...t, isActive: t.id === id ? true : false })));
+            message.success({ content: '已设为活动课表', key: 'active' });
+          } else {
+            message.error({ content: res.message || '设置失败', key: 'active' });
+          }
+        } catch (error) {
+          message.error({ content: '操作失败', key: 'active' });
+        }
       },
     });
   };
@@ -181,10 +205,20 @@ const Dashboard = ({ user }) => {
       okText: '归档',
       cancelText: '取消',
       onOk: async () => {
-        // TODO: 调用后端接口归档课表
-        setTimetables(timetables.filter(t => t.id !== id));
-        setArchivedTimetables([...archivedTimetables, timetables.find(t => t.id === id)]);
-        message.success('课表已归档');
+        try {
+          message.loading({ content: '正在归档...', key: 'archive' });
+          const res = await archiveTimetableApi(id);
+          if (res.success) {
+            setTimetables(prev => prev.filter(t => t.id !== id));
+            // 添加到归档列表
+            setArchivedTimetables(prev => [...prev, { ...timetables.find(t => t.id === id), isArchived: true }]);
+            message.success({ content: '课表已归档', key: 'archive' });
+          } else {
+            message.error({ content: res.message || '归档失败', key: 'archive' });
+          }
+        } catch (error) {
+          message.error({ content: '操作失败', key: 'archive' });
+        }
       },
     });
   };
@@ -211,22 +245,32 @@ const Dashboard = ({ user }) => {
 
   // 操作菜单
   const getActionMenu = (item) => {
-    // 假设课表有 isActive 字段
     const isOnlyOne = timetables.length === 1;
     const isActive = item.isActive;
-    return (
-      <Menu>
-        <Menu.Item key="active" disabled={isOnlyOne || isActive} onClick={() => handleSetActiveTimetable(item.id)}>
-          设为活动课表
-        </Menu.Item>
-        <Menu.Item key="archive" onClick={() => handleArchiveTimetable(item.id)}>
-          归档
-        </Menu.Item>
-        <Menu.Item key="delete" danger onClick={() => handleDeleteTimetable(item.id)}>
-          删除课表
-        </Menu.Item>
-      </Menu>
-    );
+    const setActiveDisabled = isOnlyOne || isActive;
+
+    return {
+      items: [
+        {
+          key: 'active',
+          label: '设为活动课表',
+          disabled: setActiveDisabled,
+          onClick: () => handleSetActiveTimetable(item.id),
+        },
+        {
+          key: 'archive',
+          label: '归档',
+          disabled: isActive,
+          onClick: () => handleArchiveTimetable(item.id),
+        },
+        {
+          key: 'delete',
+          label: '删除课表',
+          danger: true,
+          onClick: () => handleDeleteTimetable(item.id),
+        },
+      ],
+    };
   };
 
   const handleCreateTimetable = () => {
@@ -302,6 +346,125 @@ const Dashboard = ({ user }) => {
     setEditingTimetableName('');
   };
 
+  const handleShowTodaysCourses = async (timetable) => {
+    try {
+      message.loading({ content: '正在查询课程安排...', key: 'courses' });
+      const response = await getTimetableSchedules(timetable.id);
+
+      if (!response.success) {
+        message.destroy('courses');
+        message.error(response.message || '获取课程安排失败');
+        return;
+      }
+      const allSchedules = response.data;
+      
+      // 保存当前课表信息和所有课程数据
+      setCurrentTimetable(timetable);
+      setAllSchedulesData(allSchedules);
+      
+      const newStudentColorMap = { ...studentColorMap };
+      let localColorIndex = Object.keys(newStudentColorMap).length;
+      const localLightColorPalette = ['#f6ffed', '#e6f7ff', '#fff7e6', '#fff0f6', '#f9f0ff', '#f0f5ff' ];
+
+      const assignColorToStudent = (studentName) => {
+        if (studentName && !newStudentColorMap[studentName]) {
+          newStudentColorMap[studentName] = localLightColorPalette[localColorIndex % localLightColorPalette.length];
+          localColorIndex++;
+        }
+      };
+
+      const generateDayData = (targetDate, isWeekly) => {
+        let schedulesForDay = [];
+        let subTitle = '';
+
+        if (isWeekly) {
+          const weekDayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+          const dayOfWeek = weekDayMap[targetDate.day()];
+          schedulesForDay = allSchedules.filter(s => s.dayOfWeek === dayOfWeek);
+          subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${dayOfWeek})`;
+        } else {
+          const dateStr = targetDate.format('YYYY-MM-DD');
+          schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+          subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${dateStr})`;
+        }
+        
+        const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        
+        if (sortedSchedules.length === 0) {
+          return { tableData: [], schedulesForCopy: [], subTitle };
+        }
+
+        sortedSchedules.forEach(s => assignColorToStudent(s.studentName));
+        
+        const firstScheduleHour = parseInt(sortedSchedules[0].startTime.substring(0, 2));
+
+        const timeSlots = [];
+        for (let hour = firstScheduleHour; hour <= 19; hour++) {
+          timeSlots.push({
+            time: `${hour.toString().padStart(2, '0')}:00`,
+            displayTime: `${hour}-${hour + 1}`,
+          });
+        }
+        
+        const tableData = [];
+        for (let i = 0; i < timeSlots.length; i += 2) {
+          const leftSlot = timeSlots[i];
+          const rightSlot = timeSlots[i + 1];
+          const leftSchedule = sortedSchedules.find(s => s.startTime.substring(0, 5) === leftSlot.time);
+          const rightSchedule = rightSlot ? sortedSchedules.find(s => s.startTime.substring(0, 5) === rightSlot.time) : null;
+          tableData.push({
+            key: i / 2,
+            time1: leftSlot.displayTime,
+            studentName1: leftSchedule ? leftSchedule.studentName : '',
+            schedule1: leftSchedule || null,
+            time2: rightSlot ? rightSlot.displayTime : '',
+            studentName2: rightSchedule ? rightSchedule.studentName : '',
+            schedule2: rightSchedule || null,
+          });
+        }
+        return { tableData, schedulesForCopy: sortedSchedules, subTitle };
+      };
+
+      // Today
+      const todayData = generateDayData(dayjs(), timetable.isWeekly);
+      setTodaysCoursesData(todayData.tableData);
+      setTodaysSchedulesForCopy(todayData.schedulesForCopy);
+      setModalSubTitle(todayData.subTitle);
+      
+      // Tomorrow
+      const tomorrowData = generateDayData(dayjs().add(1, 'day'), timetable.isWeekly);
+      setTomorrowsCoursesData(tomorrowData.tableData);
+      setTomorrowsSchedulesForCopy(tomorrowData.schedulesForCopy);
+      setModalSubTitleTomorrow(tomorrowData.subTitle);
+
+      if (todayData.tableData.length === 0 && tomorrowData.tableData.length === 0) {
+        message.destroy('courses');
+        message.info('今天和明天都没有安排课程');
+        return;
+      }
+      
+      message.destroy('courses');
+      setStudentColorMap(newStudentColorMap);
+      setModalMainTitle(timetable.name);
+      setTodaysCoursesModalVisible(true);
+
+    } catch (error) {
+      message.destroy('courses');
+      message.error('查询失败，请检查网络连接');
+    }
+  };
+
+  // 生成复制文本
+  const generateCopyText = (schedules) => {
+    if (!schedules || schedules.length === 0) return '没有可复制的课程';
+    return schedules.map(schedule => {
+        const startHour = parseInt(schedule.startTime.substring(0, 2));
+        const displayTime = `${startHour}-${startHour + 1}`;
+        return `${displayTime}, ${schedule.studentName}`;
+    }).join('\n');
+  };
+
+  
   const getColumns = (colorMap) => [
     {
       title: '时间',
@@ -718,12 +881,12 @@ const Dashboard = ({ user }) => {
                 <Button type="link" onClick={() => handleShowTodaysCourses(item)}>今明课程</Button>,
                 <Button type="link" onClick={() => handleInputTimetable(item)}>录入</Button>,
                 <Button type="link" onClick={() => handleViewTimetable(item.id)}>查看</Button>,
-                <Dropdown overlay={getActionMenu(item)} trigger={["click"]} placement="bottomRight">
+                <Dropdown menu={getActionMenu(item)} trigger={["click"]} placement="bottomRight">
                   <Button type="link">操作</Button>
                 </Dropdown>
               ]}
             >
-              {item.isActive && <ActiveBadge />}
+              {item.isActive ? <ActiveBadge /> : null}
               <List.Item.Meta
                 className="timetable-item-meta"
                 avatar={
@@ -801,8 +964,8 @@ const Dashboard = ({ user }) => {
                           {item.isWeekly ? '周固定课表' : '日期范围课表'}
                         </Tag>
                     </div>
-                    <div style={{ color: '#888', fontSize: '12px' }}>
-                      创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
+                      <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
                     </div>
                   </>
                 }

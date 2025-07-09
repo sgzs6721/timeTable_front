@@ -220,3 +220,63 @@ export const mergeTimetables = async (timetableIds, mergedName) => {
     throw error;
   }
 };
+
+// 设为活动课表
+export const setActiveTimetable = async (timetableId) => {
+  try {
+    const response = await api.put(`/timetables/${timetableId}/active`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 归档课表
+export const archiveTimetableApi = async (timetableId) => {
+  try {
+    const response = await api.put(`/timetables/${timetableId}/archive`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 恢复归档课表
+export const restoreTimetableApi = async (timetableId) => {
+  try {
+    const response = await api.put(`/timetables/${timetableId}/restore`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 批量恢复课表
+export const bulkRestoreTimetables = async (ids) => {
+  try {
+    const response = await api.post('/timetables/batch-restore', { ids });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 批量删除课表
+export const bulkDeleteTimetables = async (ids) => {
+  try {
+    const response = await api.post('/timetables/batch-delete', { ids });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取归档课表
+export const getArchivedTimetables = async () => {
+  try {
+    const response = await api.get('/timetables/archived');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};

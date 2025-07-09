@@ -12,6 +12,7 @@ import ConfirmSchedulePage from './pages/ConfirmSchedulePage';
 import AppHeader from './components/AppHeader';
 import MergePreview from './pages/MergePreview';
 import UserProfile from './pages/UserProfile';
+import ArchivedTimetables from './pages/ArchivedTimetables';
 import './App.css';
 
 const { Content } = Layout;
@@ -97,6 +98,10 @@ function App() {
             <Route 
               path="/profile" 
               element={user ? <UserProfile user={user} /> : <Navigate to="/login" />} 
+            />
+            <Route
+              path="/archived-timetables"
+              element={user ? <ArchivedTimetables /> : <Navigate to="/login" />}
             />
             <Route 
               path="/" 
