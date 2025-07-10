@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin } from 'antd';
+import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin, Modal } from 'antd';
 import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getAllTimetables } from '../services/admin';
+import { getAllTimetables, updateTimetableStatus } from '../services/admin';
 
 const ActiveBadge = () => (
     <div style={{
@@ -56,6 +56,28 @@ const TimetableManagement = ({ user }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSetActive = (id) => {
+    Modal.confirm({
+      title: '确认设为活动课表',
+      content: '每个用户只能有一个活动课表。确定后，该用户之前的活动课表将自动失效。',
+      okText: '确认',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await updateTimetableStatus(id, { isActive: true });
+          if (response.success) {
+            message.success('已将课表设为活动状态');
+            fetchAllTimetables();
+          } else {
+            message.error(response.message || '操作失败');
+          }
+        } catch (error) {
+          message.error('操作失败，请检查网络连接');
+        }
+      },
+    });
   };
 
   const handleMergeTimetables = () => {
@@ -232,7 +254,26 @@ const TimetableManagement = ({ user }) => {
                   position: 'relative',
                 }}
               >
-                {item.isActive ? <ActiveBadge /> : null}
+                {item.isActive ? <ActiveBadge /> : (
+                  !batchMode && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      ghost
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetActive(item.id);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        bottom: 18,
+                        right: 18,
+                      }}
+                    >
+                      设为活动
+                    </Button>
+                  )
+                )}
                 {batchMode && (
                   <Checkbox
                     checked={checked}
@@ -248,19 +289,35 @@ const TimetableManagement = ({ user }) => {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <a style={{ color, fontWeight: 600, fontSize: 17 }} onClick={() => navigate(`/view-timetable/${item.id}`)}>{item.name}</a>
-                    <Tag style={{ backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1', marginLeft: 8, minWidth: 90, textAlign: 'center' }}>
-                      {item.isWeekly ? '周固定课表' : '日期范围课表'}
-                    </Tag>
-                  </div>
-                  {/* 用户+日期+课程数量同一行，和标题有间距 */}
-                  <div style={{ display: 'flex', alignItems: 'center', marginTop: 10, marginBottom: 0 }}>
-                    <div style={{ color: '#888', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <span><UserOutlined /> {item.username || item.user?.username || item.userName || `ID:${item.userId || '-'}`}</span>
-                      <span style={{ marginLeft: 10 }}>
-                        {item.isWeekly ? '每周重复' : `${item.startDate} 至 ${item.endDate}`}
-                      </span>
+                    <Tooltip title={item.name}>
+                      <a 
+                        onClick={() => navigate(`/view-timetable/${item.id}`)}
+                        style={{
+                          color,
+                          fontSize: '16px',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          flex: '0 1 auto',
+                        }}
+                      >
+                        {item.name}
+                      </a>
+                    </Tooltip>
+                    <div>
+                      <Tag color={item.isWeekly ? "geekblue" : "purple"}>
+                        {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                      </Tag>
                     </div>
+                  </div>
+                  <div style={{ color: '#666', fontSize: 13, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
+                    <span>
+                      <UserOutlined /> {item.username || item.user?.username || item.userName || `ID:${item.userId || '-'}`}
+                    </span>
+                    <span style={{ marginLeft: 10 }}>
+                      {item.isWeekly ? '每周重复' : `${item.startDate} 至 ${item.endDate}`}
+                    </span>
                   </div>
                   {/* 第三行：创建日期+课程数量，同一行，普通文本 */}
                   <div style={{ color: '#888', fontSize: 13, marginTop: 2, display: 'flex', alignItems: 'center', gap: 16 }}>

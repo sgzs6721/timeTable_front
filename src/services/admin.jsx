@@ -10,6 +10,15 @@ export const getAllTimetables = async () => {
   }
 };
 
+export const updateTimetableStatus = async (id, data) => {
+  try {
+    const response = await api.put(`/admin/timetables/${id}`, data);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 获取所有用户列表
 export const getAllUsers = async () => {
   try {
