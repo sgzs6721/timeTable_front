@@ -22,6 +22,8 @@ dayjs.locale({
   weekStart: 1
 });
 
+const sourceNameColors = ['#10239e','#ad6800','#006d75','#237804','#9e1068','#a8071a','#391085','#0050b3'];
+
 const MergePreview = ({ user }) => {
   const [mergedTimetable, setMergedTimetable] = useState(null);
   const [allSchedules, setAllSchedules] = useState([]);
@@ -30,6 +32,7 @@ const MergePreview = ({ user }) => {
   const [timetablesData, setTimetablesData] = useState([]);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weeksList, setWeeksList] = useState([]);
+  const [timetableColorMap, setTimetableColorMap] = useState({});
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -137,6 +140,12 @@ const MergePreview = ({ user }) => {
       const baseTimetable = { ...timetables[0] };
       const names = timetables.map(t => t.name);
       baseTimetable.name = `合并预览`; // 修改标题
+      
+      const colorMap = {};
+      timetables.forEach((t, index) => {
+        colorMap[t.id] = sourceNameColors[index % sourceNameColors.length];
+      });
+      setTimetableColorMap(colorMap);
       
       // 如果是日期范围课表，合并日期范围并生成周列表
       if (!baseTimetable.isWeekly) {
@@ -259,7 +268,7 @@ const MergePreview = ({ user }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#333',
+              color: timetableColorMap[student.timetableId] || '#333',
               fontSize: '12px',
               wordBreak: 'break-word',
               lineHeight: '1.2',
@@ -286,6 +295,9 @@ const MergePreview = ({ user }) => {
 
     // 为每个排课添加来源课表信息
     const timetableIdToNameMap = new Map();
+    timetablesData.forEach(t => {
+      timetableIdToNameMap.set(t.id, t.name);
+    });
     
     // 从URL参数解析课表ID，按顺序对应timetableNames
     const ids = idsParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
@@ -416,9 +428,11 @@ const MergePreview = ({ user }) => {
           <strong>合并来源：</strong>
           {timetablesData.map((table, index) => (
             <span key={table.id}>
-              {table.name}
+              <span style={{ color: timetableColorMap[table.id] }}>
+                {table.name}
+              </span>
               {table.username && (
-                <span style={{ color: '#999' }}>
+                <span style={{ color: timetableColorMap[table.id] }}>
                   ({table.username})
                 </span>
               )}

@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin } from 'antd';
-import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables } from '../services/admin';
+
+const ActiveBadge = () => (
+    <div style={{
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 18,
+      height: 18,
+      background: '#389e0d',
+      borderTopLeftRadius: '8px',
+      borderBottomRightRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '-1px -1px 4px rgba(0,0,0,0.15)',
+      zIndex: 1
+    }}>
+      <StarFilled style={{ color: 'white', fontSize: '10px' }} />
+    </div>
+  );
 
 const TimetableManagement = ({ user }) => {
   const [allTimetables, setAllTimetables] = useState([]);
@@ -151,6 +171,10 @@ const TimetableManagement = ({ user }) => {
     setSelectedTimetables([]);
   };
 
+  const displayTimetables = batchMode
+    ? allTimetables.filter(item => item.scheduleCount > 0 && item.isActive === 1)
+    : allTimetables;
+
   return (
     <div>
       <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: batchMode ? 'space-between' : 'flex-start', alignItems: 'center' }}>
@@ -159,7 +183,7 @@ const TimetableManagement = ({ user }) => {
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <Button size="small" style={{ marginRight: 16 }} onClick={handleCancelBatchMode}>取消批量</Button>
               <span style={{ fontSize: '14px', color: '#666' }}>
-                已选择 {selectedTimetables.length} 个课表
+                已选择 {selectedTimetables.length} 个活动课表
               </span>
             </div>
             <Button 
@@ -181,7 +205,7 @@ const TimetableManagement = ({ user }) => {
 
       {loading ? <Spin /> : (
         <List
-          dataSource={allTimetables}
+          dataSource={displayTimetables}
           renderItem={item => {
             const nameColors = ['#10239e','#ad6800','#006d75','#237804','#9e1068','#a8071a','#391085','#0050b3'];
             const keyVal = (item.username || item.userName || '').split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
@@ -197,8 +221,10 @@ const TimetableManagement = ({ user }) => {
                   display: 'flex',
                   alignItems: 'center',
                   background: '#fff',
+                  position: 'relative',
                 }}
               >
+                {item.isActive ? <ActiveBadge /> : null}
                 {batchMode && (
                   <Checkbox
                     checked={checked}

@@ -846,6 +846,7 @@ const Dashboard = ({ user }) => {
           icon={<PlusOutlined />}
           onClick={handleCreateTimetable}
           style={{ position: 'absolute', right: 0 }}
+          disabled={timetables.length >= 5}
         >
           创建课表
         </Button>
