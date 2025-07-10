@@ -223,7 +223,7 @@ const ArchivedTimetables = () => {
                 }
                 <div style={{ flex: 1, position: 'relative' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <a style={{ color: getNameColor(item.name), fontWeight: 600, fontSize: 17 }}>{item.name}</a>
+                    <a style={{ color: getNameColor(item.name), fontWeight: 600, fontSize: 17 }} onClick={() => navigate(`/view-timetable/${item.id}`)}>{item.name}</a>
                     <Tag style={{ backgroundColor:'#f9f0ff', borderColor:'transparent', color:'#722ED1' }}>
                       {item.isWeekly? '周固定课表':'日期范围课表'}
                     </Tag>

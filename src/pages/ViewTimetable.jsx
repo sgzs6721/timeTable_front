@@ -31,7 +31,7 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable, isArchived }) => {
   const [name, setName] = React.useState(schedule.studentName);
 
   return (
@@ -43,6 +43,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
           value={name}
           onChange={(e) => setName(e.target.value)}
           style={{ flex: 1 }}
+          disabled={isArchived}
         />
       </div>
 
@@ -64,21 +65,25 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
         >
             导出
         </Button>
-        <Button
-          type="primary"
-          danger
-          onClick={onDelete}
-          size="small"
-        >
-          删除
-        </Button>
-        <Button
-          size="small"
-          onClick={() => onUpdateName(name)}
-          style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
-        >
-          修改
-        </Button>
+        {!isArchived && (
+          <>
+            <Button
+              type="primary"
+              danger
+              onClick={onDelete}
+              size="small"
+            >
+              删除
+            </Button>
+            <Button
+              size="small"
+              onClick={() => onUpdateName(name)}
+              style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
+            >
+              修改
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -222,26 +227,20 @@ const ViewTimetable = ({ user }) => {
   const handleShowDayCourses = (day, dayIndex) => {
     let schedulesForDay = [];
     let modalTitle = '';
-    const studentColorMapForDay = new Map(studentColorMap);
 
     if (timetable.isWeekly) {
-      const dayOfWeekName = day.label;
-      schedulesForDay = allSchedules.filter(s => {
-        // antd的dayjs().day()周日是0，周一是1，所以要映射
-        const dayMap = ['SUNDAY','MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-        return s.dayOfWeek.toUpperCase() === dayMap[dayjs().day(dayIndex+1).day()];
-      });
-      modalTitle = `${timetable.name} - ${dayOfWeekName}`;
+      schedulesForDay = allSchedules.filter(s => s.dayOfWeek.toLowerCase() === day.key);
+      modalTitle = `${timetable.name} - ${day.label}`;
     } else {
-      const currentWeekDates = getCurrentWeekDates();
-      const targetDate = currentWeekDates[dayIndex];
-      if (targetDate) {
+      const weekDates = getCurrentWeekDates();
+      if (weekDates.start) {
+        const targetDate = weekDates.start.add(dayIndex, 'day');
         const dateStr = targetDate.format('YYYY-MM-DD');
         schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
         modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
       }
     }
-    
+
     const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     if (sortedSchedules.length === 0) {
@@ -249,7 +248,7 @@ const ViewTimetable = ({ user }) => {
       return;
     }
     
-    // Assign colors to students for this specific day
+    const studentColorMapForDay = new Map(studentColorMap);
     sortedSchedules.forEach(s => {
       if (s.studentName && !studentColorMapForDay.has(s.studentName)) {
         studentColorMapForDay.set(s.studentName, colorPalette[studentColorMapForDay.size % colorPalette.length]);
@@ -273,9 +272,6 @@ const ViewTimetable = ({ user }) => {
         studentName: schedule ? schedule.studentName : '',
         schedule: schedule || null,
       };
-    }).filter((row, index, arr) => {
-      // 优化显示：如果连续多行没有课程，可以考虑在这里过滤，但为了保持完整时间线，暂时不过滤
-      return true;
     });
 
     setDayScheduleData(tableData);
@@ -607,6 +603,27 @@ const ViewTimetable = ({ user }) => {
     return allSchedules || [];
   }, [allSchedules]);
 
+  const handleWeekChange = (week) => {
+    setCurrentWeek(week);
+  };
+
+  const colorPalette = [
+    '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF',
+    '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC',
+    '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
+  ];
+
+  const textColorPalette = ['#1890ff', '#722ed1', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#d4380d'];
+
+  const studentColorMap = new Map();
+  const studentTextColorMap = new Map();
+
+  const allStudentNames = [...new Set(allSchedules.map(s => s.studentName).filter(Boolean))];
+  allStudentNames.forEach((name, index) => {
+    studentColorMap.set(name, colorPalette[index % colorPalette.length]);
+    studentTextColorMap.set(name, textColorPalette[index % textColorPalette.length]);
+  });
+
   const generateColumns = () => {
     const weekDates = getCurrentWeekDates();
 
@@ -627,11 +644,14 @@ const ViewTimetable = ({ user }) => {
     ];
 
     weekDays.forEach((day, index) => {
-      let columnTitle = day.label;
-      if (weekDates && weekDates.start) {
+      let columnTitle;
+      if (!timetable.isWeekly && weekDates && weekDates.start) {
         const currentDate = weekDates.start.add(index, 'day');
         columnTitle = (
-          <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => handleShowDayCourses(day, index)}>
+          <div 
+            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }} 
+            onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
+          >
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
               {day.label}
             </div>
@@ -642,7 +662,10 @@ const ViewTimetable = ({ user }) => {
         );
       } else {
         columnTitle = (
-          <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => handleShowDayCourses(day, index)}>
+          <div 
+            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }} 
+            onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
+          >
             {day.label}
           </div>
         )
@@ -656,12 +679,29 @@ const ViewTimetable = ({ user }) => {
         onCell: () => ({
           style: { padding: '0px' }
         }),
-        render: (students, record) => {
-          if (!students || students.length === 0) {
-            // 空单元格：提供插入排课功能或多选功能
+        render: (text, record) => {
+          const schedules = currentWeekSchedules.filter(s => {
+            const timeKey = `${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`;
+            let scheduleDayKey;
+            if (timetable.isWeekly) {
+              scheduleDayKey = s.dayOfWeek.toLowerCase();
+            } else {
+              const scheduleDate = dayjs(s.scheduleDate);
+              const dayIndex = scheduleDate.day();
+              const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+              scheduleDayKey = dayNames[dayIndex];
+            }
+            return timeKey === record.time && scheduleDayKey === day.key;
+          });
+
+          if (!schedules || schedules.length === 0) {
             const pagePrefix = timetable?.isWeekly ? 'weekly' : `week-${currentWeek}`;
             const cellKey = `${pagePrefix}-${day.key}-${record.key}`;
             const isSelected = selectedCells.has(cellKey);
+
+            if (timetable?.isArchived) {
+              return <div style={{ height: '48px' }} />;
+            }
 
             const handleCellClick = (e) => {
               if (multiSelectMode) {
@@ -720,7 +760,6 @@ const ViewTimetable = ({ user }) => {
             };
 
             if (multiSelectMode) {
-              // 多选模式下的空白单元格
               return (
                 <div 
                   style={{ 
@@ -742,34 +781,28 @@ const ViewTimetable = ({ user }) => {
               );
             }
 
-            // 普通模式下的空白单元格
             return (
               <Popover
                 placement="rightTop"
                 title={null}
-                content={
-                  <NewSchedulePopoverContent
-                    onAdd={(studentName) => handleAddSchedule(studentName)}
-                    onCancel={() => handleOpenChange(false)}
-                  />
-                }
+                content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} /> }
                 trigger={multiSelectMode ? "contextMenu" : "click"}
-                open={openPopoverKey === cellKey}
+                open={!timetable?.isArchived && openPopoverKey === cellKey}
                 onOpenChange={handleOpenChange}
               >
                 <div style={{ height: '48px', cursor: 'pointer' }} />
               </Popover>
             );
           }
+          
           const cellKey = `${day.key}-${record.key}`;
-
           const handleOpenChange = (newOpen) => {
             setOpenPopoverKey(newOpen ? cellKey : null);
           };
 
           const popoverContent = (
             <div>
-              {students.map((student, idx) => (
+              {schedules.map((student, idx) => (
                 <div key={student.id}>
                   <SchedulePopoverContent
                     schedule={student}
@@ -777,8 +810,9 @@ const ViewTimetable = ({ user }) => {
                     onUpdateName={(newName) => handleSaveStudentName(student, newName)}
                     onExport={handleExportStudentSchedule}
                     timetable={timetable}
+                    isArchived={timetable?.isArchived}
                   />
-                  {idx < students.length - 1 && <hr style={{ margin: '8px 0' }} />}
+                  {idx < schedules.length - 1 && <hr style={{ margin: '8px 0' }} />}
                 </div>
               ))}
             </div>
@@ -793,15 +827,8 @@ const ViewTimetable = ({ user }) => {
               open={openPopoverKey === cellKey}
               onOpenChange={handleOpenChange}
             >
-              <div style={{
-                height: '100%',
-                minHeight: '48px',
-                display: 'flex',
-                flexDirection: 'column',
-                width: '100%',
-                cursor: 'pointer'
-              }}>
-                {students.map((student, idx) => (
+              <div style={{ height: '100%', minHeight: '48px', display: 'flex', flexDirection: 'column', width: '100%', cursor: 'pointer' }}>
+                {schedules.map((student, idx) => (
                   <div
                     key={student.id}
                     style={{
@@ -834,70 +861,10 @@ const ViewTimetable = ({ user }) => {
     return columns;
   };
 
-  const generateTableData = () => {
-    const data = [];
-    const groupedSchedules = {};
-
-    currentWeekSchedules.forEach(schedule => {
-      const timeKey = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
-
-      let dayKey;
-      if (timetable.isWeekly) {
-        dayKey = schedule.dayOfWeek.toLowerCase();
-      } else {
-        // 对于日期范围课表，根据日期计算星期几
-        const scheduleDate = dayjs(schedule.scheduleDate);
-        const dayIndex = scheduleDate.day(); // 0=Sunday, 1=Monday, ..., 6=Saturday
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        dayKey = dayNames[dayIndex];
-      }
-
-      if (!groupedSchedules[timeKey]) {
-        groupedSchedules[timeKey] = {};
-      }
-      if (!groupedSchedules[timeKey][dayKey]) {
-        groupedSchedules[timeKey][dayKey] = [];
-      }
-      groupedSchedules[timeKey][dayKey].push(schedule);
-    });
-
-    timeSlots.forEach((timeSlot, index) => {
-      const rowData = {
-        key: index,
-        time: timeSlot,
-      };
-
-      weekDays.forEach((day, dayIndex) => {
-        const daySchedules = groupedSchedules[timeSlot]?.[day.key] || [];
-        rowData[day.key] = daySchedules;
-      });
-
-      data.push(rowData);
-    });
-
-    return data;
-  };
-
-  const handleWeekChange = (week) => {
-    setCurrentWeek(week);
-  };
-
-  const colorPalette = [
-    '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF',
-    '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC',
-    '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
-  ];
-
-  const textColorPalette = ['#1890ff', '#722ed1', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#d4380d'];
-
-  const studentColorMap = new Map();
-  const studentTextColorMap = new Map();
-
-  const allStudentNames = [...new Set(allSchedules.map(s => s.studentName).filter(Boolean))];
-  allStudentNames.forEach((name, index) => {
-    studentColorMap.set(name, colorPalette[index % colorPalette.length]);
-    studentTextColorMap.set(name, textColorPalette[index % textColorPalette.length]);
-  });
+  const tableDataSource = timeSlots.map((time, index) => ({
+    key: index,
+    time: time,
+  }));
 
   if (loading && !timetable) {
     return (
@@ -940,56 +907,58 @@ const ViewTimetable = ({ user }) => {
       </div>
 
       {/* 多选功能控制区域 */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: '1rem',
-        padding: '8px 12px',
-        backgroundColor: multiSelectMode ? '#f0f9ff' : '#fafafa',
-        borderRadius: '6px',
-        border: multiSelectMode ? '1px solid #bae7ff' : '1px solid #f0f0f0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Button 
-            type={multiSelectMode ? 'default' : 'default'}
-            size="small"
-            onClick={toggleMultiSelectMode}
-            style={multiSelectMode ? { 
-              backgroundColor: '#fff2f0', 
-              borderColor: '#ffccc7', 
-              color: '#cf1322' 
-            } : {}}
-          >
-            {multiSelectMode ? '退出多选' : '多选排课'}
-          </Button>
-          
-          {multiSelectMode && (
-            <span style={{ fontSize: '14px', color: '#666' }}>
-              {timetable?.isWeekly ? (
-                `已选择 ${selectedCells.size} 个时间段`
-              ) : (
-                `共选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
-              )}
-            </span>
+      {!timetable?.isArchived && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '1rem',
+          padding: '8px 12px',
+          backgroundColor: multiSelectMode ? '#f0f9ff' : '#fafafa',
+          borderRadius: '6px',
+          border: multiSelectMode ? '1px solid #bae7ff' : '1px solid #f0f0f0'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Button 
+              type={multiSelectMode ? 'default' : 'default'}
+              size="small"
+              onClick={toggleMultiSelectMode}
+              style={multiSelectMode ? { 
+                backgroundColor: '#fff2f0', 
+                borderColor: '#ffccc7', 
+                color: '#cf1322' 
+              } : {}}
+            >
+              {multiSelectMode ? '退出多选' : '多选排课'}
+            </Button>
+            
+            {multiSelectMode && (
+              <span style={{ fontSize: '14px', color: '#666' }}>
+                {timetable?.isWeekly ? (
+                  `已选择 ${selectedCells.size} 个时间段`
+                ) : (
+                  `共选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
+                )}
+              </span>
+            )}
+          </div>
+
+          {multiSelectMode && selectedCells.size > 0 && (
+            <Button 
+              type="primary"
+              size="small"
+              onClick={openBatchScheduleModal}
+            >
+              批量排课
+            </Button>
           )}
         </div>
-
-        {multiSelectMode && selectedCells.size > 0 && (
-          <Button 
-            type="primary"
-            size="small"
-            onClick={openBatchScheduleModal}
-          >
-            批量排课
-          </Button>
-        )}
-      </div>
+      )}
       
       <div className="compact-timetable-container">
         <Table
           columns={generateColumns()}
-          dataSource={generateTableData()}
+          dataSource={tableDataSource}
           pagination={false}
           loading={loading}
           size="small"
