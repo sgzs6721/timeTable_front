@@ -21,6 +21,16 @@ dayjs.extend(isSameOrAfter);
 dayjs.extend(weekOfYear);
 dayjs.locale({ ...dayjs.Ls.en, weekStart: 1 });
 
+const dayMap = {
+  MONDAY: '一',
+  TUESDAY: '二',
+  WEDNESDAY: '三',
+  THURSDAY: '四',
+  FRIDAY: '五',
+  SATURDAY: '六',
+  SUNDAY: '日',
+};
+
 const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable }) => {
   const [name, setName] = React.useState(schedule.studentName);
 
@@ -37,14 +47,15 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
       </div>
 
       {timetable.isWeekly ? (
-        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {schedule.dayOfWeek}</p>
+        <p style={{ margin: '8px 0', textAlign: 'left' }}>
+          {`星期${dayMap[schedule.dayOfWeek.toUpperCase()] || schedule.dayOfWeek}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`}
+        </p>
       ) : (
-        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>日期:</strong> {schedule.scheduleDate}</p>
+        <p style={{ margin: '8px 0', textAlign: 'left' }}>
+          {`${schedule.scheduleDate}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`}
+        </p>
       )}
 
-      <p style={{ margin: '4px 0', textAlign: 'left' }}>
-        <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
-      </p>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
         <Button
             type="primary"
@@ -54,19 +65,19 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
             导出
         </Button>
         <Button
-          size="small"
-          onClick={() => onUpdateName(name)}
-          style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
-        >
-          修改
-        </Button>
-        <Button
           type="primary"
           danger
           onClick={onDelete}
           size="small"
         >
           删除
+        </Button>
+        <Button
+          size="small"
+          onClick={() => onUpdateName(name)}
+          style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
+        >
+          修改
         </Button>
       </div>
     </div>
@@ -111,12 +122,19 @@ const ViewTimetable = ({ user }) => {
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exportContent, setExportContent] = useState('');
+  const [exportingStudentName, setExportingStudentName] = useState('');
   
   // 多选功能状态
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedCells, setSelectedCells] = useState(new Set());
   const [batchScheduleModalVisible, setBatchScheduleModalVisible] = useState(false);
   const [batchStudentName, setBatchStudentName] = useState('');
+
+  // Day schedule modal state
+  const [dayScheduleModalVisible, setDayScheduleModalVisible] = useState(false);
+  const [dayScheduleData, setDayScheduleData] = useState([]);
+  const [dayScheduleTitle, setDayScheduleTitle] = useState('');
+  const [daySchedulesForCopy, setDaySchedulesForCopy] = useState([]);
 
   const navigate = useNavigate();
   const { timetableId } = useParams();
@@ -199,6 +217,80 @@ const ViewTimetable = ({ user }) => {
       }
     }
     touchStartRef.current = null;
+  };
+
+  const handleShowDayCourses = (day, dayIndex) => {
+    let schedulesForDay = [];
+    let modalTitle = '';
+    const studentColorMapForDay = new Map(studentColorMap);
+
+    if (timetable.isWeekly) {
+      const dayOfWeekName = day.label;
+      schedulesForDay = allSchedules.filter(s => {
+        // antd的dayjs().day()周日是0，周一是1，所以要映射
+        const dayMap = ['SUNDAY','MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+        return s.dayOfWeek.toUpperCase() === dayMap[dayjs().day(dayIndex+1).day()];
+      });
+      modalTitle = `${timetable.name} - ${dayOfWeekName}`;
+    } else {
+      const currentWeekDates = getCurrentWeekDates();
+      const targetDate = currentWeekDates[dayIndex];
+      if (targetDate) {
+        const dateStr = targetDate.format('YYYY-MM-DD');
+        schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+        modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
+      }
+    }
+    
+    const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    if (sortedSchedules.length === 0) {
+      message.info('当天没有课程');
+      return;
+    }
+    
+    // Assign colors to students for this specific day
+    sortedSchedules.forEach(s => {
+      if (s.studentName && !studentColorMapForDay.has(s.studentName)) {
+        studentColorMapForDay.set(s.studentName, colorPalette[studentColorMapForDay.size % colorPalette.length]);
+      }
+    });
+
+    const firstScheduleHour = parseInt(sortedSchedules[0].startTime.substring(0, 2));
+    const timeSlotsForDay = [];
+    for (let hour = firstScheduleHour; hour <= 19; hour++) {
+      timeSlotsForDay.push({
+        time: `${hour.toString().padStart(2, '0')}:00`,
+        displayTime: `${hour}-${hour + 1}`,
+      });
+    }
+    
+    const tableData = timeSlotsForDay.map((slot, index) => {
+      const schedule = sortedSchedules.find(s => s.startTime.substring(0, 5) === slot.time);
+      return {
+        key: index,
+        time: slot.displayTime,
+        studentName: schedule ? schedule.studentName : '',
+        schedule: schedule || null,
+      };
+    }).filter((row, index, arr) => {
+      // 优化显示：如果连续多行没有课程，可以考虑在这里过滤，但为了保持完整时间线，暂时不过滤
+      return true;
+    });
+
+    setDayScheduleData(tableData);
+    setDayScheduleTitle(modalTitle);
+    setDaySchedulesForCopy(sortedSchedules);
+    setDayScheduleModalVisible(true);
+  };
+  
+  const generateCopyTextForDay = (schedules) => {
+    if (!schedules || schedules.length === 0) return '没有可复制的课程';
+    return schedules.map(schedule => {
+        const startHour = parseInt(schedule.startTime.substring(0, 2));
+        const displayTime = `${startHour.toString().padStart(2, '0')}:00-${(startHour + 1).toString().padStart(2, '0')}:00`;
+        return `${displayTime} ${schedule.studentName}`;
+    }).join('\n');
   };
 
   useEffect(() => {
@@ -335,30 +427,32 @@ const ViewTimetable = ({ user }) => {
       message.destroy('exporting');
 
       if (studentSchedules.length === 0) {
-        message.info('该学生在整个课表中没有排课');
+        message.info('该学生在本课表没有课程');
+        message.destroy('exporting');
         return;
       }
 
+      setExportingStudentName(studentName);
+
+      // 格式化内容
       let content = '';
+
       if (timetable.isWeekly) {
-        content = `${studentName} 的周课表安排如下：\n`;
-        const sortedSchedules = [...studentSchedules].sort((a, b) => {
-          const dayA = weekDays.findIndex(d => d.label === a.dayOfWeek);
-          const dayB = weekDays.findIndex(d => d.label === b.dayOfWeek);
-          if (dayA !== dayB) return dayA - dayB;
-          return a.startTime.localeCompare(b.startTime);
-        });
-        content += sortedSchedules.map(s => `${s.dayOfWeek} ${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`).join('\n');
+        // 周固定课表
+        content += studentSchedules
+          .map(s => `星期${dayMap[s.dayOfWeek.toUpperCase()] || s.dayOfWeek}, ${s.startTime.substring(0, 5)}~${s.endTime.substring(0, 5)}`)
+          .join('\n');
       } else {
-        content = `${studentName} 的课表安排如下：\n`;
-        const sortedSchedules = [...studentSchedules].sort((a, b) => {
-          if (a.scheduleDate !== b.scheduleDate) return dayjs(a.scheduleDate).diff(dayjs(b.scheduleDate));
-          return a.startTime.localeCompare(b.startTime);
-        });
-        content += sortedSchedules.map(s => `${s.scheduleDate} ${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`).join('\n');
+        // 日期范围课表
+        content += studentSchedules
+          .map(s => `${s.scheduleDate}, 星期${dayMap[s.dayOfWeek.toUpperCase()] || s.dayOfWeek}, ${s.startTime.substring(0, 5)}~${s.endTime.substring(0, 5)}`)
+          .join('\n');
       }
+      
+      message.destroy('exporting');
       setExportContent(content);
       setExportModalVisible(true);
+      setOpenPopoverKey(null);
     } catch (error) {
       message.destroy('exporting');
       message.error('导出失败，请检查网络连接');
@@ -533,21 +627,29 @@ const ViewTimetable = ({ user }) => {
     ];
 
     weekDays.forEach((day, index) => {
-      let title = day.label;
+      let columnTitle = day.label;
       if (weekDates && weekDates.start) {
         const currentDate = weekDates.start.add(index, 'day');
-        title = (
-          <div className="day-header">
-            <div className="day-name">{day.label}</div>
-            <div className="day-date">
-              {currentDate.format('MM-DD')}
+        columnTitle = (
+          <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => handleShowDayCourses(day, index)}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
+              {day.label}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {currentDate.format('MM/DD')}
             </div>
           </div>
         );
+      } else {
+        columnTitle = (
+          <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => handleShowDayCourses(day, index)}>
+            {day.label}
+          </div>
+        )
       }
-
+      
       columns.push({
-        title,
+        title: columnTitle,
         dataIndex: day.key,
         key: day.key,
         className: 'timetable-day-column',
@@ -786,10 +888,15 @@ const ViewTimetable = ({ user }) => {
     '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
   ];
 
+  const textColorPalette = ['#1890ff', '#722ed1', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#d4380d'];
+
   const studentColorMap = new Map();
+  const studentTextColorMap = new Map();
+
   const allStudentNames = [...new Set(allSchedules.map(s => s.studentName).filter(Boolean))];
   allStudentNames.forEach((name, index) => {
     studentColorMap.set(name, colorPalette[index % colorPalette.length]);
+    studentTextColorMap.set(name, textColorPalette[index % textColorPalette.length]);
   });
 
   if (loading && !timetable) {
@@ -930,15 +1037,19 @@ const ViewTimetable = ({ user }) => {
       )}
 
       <Modal
-        title="导出学生课时"
+        title={
+          <span>
+            <span style={{ color: studentTextColorMap.get(exportingStudentName) || '#000' }}>
+              {exportingStudentName}
+            </span>
+            的课程安排
+          </span>
+        }
         open={exportModalVisible}
         onCancel={() => setExportModalVisible(false)}
+        width={350}
         footer={[
-          <Button
-            key="copy"
-            icon={<CopyOutlined />}
-            onClick={() => copyToClipboard(exportContent)}
-          >
+          <Button key="copy" icon={<CopyOutlined />} type="primary" onClick={() => copyToClipboard(exportContent)}>
             复制
           </Button>,
           <Button key="close" onClick={() => setExportModalVisible(false)}>
@@ -1028,6 +1139,44 @@ const ViewTimetable = ({ user }) => {
             onPressEnter={handleBatchSchedule}
           />
         </div>
+      </Modal>
+
+      <Modal
+        title={dayScheduleTitle}
+        open={dayScheduleModalVisible}
+        onCancel={() => setDayScheduleModalVisible(false)}
+        footer={[
+          <Button key="copy" type="primary" onClick={() => copyToClipboard(generateCopyTextForDay(daySchedulesForCopy))}>
+            复制课程
+          </Button>,
+          <Button key="close" onClick={() => setDayScheduleModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+        width={400}
+      >
+        <Table
+          columns={[
+            { title: '时间', dataIndex: 'time', key: 'time', width: '40%', align: 'center' },
+            {
+              title: '学员',
+              dataIndex: 'studentName',
+              key: 'studentName',
+              width: '60%',
+              align: 'center',
+              onCell: (record) => ({
+                style: {
+                  backgroundColor: record.studentName ? studentColorMap.get(record.studentName) : 'transparent',
+                }
+              }),
+              render: (text) => text,
+            },
+          ]}
+          dataSource={dayScheduleData}
+          pagination={false}
+          size="small"
+          bordered
+        />
       </Modal>
     </div>
   );

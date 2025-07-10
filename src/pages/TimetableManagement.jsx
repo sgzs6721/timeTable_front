@@ -39,7 +39,15 @@ const TimetableManagement = ({ user }) => {
     try {
       const response = await getAllTimetables();
       if (response.success) {
-        setAllTimetables(response.data);
+        const sortedData = response.data.sort((a, b) => {
+            const activeA = a.isActive ? 1 : 0;
+            const activeB = b.isActive ? 1 : 0;
+            if (activeB !== activeA) {
+              return activeB - activeA;
+            }
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          });
+        setAllTimetables(sortedData);
       } else {
         message.error(response.message || '获取课表数据失败');
       }
