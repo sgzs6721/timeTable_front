@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layout, Menu, Button, Dropdown, Avatar } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, SettingOutlined, HomeOutlined, InboxOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined } from '@ant-design/icons';
 import logo from '../assets/logo.png';
 
 const { Header } = Layout;
@@ -21,13 +21,20 @@ const AppHeader = ({ user, onLogout }) => {
   const userMenuItems = [
     {
       key: 'archived',
-      icon: <InboxOutlined />, 
+      icon: <InboxOutlined />,
       label: '归档课表',
-      onClick: () => navigate('/archived-timetables'),
+      onClick: () => {
+        // 从当前页面获取非归档课表数量 - 使用更精确的选择器
+        const listItems = document.querySelectorAll('.timetable-list .ant-list-item');
+        const nonArchivedCount = listItems.length;
+        console.log('获取到的非归档课表数量:', nonArchivedCount);
+        console.log('找到的List项目:', listItems);
+        navigate('/archived-timetables', { state: { nonArchivedCount } });
+      },
     },
     {
       key: 'profile',
-      icon: <UserOutlined />, 
+      icon: <UserOutlined />,
       label: '个人账号',
       onClick: () => navigate('/profile'),
     },
@@ -36,7 +43,7 @@ const AppHeader = ({ user, onLogout }) => {
     },
     {
       key: 'logout',
-      icon: <LogoutOutlined />, 
+      icon: <LogoutOutlined />,
       label: '退出登录',
       onClick: onLogout,
     },
@@ -69,7 +76,7 @@ const AppHeader = ({ user, onLogout }) => {
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           className="nav-menu"
-          style={{ 
+          style={{
             border: 'none',
             flex: 1,
             minWidth: 0,
@@ -102,4 +109,4 @@ const AppHeader = ({ user, onLogout }) => {
   );
 };
 
-export default AppHeader; 
+export default AppHeader;

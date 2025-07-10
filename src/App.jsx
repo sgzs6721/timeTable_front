@@ -59,53 +59,53 @@ function App() {
         {user && <AppHeader user={user} onLogout={handleLogout} />}
         <Content>
           <Routes>
-            <Route 
-              path="/login" 
-              element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard" />} 
+            <Route
+              path="/login"
+              element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard" />}
             />
-            <Route 
-              path="/register" 
-              element={!user ? <Register onLogin={handleLogin} /> : <Navigate to="/dashboard" />} 
+            <Route
+              path="/register"
+              element={!user ? <Register onLogin={handleLogin} /> : <Navigate to="/dashboard" />}
             />
-            <Route 
-              path="/dashboard" 
-              element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} 
+            <Route
+              path="/dashboard"
+              element={user ? <Dashboard user={user} /> : <Navigate to="/login" />}
             />
-            <Route 
-              path="/create-timetable" 
-              element={user ? <CreateTimetable user={user} /> : <Navigate to="/login" />} 
+            <Route
+              path="/create-timetable"
+              element={user ? <CreateTimetable user={user} /> : <Navigate to="/login" />}
             />
-            <Route 
-              path="/input-timetable/:timetableId" 
-              element={user ? <InputTimetable user={user} textInputValue={textInputValue} setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />} 
+            <Route
+              path="/input-timetable/:timetableId"
+              element={user ? <InputTimetable user={user} textInputValue={textInputValue} setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />}
             />
-            <Route 
-              path="/view-timetable/:timetableId" 
-              element={user ? <ViewTimetable user={user} /> : <Navigate to="/login" />} 
+            <Route
+              path="/view-timetable/:timetableId"
+              element={user ? <ViewTimetable user={user} /> : <Navigate to="/login" />}
             />
-            <Route 
-              path="/timetables/:timetableId/confirm-schedule" 
-              element={user ? <ConfirmSchedulePage setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />} 
+            <Route
+              path="/timetables/:timetableId/confirm-schedule"
+              element={user ? <ConfirmSchedulePage setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />}
             />
-            <Route 
-              path="/admin" 
-              element={user && user.role?.toUpperCase() === 'ADMIN' ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />} 
+            <Route
+              path="/admin"
+              element={user && user.role?.toUpperCase() === 'ADMIN' ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />}
             />
-            <Route 
-              path="/preview-merge" 
-              element={user ? <MergePreview user={user} /> : <Navigate to="/login" />} 
+            <Route
+              path="/preview-merge"
+              element={user ? <MergePreview user={user} /> : <Navigate to="/login" />}
             />
-            <Route 
-              path="/profile" 
-              element={user ? <UserProfile user={user} /> : <Navigate to="/login" />} 
+            <Route
+              path="/profile"
+              element={user ? <UserProfile user={user} /> : <Navigate to="/login" />}
             />
             <Route
               path="/archived-timetables"
               element={user ? <ArchivedTimetables /> : <Navigate to="/login" />}
             />
-            <Route 
-              path="/" 
-              element={<Navigate to={user ? "/dashboard" : "/login"} />} 
+            <Route
+              path="/"
+              element={<Navigate to={user ? "/dashboard" : "/login"} />}
             />
           </Routes>
         </Content>
@@ -114,4 +114,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

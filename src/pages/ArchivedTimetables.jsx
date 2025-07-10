@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { List, Button, Tag, Modal, message, Empty, Checkbox, Space, Spin } from 'antd';
 import { CalendarOutlined, LeftOutlined, UserOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   getArchivedTimetables,
   restoreTimetableApi,
@@ -11,11 +11,17 @@ import {
 } from '../services/timetable';
 
 const ArchivedTimetables = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [archived, setArchived] = useState([]);
   const [selectedTimetables, setSelectedTimetables] = useState([]);
   const [batchMode, setBatchMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  // 从导航状态获取非归档课表数量，如果没有则默认为0
+  const [nonArchivedCount, setNonArchivedCount] = useState(location.state?.nonArchivedCount || 0);
+
+  console.log('归档页面接收到的非归档课表数量:', location.state?.nonArchivedCount);
+  console.log('当前nonArchivedCount状态:', nonArchivedCount);
 
   useEffect(() => {
     fetchArchived();
@@ -32,10 +38,11 @@ const ArchivedTimetables = () => {
     try {
       const res = await getArchivedTimetables();
       if (res.success) {
-        setArchived(res.data);
+        setArchived(res.data.archivedList);
       } else message.error(res.message || '获取归档课表失败');
     } catch (e) {
       message.error('获取归档课表失败');
+      console.error('获取归档课表失败:', e);
     } finally {
       setLoading(false);
     }
@@ -51,11 +58,17 @@ const ArchivedTimetables = () => {
       content: `确定要恢复选中的 ${selectedTimetables.length} 个课表吗？`,
       okText: '恢复',
       onOk: async () => {
+        if (nonArchivedCount + selectedTimetables.length > 5) {
+          message.error('无法恢复，操作后非归档课表将超过数量上限 (5个)');
+          return;
+        }
         try {
           const res = await bulkRestoreTimetables(selectedTimetables);
           if (res.success) {
             message.success(res.message || '已恢复');
-            fetchArchived();
+            // 更新本地状态：增加非归档数量，移除已恢复的课表
+            setNonArchivedCount(prev => prev + selectedTimetables.length);
+            setArchived(prev => prev.filter(item => !selectedTimetables.includes(item.id)));
             setSelectedTimetables([]);
           } else {
             message.error(res.message || '操作失败');
@@ -80,7 +93,8 @@ const ArchivedTimetables = () => {
           const res = await bulkDeleteTimetables(selectedTimetables);
           if (res.success) {
             message.success(res.message || '已批量删除');
-            fetchArchived();
+            // 更新本地状态：移除已删除的课表
+            setArchived(prev => prev.filter(item => !selectedTimetables.includes(item.id)));
             setSelectedTimetables([]);
           } else {
             message.error(res.message || '批量删除操作失败');
@@ -100,9 +114,15 @@ const ArchivedTimetables = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await restoreTimetableApi(id);
-          setArchived(prev=>prev.filter(t=>t.id!==id));
-          message.success('课表已恢复');
+          const res = await restoreTimetableApi(id);
+          if (res.success) {
+            // 更新本地状态：增加非归档数量，移除已恢复的课表
+            setNonArchivedCount(prev => prev + 1);
+            setArchived(prev => prev.filter(t => t.id !== id));
+            message.success('课表已恢复');
+          } else {
+            message.error(res.message || '恢复失败');
+          }
         } catch(e){message.error('恢复失败');}
       },
     });
@@ -161,7 +181,7 @@ const ArchivedTimetables = () => {
             <Button
               type="primary"
               onClick={handleBulkRestore}
-              disabled={selectedTimetables.length === 0}
+              disabled={selectedTimetables.length === 0 || nonArchivedCount >= 5}
             >
               批量恢复
             </Button>
@@ -221,7 +241,13 @@ const ArchivedTimetables = () => {
                     <span>创建日期：{item.createdAt? item.createdAt.slice(0,10):''}</span>
                     {!batchMode && (
                       <div>
-                        <Button type="link" onClick={()=>handleRestore(item.id)}>恢复</Button>
+                        <Button
+                          type="link"
+                          onClick={() => handleRestore(item.id)}
+                          disabled={nonArchivedCount >= 5}
+                        >
+                          恢复
+                        </Button>
                         <Button type="link" danger onClick={()=>handleDelete(item.id)}>删除</Button>
                       </div>
                     )}
@@ -236,4 +262,4 @@ const ArchivedTimetables = () => {
   );
 };
 
-export default ArchivedTimetables; 
+export default ArchivedTimetables;

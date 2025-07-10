@@ -103,18 +103,18 @@ const Dashboard = ({ user }) => {
   const [tomorrowsSchedulesForCopy, setTomorrowsSchedulesForCopy] = useState([]);
   const [modalSubTitleTomorrow, setModalSubTitleTomorrow] = useState('');
   const [studentColorMap, setStudentColorMap] = useState({});
-  
+
   // 新增状态用于管理弹窗功能
   const [currentTimetable, setCurrentTimetable] = useState(null);
   const [allSchedulesData, setAllSchedulesData] = useState([]);
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
-  
+
   // 编辑课表名称相关状态
   const [editingTimetableId, setEditingTimetableId] = useState(null);
   const [editingTimetableName, setEditingTimetableName] = useState('');
-  
+
   const navigate = useNavigate();
 
   // 兼容移动端的复制函数
@@ -126,7 +126,7 @@ const Dashboard = ({ user }) => {
         message.success('已复制到剪贴板');
         return;
       }
-      
+
       // 移动端兼容方案
       const textArea = document.createElement('textarea');
       textArea.value = text;
@@ -134,16 +134,16 @@ const Dashboard = ({ user }) => {
       textArea.style.left = '-999999px';
       textArea.style.top = '-999999px';
       document.body.appendChild(textArea);
-      
+
       // 在移动端，需要先聚焦再选择
       textArea.focus();
       textArea.select();
       textArea.setSelectionRange(0, textArea.value.length);
-      
+
       // 尝试复制
       const successful = document.execCommand('copy');
       document.body.removeChild(textArea);
-      
+
       if (successful) {
         message.success('已复制到剪贴板');
       } else {
@@ -285,9 +285,7 @@ const Dashboard = ({ user }) => {
     navigate(`/input-timetable/${timetable.id}`);
   };
 
-  const handleAdminPanel = () => {
-    navigate('/admin');
-  };
+
 
   // 开始编辑课表名称
   const handleStartEditTimetableName = (timetableId, currentName) => {
@@ -301,7 +299,7 @@ const Dashboard = ({ user }) => {
       message.warning('课表名称不能为空');
       return;
     }
-    
+
     try {
       // 获取当前课表的完整信息
       const currentTimetable = timetables.find(t => t.id === timetableId);
@@ -309,7 +307,7 @@ const Dashboard = ({ user }) => {
         message.error('找不到对应的课表');
         return;
       }
-      
+
       // 构造完整的更新请求，保持其他字段不变，只修改name
       const updateData = {
         name: editingTimetableName.trim(),
@@ -318,14 +316,14 @@ const Dashboard = ({ user }) => {
         startDate: currentTimetable.startDate || null,
         endDate: currentTimetable.endDate || null
       };
-      
+
       const response = await updateTimetable(timetableId, updateData);
-      
+
       if (response.success) {
         message.success('课表名称修改成功');
         // 更新本地数据
-        setTimetables(timetables.map(item => 
-          item.id === timetableId 
+        setTimetables(timetables.map(item =>
+          item.id === timetableId
             ? { ...item, name: editingTimetableName.trim() }
             : item
         ));
@@ -357,11 +355,11 @@ const Dashboard = ({ user }) => {
         return;
       }
       const allSchedules = response.data;
-      
+
       // 保存当前课表信息和所有课程数据
       setCurrentTimetable(timetable);
       setAllSchedulesData(allSchedules);
-      
+
       const newStudentColorMap = { ...studentColorMap };
       let localColorIndex = Object.keys(newStudentColorMap).length;
       const localLightColorPalette = ['#f6ffed', '#e6f7ff', '#fff7e6', '#fff0f6', '#f9f0ff', '#f0f5ff' ];
@@ -387,15 +385,15 @@ const Dashboard = ({ user }) => {
           schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
           subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${dateStr})`;
         }
-        
+
         const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
-        
+
         if (sortedSchedules.length === 0) {
           return { tableData: [], schedulesForCopy: [], subTitle };
         }
 
         sortedSchedules.forEach(s => assignColorToStudent(s.studentName));
-        
+
         const firstScheduleHour = parseInt(sortedSchedules[0].startTime.substring(0, 2));
 
         const timeSlots = [];
@@ -405,7 +403,7 @@ const Dashboard = ({ user }) => {
             displayTime: `${hour}-${hour + 1}`,
           });
         }
-        
+
         const tableData = [];
         for (let i = 0; i < timeSlots.length; i += 2) {
           const leftSlot = timeSlots[i];
@@ -430,7 +428,7 @@ const Dashboard = ({ user }) => {
       setTodaysCoursesData(todayData.tableData);
       setTodaysSchedulesForCopy(todayData.schedulesForCopy);
       setModalSubTitle(todayData.subTitle);
-      
+
       // Tomorrow
       const tomorrowData = generateDayData(dayjs().add(1, 'day'), timetable.isWeekly);
       setTomorrowsCoursesData(tomorrowData.tableData);
@@ -442,7 +440,7 @@ const Dashboard = ({ user }) => {
         message.info('今天和明天都没有安排课程');
         return;
       }
-      
+
       message.destroy('courses');
       setStudentColorMap(newStudentColorMap);
       setModalMainTitle(timetable.name);
@@ -464,7 +462,7 @@ const Dashboard = ({ user }) => {
     }).join('\n');
   };
 
-  
+
   const getColumns = (colorMap) => [
     {
       title: '时间',
@@ -480,7 +478,7 @@ const Dashboard = ({ user }) => {
       width: '25%',
       align: 'center',
       onCell: (record) => ({
-        style: { 
+        style: {
           backgroundColor: record.studentName1 ? colorMap[record.studentName1] : undefined,
           padding: '1px',
           cursor: 'pointer'
@@ -489,7 +487,7 @@ const Dashboard = ({ user }) => {
       render: (text, record) => {
         const cellKey = `today-1-${record.key}`;
         const targetDate = dayjs();
-        
+
         if (!text) {
           // 空白单元格 - 添加功能
           return (
@@ -550,7 +548,7 @@ const Dashboard = ({ user }) => {
       width: '25%',
       align: 'center',
       onCell: (record) => ({
-        style: { 
+        style: {
           backgroundColor: record.studentName2 ? colorMap[record.studentName2] : undefined,
           padding: '1px',
           cursor: 'pointer'
@@ -559,7 +557,7 @@ const Dashboard = ({ user }) => {
       render: (text, record) => {
         const cellKey = `today-2-${record.key}`;
         const targetDate = dayjs();
-        
+
         if (!text) {
           // 空白单元格 - 添加功能
           return (
@@ -623,7 +621,7 @@ const Dashboard = ({ user }) => {
       width: '25%',
       align: 'center',
       onCell: (record) => ({
-        style: { 
+        style: {
           backgroundColor: record.studentName1 ? colorMap[record.studentName1] : undefined,
           padding: '1px',
           cursor: 'pointer'
@@ -632,7 +630,7 @@ const Dashboard = ({ user }) => {
       render: (text, record) => {
         const cellKey = `tomorrow-1-${record.key}`;
         const targetDate = dayjs().add(1, 'day');
-        
+
         if (!text) {
           // 空白单元格 - 添加功能
           return (
@@ -693,7 +691,7 @@ const Dashboard = ({ user }) => {
       width: '25%',
       align: 'center',
       onCell: (record) => ({
-        style: { 
+        style: {
           backgroundColor: record.studentName2 ? colorMap[record.studentName2] : undefined,
           padding: '1px',
           cursor: 'pointer'
@@ -702,7 +700,7 @@ const Dashboard = ({ user }) => {
       render: (text, record) => {
         const cellKey = `tomorrow-2-${record.key}`;
         const targetDate = dayjs().add(1, 'day');
-        
+
         if (!text) {
           // 空白单元格 - 添加功能
           return (
@@ -834,17 +832,7 @@ const Dashboard = ({ user }) => {
     }
   };
 
-  // 颜色组：主色和浅色背景
-  const colorPairs = [
-    { main: '#722ED1', bg: '#f9f0ff' }, // 紫
-    { main: '#1890ff', bg: '#e6f7ff' }, // 蓝
-    { main: '#52c41a', bg: '#f6ffed' }, // 绿
-    { main: '#faad14', bg: '#fffbe6' }, // 橙
-    { main: '#eb2f96', bg: '#fff0f6' }, // 粉
-    { main: '#fa541c', bg: '#fff7e6' }, // 橘
-    { main: '#13c2c2', bg: '#e6fffb' }, // 青
-    { main: '#531dab', bg: '#f4f0ff' }, // 深紫
-  ];
+
   // 图标主色循环
   const iconColors = ['#722ED1','#1890ff','#52c41a','#faad14','#eb2f96','#fa541c','#13c2c2','#531dab'];
   const getIconColor = (id) => iconColors[id % iconColors.length];
@@ -853,9 +841,9 @@ const Dashboard = ({ user }) => {
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>
         <h1 style={{ margin: 0, fontWeight: '700' }}>我的课表</h1>
-        <Button 
-          type="link" 
-          icon={<PlusOutlined />} 
+        <Button
+          type="link"
+          icon={<PlusOutlined />}
           onClick={handleCreateTimetable}
           style={{ position: 'absolute', right: 0 }}
         >
@@ -917,16 +905,16 @@ const Dashboard = ({ user }) => {
                             style={{ width: '200px' }}
                             autoFocus
                           />
-                          <Button 
-                            type="text" 
-                            size="small" 
+                          <Button
+                            type="text"
+                            size="small"
                             icon={<CheckOutlined />}
                             onClick={() => handleSaveTimetableName(item.id)}
                             style={{ color: '#52c41a' }}
                           />
-                          <Button 
-                            type="text" 
-                            size="small" 
+                          <Button
+                            type="text"
+                            size="small"
                             icon={<CloseOutlined />}
                             onClick={handleCancelEditTimetableName}
                             style={{ color: '#ff4d4f' }}
@@ -935,9 +923,9 @@ const Dashboard = ({ user }) => {
                       ) : (
                         <>
                           <a onClick={() => handleViewTimetable(item.id)} style={{ fontWeight: 600, fontSize: 17 }}>{item.name}</a>
-                          <Button 
-                            type="text" 
-                            size="small" 
+                          <Button
+                            type="text"
+                            size="small"
                             icon={<EditOutlined />}
                             onClick={() => handleStartEditTimetableName(item.id, item.name)}
                             style={{ color: '#8c8c8c', padding: '0 4px', marginLeft: 2 }}
@@ -1036,7 +1024,7 @@ const Dashboard = ({ user }) => {
         )}
 
         {(todaysCoursesData.length > 0 || tomorrowsCoursesData.length > 0) && <Divider />}
-        
+
         <div style={{ textAlign: 'center', marginTop: '16px' }}>
           <Button
             danger
@@ -1077,4 +1065,4 @@ const Dashboard = ({ user }) => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;
