@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button, Table, message, Pagination, Space, Tag, Popover, Spin, Input, Modal } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined, ExportOutlined, CopyOutlined, LeftCircleOutlined, RightCircleOutlined } from '@ant-design/icons';
+import { LeftOutlined, CalendarOutlined, RightOutlined, ExportOutlined, CopyOutlined, LeftCircleOutlined, RightCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch } from '../services/timetable';
 import dayjs from 'dayjs';
@@ -10,6 +10,7 @@ import localeData from 'dayjs/plugin/localeData';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
+import html2canvas from 'html2canvas';
 import EditScheduleModal from '../components/EditScheduleModal';
 import './ViewTimetable.css';
 
@@ -141,6 +142,7 @@ const ViewTimetable = ({ user }) => {
   const [dayScheduleTitle, setDayScheduleTitle] = useState('');
   const [daySchedulesForCopy, setDaySchedulesForCopy] = useState([]);
 
+  const tableRef = useRef(null);
   const navigate = useNavigate();
   const { timetableId } = useParams();
 
@@ -453,6 +455,134 @@ const ViewTimetable = ({ user }) => {
       message.destroy('exporting');
       message.error('导出失败，请检查网络连接');
     }
+  };
+
+  const handleExportTable = () => {
+    const tableNode = tableRef.current;
+    if (!tableNode) {
+      message.error('无法导出，未找到表格元素');
+      return;
+    }
+
+    message.loading({ content: '正在生成图片...', key: 'exporting' });
+
+    // 1. 克隆节点
+    const clonedNode = tableNode.cloneNode(true);
+
+    // 2. 在克隆体上修改截断的学生姓名
+    const elementsToModify = clonedNode.querySelectorAll('.student-name-truncated');
+    
+    elementsToModify.forEach(el => {
+      if (el.title) {
+        el.innerText = el.title;
+      }
+    });
+
+    // 计算整个表格中最长文字的宽度
+    const calculateMaxTextWidth = () => {
+      let maxWidth = 0;
+      
+      // 为计算文字宽度创建测试元素
+      const testDiv = document.createElement('div');
+      testDiv.style.position = 'absolute';
+      testDiv.style.left = '-9999px';
+      testDiv.style.fontSize = '12px';
+      testDiv.style.fontFamily = 'inherit';
+      testDiv.style.whiteSpace = 'nowrap';
+      testDiv.style.visibility = 'hidden';
+      document.body.appendChild(testDiv);
+      
+      // 检查所有表头
+      const headerCells = clonedNode.querySelectorAll('thead th');
+      headerCells.forEach(th => {
+        testDiv.innerText = th.innerText || th.textContent || '';
+        maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
+      });
+      
+      // 检查所有单元格内容
+      const allCells = clonedNode.querySelectorAll('tbody td');
+      allCells.forEach(cell => {
+        // 获取单元格中所有学生姓名（包括截断的）
+        const studentNames = cell.querySelectorAll('.student-name-truncated');
+        studentNames.forEach(nameEl => {
+          const fullName = nameEl.title || nameEl.innerText;
+          testDiv.innerText = fullName;
+          maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
+        });
+        
+        // 也检查非截断的文本
+        const allText = cell.innerText || cell.textContent || '';
+        if (allText.trim()) {
+          testDiv.innerText = allText;
+          maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
+        }
+      });
+      
+      document.body.removeChild(testDiv);
+      
+      // 添加一个字的宽度作为缓冲（约14px）
+      return maxWidth + 14;
+    };
+
+    const maxTextWidth = calculateMaxTextWidth();
+    const headerCells = clonedNode.querySelectorAll('thead th');
+    const columnCount = headerCells.length;
+    
+    // 所有列都使用相同宽度，基于最长文字+1个字的宽度
+    const uniformWidth = Math.max(maxTextWidth, 60); // 最小60px
+    const totalWidth = uniformWidth * columnCount;
+
+    // 对所有单元格设置统一样式
+    const allCells = clonedNode.querySelectorAll('td, th');
+    allCells.forEach(cell => {
+      cell.style.whiteSpace = 'nowrap';  // 所有单元格都不换行
+      cell.style.overflow = 'visible';
+      cell.style.textOverflow = 'clip';
+      cell.style.padding = '8px 16px';  // 内边距
+    });
+
+    // 设置表格布局和各列宽度
+    const tableElement = clonedNode.querySelector('table');
+    if (tableElement) {
+      tableElement.style.tableLayout = 'fixed';
+      tableElement.style.width = `${totalWidth}px`;
+      
+      // 所有列都设置为相同宽度
+      headerCells.forEach(th => {
+        th.style.width = `${uniformWidth}px`;
+      });
+    }
+
+    // 必须将克隆节点添加到DOM中才能被html2canvas捕获，但可以设为不可见
+    clonedNode.style.position = 'absolute';
+    clonedNode.style.width = `${totalWidth}px`;  // 匹配表格宽度
+    clonedNode.style.left = '-9999px';
+    clonedNode.style.top = '0px';
+    clonedNode.style.backgroundColor = 'white';
+    document.body.appendChild(clonedNode);
+    
+    // 3. 对克隆体截图
+    html2canvas(clonedNode, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor: '#ffffff'
+    }).then(canvas => {
+      const image = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.href = image;
+      const weekInfo = !timetable?.isWeekly && totalWeeks > 1 ? `-第${currentWeek}周` : '';
+      link.download = `${timetable?.name || '课表'}${weekInfo}-${new Date().toLocaleString()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success({ content: '图片已导出！', key: 'exporting' });
+    }).catch(error => {
+      console.error('导出失败:', error);
+      message.error({ content: '导出失败，请稍后重试', key: 'exporting' });
+    }).finally(() => {
+      // 4. 清理
+      document.body.removeChild(clonedNode);
+    });
   };
 
   // 多选功能处理函数
@@ -845,10 +975,18 @@ const ViewTimetable = ({ user }) => {
                     }}
                     title={`点击查看详情或删除`}
                   >
-                    {student.studentName.length > 4 ?
-                      student.studentName.substring(0, 3) + '…' :
-                      student.studentName
-                    }
+                    {(() => {
+                      const isTruncated = student.studentName.length > 4;
+                      const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
+                      return (
+                        <span 
+                          className={isTruncated ? 'student-name-truncated' : ''}
+                          title={isTruncated ? student.studentName : undefined}
+                        >
+                          {content}
+                        </span>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
@@ -955,7 +1093,7 @@ const ViewTimetable = ({ user }) => {
         </div>
       )}
       
-      <div className="compact-timetable-container">
+      <div className="compact-timetable-container" ref={tableRef}>
         <Table
           columns={generateColumns()}
           dataSource={tableDataSource}
@@ -965,6 +1103,19 @@ const ViewTimetable = ({ user }) => {
           bordered
           className="compact-timetable"
         />
+      </div>
+      <div style={{ textAlign: 'right', marginTop: '16px' }}>
+        <a
+          onClick={handleExportTable}
+          style={{
+            color: '#1890ff',
+            cursor: 'pointer',
+            fontSize: '14px',
+            padding: '4px 8px',
+          }}
+        >
+          导出
+        </a>
       </div>
 
       {!timetable?.isWeekly && totalWeeks > 1 && (

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button, Table, message, Space, Tag, Spin, Pagination } from 'antd';
-import { LeftOutlined, CalendarOutlined, LeftCircleOutlined, RightCircleOutlined } from '@ant-design/icons';
+import { LeftOutlined, CalendarOutlined, LeftCircleOutlined, RightCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, getBatchTimetablesInfo } from '../services/timetable';
 import dayjs from 'dayjs';
@@ -8,6 +8,7 @@ import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import localeData from 'dayjs/plugin/localeData';
+import html2canvas from 'html2canvas';
 import './ViewTimetable.css';
 
 // 扩展 dayjs 插件
@@ -33,6 +34,7 @@ const MergePreview = ({ user }) => {
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weeksList, setWeeksList] = useState([]);
   const [timetableColorMap, setTimetableColorMap] = useState({});
+  const tableRef = useRef(null);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -56,6 +58,133 @@ const MergePreview = ({ user }) => {
     { key: 'saturday', label: '周六' },
     { key: 'sunday', label: '周日' },
   ];
+
+  const handleExport = () => {
+    const tableNode = tableRef.current;
+    if (!tableNode) {
+      message.error('无法导出，未找到表格元素');
+      return;
+    }
+
+    message.loading({ content: '正在生成图片...', key: 'exporting' });
+
+    // 1. 克隆节点
+    const clonedNode = tableNode.cloneNode(true);
+
+    // 2. 在克隆体上修改
+    const elementsToModify = clonedNode.querySelectorAll('.student-name-truncated');
+    
+    elementsToModify.forEach(el => {
+      if (el.title) {
+        el.innerText = el.title;
+      }
+    });
+
+    // 计算整个表格中最长文字的宽度
+    const calculateMaxTextWidth = () => {
+      let maxWidth = 0;
+      
+      // 为计算文字宽度创建测试元素
+      const testDiv = document.createElement('div');
+      testDiv.style.position = 'absolute';
+      testDiv.style.left = '-9999px';
+      testDiv.style.fontSize = '12px';
+      testDiv.style.fontFamily = 'inherit';
+      testDiv.style.whiteSpace = 'nowrap';
+      testDiv.style.visibility = 'hidden';
+      document.body.appendChild(testDiv);
+      
+      // 检查所有表头
+      const headerCells = clonedNode.querySelectorAll('thead th');
+      headerCells.forEach(th => {
+        testDiv.innerText = th.innerText || th.textContent || '';
+        maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
+      });
+      
+      // 检查所有单元格内容
+      const allCells = clonedNode.querySelectorAll('tbody td');
+      allCells.forEach(cell => {
+        // 获取单元格中所有学生姓名（包括截断的）
+        const studentNames = cell.querySelectorAll('.student-name-truncated');
+        studentNames.forEach(nameEl => {
+          const fullName = nameEl.title || nameEl.innerText;
+          testDiv.innerText = fullName;
+          maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
+        });
+        
+        // 也检查非截断的文本
+        const allText = cell.innerText || cell.textContent || '';
+        if (allText.trim()) {
+          testDiv.innerText = allText;
+          maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
+        }
+      });
+      
+      document.body.removeChild(testDiv);
+      
+      // 添加一个字的宽度作为缓冲（约14px）
+      return maxWidth + 14;
+    };
+
+    const maxTextWidth = calculateMaxTextWidth();
+    const headerCells = clonedNode.querySelectorAll('thead th');
+    const columnCount = headerCells.length;
+    
+    // 所有列都使用相同宽度，基于最长文字+1个字的宽度
+    const uniformWidth = Math.max(maxTextWidth, 60); // 最小60px
+    const totalWidth = uniformWidth * columnCount;
+
+    // 对所有单元格设置统一样式
+    const allCells = clonedNode.querySelectorAll('td, th');
+    allCells.forEach(cell => {
+      cell.style.whiteSpace = 'nowrap';  // 所有单元格都不换行
+      cell.style.overflow = 'visible';
+      cell.style.textOverflow = 'clip';
+      cell.style.padding = '8px 16px';  // 内边距
+    });
+
+    // 设置表格布局和各列宽度
+    const tableElement = clonedNode.querySelector('table');
+    if (tableElement) {
+      tableElement.style.tableLayout = 'fixed';
+      tableElement.style.width = `${totalWidth}px`;
+      
+      // 所有列都设置为相同宽度
+      headerCells.forEach(th => {
+        th.style.width = `${uniformWidth}px`;
+      });
+    }
+
+    // 必须将克隆节点添加到DOM中才能被html2canvas捕获，但可以设为不可见
+    clonedNode.style.position = 'absolute';
+    clonedNode.style.width = `${totalWidth}px`;  // 匹配表格宽度
+    clonedNode.style.left = '-9999px';
+    clonedNode.style.top = '0px';
+    clonedNode.style.backgroundColor = 'white';
+    document.body.appendChild(clonedNode);
+    
+    // 3. 对克隆体截图
+    html2canvas(clonedNode, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor: '#ffffff'
+    }).then(canvas => {
+      const image = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `合并课表预览-${new Date().toLocaleString()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success({ content: '图片已导出！', key: 'exporting' });
+    }).catch(error => {
+      console.error('导出失败:', error);
+      message.error({ content: '导出失败，请稍后重试', key: 'exporting' });
+    }).finally(() => {
+      // 4. 清理
+      document.body.removeChild(clonedNode);
+    });
+  };
 
   useEffect(() => {
     if (!idsParam) {
@@ -279,10 +408,18 @@ const MergePreview = ({ user }) => {
               student.scheduleDate ? ` - ${student.scheduleDate}` : ''
             }`}
           >
-            {student.studentName.length > 4 ?
-              student.studentName.substring(0, 3) + '…' :
-              student.studentName
-            }
+            {(() => {
+              const isTruncated = student.studentName.length > 4;
+              const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
+              return (
+                <span 
+                  className={isTruncated ? 'student-name-truncated' : ''}
+                  title={isTruncated ? student.studentName : undefined}
+                >
+                  {content}
+                </span>
+              );
+            })()}
           </div>
         ))}
       </div>
@@ -403,28 +540,38 @@ const MergePreview = ({ user }) => {
   }
 
   return (
-    <div className="page-container">
-      <div style={{ position: 'relative', marginBottom: '1.5rem', minHeight: 48, display: 'flex', alignItems: 'center' }}>
+    <div className="page-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <Button
-          type="default"
-          shape="circle"
+          type="text"
           onClick={() => navigate(-1)}
           icon={<LeftOutlined style={{ fontSize: 20 }} />}
-          style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)' }}
+          style={{ 
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: '1px solid #d9d9d9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
         />
-        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <CalendarOutlined style={{ fontSize: '22px', color: '#8a2be2' }} />
-          <h1 style={{ margin: 0, fontSize: 22, textAlign: 'center', whiteSpace: 'nowrap' }}>{mergedTimetable?.name}</h1>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center' 
+        }}>
+          <Space align="center" size="large">
+            <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
+            <h1 style={{ margin: 0 }}>{mergedTimetable?.name}</h1>
+          </Space>
         </div>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-          <Tag color={mergedTimetable?.isWeekly ? 'blue' : 'green'}>
-            {mergedTimetable?.isWeekly ? '周固定课表' : '日期范围课表'}
-          </Tag>
-        </div>
+
       </div>
 
-      <div style={{ marginBottom: '1rem', padding: '12px', background: '#f6f8fa', borderRadius: '6px' }}>
-        <div style={{ fontSize: '14px', color: '#666' }}>
+      <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '8px', marginBottom: '1.5rem' }}>
+        <div style={{ marginBottom: 8, color: '#666' }}>
           <strong>合并来源：</strong>
           {timetablesData.map((table, index) => (
             <span key={table.id}>
@@ -443,11 +590,33 @@ const MergePreview = ({ user }) => {
         {!mergedTimetable?.isWeekly && mergedTimetable?.startDate && mergedTimetable?.endDate && (
           <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
             日期范围：{mergedTimetable.startDate} 至 {mergedTimetable.endDate}，包含 {allSchedules.length} 个课程
+            <a 
+              onClick={handleExport}
+              style={{ 
+                color: '#1890ff', 
+                cursor: 'pointer',
+                marginLeft: '8px',
+                fontSize: '12px'
+              }}
+            >
+              导出
+            </a>
           </div>
         )}
         {mergedTimetable?.isWeekly && (
           <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
             包含 {allSchedules.length} 个课程安排
+            <a 
+              onClick={handleExport}
+              style={{ 
+                color: '#1890ff', 
+                cursor: 'pointer',
+                marginLeft: '8px',
+                fontSize: '12px'
+              }}
+            >
+              导出
+            </a>
           </div>
         )}
       </div>
@@ -479,7 +648,7 @@ const MergePreview = ({ user }) => {
         </div>
       )}
       
-      <div className="compact-timetable-container">
+      <div className="compact-timetable-container" ref={tableRef}>
         <Table
           columns={generateColumns()}
           dataSource={generateTableData()}
