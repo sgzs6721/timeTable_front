@@ -94,6 +94,7 @@ const Dashboard = ({ user }) => {
   const [timetables, setTimetables] = useState([]);
   const [archivedTimetables, setArchivedTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [timetableScheduleCounts, setTimetableScheduleCounts] = useState({});
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
   const [todaysCoursesData, setTodaysCoursesData] = useState([]);
   const [modalMainTitle, setModalMainTitle] = useState('');
@@ -160,9 +161,31 @@ const Dashboard = ({ user }) => {
     const fetchTimetables = async () => {
       try {
         const response = await getTimetables();
-        // 假设后端返回的课表有 isArchived 字段
-        setTimetables(response.data.filter(t => !t.isArchived));
-        setArchivedTimetables(response.data.filter(t => t.isArchived));
+        const allTimetables = response.data;
+        const activeTimetables = allTimetables.filter(t => !t.isArchived);
+        const archivedTimetables = allTimetables.filter(t => t.isArchived);
+
+        setTimetables(activeTimetables);
+        setArchivedTimetables(archivedTimetables);
+
+        // 获取每个课表的课程数量
+        const scheduleCounts = {};
+        await Promise.all(
+          activeTimetables.map(async (timetable) => {
+            try {
+              const scheduleResponse = await getTimetableSchedules(timetable.id);
+              if (scheduleResponse.success && scheduleResponse.data) {
+                scheduleCounts[timetable.id] = scheduleResponse.data.length;
+              } else {
+                scheduleCounts[timetable.id] = 0;
+              }
+            } catch (error) {
+              console.error(`获取课表 ${timetable.id} 的课程数量失败:`, error);
+              scheduleCounts[timetable.id] = 0;
+            }
+          })
+        );
+        setTimetableScheduleCounts(scheduleCounts);
       } catch (error) {
         message.error('获取课表列表失败');
       } finally {
@@ -271,6 +294,21 @@ const Dashboard = ({ user }) => {
         },
       ],
     };
+  };
+
+  // 更新单个课表的课程数量
+  const updateTimetableScheduleCount = async (timetableId) => {
+    try {
+      const scheduleResponse = await getTimetableSchedules(timetableId);
+      if (scheduleResponse.success && scheduleResponse.data) {
+        setTimetableScheduleCounts(prev => ({
+          ...prev,
+          [timetableId]: scheduleResponse.data.length
+        }));
+      }
+    } catch (error) {
+      console.error(`更新课表 ${timetableId} 的课程数量失败:`, error);
+    }
   };
 
   const handleCreateTimetable = () => {
@@ -789,6 +827,8 @@ const Dashboard = ({ user }) => {
         setOpenPopoverKey(null);
         // 重新获取课程数据
         handleShowTodaysCourses(currentTimetable);
+        // 更新课程数量
+        updateTimetableScheduleCount(currentTimetable.id);
       } else {
         message.error(response.message || '添加失败');
       }
@@ -812,6 +852,8 @@ const Dashboard = ({ user }) => {
         setOpenPopoverKey(null);
         // 重新获取课程数据
         handleShowTodaysCourses(currentTimetable);
+        // 更新课程数量
+        updateTimetableScheduleCount(currentTimetable.id);
       } else {
         message.error(response.message || '修改失败');
       }
@@ -828,6 +870,8 @@ const Dashboard = ({ user }) => {
         setOpenPopoverKey(null);
         // 重新获取课程数据
         handleShowTodaysCourses(currentTimetable);
+        // 更新课程数量
+        updateTimetableScheduleCount(currentTimetable.id);
       } else {
         message.error(response.message || '删除失败');
       }
@@ -957,8 +1001,11 @@ const Dashboard = ({ user }) => {
                           {item.isWeekly ? '周固定课表' : '日期范围课表'}
                         </Tag>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
+                    <div style={{ color: '#888', fontSize: '12px' }}>
                       <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
+                      <span style={{ marginLeft: '16px' }}>共</span>
+                      <span style={{ color: '#1890ff', fontWeight: 'bold' }}>{timetableScheduleCounts[item.id] || 0}</span>
+                      <span>课程</span>
                     </div>
                   </>
                 }
