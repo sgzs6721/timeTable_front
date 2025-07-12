@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -38,9 +38,21 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
 // 新增的组件，用于修改现有课程
 const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, timetable }) => {
   const [name, setName] = React.useState(schedule.studentName);
+  const isNameChanged = name !== schedule.studentName;
 
   return (
     <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
+      {/* 关闭图标 */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+        <Button
+          type="text"
+          size="small"
+          icon={<CloseOutlined />}
+          onClick={onCancel}
+          style={{ padding: '0', minWidth: 'auto', height: 'auto' }}
+        />
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', textAlign: 'left', gap: 4 }}>
         <strong>学生:</strong>
         <Input
@@ -63,7 +75,18 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, ti
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
         <Button size="small" onClick={onCancel}>取消</Button>
         <Button type="primary" danger size="small" onClick={onDelete}>删除</Button>
-        <Button size="small" onClick={() => onUpdateName(name)} style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}>修改</Button>
+        <Button
+          size="small"
+          onClick={() => onUpdateName(name)}
+          disabled={!isNameChanged}
+          style={{
+            backgroundColor: isNameChanged ? '#faad14' : undefined,
+            borderColor: isNameChanged ? '#faad14' : undefined,
+            color: isNameChanged ? 'white' : undefined
+          }}
+        >
+          修改
+        </Button>
       </div>
     </div>
   );
@@ -117,6 +140,27 @@ const Dashboard = ({ user }) => {
   const [editingTimetableName, setEditingTimetableName] = useState('');
 
   const navigate = useNavigate();
+
+  // 智能弹框定位函数
+  const getSmartPlacement = useCallback((columnIndex) => {
+    // Dashboard中的今明课程表格只有2列，比较简单
+    // 根据屏幕宽度和列位置决定
+    const screenWidth = window.innerWidth;
+
+    if (screenWidth <= 768) {
+      // 移动端，优先使用上下方向
+      return 'top';
+    }
+
+    // 桌面端，根据列位置决定
+    if (columnIndex === 0) {
+      // 第一列，弹框显示在右侧
+      return 'rightTop';
+    } else {
+      // 第二列，弹框显示在左侧
+      return 'leftTop';
+    }
+  }, []);
 
   // 兼容移动端的复制函数
   const copyToClipboard = async (text) => {
@@ -533,7 +577,7 @@ const Dashboard = ({ user }) => {
           // 空白单元格 - 添加功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(0)}
               title={null}
               content={
                 <NewSchedulePopoverContent
@@ -552,7 +596,7 @@ const Dashboard = ({ user }) => {
           // 非空白单元格 - 修改功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(0)}
               title={null}
               content={
                 <SchedulePopoverContent
@@ -603,7 +647,7 @@ const Dashboard = ({ user }) => {
           // 空白单元格 - 添加功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(1)}
               title={null}
               content={
                 <NewSchedulePopoverContent
@@ -622,7 +666,7 @@ const Dashboard = ({ user }) => {
           // 非空白单元格 - 修改功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(1)}
               title={null}
               content={
                 <SchedulePopoverContent
@@ -676,7 +720,7 @@ const Dashboard = ({ user }) => {
           // 空白单元格 - 添加功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(0)}
               title={null}
               content={
                 <NewSchedulePopoverContent
@@ -695,7 +739,7 @@ const Dashboard = ({ user }) => {
           // 非空白单元格 - 修改功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(0)}
               title={null}
               content={
                 <SchedulePopoverContent
@@ -746,7 +790,7 @@ const Dashboard = ({ user }) => {
           // 空白单元格 - 添加功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(1)}
               title={null}
               content={
                 <NewSchedulePopoverContent
@@ -765,7 +809,7 @@ const Dashboard = ({ user }) => {
           // 非空白单元格 - 修改功能
           return (
             <Popover
-              placement="top"
+              placement={getSmartPlacement(1)}
               title={null}
               content={
                 <SchedulePopoverContent

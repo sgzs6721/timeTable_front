@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined } from '@ant-design/icons';
+import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch } from '../services/timetable';
 import dayjs from 'dayjs';
@@ -32,11 +32,23 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable, isArchived }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable, isArchived, onClose }) => {
   const [name, setName] = React.useState(schedule.studentName);
+  const isNameChanged = name !== schedule.studentName;
 
   return (
     <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
+      {/* 关闭图标 */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+        <Button
+          type="text"
+          size="small"
+          icon={<CloseOutlined />}
+          onClick={onClose}
+          style={{ padding: '0', minWidth: 'auto', height: 'auto' }}
+        />
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', textAlign: 'left', gap: 4 }}>
         <strong>学生:</strong>
         <Input
@@ -79,7 +91,12 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
             <Button
               size="small"
               onClick={() => onUpdateName(name)}
-              style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
+              disabled={!isNameChanged}
+              style={{
+                backgroundColor: isNameChanged ? '#faad14' : undefined,
+                borderColor: isNameChanged ? '#faad14' : undefined,
+                color: isNameChanged ? 'white' : undefined
+              }}
             >
               修改
             </Button>
@@ -141,6 +158,56 @@ const ViewTimetable = ({ user }) => {
   const [dayScheduleData, setDayScheduleData] = useState([]);
   const [dayScheduleTitle, setDayScheduleTitle] = useState('');
   const [daySchedulesForCopy, setDaySchedulesForCopy] = useState([]);
+
+  // 智能弹框定位函数
+  const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
+    const totalTimeSlots = 11; // 固定的时间段数量：09:00-20:00，共11个时间段
+    const screenWidth = window.innerWidth;
+
+    // 移动端优先使用上下方向
+    if (screenWidth <= 768) {
+      if (timeIndex <= Math.floor(totalTimeSlots / 2)) {
+        return 'bottom';
+      } else {
+        return 'top';
+      }
+    }
+
+    // 桌面端智能定位
+    // 根据列位置决定左右方向 (dayIndex: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日)
+    let horizontalPlacement;
+    if (dayIndex <= 1) {
+      // 周一、周二：弹框显示在右侧
+      horizontalPlacement = 'right';
+    } else if (dayIndex >= 5) {
+      // 周六、周日：弹框显示在左侧
+      horizontalPlacement = 'left';
+    } else {
+      // 周三、周四、周五：根据时间位置决定，优先使用上下方向
+      if (timeIndex <= Math.floor(totalTimeSlots / 3)) {
+        return 'bottom';
+      } else if (timeIndex >= Math.floor(totalTimeSlots * 2 / 3)) {
+        return 'top';
+      } else {
+        return 'top'; // 中间时间段默认上方
+      }
+    }
+
+    // 根据行位置决定上下方向
+    let verticalPlacement;
+    if (timeIndex <= Math.floor(totalTimeSlots / 3)) {
+      // 前1/3行，弹框显示在下方
+      verticalPlacement = 'Bottom';
+    } else if (timeIndex >= Math.floor(totalTimeSlots * 2 / 3)) {
+      // 后1/3行，弹框显示在上方
+      verticalPlacement = 'Top';
+    } else {
+      // 中间行，默认显示在下方
+      verticalPlacement = 'Bottom';
+    }
+
+    return `${horizontalPlacement}${verticalPlacement}`;
+  }, []);
 
 
 
@@ -917,7 +984,7 @@ const ViewTimetable = ({ user }) => {
 
             return (
               <Popover
-                placement="rightTop"
+                placement={getSmartPlacement(index, record.key)}
                 title={null}
                 content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} /> }
                 trigger={multiSelectMode ? "contextMenu" : "click"}
@@ -945,6 +1012,7 @@ const ViewTimetable = ({ user }) => {
                     onExport={handleExportStudentSchedule}
                     timetable={timetable}
                     isArchived={timetable?.isArchived}
+                    onClose={() => setOpenPopoverKey(null)}
                   />
                   {idx < schedules.length - 1 && <hr style={{ margin: '8px 0' }} />}
                 </div>
@@ -954,7 +1022,7 @@ const ViewTimetable = ({ user }) => {
 
           return (
             <Popover
-              placement="rightTop"
+              placement={getSmartPlacement(index, record.key)}
               title={null}
               content={popoverContent}
               trigger="click"
