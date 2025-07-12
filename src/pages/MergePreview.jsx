@@ -9,6 +9,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import localeData from 'dayjs/plugin/localeData';
 import html2canvas from 'html2canvas';
+import { isWeChatBrowser } from '../utils/browserDetect';
 import './ViewTimetable.css';
 
 // 扩展 dayjs 插件
@@ -73,7 +74,7 @@ const MergePreview = ({ user }) => {
 
     // 2. 在克隆体上修改
     const elementsToModify = clonedNode.querySelectorAll('.student-name-truncated');
-    
+
     elementsToModify.forEach(el => {
       if (el.title) {
         el.innerText = el.title;
@@ -83,7 +84,7 @@ const MergePreview = ({ user }) => {
     // 计算整个表格中最长文字的宽度
     const calculateMaxTextWidth = () => {
       let maxWidth = 0;
-      
+
       // 为计算文字宽度创建测试元素
       const testDiv = document.createElement('div');
       testDiv.style.position = 'absolute';
@@ -93,14 +94,14 @@ const MergePreview = ({ user }) => {
       testDiv.style.whiteSpace = 'nowrap';
       testDiv.style.visibility = 'hidden';
       document.body.appendChild(testDiv);
-      
+
       // 检查所有表头
       const headerCells = clonedNode.querySelectorAll('thead th');
       headerCells.forEach(th => {
         testDiv.innerText = th.innerText || th.textContent || '';
         maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
       });
-      
+
       // 检查所有单元格内容
       const allCells = clonedNode.querySelectorAll('tbody td');
       allCells.forEach(cell => {
@@ -111,7 +112,7 @@ const MergePreview = ({ user }) => {
           testDiv.innerText = fullName;
           maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
         });
-        
+
         // 也检查非截断的文本
         const allText = cell.innerText || cell.textContent || '';
         if (allText.trim()) {
@@ -119,9 +120,9 @@ const MergePreview = ({ user }) => {
           maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
         }
       });
-      
+
       document.body.removeChild(testDiv);
-      
+
       // 添加一个字的宽度作为缓冲（约14px）
       return maxWidth + 14;
     };
@@ -129,7 +130,7 @@ const MergePreview = ({ user }) => {
     const maxTextWidth = calculateMaxTextWidth();
     const headerCells = clonedNode.querySelectorAll('thead th');
     const columnCount = headerCells.length;
-    
+
     // 所有列都使用相同宽度，基于最长文字+1个字的宽度
     const uniformWidth = Math.max(maxTextWidth, 60); // 最小60px
     const totalWidth = uniformWidth * columnCount;
@@ -148,7 +149,7 @@ const MergePreview = ({ user }) => {
     if (tableElement) {
       tableElement.style.tableLayout = 'fixed';
       tableElement.style.width = `${totalWidth}px`;
-      
+
       // 所有列都设置为相同宽度
       headerCells.forEach(th => {
         th.style.width = `${uniformWidth}px`;
@@ -162,7 +163,7 @@ const MergePreview = ({ user }) => {
     clonedNode.style.top = '0px';
     clonedNode.style.backgroundColor = 'white';
     document.body.appendChild(clonedNode);
-    
+
     // 3. 对克隆体截图
     html2canvas(clonedNode, {
       useCORS: true,
@@ -200,10 +201,10 @@ const MergePreview = ({ user }) => {
     const start = dayjs(startDate);
     const end = dayjs(endDate);
     const weeks = [];
-    
+
     // 找到开始日期所在周的周一
     let currentWeekStart = start.startOf('week'); // 现在已经设置了weekStart: 1，所以这里会正确找到周一
-    
+
     while (currentWeekStart.isBefore(end) || currentWeekStart.isSame(end)) {
       const weekEnd = currentWeekStart.add(6, 'day');
       weeks.push({
@@ -213,7 +214,7 @@ const MergePreview = ({ user }) => {
       });
       currentWeekStart = currentWeekStart.add(1, 'week');
     }
-    
+
     return weeks;
   };
 
@@ -255,7 +256,7 @@ const MergePreview = ({ user }) => {
       // 检查课表类型是否一致
       const firstType = timetables[0]?.isWeekly;
       const allSameType = timetables.every(table => table.isWeekly === firstType);
-      
+
       if (!allSameType) {
         message.error('只能合并相同类型的课表');
         navigate(-1);
@@ -269,37 +270,37 @@ const MergePreview = ({ user }) => {
       const baseTimetable = { ...timetables[0] };
       const names = timetables.map(t => t.name);
       baseTimetable.name = `合并预览`; // 修改标题
-      
+
       const colorMap = {};
       timetables.forEach((t, index) => {
         colorMap[t.id] = sourceNameColors[index % sourceNameColors.length];
       });
       setTimetableColorMap(colorMap);
-      
+
       // 如果是日期范围课表，合并日期范围并生成周列表
       if (!baseTimetable.isWeekly) {
         const allStartDates = timetables
           .map(t => t.startDate)
           .filter(date => date)
           .map(date => dayjs(date));
-        
+
         const allEndDates = timetables
           .map(t => t.endDate)
           .filter(date => date)
           .map(date => dayjs(date));
-        
+
         if (allStartDates.length > 0 && allEndDates.length > 0) {
-          const mergedStartDate = allStartDates.reduce((min, date) => 
+          const mergedStartDate = allStartDates.reduce((min, date) =>
             date.isBefore(min) ? date : min
           ).format('YYYY-MM-DD');
-          
-          const mergedEndDate = allEndDates.reduce((max, date) => 
+
+          const mergedEndDate = allEndDates.reduce((max, date) =>
             date.isAfter(max) ? date : max
           ).format('YYYY-MM-DD');
 
           baseTimetable.startDate = mergedStartDate;
           baseTimetable.endDate = mergedEndDate;
-          
+
           // 生成周列表
           const weeks = generateWeeksList(mergedStartDate, mergedEndDate);
           setWeeksList(weeks);
@@ -340,13 +341,13 @@ const MergePreview = ({ user }) => {
     weekDays.forEach((day, index) => {
       const currentWeek = weeksList[currentWeekIndex];
       let columnTitle = day.label;
-      
+
       // 如果是日期范围课表，在星期几下方显示具体日期
       if (!mergedTimetable?.isWeekly && currentWeek) {
         const weekStart = dayjs(currentWeek.start);
         // 直接使用 index，因为 weekDays 的顺序就是周一(0)到周日(6)
         const currentDate = weekStart.add(index, 'day');
-        
+
         columnTitle = (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
@@ -358,7 +359,7 @@ const MergePreview = ({ user }) => {
           </div>
         );
       }
-      
+
       columns.push({
         title: columnTitle,
         dataIndex: day.key,
@@ -412,7 +413,7 @@ const MergePreview = ({ user }) => {
               const isTruncated = student.studentName.length > 4;
               const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
               return (
-                <span 
+                <span
                   className={isTruncated ? 'student-name-truncated' : ''}
                   title={isTruncated ? student.studentName : undefined}
                 >
@@ -435,7 +436,7 @@ const MergePreview = ({ user }) => {
     timetablesData.forEach(t => {
       timetableIdToNameMap.set(t.id, t.name);
     });
-    
+
     // 从URL参数解析课表ID，按顺序对应timetableNames
     const ids = idsParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
     ids.forEach((id, index) => {
@@ -455,7 +456,7 @@ const MergePreview = ({ user }) => {
       const currentWeek = weeksList[currentWeekIndex];
       const weekStart = dayjs(currentWeek.start);
       const weekEnd = dayjs(currentWeek.end);
-      
+
       filteredSchedules = schedulesWithSource.filter(schedule => {
         if (schedule.scheduleDate) {
           const scheduleDate = dayjs(schedule.scheduleDate);
@@ -546,7 +547,7 @@ const MergePreview = ({ user }) => {
           type="text"
           onClick={() => navigate(-1)}
           icon={<LeftOutlined style={{ fontSize: 20 }} />}
-          style={{ 
+          style={{
             width: 40,
             height: 40,
             borderRadius: '50%',
@@ -556,11 +557,11 @@ const MergePreview = ({ user }) => {
             justifyContent: 'center'
           }}
         />
-        <div style={{ 
-          flex: 1, 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
         }}>
           <Space align="center" size="large">
             <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
@@ -590,43 +591,47 @@ const MergePreview = ({ user }) => {
         {!mergedTimetable?.isWeekly && mergedTimetable?.startDate && mergedTimetable?.endDate && (
           <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
             日期范围：{mergedTimetable.startDate} 至 {mergedTimetable.endDate}，包含 {allSchedules.length} 个课程
-            <a 
-              onClick={handleExport}
-              style={{ 
-                color: '#1890ff', 
-                cursor: 'pointer',
-                marginLeft: '8px',
-                fontSize: '12px'
-              }}
-            >
-              导出
-            </a>
+            {!isWeChatBrowser() && (
+              <a
+                onClick={handleExport}
+                style={{
+                  color: '#1890ff',
+                  cursor: 'pointer',
+                  marginLeft: '8px',
+                  fontSize: '12px'
+                }}
+              >
+                导出
+              </a>
+            )}
           </div>
         )}
         {mergedTimetable?.isWeekly && (
           <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
             包含 {allSchedules.length} 个课程安排
-            <a 
-              onClick={handleExport}
-              style={{ 
-                color: '#1890ff', 
-                cursor: 'pointer',
-                marginLeft: '8px',
-                fontSize: '12px'
-              }}
-            >
-              导出
-            </a>
+            {!isWeChatBrowser() && (
+              <a
+                onClick={handleExport}
+                style={{
+                  color: '#1890ff',
+                  cursor: 'pointer',
+                  marginLeft: '8px',
+                  fontSize: '12px'
+                }}
+              >
+                导出
+              </a>
+            )}
           </div>
         )}
       </div>
 
       {/* 日期范围课表的周导航 */}
       {!mergedTimetable?.isWeekly && weeksList.length > 0 && (
-        <div style={{ 
-          marginBottom: '1rem', 
-          display: 'flex', 
-          justifyContent: 'center', 
+        <div style={{
+          marginBottom: '1rem',
+          display: 'flex',
+          justifyContent: 'center',
           alignItems: 'center',
           gap: '16px'
         }}>
@@ -647,7 +652,7 @@ const MergePreview = ({ user }) => {
           />
         </div>
       )}
-      
+
       <div className="compact-timetable-container" ref={tableRef}>
         <Table
           columns={generateColumns()}
@@ -662,4 +667,4 @@ const MergePreview = ({ user }) => {
   );
 };
 
-export default MergePreview; 
+export default MergePreview;

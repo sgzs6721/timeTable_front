@@ -12,6 +12,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import html2canvas from 'html2canvas';
 import EditScheduleModal from '../components/EditScheduleModal';
+import { isWeChatBrowser } from '../utils/browserDetect';
 import './ViewTimetable.css';
 
 dayjs.extend(isBetween);
@@ -71,13 +72,13 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-        <Button
-            type="primary"
-            size="small"
-            onClick={() => onExport(schedule.studentName)}
-        >
-            导出
-        </Button>
+          <Button
+              type="primary"
+              size="small"
+              onClick={() => onExport(schedule.studentName)}
+          >
+              全部
+          </Button>
         {!isArchived && (
           <>
             <Button
@@ -1178,19 +1179,21 @@ const ViewTimetable = ({ user }) => {
           className="compact-timetable"
         />
       </div>
-      <div style={{ textAlign: 'right', marginTop: '16px' }}>
-        <a
-          onClick={handleExportTable}
-          style={{
-            color: '#1890ff',
-            cursor: 'pointer',
-            fontSize: '14px',
-            padding: '4px 8px',
-          }}
-        >
-          导出
-        </a>
-      </div>
+      {!isWeChatBrowser() && (
+        <div style={{ textAlign: 'right', marginTop: '16px' }}>
+          <a
+            onClick={handleExportTable}
+            style={{
+              color: '#1890ff',
+              cursor: 'pointer',
+              fontSize: '14px',
+              padding: '4px 8px',
+            }}
+          >
+            导出
+          </a>
+        </div>
+      )}
 
       {!timetable?.isWeekly && totalWeeks > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.5rem', gap: '1rem' }}>
