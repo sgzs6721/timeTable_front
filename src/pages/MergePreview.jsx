@@ -542,7 +542,7 @@ const MergePreview = ({ user }) => {
 
   return (
     <div className="page-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem', position: 'relative' }}>
         <Button
           type="text"
           onClick={() => navigate(-1)}
@@ -554,11 +554,13 @@ const MergePreview = ({ user }) => {
             border: '1px solid #d9d9d9',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            position: 'absolute',
+            left: 0
           }}
         />
         <div style={{
-          flex: 1,
+          width: '100%',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center'
@@ -571,7 +573,7 @@ const MergePreview = ({ user }) => {
 
       </div>
 
-      <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '8px', marginBottom: '0.5rem' }}>
+      <div style={{ padding: '12px 16px', backgroundColor: '#fafafa', borderRadius: '8px', marginBottom: '0.5rem' }}>
         <div style={{ marginBottom: 8, color: '#666' }}>
           <strong>合并来源：</strong>
           {timetablesData.map((table, index) => (
