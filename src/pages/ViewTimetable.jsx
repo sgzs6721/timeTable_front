@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Button, Table, message, Pagination, Space, Tag, Popover, Spin, Input, Modal } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined, ExportOutlined, CopyOutlined, LeftCircleOutlined, RightCircleOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal } from 'antd';
+import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch } from '../services/timetable';
 import dayjs from 'dayjs';
@@ -129,7 +129,7 @@ const ViewTimetable = ({ user }) => {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exportContent, setExportContent] = useState('');
   const [exportingStudentName, setExportingStudentName] = useState('');
-  
+
   // 多选功能状态
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedCells, setSelectedCells] = useState(new Set());
@@ -141,6 +141,8 @@ const ViewTimetable = ({ user }) => {
   const [dayScheduleData, setDayScheduleData] = useState([]);
   const [dayScheduleTitle, setDayScheduleTitle] = useState('');
   const [daySchedulesForCopy, setDaySchedulesForCopy] = useState([]);
+
+
 
   const tableRef = useRef(null);
   const navigate = useNavigate();
@@ -155,7 +157,7 @@ const ViewTimetable = ({ user }) => {
         message.success('已复制到剪贴板');
         return;
       }
-      
+
       // 移动端兼容方案
       const textArea = document.createElement('textarea');
       textArea.value = text;
@@ -163,16 +165,16 @@ const ViewTimetable = ({ user }) => {
       textArea.style.left = '-999999px';
       textArea.style.top = '-999999px';
       document.body.appendChild(textArea);
-      
+
       // 在移动端，需要先聚焦再选择
       textArea.focus();
       textArea.select();
       textArea.setSelectionRange(0, textArea.value.length);
-      
+
       // 尝试复制
       const successful = document.execCommand('copy');
       document.body.removeChild(textArea);
-      
+
       if (successful) {
         message.success('已复制到剪贴板');
       } else {
@@ -249,7 +251,7 @@ const ViewTimetable = ({ user }) => {
       message.info('当天没有课程');
       return;
     }
-    
+
     const studentColorMapForDay = new Map(studentColorMap);
     sortedSchedules.forEach(s => {
       if (s.studentName && !studentColorMapForDay.has(s.studentName)) {
@@ -265,7 +267,7 @@ const ViewTimetable = ({ user }) => {
         displayTime: `${hour}-${hour + 1}`,
       });
     }
-    
+
     const tableData = timeSlotsForDay.map((slot, index) => {
       const schedule = sortedSchedules.find(s => s.startTime.substring(0, 5) === slot.time);
       return {
@@ -281,7 +283,7 @@ const ViewTimetable = ({ user }) => {
     setDaySchedulesForCopy(sortedSchedules);
     setDayScheduleModalVisible(true);
   };
-  
+
   const generateCopyTextForDay = (schedules) => {
     if (!schedules || schedules.length === 0) return '没有可复制的课程';
     return schedules.map(schedule => {
@@ -290,6 +292,8 @@ const ViewTimetable = ({ user }) => {
         return `${displayTime} ${schedule.studentName}`;
     }).join('\n');
   };
+
+
 
   useEffect(() => {
     fetchTimetable();
@@ -328,7 +332,7 @@ const ViewTimetable = ({ user }) => {
             // 计算今天是第几周
             const daysSinceAnchor = today.diff(anchorMonday, 'day');
             const weekNumber = Math.floor(daysSinceAnchor / 7) + 1;
-            
+
             // 确保周数在有效范围内
             if (weekNumber >= 1 && weekNumber <= weeks) {
               targetWeek = weekNumber;
@@ -406,7 +410,7 @@ const ViewTimetable = ({ user }) => {
   const handleExportStudentSchedule = async (studentName) => {
     try {
       message.loading({ content: '正在导出全部课时...', key: 'exporting' });
-      
+
       let schedulesToExport;
       if (timetable && !timetable.isWeekly) {
         const response = await getTimetableSchedules(timetableId);
@@ -446,7 +450,7 @@ const ViewTimetable = ({ user }) => {
           .map(s => `${s.scheduleDate}, 星期${dayMap[s.dayOfWeek.toUpperCase()] || s.dayOfWeek}, ${s.startTime.substring(0, 5)}~${s.endTime.substring(0, 5)}`)
           .join('\n');
       }
-      
+
       message.destroy('exporting');
       setExportContent(content);
       setExportModalVisible(true);
@@ -471,7 +475,7 @@ const ViewTimetable = ({ user }) => {
 
     // 2. 在克隆体上修改截断的学生姓名
     const elementsToModify = clonedNode.querySelectorAll('.student-name-truncated');
-    
+
     elementsToModify.forEach(el => {
       if (el.title) {
         el.innerText = el.title;
@@ -481,7 +485,7 @@ const ViewTimetable = ({ user }) => {
     // 计算整个表格中最长文字的宽度
     const calculateMaxTextWidth = () => {
       let maxWidth = 0;
-      
+
       // 为计算文字宽度创建测试元素
       const testDiv = document.createElement('div');
       testDiv.style.position = 'absolute';
@@ -491,14 +495,14 @@ const ViewTimetable = ({ user }) => {
       testDiv.style.whiteSpace = 'nowrap';
       testDiv.style.visibility = 'hidden';
       document.body.appendChild(testDiv);
-      
+
       // 检查所有表头
       const headerCells = clonedNode.querySelectorAll('thead th');
       headerCells.forEach(th => {
         testDiv.innerText = th.innerText || th.textContent || '';
         maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
       });
-      
+
       // 检查所有单元格内容
       const allCells = clonedNode.querySelectorAll('tbody td');
       allCells.forEach(cell => {
@@ -509,7 +513,7 @@ const ViewTimetable = ({ user }) => {
           testDiv.innerText = fullName;
           maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
         });
-        
+
         // 也检查非截断的文本
         const allText = cell.innerText || cell.textContent || '';
         if (allText.trim()) {
@@ -517,9 +521,9 @@ const ViewTimetable = ({ user }) => {
           maxWidth = Math.max(maxWidth, testDiv.offsetWidth);
         }
       });
-      
+
       document.body.removeChild(testDiv);
-      
+
       // 添加一个字的宽度作为缓冲（约14px）
       return maxWidth + 14;
     };
@@ -527,7 +531,7 @@ const ViewTimetable = ({ user }) => {
     const maxTextWidth = calculateMaxTextWidth();
     const headerCells = clonedNode.querySelectorAll('thead th');
     const columnCount = headerCells.length;
-    
+
     // 所有列都使用相同宽度，基于最长文字+1个字的宽度
     const uniformWidth = Math.max(maxTextWidth, 60); // 最小60px
     const totalWidth = uniformWidth * columnCount;
@@ -546,7 +550,7 @@ const ViewTimetable = ({ user }) => {
     if (tableElement) {
       tableElement.style.tableLayout = 'fixed';
       tableElement.style.width = `${totalWidth}px`;
-      
+
       // 所有列都设置为相同宽度
       headerCells.forEach(th => {
         th.style.width = `${uniformWidth}px`;
@@ -560,7 +564,7 @@ const ViewTimetable = ({ user }) => {
     clonedNode.style.top = '0px';
     clonedNode.style.backgroundColor = 'white';
     document.body.appendChild(clonedNode);
-    
+
     // 3. 对克隆体截图
     html2canvas(clonedNode, {
       useCORS: true,
@@ -591,7 +595,7 @@ const ViewTimetable = ({ user }) => {
     setMultiSelectMode(newMode);
     setSelectedCells(new Set()); // 切换模式时总是清空选择
     setOpenPopoverKey(null);
-    
+
     // 如果是进入多选模式，显示提示
     if (newMode) {
       message.info('已进入多选模式，点击空白单元格进行选择');
@@ -600,7 +604,7 @@ const ViewTimetable = ({ user }) => {
 
   const handleCellSelection = (cellKey, dayIndex, timeIndex) => {
     if (!multiSelectMode) return;
-    
+
     const newSelectedCells = new Set(selectedCells);
     if (newSelectedCells.has(cellKey)) {
       newSelectedCells.delete(cellKey);
@@ -613,16 +617,16 @@ const ViewTimetable = ({ user }) => {
   // 获取当前页面的选择数量
   const getCurrentPageSelectionCount = useCallback(() => {
     if (!multiSelectMode || selectedCells.size === 0) return 0;
-    
+
     const currentPagePrefix = timetable?.isWeekly ? 'weekly' : `week-${currentWeek}`;
     let count = 0;
-    
+
     selectedCells.forEach(cellKey => {
       if (cellKey.startsWith(currentPagePrefix)) {
         count++;
       }
     });
-    
+
     return count;
   }, [multiSelectMode, selectedCells, timetable?.isWeekly, currentWeek]);
 
@@ -647,7 +651,7 @@ const ViewTimetable = ({ user }) => {
       // 解析新的cellKey格式：pagePrefix-dayKey-timeIndex
       const parts = cellKey.split('-');
       let dayKey, timeIndex, weekNum;
-      
+
       if (timetable.isWeekly) {
         // 周固定课表：weekly-dayKey-timeIndex
         [, dayKey, timeIndex] = parts;
@@ -655,7 +659,7 @@ const ViewTimetable = ({ user }) => {
         // 日期范围课表：week-weekNum-dayKey-timeIndex
         [, weekNum, dayKey, timeIndex] = parts;
       }
-      
+
       const dayIndex = weekDays.findIndex(day => day.key === dayKey);
       const timeSlot = timeSlots[parseInt(timeIndex)];
       const [startTimeStr, endTimeStr] = timeSlot.split('-');
@@ -778,8 +782,8 @@ const ViewTimetable = ({ user }) => {
       if (!timetable.isWeekly && weekDates && weekDates.start) {
         const currentDate = weekDates.start.add(index, 'day');
         columnTitle = (
-          <div 
-            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }} 
+          <div
+            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }}
             onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
           >
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
@@ -792,15 +796,15 @@ const ViewTimetable = ({ user }) => {
         );
       } else {
         columnTitle = (
-          <div 
-            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }} 
+          <div
+            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }}
             onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
           >
             {day.label}
           </div>
         )
       }
-      
+
       columns.push({
         title: columnTitle,
         dataIndex: day.key,
@@ -891,9 +895,9 @@ const ViewTimetable = ({ user }) => {
 
             if (multiSelectMode) {
               return (
-                <div 
-                  style={{ 
-                    height: '48px', 
+                <div
+                  style={{
+                    height: '48px',
                     cursor: 'pointer',
                     backgroundColor: isSelected ? '#e6f7ff' : 'transparent',
                     border: isSelected ? '2px solid #1890ff' : '2px solid transparent',
@@ -924,7 +928,7 @@ const ViewTimetable = ({ user }) => {
               </Popover>
             );
           }
-          
+
           const cellKey = `${day.key}-${record.key}`;
           const handleOpenChange = (newOpen) => {
             setOpenPopoverKey(newOpen ? cellKey : null);
@@ -979,7 +983,7 @@ const ViewTimetable = ({ user }) => {
                       const isTruncated = student.studentName.length > 4;
                       const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
                       return (
-                        <span 
+                        <span
                           className={isTruncated ? 'student-name-truncated' : ''}
                           title={isTruncated ? student.studentName : undefined}
                         >
@@ -1019,7 +1023,7 @@ const ViewTimetable = ({ user }) => {
           type="text"
           onClick={() => navigate(-1)}
           icon={<LeftOutlined style={{ fontSize: 20 }} />}
-          style={{ 
+          style={{
             position: 'absolute',
             left: 0,
             width: 40,
@@ -1031,11 +1035,11 @@ const ViewTimetable = ({ user }) => {
             justifyContent: 'center'
           }}
         />
-        <div style={{ 
-          flex: 1, 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
         }}>
           <Space align="center" size="large">
             <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
@@ -1046,10 +1050,10 @@ const ViewTimetable = ({ user }) => {
 
       {/* 多选功能控制区域 */}
       {!timetable?.isArchived && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: '1rem',
           padding: '8px 12px',
           backgroundColor: multiSelectMode ? '#f0f9ff' : '#fafafa',
@@ -1057,19 +1061,19 @@ const ViewTimetable = ({ user }) => {
           border: multiSelectMode ? '1px solid #bae7ff' : '1px solid #f0f0f0'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Button 
+            <Button
               type={multiSelectMode ? 'default' : 'default'}
               size="small"
               onClick={toggleMultiSelectMode}
-              style={multiSelectMode ? { 
-                backgroundColor: '#fff2f0', 
-                borderColor: '#ffccc7', 
-                color: '#cf1322' 
+              style={multiSelectMode ? {
+                backgroundColor: '#fff2f0',
+                borderColor: '#ffccc7',
+                color: '#cf1322'
               } : {}}
             >
               {multiSelectMode ? '退出多选' : '多选排课'}
             </Button>
-            
+
             {multiSelectMode && (
               <span style={{ fontSize: '14px', color: '#666' }}>
                 {timetable?.isWeekly ? (
@@ -1082,7 +1086,7 @@ const ViewTimetable = ({ user }) => {
           </div>
 
           {multiSelectMode && selectedCells.size > 0 && (
-            <Button 
+            <Button
               type="primary"
               size="small"
               onClick={openBatchScheduleModal}
@@ -1092,7 +1096,9 @@ const ViewTimetable = ({ user }) => {
           )}
         </div>
       )}
-      
+
+
+
       <div className="compact-timetable-container" ref={tableRef}>
         <Table
           columns={generateColumns()}
@@ -1125,7 +1131,7 @@ const ViewTimetable = ({ user }) => {
             onClick={() => currentWeek > 1 && handleWeekChange(currentWeek - 1)}
             disabled={currentWeek <= 1}
             icon={<LeftOutlined style={{ fontSize: 14 }} />}
-            style={{ 
+            style={{
               width: 32,
               height: 32,
               borderRadius: '50%',
@@ -1143,7 +1149,7 @@ const ViewTimetable = ({ user }) => {
             onClick={() => currentWeek < totalWeeks && handleWeekChange(currentWeek + 1)}
             disabled={currentWeek >= totalWeeks}
             icon={<RightOutlined style={{ fontSize: 14 }} />}
-            style={{ 
+            style={{
               width: 32,
               height: 32,
               borderRadius: '50%',
@@ -1212,11 +1218,11 @@ const ViewTimetable = ({ user }) => {
           <p style={{ marginBottom: '8px', color: '#666' }}>
             将为以下 {selectedCells.size} 个时间段批量排课：
           </p>
-          <div style={{ 
-            maxHeight: '120px', 
-            overflowY: 'auto', 
-            backgroundColor: '#f5f5f5', 
-            padding: '8px', 
+          <div style={{
+            maxHeight: '120px',
+            overflowY: 'auto',
+            backgroundColor: '#f5f5f5',
+            padding: '8px',
             borderRadius: '4px',
             fontSize: '12px'
           }}>
@@ -1224,7 +1230,7 @@ const ViewTimetable = ({ user }) => {
                // 解析cellKey格式
                const parts = cellKey.split('-');
                let dayKey, timeIndex, weekNum, displayText;
-               
+
                if (timetable?.isWeekly) {
                  // 周固定课表：weekly-dayKey-timeIndex
                  [, dayKey, timeIndex] = parts;
@@ -1238,7 +1244,7 @@ const ViewTimetable = ({ user }) => {
                  const timeSlot = timeSlots[parseInt(timeIndex)];
                  displayText = `第${weekNum}周 ${dayLabel} ${timeSlot}`;
                }
-               
+
                return (
                  <div key={cellKey} style={{ marginBottom: '4px' }}>
                    {displayText}
@@ -1247,7 +1253,7 @@ const ViewTimetable = ({ user }) => {
              })}
           </div>
         </div>
-        
+
         <div>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
             学生姓名：
@@ -1298,6 +1304,8 @@ const ViewTimetable = ({ user }) => {
           bordered
         />
       </Modal>
+
+
     </div>
   );
 };

@@ -376,10 +376,13 @@ const Dashboard = ({ user }) => {
         let subTitle = '';
 
         if (isWeekly) {
-          const weekDayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-          const dayOfWeek = weekDayMap[targetDate.day()];
-          schedulesForDay = allSchedules.filter(s => s.dayOfWeek === dayOfWeek);
-          subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${dayOfWeek})`;
+          // 数据库中存储的是英文格式，需要映射
+          const weekDayMapEn = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+          const weekDayMapCn = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+          const dayOfWeekEn = weekDayMapEn[targetDate.day()];
+          const dayOfWeekCn = weekDayMapCn[targetDate.day()];
+          schedulesForDay = allSchedules.filter(s => s.dayOfWeek === dayOfWeekEn);
+          subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${dayOfWeekCn})`;
         } else {
           const dateStr = targetDate.format('YYYY-MM-DD');
           schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
@@ -768,8 +771,9 @@ const Dashboard = ({ user }) => {
     };
 
     if (currentTimetable.isWeekly) {
-      const weekDayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-      const dayOfWeek = weekDayMap[targetDate.day()];
+      // 周课表需要使用英文格式的星期几
+      const weekDayMapEn = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+      const dayOfWeek = weekDayMapEn[targetDate.day()];
       payload.dayOfWeek = dayOfWeek;
     } else {
       payload.scheduleDate = targetDate.format('YYYY-MM-DD');
