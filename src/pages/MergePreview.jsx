@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Button, Table, message, Space, Tag, Spin, Pagination } from 'antd';
-import { LeftOutlined, CalendarOutlined, LeftCircleOutlined, RightCircleOutlined, DownloadOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Button, Table, message, Space, Tag, Spin } from 'antd';
+import { LeftOutlined, CalendarOutlined, LeftCircleOutlined, RightCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, getBatchTimetablesInfo } from '../services/timetable';
+import { getTimetableSchedules, getBatchTimetablesInfo } from '../services/timetable';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
@@ -571,7 +571,7 @@ const MergePreview = ({ user }) => {
 
       </div>
 
-      <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '8px', marginBottom: '1.5rem' }}>
+      <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '8px', marginBottom: '0.5rem' }}>
         <div style={{ marginBottom: 8, color: '#666' }}>
           <strong>合并来源：</strong>
           {timetablesData.map((table, index) => (
@@ -626,10 +626,21 @@ const MergePreview = ({ user }) => {
         )}
       </div>
 
-      {/* 日期范围课表的周导航 */}
+      <div className="compact-timetable-container" ref={tableRef} style={{ marginTop: '1rem' }}>
+        <Table
+          columns={generateColumns()}
+          dataSource={generateTableData()}
+          pagination={false}
+          size="small"
+          bordered
+          className="compact-timetable"
+        />
+      </div>
+
+      {/* 日期范围课表的周导航 - 移到表格下方 */}
       {!mergedTimetable?.isWeekly && weeksList.length > 0 && (
         <div style={{
-          marginBottom: '1rem',
+          marginTop: '1rem',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
@@ -652,17 +663,6 @@ const MergePreview = ({ user }) => {
           />
         </div>
       )}
-
-      <div className="compact-timetable-container" ref={tableRef}>
-        <Table
-          columns={generateColumns()}
-          dataSource={generateTableData()}
-          pagination={false}
-          size="small"
-          bordered
-          className="compact-timetable"
-        />
-      </div>
     </div>
   );
 };
