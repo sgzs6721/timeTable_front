@@ -323,12 +323,13 @@ const Dashboard = ({ user }) => {
           label: '设为活动课表',
           disabled: setActiveDisabled,
           onClick: () => handleSetActiveTimetable(item.id),
+          style: { color: '#52c41a' },
         },
         {
           key: 'archive',
           label: '归档',
-          disabled: isActive,
           onClick: () => handleArchiveTimetable(item.id),
+          style: { color: '#faad14' },
         },
         {
           key: 'delete',

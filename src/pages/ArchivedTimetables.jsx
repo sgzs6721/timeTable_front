@@ -83,6 +83,7 @@ const ArchivedTimetables = () => {
       message.info('请先选择要删除的课表');
       return;
     }
+
     Modal.confirm({
       title: '批量彻底删除',
       content: `删除后无法恢复，确定要彻底删除选中的 ${selectedTimetables.length} 个课表吗？`,
@@ -248,7 +249,13 @@ const ArchivedTimetables = () => {
                         >
                           恢复
                         </Button>
-                        <Button type="link" danger onClick={()=>handleDelete(item.id)}>删除</Button>
+                        <Button
+                          type="link"
+                          danger
+                          onClick={()=>handleDelete(item.id)}
+                        >
+                          删除
+                        </Button>
                       </div>
                     )}
                   </div>
