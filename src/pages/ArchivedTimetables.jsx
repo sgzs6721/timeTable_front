@@ -7,7 +7,8 @@ import {
   restoreTimetableApi,
   deleteTimetable,
   bulkRestoreTimetables,
-  bulkDeleteTimetables
+  bulkDeleteTimetables,
+  getTimetableSchedules
 } from '../services/timetable';
 
 const ArchivedTimetables = () => {
@@ -17,6 +18,7 @@ const ArchivedTimetables = () => {
   const [selectedTimetables, setSelectedTimetables] = useState([]);
   const [batchMode, setBatchMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [scheduleCount, setScheduleCount] = useState({});
   // 从导航状态获取非归档课表数量，如果没有则默认为0
   const [nonArchivedCount, setNonArchivedCount] = useState(location.state?.nonArchivedCount || 0);
 
@@ -38,7 +40,27 @@ const ArchivedTimetables = () => {
     try {
       const res = await getArchivedTimetables();
       if (res.success) {
-        setArchived(res.data.archivedList);
+        const archivedList = res.data.archivedList;
+        setArchived(archivedList);
+        
+        // 获取每个课表的课程数量
+        const counts = {};
+        await Promise.all(
+          archivedList.map(async (timetable) => {
+            try {
+              const scheduleResponse = await getTimetableSchedules(timetable.id);
+              if (scheduleResponse.success && scheduleResponse.data) {
+                counts[timetable.id] = scheduleResponse.data.length;
+              } else {
+                counts[timetable.id] = 0;
+              }
+            } catch (error) {
+              console.error(`获取课表 ${timetable.id} 的课程数量失败:`, error);
+              counts[timetable.id] = 0;
+            }
+          })
+        );
+        setScheduleCount(counts);
       } else message.error(res.message || '获取归档课表失败');
     } catch (e) {
       message.error('获取归档课表失败');
@@ -236,6 +258,7 @@ const ArchivedTimetables = () => {
                         <CalendarOutlined />{' '}
                         {item.isWeekly? '每周重复': `${item.startDate || ''} 至 ${item.endDate || ''}`}
                       </span>
+                      <span>共{scheduleCount[item.id] || 0}课程</span>
                     </Space>
                   </div>
                   <div style={{ color:'#888', fontSize:13, marginTop:2, display:'flex', alignItems: 'center', justifyContent: 'space-between' }}>

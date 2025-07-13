@@ -268,23 +268,46 @@ const Dashboard = ({ user }) => {
   const handleArchiveTimetable = (id) => {
     Modal.confirm({
       title: '归档课表',
-      content: '归档后该课表将从列表中隐藏，可在右上角头像菜单“归档课表”中查看和恢复。确定要归档吗？',
+      content: '归档后该课表将从列表中隐藏，可在右上角头像菜单"归档课表"中查看和恢复。确定要归档吗？',
       okText: '归档',
       cancelText: '取消',
       onOk: async () => {
         try {
-          message.loading({ content: '正在归档...', key: 'archive' });
           const res = await archiveTimetableApi(id);
           if (res.success) {
-            setTimetables(prev => prev.filter(t => t.id !== id));
-            // 添加到归档列表
-            setArchivedTimetables(prev => [...prev, { ...timetables.find(t => t.id === id), isArchived: true }]);
-            message.success({ content: '课表已归档', key: 'archive' });
+            // 重新获取课表列表以同步后端设置的新活动课表状态
+            const response = await getTimetables();
+            const allTimetables = response.data;
+            const activeTimetables = allTimetables.filter(t => !t.isArchived);
+            const archivedTimetables = allTimetables.filter(t => t.isArchived);
+            
+            setTimetables(activeTimetables);
+            setArchivedTimetables(archivedTimetables);
+            
+            // 更新课程数量
+            const scheduleCounts = {};
+            await Promise.all(
+              activeTimetables.map(async (timetable) => {
+                try {
+                  const scheduleResponse = await getTimetableSchedules(timetable.id);
+                  if (scheduleResponse.success && scheduleResponse.data) {
+                    scheduleCounts[timetable.id] = scheduleResponse.data.length;
+                  } else {
+                    scheduleCounts[timetable.id] = 0;
+                  }
+                } catch (error) {
+                  scheduleCounts[timetable.id] = 0;
+                }
+              })
+            );
+            setTimetableScheduleCounts(scheduleCounts);
+            
+            message.success('课表已归档');
           } else {
-            message.error({ content: res.message || '归档失败', key: 'archive' });
+            message.error(res.message || '归档失败');
           }
         } catch (error) {
-          message.error({ content: '操作失败', key: 'archive' });
+          message.error('操作失败');
         }
       },
     });
@@ -302,7 +325,32 @@ const Dashboard = ({ user }) => {
         try {
           await deleteTimetable(id);
           message.success('课表删除成功');
-          setTimetables(timetables.filter((item) => item.id !== id));
+          // 重新获取课表列表以同步后端设置的新活动课表状态
+          const response = await getTimetables();
+          const allTimetables = response.data;
+          const activeTimetables = allTimetables.filter(t => !t.isArchived);
+          const archivedTimetables = allTimetables.filter(t => t.isArchived);
+          
+          setTimetables(activeTimetables);
+          setArchivedTimetables(archivedTimetables);
+          
+          // 更新课程数量
+          const scheduleCounts = {};
+          await Promise.all(
+            activeTimetables.map(async (timetable) => {
+              try {
+                const scheduleResponse = await getTimetableSchedules(timetable.id);
+                if (scheduleResponse.success && scheduleResponse.data) {
+                  scheduleCounts[timetable.id] = scheduleResponse.data.length;
+                } else {
+                  scheduleCounts[timetable.id] = 0;
+                }
+              } catch (error) {
+                scheduleCounts[timetable.id] = 0;
+              }
+            })
+          );
+          setTimetableScheduleCounts(scheduleCounts);
         } catch (error) {
           message.error('删除失败');
         }
@@ -323,7 +371,7 @@ const Dashboard = ({ user }) => {
           label: '设为活动课表',
           disabled: setActiveDisabled,
           onClick: () => handleSetActiveTimetable(item.id),
-          style: { color: '#52c41a' },
+          style: !setActiveDisabled ? { color: '#52c41a' } : undefined,
         },
         {
           key: 'archive',
