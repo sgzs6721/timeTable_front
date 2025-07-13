@@ -1097,7 +1097,7 @@ const Dashboard = ({ user }) => {
                     <div style={{ color: '#888', fontSize: '12px' }}>
                       <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
                       <span style={{ marginLeft: '16px' }}>共</span>
-                      <span style={{ color: '#1890ff', fontWeight: 'bold' }}>{timetableScheduleCounts[item.id] || 0}</span>
+                      <span style={{ color: '#1890ff' }}>{timetableScheduleCounts[item.id] || 0}</span>
                       <span>课程</span>
                     </div>
                   </>
