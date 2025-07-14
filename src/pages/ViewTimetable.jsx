@@ -1561,6 +1561,25 @@ const ViewTimetable = ({ user }) => {
             <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
           </Space>
         </div>
+        {!isWeChatBrowser() && (
+          <div style={{
+            position: 'absolute',
+            right: 0
+          }}>
+            <a
+              onClick={handleExportTable}
+              style={{
+                color: '#1890ff',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '4px 8px',
+                textDecoration: 'none'
+              }}
+            >
+              导出
+            </a>
+          </div>
+        )}
       </div>
 
       {/* 功能控制区域 */}
@@ -1701,21 +1720,6 @@ const ViewTimetable = ({ user }) => {
           className="compact-timetable"
         />
       </div>
-      {!isWeChatBrowser() && (
-        <div style={{ textAlign: 'right', marginTop: '16px' }}>
-          <a
-            onClick={handleExportTable}
-            style={{
-              color: '#1890ff',
-              cursor: 'pointer',
-              fontSize: '14px',
-              padding: '4px 8px',
-            }}
-          >
-            导出
-          </a>
-        </div>
-      )}
 
       {!timetable?.isWeekly && totalWeeks > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.5rem', gap: '1rem' }}>
