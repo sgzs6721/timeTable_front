@@ -33,12 +33,12 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, timetable, isArchived, onClose }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, timetable, isArchived, onClose }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const isNameChanged = name !== schedule.studentName;
 
   return (
-    <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
       {/* 关闭图标 */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
         <Button
@@ -71,16 +71,28 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, ti
         </p>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-          <Button
-              type="primary"
-              size="small"
-              onClick={() => onExport(schedule.studentName)}
-          >
-              全部
-          </Button>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '12px' }}>
+        <Button
+          type="primary"
+          size="small"
+          onClick={() => onExport(schedule.studentName)}
+        >
+          全部
+        </Button>
         {!isArchived && (
           <>
+            <Button
+              type="default"
+              size="small"
+              onClick={() => onMove(schedule)}
+              style={{
+                backgroundColor: '#52c41a',
+                borderColor: '#52c41a',
+                color: 'white'
+              }}
+            >
+              移动
+            </Button>
             <Button
               type="primary"
               danger
@@ -162,6 +174,10 @@ const ViewTimetable = ({ user }) => {
   const [daySchedulesForCopy, setDaySchedulesForCopy] = useState([]);
   const [currentDayDate, setCurrentDayDate] = useState(null);
   const [currentDayLabel, setCurrentDayLabel] = useState('');
+
+  // 移动功能状态
+  const [moveMode, setMoveMode] = useState(false);
+  const [scheduleToMove, setScheduleToMove] = useState(null);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
@@ -496,6 +512,58 @@ const ViewTimetable = ({ user }) => {
         fetchSchedules();
       } else {
         message.error(response.message || '修改失败');
+      }
+    } catch (error) {
+      message.error('操作失败，请重试');
+    }
+  };
+
+  const handleStartMove = (schedule) => {
+    setScheduleToMove(schedule);
+    setMoveMode(true);
+    setOpenPopoverKey(null);
+    message.info('请选择要移动到的空白时间段');
+  };
+
+  const handleCancelMove = () => {
+    setMoveMode(false);
+    setScheduleToMove(null);
+    message.info('已取消移动');
+  };
+
+  const handleMoveSchedule = async (targetDayKey, targetTimeIndex) => {
+    if (!scheduleToMove) return;
+
+    const targetTimeSlot = timeSlots[targetTimeIndex];
+    const [startTimeStr, endTimeStr] = targetTimeSlot.split('-');
+    const startTime = `${startTimeStr}:00`;
+    const endTime = `${endTimeStr}:00`;
+
+    let payload = {
+      startTime,
+      endTime,
+      dayOfWeek: targetDayKey.toUpperCase(),
+    };
+
+    // 如果是日期范围课表，需要计算目标日期
+    if (!timetable.isWeekly) {
+      const weekDates = getCurrentWeekDates();
+      if (weekDates.start) {
+        const dayIndex = weekDays.findIndex(day => day.key === targetDayKey);
+        const targetDate = weekDates.start.add(dayIndex, 'day');
+        payload.scheduleDate = targetDate.format('YYYY-MM-DD');
+      }
+    }
+
+    try {
+      const response = await updateSchedule(timetableId, scheduleToMove.id, payload);
+      if (response.success) {
+        message.success('课程移动成功');
+        setMoveMode(false);
+        setScheduleToMove(null);
+        fetchSchedules();
+      } else {
+        message.error(response.message || '移动失败');
       }
     } catch (error) {
       message.error('操作失败，请重试');
@@ -936,6 +1004,9 @@ const ViewTimetable = ({ user }) => {
               if (multiSelectMode) {
                 e.stopPropagation();
                 handleCellSelection(cellKey, index, record.key);
+              } else if (moveMode) {
+                e.stopPropagation();
+                handleMoveSchedule(day.key, record.key);
               }
             };
 
@@ -1010,6 +1081,25 @@ const ViewTimetable = ({ user }) => {
               );
             }
 
+            if (moveMode) {
+              return (
+                <div
+                  style={{
+                    height: '48px',
+                    cursor: 'pointer',
+                    backgroundColor: '#f6ffed',
+                    border: '2px dashed #52c41a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={handleCellClick}
+                  title="点击此处移动课程"
+                >
+                </div>
+              );
+            }
+
             return (
               <Popover
                 placement={getSmartPlacement(index, record.key)}
@@ -1038,6 +1128,7 @@ const ViewTimetable = ({ user }) => {
                     onDelete={() => handleDeleteSchedule(student.id)}
                     onUpdateName={(newName) => handleSaveStudentName(student, newName)}
                     onExport={handleExportStudentSchedule}
+                    onMove={handleStartMove}
                     timetable={timetable}
                     isArchived={timetable?.isArchived}
                     onClose={() => setOpenPopoverKey(null)}
@@ -1047,6 +1138,53 @@ const ViewTimetable = ({ user }) => {
               ))}
             </div>
           );
+
+          // 在移动模式下，有内容的单元格不可点击
+          if (moveMode) {
+            return (
+              <div style={{ 
+                height: '100%', 
+                minHeight: '48px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                width: '100%', 
+                cursor: 'not-allowed',
+                opacity: 0.6 
+              }}>
+                {schedules.map((student, idx) => (
+                  <div
+                    key={student.id}
+                    style={{
+                      backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#333',
+                      fontSize: '12px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.2',
+                      borderTop: idx > 0 ? '1px solid #fff' : 'none',
+                    }}
+                    title="移动模式下无法操作已有课程"
+                  >
+                    {(() => {
+                      const isTruncated = student.studentName.length > 4;
+                      const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
+                      return (
+                        <span
+                          className={isTruncated ? 'student-name-truncated' : ''}
+                          title={isTruncated ? student.studentName : undefined}
+                        >
+                          {content}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                ))}
+              </div>
+            );
+          }
 
           return (
             <Popover
@@ -1144,7 +1282,7 @@ const ViewTimetable = ({ user }) => {
         </div>
       </div>
 
-      {/* 多选功能控制区域 */}
+      {/* 功能控制区域 */}
       {!timetable?.isArchived && (
         <div style={{
           display: 'flex',
@@ -1152,23 +1290,45 @@ const ViewTimetable = ({ user }) => {
           alignItems: 'center',
           marginBottom: '1rem',
           padding: '8px 12px',
-          backgroundColor: multiSelectMode ? '#f0f9ff' : '#fafafa',
+          backgroundColor: multiSelectMode ? '#f0f9ff' : (moveMode ? '#fff7e6' : '#fafafa'),
           borderRadius: '6px',
-          border: multiSelectMode ? '1px solid #bae7ff' : '1px solid #f0f0f0'
+          border: multiSelectMode ? '1px solid #bae7ff' : (moveMode ? '1px solid #ffd591' : '1px solid #f0f0f0')
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Button
-              type={multiSelectMode ? 'default' : 'default'}
-              size="small"
-              onClick={toggleMultiSelectMode}
-              style={multiSelectMode ? {
-                backgroundColor: '#fff2f0',
-                borderColor: '#ffccc7',
-                color: '#cf1322'
-              } : {}}
-            >
-              {multiSelectMode ? '退出多选' : '多选排课'}
-            </Button>
+            {!moveMode && (
+              <Button
+                type={multiSelectMode ? 'default' : 'default'}
+                size="small"
+                onClick={toggleMultiSelectMode}
+                style={multiSelectMode ? {
+                  backgroundColor: '#fff2f0',
+                  borderColor: '#ffccc7',
+                  color: '#cf1322'
+                } : {}}
+              >
+                {multiSelectMode ? '退出多选' : '多选排课'}
+              </Button>
+            )}
+
+            {moveMode && (
+              <>
+                <span style={{ fontSize: '14px', color: '#fa8c16', fontWeight: 'bold' }}>
+                  移动模式：请选择空白时间段移动课程
+                </span>
+                <Button
+                  type="default"
+                  size="small"
+                  onClick={handleCancelMove}
+                  style={{
+                    backgroundColor: '#fff2f0',
+                    borderColor: '#ffccc7',
+                    color: '#cf1322'
+                  }}
+                >
+                  取消移动
+                </Button>
+              </>
+            )}
 
             {multiSelectMode && (
               <span style={{ fontSize: '14px', color: '#666' }}>
@@ -1181,7 +1341,7 @@ const ViewTimetable = ({ user }) => {
             )}
           </div>
 
-          {multiSelectMode && selectedCells.size > 0 && (
+          {multiSelectMode && selectedCells.size > 0 && !moveMode && (
             <Button
               type="primary"
               size="small"
