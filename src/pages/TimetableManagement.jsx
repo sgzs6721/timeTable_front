@@ -204,6 +204,18 @@ const TimetableManagement = ({ user }) => {
     setSelectedTimetables([]);
   };
 
+  // 添加全选功能
+  const handleSelectAll = () => {
+    if (selectedTimetables.length === displayTimetables.length) {
+      // 如果已全选，则取消全选
+      setSelectedTimetables([]);
+    } else {
+      // 否则全选当前显示的课表
+      const allIds = displayTimetables.map(item => item.id);
+      setSelectedTimetables(allIds);
+    }
+  };
+
   const displayTimetables = batchMode
     ? allTimetables.filter(item => item.scheduleCount > 0 && item.isActive === 1)
     : allTimetables;
@@ -214,9 +226,34 @@ const TimetableManagement = ({ user }) => {
         {batchMode ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <Button size="small" style={{ marginRight: 16 }} onClick={handleCancelBatchMode}>取消批量</Button>
+              <Button 
+                size="small" 
+                style={{ marginRight: 8, display: 'flex', alignItems: 'center', gap: '4px' }} 
+                onClick={handleSelectAll}
+                type={selectedTimetables.length === displayTimetables.length && displayTimetables.length > 0 ? 'primary' : 'default'}
+              >
+                <Checkbox
+                  checked={selectedTimetables.length === displayTimetables.length && displayTimetables.length > 0}
+                  indeterminate={selectedTimetables.length > 0 && selectedTimetables.length < displayTimetables.length}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={handleSelectAll}
+                />
+                全选
+              </Button>
+              <Button 
+                size="small" 
+                style={{ 
+                  marginRight: 16,
+                  backgroundColor: '#ff4d4f',
+                  borderColor: '#ff4d4f',
+                  color: 'white'
+                }} 
+                onClick={handleCancelBatchMode}
+              >
+                取消
+              </Button>
               <span style={{ fontSize: '14px', color: '#666' }}>
-                已选择 {selectedTimetables.length} 个活动课表
+                已选择 {selectedTimetables.length} 个课表
               </span>
             </div>
             <Button 
@@ -226,7 +263,7 @@ const TimetableManagement = ({ user }) => {
               disabled={selectedTimetables.length < 2 || !checkCanMerge()}
               size="small"
             >
-              合并选中课表
+              合并课表
             </Button>
           </>
         ) : (
