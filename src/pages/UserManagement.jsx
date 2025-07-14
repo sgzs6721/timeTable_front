@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip } from 'antd';
 import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined } from '@ant-design/icons';
-import { getAllUsers, updateUserRole, resetUserPassword, deleteUser } from '../services/admin';
+import { getAllUsers, updateUserRole, resetUserPassword, deleteUser, updateUserNickname } from '../services/admin';
 import './UserManagement.css';
 
 const { Option } = Select;
@@ -11,9 +11,14 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [roleModalVisible, setRoleModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newNickname, setNewNickname] = useState('');
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [nicknameLoading, setNicknameLoading] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -44,6 +49,12 @@ const UserManagement = () => {
     setEditingUser(user);
     setNewPassword('');
     setPasswordModalVisible(true);
+  };
+
+  const handleEditNickname = (user) => {
+    setEditingUser(user);
+    setNewNickname(user.nickname || '');
+    setNicknameModalVisible(true);
   };
 
   const handleDeleteUser = (user) => {
@@ -81,6 +92,7 @@ const UserManagement = () => {
       return;
     }
 
+    setRoleLoading(true);
     try {
       const response = await updateUserRole(editingUser.id, selectedRole);
       if (response.success) {
@@ -92,6 +104,8 @@ const UserManagement = () => {
       }
     } catch (error) {
       message.error('更新用户权限失败，请检查网络连接');
+    } finally {
+      setRoleLoading(false);
     }
   };
 
@@ -106,6 +120,7 @@ const UserManagement = () => {
       return;
     }
 
+    setPasswordLoading(true);
     try {
       const response = await resetUserPassword(editingUser.id, newPassword);
       if (response.success) {
@@ -117,6 +132,43 @@ const UserManagement = () => {
       }
     } catch (error) {
       message.error('密码重置失败，请检查网络连接');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleUpdateNickname = async () => {
+    if (!editingUser) {
+      return;
+    }
+
+    if (newNickname && newNickname.length > 50) {
+      message.error('昵称长度不能超过50个字符');
+      return;
+    }
+
+    setNicknameLoading(true);
+    try {
+      const response = await updateUserNickname(editingUser.id, newNickname);
+      if (response.success) {
+        message.success('昵称更新成功');
+        setNicknameModalVisible(false);
+        setNewNickname('');
+        // 更新用户列表
+        setUsers(prevUsers => 
+          prevUsers.map(user => 
+            user.id === editingUser.id 
+              ? { ...user, nickname: newNickname }
+              : user
+          )
+        );
+      } else {
+        message.error(response.message || '昵称更新失败');
+      }
+    } catch (error) {
+      message.error('昵称更新失败，请检查网络连接');
+    } finally {
+      setNicknameLoading(false);
     }
   };
 
@@ -130,14 +182,20 @@ const UserManagement = () => {
         style: { textAlign: 'center' },
       }),
       render: (text, record) => {
-        const showText = text && text.length > 7 ? text.slice(0, 7) + '…' : text;
+        const displayName = record.nickname || text;
+        const showText = displayName && displayName.length > 7 ? displayName.slice(0, 7) + '…' : displayName;
         return (
           <Space>
             {record.role === 'ADMIN' 
               ? <CrownOutlined style={{ color: '#f5222d' }} /> 
               : <UserOutlined style={{ color: '#1890ff' }} />}
-            <Tooltip title={text} placement="topLeft" mouseEnterDelay={0.2}>
-              <span style={{ fontWeight: 'bold' }}>{showText}</span>
+            <Tooltip title={`用户名: ${text}${record.nickname ? ` | 昵称: ${record.nickname}` : ''}`} placement="topLeft" mouseEnterDelay={0.2}>
+              <span 
+                style={{ fontWeight: 'bold', cursor: 'pointer', color: '#1890ff' }}
+                onClick={() => handleEditNickname(record)}
+              >
+                {showText}
+              </span>
             </Tooltip>
           </Space>
         );
@@ -221,9 +279,13 @@ const UserManagement = () => {
         title="修改用户权限"
         open={roleModalVisible}
         onOk={handleUpdateRole}
-        onCancel={() => setRoleModalVisible(false)}
+        onCancel={() => {
+          setRoleModalVisible(false);
+          setRoleLoading(false);
+        }}
         okText="确认修改"
         cancelText="取消"
+        confirmLoading={roleLoading}
       >
         {editingUser && (
           <div style={{ padding: '16px 0' }}>
@@ -267,9 +329,13 @@ const UserManagement = () => {
         title="重置用户密码"
         open={passwordModalVisible}
         onOk={handleUpdatePassword}
-        onCancel={() => setPasswordModalVisible(false)}
+        onCancel={() => {
+          setPasswordModalVisible(false);
+          setPasswordLoading(false);
+        }}
         okText="确认重置"
         cancelText="取消"
+        confirmLoading={passwordLoading}
       >
         {editingUser && (
           <div style={{ padding: '16px 0' }}>
@@ -282,6 +348,37 @@ const UserManagement = () => {
                 style={{ marginTop: 8 }}
                 placeholder="请输入新密码（至少6个字符）"
                 autoComplete="new-password"
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 编辑昵称Modal */}
+      <Modal
+        title="编辑用户昵称"
+        open={nicknameModalVisible}
+        onOk={handleUpdateNickname}
+        onCancel={() => {
+          setNicknameModalVisible(false);
+          setNicknameLoading(false);
+        }}
+        okText="确认修改"
+        cancelText="取消"
+        confirmLoading={nicknameLoading}
+      >
+        {editingUser && (
+          <div style={{ padding: '16px 0' }}>
+            <p><strong>用户名：</strong>{editingUser.username}</p>
+            <p><strong>当前昵称：</strong>{editingUser.nickname || '未设置'}</p>
+            <div style={{ marginTop: 16 }}>
+              <label><strong>新昵称：</strong></label>
+              <Input
+                value={newNickname}
+                onChange={(e) => setNewNickname(e.target.value)}
+                placeholder="请输入新昵称（可为空）"
+                style={{ marginTop: 8 }}
+                maxLength={50}
               />
             </div>
           </div>

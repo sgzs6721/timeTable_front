@@ -253,7 +253,7 @@ const ArchivedTimetables = () => {
                   </div>
                   <div style={{ display:'flex', alignItems:'center', marginTop:10 }}>
                     <Space size={16} style={{ color:'#888', fontSize:13 }}>
-                      <span><UserOutlined /> {item.username || '未知用户'}</span>
+                      <span><UserOutlined /> {item.nickname || item.username || '未知用户'}</span>
                       <span>
                         <CalendarOutlined />{' '}
                         {item.isWeekly? '每周重复': `${item.startDate || ''} 至 ${item.endDate || ''}`}

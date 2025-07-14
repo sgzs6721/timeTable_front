@@ -49,6 +49,16 @@ export const resetUserPassword = async (userId, password) => {
   }
 };
 
+// 更新用户昵称
+export const updateUserNickname = async (userId, nickname) => {
+  try {
+    const response = await api.put(`/admin/users/${userId}/nickname`, { nickname });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 软删除用户
 export const deleteUser = async (userId) => {
   try {

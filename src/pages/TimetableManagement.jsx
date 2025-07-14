@@ -39,7 +39,9 @@ const TimetableManagement = ({ user }) => {
     try {
       const response = await getAllTimetables();
       if (response.success) {
-        const sortedData = response.data.sort((a, b) => {
+        // 过滤掉已归档的课表，只显示活跃课表
+        const activeTimetables = response.data.filter(t => !t.isArchived || t.isArchived === 0);
+        const sortedData = activeTimetables.sort((a, b) => {
             const activeA = a.isActive ? 1 : 0;
             const activeB = b.isActive ? 1 : 0;
             if (activeB !== activeA) {
@@ -112,8 +114,8 @@ const TimetableManagement = ({ user }) => {
         <div>
           {(() => {
             const nameColors = ['#10239e','#ad6800','#006d75','#237804','#9e1068','#a8071a','#391085','#0050b3'];
-            const keyVal = (record.username || record.userName || '')
-              .split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
+            const displayName = record.nickname || record.username || record.userName || '';
+            const keyVal = displayName.split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
             const color = nameColors[keyVal % nameColors.length];
             return (
               <a style={{ color }} onClick={() => navigate(`/view-timetable/${record.id}`)}>{text}</a>
@@ -132,7 +134,8 @@ const TimetableManagement = ({ user }) => {
       dataIndex: 'username',
       key: 'username',
       render: (_, record) => {
-        const text = record.username || record.user?.username || record.userName || `ID:${record.userId || '-'}`;
+        const displayName = record.nickname || record.username || record.user?.username || record.userName;
+        const text = displayName || `ID:${record.userId || '-'}`;
         return (
           <Space>
             <UserOutlined />
@@ -238,7 +241,8 @@ const TimetableManagement = ({ user }) => {
           dataSource={displayTimetables}
           renderItem={item => {
             const nameColors = ['#10239e','#ad6800','#006d75','#237804','#9e1068','#a8071a','#391085','#0050b3'];
-            const keyVal = (item.username || item.userName || '').split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
+            const displayName = item.nickname || item.username || item.userName || '';
+          const keyVal = displayName.split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
             const color = nameColors[keyVal % nameColors.length];
             const checked = selectedTimetables.includes(item.id);
             return (
@@ -313,7 +317,7 @@ const TimetableManagement = ({ user }) => {
                   </div>
                   <div style={{ color: '#666', fontSize: 13, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
                     <span>
-                      <UserOutlined /> {item.username || item.user?.username || item.userName || `ID:${item.userId || '-'}`}
+                      <UserOutlined /> {item.nickname || item.username || item.user?.username || item.userName || `ID:${item.userId || '-'}`}
                     </span>
                     <span style={{ marginLeft: 10 }}>
                       {item.isWeekly ? '每周重复' : `${item.startDate} 至 ${item.endDate}`}

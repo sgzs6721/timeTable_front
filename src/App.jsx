@@ -35,6 +35,17 @@ function App() {
       }
     }
     setLoading(false);
+
+    // 监听用户更新事件
+    const handleUserUpdate = (event) => {
+      setUser(event.detail);
+    };
+
+    window.addEventListener('userUpdated', handleUserUpdate);
+
+    return () => {
+      window.removeEventListener('userUpdated', handleUserUpdate);
+    };
   }, []);
 
   const handleLogin = (userData) => {

@@ -14,12 +14,20 @@ const UserProfile = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(user);
+  const [initialValues, setInitialValues] = useState({});
+  const [currentFormValues, setCurrentFormValues] = useState({});
 
   useEffect(() => {
     if (user) {
-      profileForm.setFieldsValue({
+      const values = {
         username: user.username,
-      });
+        nickname: user.nickname || '',
+      };
+      setInitialValues(values);
+      setCurrentUser(user);
+      setCurrentFormValues(values);
+      profileForm.setFieldsValue(values);
     }
   }, [user, profileForm]);
 
@@ -28,20 +36,30 @@ const UserProfile = ({ user }) => {
     try {
       const response = await updateProfile(values);
       if (response.success) {
-        message.success('用户名更新成功');
+        message.success('资料更新成功');
+        
+        // 更新当前组件的用户信息
+        const updatedUser = response.data.user;
+        setCurrentUser(updatedUser);
+        
+        // 更新初始值
+        const newInitialValues = {
+          username: updatedUser.username,
+          nickname: updatedUser.nickname || '',
+        };
+        setInitialValues(newInitialValues);
+        setCurrentFormValues(newInitialValues);
         
         // 更新localStorage中的用户信息
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-        }
+        localStorage.setItem('user', JSON.stringify(updatedUser));
         
         // 如果有新token，更新token
         if (response.data.token) {
           localStorage.setItem('token', response.data.token);
         }
         
-        // 重新加载页面以更新所有组件中的用户信息
-        window.location.reload();
+        // 触发全局用户信息更新事件，让其他组件也能更新
+        window.dispatchEvent(new CustomEvent('userUpdated', { detail: updatedUser }));
       } else {
         message.error(response.message || '更新失败');
       }
@@ -121,6 +139,19 @@ const UserProfile = ({ user }) => {
     });
   };
 
+  // 监听表单值变化
+  const handleFormValuesChange = (changedValues, allValues) => {
+    setCurrentFormValues(allValues);
+  };
+
+  // 判断表单是否有变更
+  const hasFormChanged = () => {
+    return (
+      currentFormValues.username !== initialValues.username ||
+      (currentFormValues.nickname || '') !== (initialValues.nickname || '')
+    );
+  };
+
   return (
     <div className="user-profile-container">
       <div className="user-profile-content">
@@ -129,6 +160,7 @@ const UserProfile = ({ user }) => {
             form={profileForm}
             layout="vertical"
             onFinish={handleUpdateProfile}
+            onValuesChange={handleFormValuesChange}
           >
             <Form.Item
               label="用户名"
@@ -138,26 +170,40 @@ const UserProfile = ({ user }) => {
                 { min: 3, message: '用户名至少3个字符' },
                 { max: 20, message: '用户名最多20个字符' },
               ]}
-              style={{ marginBottom: 0 }}
             >
-              <div className="username-input-row">
-                <Input
-                  prefix={<UserOutlined />}
-                  placeholder="请输入用户名"
-                  size="large"
-                  className="username-input"
-                />
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  icon={<SaveOutlined />}
-                  size="large"
-                  className="action-button"
-                >
-                  更新用户名
-                </Button>
-              </div>
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="请输入用户名"
+                size="large"
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="昵称"
+              name="nickname"
+              rules={[
+                { max: 50, message: '昵称最多50个字符' },
+              ]}
+            >
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="请输入昵称（可选）"
+                size="large"
+              />
+            </Form.Item>
+
+            <Form.Item style={{ textAlign: 'center', marginBottom: 0 }}>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                disabled={!hasFormChanged()}
+                icon={<SaveOutlined />}
+                size="large"
+                className="action-button"
+              >
+                更新资料
+              </Button>
             </Form.Item>
           </Form>
         </Card>

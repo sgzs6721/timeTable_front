@@ -93,13 +93,13 @@ const AppHeader = ({ user, onLogout }) => {
           >
             <Button type="text" className="user-dropdown" style={{ display: 'flex', alignItems: 'center' }}>
               <span style={{ marginRight: '8px' }}>
-                {user?.username}
+                {user?.nickname || user?.username}
               </span>
               <Avatar
                 size="small"
                 style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
               >
-                {user?.username?.[0]?.toUpperCase()}
+                {(user?.nickname || user?.username)?.[0]?.toUpperCase()}
               </Avatar>
             </Button>
           </Dropdown>

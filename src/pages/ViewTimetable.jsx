@@ -137,6 +137,7 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
 
 const ViewTimetable = ({ user }) => {
   const [timetable, setTimetable] = useState(null);
+  const [timetableOwner, setTimetableOwner] = useState(null);
   const [allSchedules, setAllSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState(1);
@@ -159,6 +160,8 @@ const ViewTimetable = ({ user }) => {
   const [dayScheduleData, setDayScheduleData] = useState([]);
   const [dayScheduleTitle, setDayScheduleTitle] = useState('');
   const [daySchedulesForCopy, setDaySchedulesForCopy] = useState([]);
+  const [currentDayDate, setCurrentDayDate] = useState(null);
+  const [currentDayLabel, setCurrentDayLabel] = useState('');
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
@@ -299,14 +302,19 @@ const ViewTimetable = ({ user }) => {
   const handleShowDayCourses = (day, dayIndex) => {
     let schedulesForDay = [];
     let modalTitle = '';
+    let targetDate = null;
 
     if (timetable.isWeekly) {
       schedulesForDay = allSchedules.filter(s => s.dayOfWeek.toLowerCase() === day.key);
       modalTitle = `${timetable.name} - ${day.label}`;
+      // 对于周固定课表，计算本周对应的日期
+      const today = dayjs();
+      const currentWeekStart = today.startOf('week');
+      targetDate = currentWeekStart.add(dayIndex, 'day');
     } else {
       const weekDates = getCurrentWeekDates();
       if (weekDates.start) {
-        const targetDate = weekDates.start.add(dayIndex, 'day');
+        targetDate = weekDates.start.add(dayIndex, 'day');
         const dateStr = targetDate.format('YYYY-MM-DD');
         schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
         modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
@@ -349,16 +357,34 @@ const ViewTimetable = ({ user }) => {
     setDayScheduleData(tableData);
     setDayScheduleTitle(modalTitle);
     setDaySchedulesForCopy(sortedSchedules);
+    setCurrentDayDate(targetDate);
+    setCurrentDayLabel(day.label);
     setDayScheduleModalVisible(true);
   };
 
-  const generateCopyTextForDay = (schedules) => {
+  const generateCopyTextForDay = (schedules, targetDate, dayLabel) => {
     if (!schedules || schedules.length === 0) return '没有可复制的课程';
-    return schedules.map(schedule => {
+    
+    // 格式化日期为：2025年07月14日
+    let formattedDate = '';
+    if (targetDate) {
+      formattedDate = targetDate.format('YYYY年MM月DD日');
+    }
+    
+    // 获取教练名称
+    const coachName = timetableOwner?.nickname || timetableOwner?.username || '教练';
+    
+    // 构建标题
+    const title = formattedDate ? `${formattedDate} ${dayLabel}课程安排` : `${dayLabel}课程安排`;
+    
+    // 构建课程列表
+    const courseList = schedules.map(schedule => {
         const startHour = parseInt(schedule.startTime.substring(0, 2));
-        const displayTime = `${startHour.toString().padStart(2, '0')}:00-${(startHour + 1).toString().padStart(2, '0')}:00`;
-        return `${displayTime} ${schedule.studentName}`;
+        const endHour = startHour + 1;
+        return `${startHour}-${endHour} ${schedule.studentName}`;
     }).join('\n');
+    
+    return `${title}\n${coachName}：\n${courseList}`;
   };
 
 
@@ -377,8 +403,9 @@ const ViewTimetable = ({ user }) => {
     try {
       const response = await getTimetable(timetableId);
       if (response.success) {
-        const timetableData = response.data;
+        const { timetable: timetableData, owner } = response.data;
         setTimetable(timetableData);
+        setTimetableOwner(owner);
         if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
           const start = dayjs(timetableData.startDate);
           const end = dayjs(timetableData.endDate);
@@ -1339,11 +1366,20 @@ const ViewTimetable = ({ user }) => {
       </Modal>
 
       <Modal
-        title={dayScheduleTitle}
+        title={
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px' }}>
+              {timetable?.name}
+            </div>
+            <div style={{ fontSize: '14px', color: '#666', fontWeight: 'normal' }}>
+              {timetableOwner?.nickname || timetableOwner?.username || '未知用户'} · {dayScheduleTitle?.split(' - ')[1] || dayScheduleTitle}
+            </div>
+          </div>
+        }
         open={dayScheduleModalVisible}
         onCancel={() => setDayScheduleModalVisible(false)}
         footer={[
-          <Button key="copy" type="primary" onClick={() => copyToClipboard(generateCopyTextForDay(daySchedulesForCopy))}>
+          <Button key="copy" type="primary" onClick={() => copyToClipboard(generateCopyTextForDay(daySchedulesForCopy, currentDayDate, currentDayLabel))}>
             复制课程
           </Button>,
           <Button key="close" onClick={() => setDayScheduleModalVisible(false)}>

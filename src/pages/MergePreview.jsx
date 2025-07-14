@@ -37,9 +37,47 @@ const MergePreview = ({ user }) => {
   const [timetableColorMap, setTimetableColorMap] = useState({});
   const tableRef = useRef(null);
 
+
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const idsParam = searchParams.get('ids');
+
+  // 兼容移动端的复制函数
+  const copyToClipboard = async (text) => {
+    try {
+      // 优先使用现代 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      // 移动端兼容方案
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+
+      // 在移动端，需要先聚焦再选择
+      textArea.focus();
+      textArea.select();
+      textArea.setSelectionRange(0, textArea.value.length);
+
+      // 尝试复制
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+
+      if (!successful) {
+        throw new Error('复制失败');
+      }
+    } catch (error) {
+      // 如果所有方法都失败，提示用户手动复制
+      message.warning('复制失败，请长按选择文本手动复制');
+      console.error('复制失败:', error);
+    }
+  };
 
   // 时间段定义
   const timeSlots = [
@@ -59,6 +97,95 @@ const MergePreview = ({ user }) => {
     { key: 'saturday', label: '周六' },
     { key: 'sunday', label: '周日' },
   ];
+
+  const handleShowDayCourses = (day, dayIndex) => {
+    let schedulesForDay = [];
+    let targetDate = null;
+
+    if (mergedTimetable.isWeekly) {
+      schedulesForDay = allSchedules.filter(s => s.dayOfWeek.toLowerCase() === day.key);
+      // 对于周固定课表，计算本周对应的日期
+      const today = dayjs();
+      const currentWeekStart = today.startOf('week');
+      targetDate = currentWeekStart.add(dayIndex, 'day');
+    } else {
+      const currentWeek = weeksList[currentWeekIndex];
+      if (currentWeek) {
+        const weekStart = dayjs(currentWeek.start);
+        targetDate = weekStart.add(dayIndex, 'day');
+        const dateStr = targetDate.format('YYYY-MM-DD');
+        
+        // 过滤当前周的课程
+        const weekEnd = dayjs(currentWeek.end);
+        const weekSchedules = allSchedules.filter(schedule => {
+          if (schedule.scheduleDate) {
+            const scheduleDate = dayjs(schedule.scheduleDate);
+            return scheduleDate.isSameOrAfter(weekStart) && scheduleDate.isSameOrBefore(weekEnd);
+          }
+          return false;
+        });
+        
+        schedulesForDay = weekSchedules.filter(s => s.scheduleDate === dateStr);
+      }
+    }
+
+    const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    if (sortedSchedules.length === 0) {
+      message.info('当天没有课程');
+      return;
+    }
+
+    // 直接复制课程信息
+    const copyText = generateCopyTextForDay(sortedSchedules, targetDate, day.label);
+    copyToClipboard(copyText);
+    message.success('已复制合并课程信息');
+  };
+
+  const generateCopyTextForDay = (schedules, targetDate, dayLabel) => {
+    if (!schedules || schedules.length === 0) return '没有可复制的课程';
+    
+    // 格式化日期为：2025年07月14日
+    let formattedDate = '';
+    if (targetDate) {
+      formattedDate = targetDate.format('YYYY年MM月DD日');
+    }
+    
+    // 构建标题
+    const title = formattedDate ? `${formattedDate} ${dayLabel}课程安排` : `${dayLabel}课程安排`;
+    
+    // 按课表ID分组课程，然后按教练输出
+    const schedulesByTimetable = {};
+    schedules.forEach(schedule => {
+      const timetableId = schedule.timetableId;
+      if (!schedulesByTimetable[timetableId]) {
+        schedulesByTimetable[timetableId] = [];
+      }
+      schedulesByTimetable[timetableId].push(schedule);
+    });
+    
+    // 构建每个教练的课程列表
+    const coachSections = [];
+    Object.keys(schedulesByTimetable).forEach(timetableId => {
+      const timetableSchedules = schedulesByTimetable[timetableId];
+      const timetableInfo = timetablesData.find(t => t.id === parseInt(timetableId));
+      const coachName = timetableInfo ? (timetableInfo.nickname || timetableInfo.username) : '教练';
+      
+      // 按时间排序
+      const sortedSchedules = timetableSchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      
+      // 构建课程列表
+      const courseList = sortedSchedules.map(schedule => {
+        const startHour = parseInt(schedule.startTime.substring(0, 2));
+        const endHour = startHour + 1;
+        return `${startHour}-${endHour} ${schedule.studentName}`;
+      }).join('\n');
+      
+      coachSections.push(`${coachName}：\n${courseList}`);
+    });
+    
+    return `${title}\n${coachSections.join('\n\n')}`;
+  };
 
   const handleExport = () => {
     const tableNode = tableRef.current;
@@ -349,13 +476,25 @@ const MergePreview = ({ user }) => {
         const currentDate = weekStart.add(index, 'day');
 
         columnTitle = (
-          <div style={{ textAlign: 'center' }}>
+          <div 
+            style={{ textAlign: 'center', cursor: 'pointer' }}
+            onClick={() => handleShowDayCourses(day, index)}
+          >
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
               {day.label}
             </div>
             <div style={{ fontSize: '12px', color: '#666' }}>
               {currentDate.format('MM/DD')}
             </div>
+          </div>
+        );
+      } else {
+        columnTitle = (
+          <div
+            style={{ textAlign: 'center', cursor: 'pointer' }}
+            onClick={() => handleShowDayCourses(day, index)}
+          >
+            {day.label}
           </div>
         );
       }
@@ -581,9 +720,9 @@ const MergePreview = ({ user }) => {
               <span style={{ color: timetableColorMap[table.id] }}>
                 {table.name}
               </span>
-              {table.username && (
+              {(table.nickname || table.username) && (
                 <span style={{ color: timetableColorMap[table.id] }}>
-                  ({table.username})
+                  ({table.nickname || table.username})
                 </span>
               )}
               {index < timetablesData.length - 1 && '、'}
@@ -665,6 +804,8 @@ const MergePreview = ({ user }) => {
           />
         </div>
       )}
+
+
     </div>
   );
 };
