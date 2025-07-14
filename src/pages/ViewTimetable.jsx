@@ -33,7 +33,7 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose, deleteLoading }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const isNameChanged = name !== schedule.studentName;
 
@@ -85,21 +85,27 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
         </p>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+      <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
         <Button
           type="primary"
           size="small"
           onClick={() => onExport(schedule.studentName)}
+          style={{ 
+            flex: 1,
+            backgroundColor: '#52c41a',
+            borderColor: '#52c41a'
+          }}
         >
           全部
         </Button>
         {!isArchived && (
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <>
             <Button
               type="default"
               size="small"
               onClick={() => onMove(schedule)}
               style={{
+                flex: 1,
                 backgroundColor: '#1890ff',
                 borderColor: '#1890ff',
                 color: 'white'
@@ -112,8 +118,9 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
               size="small"
               onClick={() => onCopy(schedule)}
               style={{
-                backgroundColor: '#1890ff',
-                borderColor: '#1890ff',
+                flex: 1,
+                backgroundColor: '#722ed1',
+                borderColor: '#722ed1',
                 color: 'white'
               }}
             >
@@ -122,12 +129,19 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
             <Button
               type="primary"
               danger
+              loading={deleteLoading}
               onClick={onDelete}
               size="small"
+              disabled={deleteLoading}
+              style={{ 
+                flex: 1,
+                backgroundColor: '#ff4d4f',
+                borderColor: '#ff4d4f'
+              }}
             >
               删除
             </Button>
-          </div>
+          </>
         )}
       </div>
     </div>
@@ -201,6 +215,9 @@ const ViewTimetable = ({ user }) => {
   const [scheduleToCopy, setScheduleToCopy] = useState(null);
   const [selectedCopyTargets, setSelectedCopyTargets] = useState(new Set());
   const [copyLoading, setCopyLoading] = useState(false);
+
+  // 删除功能状态
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
@@ -519,6 +536,7 @@ const ViewTimetable = ({ user }) => {
   };
 
   const handleDeleteSchedule = async (scheduleId) => {
+    setDeleteLoading(true);
     try {
       const response = await deleteSchedule(timetableId, scheduleId);
       if (response.success) {
@@ -530,6 +548,8 @@ const ViewTimetable = ({ user }) => {
       }
     } catch (error) {
       message.error('操作失败，请重试');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -694,43 +714,60 @@ const ViewTimetable = ({ user }) => {
 
     setCopyLoading(true);
     try {
-      const promises = Array.from(selectedCopyTargets).map(async (targetKey) => {
-        const [targetDayKey, targetTimeIndex] = targetKey.split('-');
-        const targetTimeSlot = timeSlots[parseInt(targetTimeIndex)];
+      // 构建批量创建的payload数组
+      const schedulesToCreate = Array.from(selectedCopyTargets).map((targetKey) => {
+        // 解析cellKey格式：pagePrefix-dayKey-timeIndex
+        const parts = targetKey.split('-');
+        let dayKey, timeIndex, weekNum;
+
+        if (timetable.isWeekly) {
+          // 周固定课表：weekly-dayKey-timeIndex
+          [, dayKey, timeIndex] = parts;
+        } else {
+          // 日期范围课表：week-weekNum-dayKey-timeIndex
+          [, weekNum, dayKey, timeIndex] = parts;
+        }
+
+        const dayIndex = weekDays.findIndex(day => day.key === dayKey);
+        const targetTimeSlot = timeSlots[parseInt(timeIndex)];
         const [startTimeStr, endTimeStr] = targetTimeSlot.split('-');
         const startTime = `${startTimeStr}:00`;
         const endTime = `${endTimeStr}:00`;
 
-        let payload = {
+        let scheduleDate = null;
+        if (!timetable.isWeekly) {
+          // 对于日期范围课表，使用cellKey中的周数信息计算日期
+          const targetWeek = weekNum ? parseInt(weekNum) : currentWeek;
+          const startDate = dayjs(timetable.startDate);
+          const anchorMonday = startDate.startOf('week');
+          const weekStart = anchorMonday.add(targetWeek - 1, 'week');
+          const currentDate = weekStart.add(dayIndex, 'day');
+          scheduleDate = currentDate.format('YYYY-MM-DD');
+        }
+
+        const payload = {
           studentName: scheduleToCopy.studentName,
-          dayOfWeek: targetDayKey.toUpperCase(),
+          dayOfWeek: dayKey.toUpperCase(),
           startTime,
           endTime,
           note: '复制创建',
         };
 
-        // 如果是日期范围课表，需要计算目标日期
-        if (!timetable.isWeekly) {
-          const weekDates = getCurrentWeekDates();
-          if (weekDates.start) {
-            const dayIndex = weekDays.findIndex(day => day.key === targetDayKey);
-            const targetDate = weekDates.start.add(dayIndex, 'day');
-            payload.scheduleDate = targetDate.format('YYYY-MM-DD');
-          }
+        if (scheduleDate) {
+          payload.scheduleDate = scheduleDate;
         }
 
-        return createSchedule(timetableId, payload);
+        return payload;
       });
 
-      const results = await Promise.all(promises);
-      const successCount = results.filter(r => r.success).length;
-      const failCount = results.length - successCount;
-
-      if (successCount > 0) {
+      // 使用批量创建接口
+      const response = await createSchedulesBatch(timetableId, schedulesToCreate);
+      
+      if (response.success) {
         await refreshSchedulesQuietly();
-        message.success(`成功复制 ${successCount} 个课程${failCount > 0 ? `，失败 ${failCount} 个` : ''}`);
+        message.success(`成功复制 ${schedulesToCreate.length} 个课程`);
       } else {
-        message.error('复制失败');
+        message.error(response.message || '复制失败');
       }
 
       handleCancelCopy();
@@ -1374,6 +1411,7 @@ const ViewTimetable = ({ user }) => {
                     timetable={timetable}
                     isArchived={timetable?.isArchived}
                     onClose={() => setOpenPopoverKey(null)}
+                    deleteLoading={deleteLoading}
                   />
                   {idx < schedules.length - 1 && <hr style={{ margin: '8px 0' }} />}
                 </div>
