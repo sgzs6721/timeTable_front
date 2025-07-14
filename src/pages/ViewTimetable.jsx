@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
+import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch } from '../services/timetable';
 import dayjs from 'dayjs';
@@ -33,7 +33,7 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, timetable, isArchived, onClose }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const isNameChanged = name !== schedule.studentName;
 
@@ -59,6 +59,20 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
           style={{ flex: 1 }}
           disabled={isArchived}
         />
+        {!isArchived && (
+          <Button
+            size="small"
+            onClick={() => onUpdateName(name)}
+            disabled={!isNameChanged}
+            style={{
+              backgroundColor: isNameChanged ? '#faad14' : undefined,
+              borderColor: isNameChanged ? '#faad14' : undefined,
+              color: isNameChanged ? 'white' : undefined
+            }}
+          >
+            修改
+          </Button>
+        )}
       </div>
 
       {timetable.isWeekly ? (
@@ -71,7 +85,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
         </p>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
         <Button
           type="primary"
           size="small"
@@ -80,18 +94,30 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
           全部
         </Button>
         {!isArchived && (
-          <>
+          <div style={{ display: 'flex', gap: '4px' }}>
             <Button
               type="default"
               size="small"
               onClick={() => onMove(schedule)}
               style={{
-                backgroundColor: '#52c41a',
-                borderColor: '#52c41a',
+                backgroundColor: '#1890ff',
+                borderColor: '#1890ff',
                 color: 'white'
               }}
             >
               移动
+            </Button>
+            <Button
+              type="default"
+              size="small"
+              onClick={() => onCopy(schedule)}
+              style={{
+                backgroundColor: '#1890ff',
+                borderColor: '#1890ff',
+                color: 'white'
+              }}
+            >
+              复制
             </Button>
             <Button
               type="primary"
@@ -101,19 +127,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
             >
               删除
             </Button>
-            <Button
-              size="small"
-              onClick={() => onUpdateName(name)}
-              disabled={!isNameChanged}
-              style={{
-                backgroundColor: isNameChanged ? '#faad14' : undefined,
-                borderColor: isNameChanged ? '#faad14' : undefined,
-                color: isNameChanged ? 'white' : undefined
-              }}
-            >
-              修改
-            </Button>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -178,6 +192,15 @@ const ViewTimetable = ({ user }) => {
   // 移动功能状态
   const [moveMode, setMoveMode] = useState(false);
   const [scheduleToMove, setScheduleToMove] = useState(null);
+  const [selectedMoveTarget, setSelectedMoveTarget] = useState(null);
+  const [moveTargetText, setMoveTargetText] = useState('请选择要移动到的时间段');
+  const [moveLoading, setMoveLoading] = useState(false);
+
+  // 复制功能状态
+  const [copyMode, setCopyMode] = useState(false);
+  const [scheduleToCopy, setScheduleToCopy] = useState(null);
+  const [selectedCopyTargets, setSelectedCopyTargets] = useState(new Set());
+  const [copyLoading, setCopyLoading] = useState(false);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
@@ -480,13 +503,28 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
+  // 局部刷新函数，不影响页面loading状态
+  const refreshSchedulesQuietly = async () => {
+    try {
+      const week = timetable && !timetable.isWeekly ? currentWeek : null;
+      const response = await getTimetableSchedules(timetableId, week);
+      if (response.success) {
+        setAllSchedules(response.data);
+      } else {
+        message.error(response.message || '获取课程安排失败');
+      }
+    } catch (error) {
+      message.error('获取课程安排失败，请检查网络连接');
+    }
+  };
+
   const handleDeleteSchedule = async (scheduleId) => {
     try {
       const response = await deleteSchedule(timetableId, scheduleId);
       if (response.success) {
-        message.success('删除成功');
         setOpenPopoverKey(null);
-        fetchSchedules();
+        await refreshSchedulesQuietly();
+        message.success('删除成功');
       } else {
         message.error(response.message || '删除失败');
       }
@@ -507,9 +545,9 @@ const ViewTimetable = ({ user }) => {
     try {
       const response = await updateSchedule(timetableId, scheduleObj.id, payload);
       if (response.success) {
-        message.success('修改成功');
         setOpenPopoverKey(null);
-        fetchSchedules();
+        await refreshSchedulesQuietly();
+        message.success('修改成功');
       } else {
         message.error(response.message || '修改失败');
       }
@@ -521,20 +559,63 @@ const ViewTimetable = ({ user }) => {
   const handleStartMove = (schedule) => {
     setScheduleToMove(schedule);
     setMoveMode(true);
+    setSelectedMoveTarget(null);
     setOpenPopoverKey(null);
-    message.info('请选择要移动到的空白时间段');
+    message.info('请选择要移动到的时间段');
   };
 
   const handleCancelMove = () => {
     setMoveMode(false);
     setScheduleToMove(null);
-    message.info('已取消移动');
+    setSelectedMoveTarget(null);
+    setMoveTargetText('请选择要移动到的时间段');
   };
 
-  const handleMoveSchedule = async (targetDayKey, targetTimeIndex) => {
-    if (!scheduleToMove) return;
+  const handleSelectMoveTarget = (targetDayKey, targetTimeIndex) => {
+    const pagePrefix = timetable?.isWeekly ? 'weekly' : `week-${currentWeek}`;
+    const targetKey = `${pagePrefix}-${targetDayKey}-${targetTimeIndex}`;
+    setSelectedMoveTarget(targetKey);
+    
+    // 生成显示文本
+    const dayText = dayMap[targetDayKey.toUpperCase()] || targetDayKey;
+    const timeSlots = ['09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00'];
+    const timeText = timeSlots[targetTimeIndex] || `${targetTimeIndex + 9}:00-${targetTimeIndex + 10}:00`;
+    
+    setMoveTargetText(`移动到周${dayText}，${timeText}`);
+  };
 
-    const targetTimeSlot = timeSlots[targetTimeIndex];
+  const handleConfirmMove = async () => {
+    if (!selectedMoveTarget || !scheduleToMove) {
+      message.warning('请先选择移动目标位置');
+      return;
+    }
+
+    setMoveLoading(true);
+    console.log('selectedMoveTarget:', selectedMoveTarget);
+    console.log('scheduleToMove:', scheduleToMove);
+    
+    // 处理key格式: week-3-tuesday-5 或 weekly-tuesday-5
+    const parts = selectedMoveTarget.split('-');
+    let targetDayKey, targetTimeIndex;
+    
+    if (parts.length === 4) {
+      // week-3-tuesday-5 格式
+      targetDayKey = parts[2];
+      targetTimeIndex = parts[3];
+    } else if (parts.length === 3) {
+      // weekly-tuesday-5 格式
+      targetDayKey = parts[1]; 
+      targetTimeIndex = parts[2];
+    } else {
+      message.error('移动目标格式错误');
+      return;
+    }
+    
+    console.log('targetDayKey:', targetDayKey, 'targetTimeIndex:', targetTimeIndex);
+    
+    const targetTimeSlot = timeSlots[parseInt(targetTimeIndex)];
+    console.log('targetTimeSlot:', targetTimeSlot);
+    
     const [startTimeStr, endTimeStr] = targetTimeSlot.split('-');
     const startTime = `${startTimeStr}:00`;
     const endTime = `${endTimeStr}:00`;
@@ -558,15 +639,106 @@ const ViewTimetable = ({ user }) => {
     try {
       const response = await updateSchedule(timetableId, scheduleToMove.id, payload);
       if (response.success) {
-        message.success('课程移动成功');
         setMoveMode(false);
         setScheduleToMove(null);
-        fetchSchedules();
+        setSelectedMoveTarget(null);
+        setMoveTargetText('请选择要移动到的时间段');
+        await refreshSchedulesQuietly();
+        message.success('课程移动成功');
       } else {
         message.error(response.message || '移动失败');
       }
     } catch (error) {
       message.error('操作失败，请重试');
+    } finally {
+      setMoveLoading(false);
+    }
+  };
+
+
+
+  const handleStartCopy = (schedule) => {
+    setCopyMode(true);
+    setScheduleToCopy(schedule);
+    setSelectedCopyTargets(new Set());
+    setOpenPopoverKey(null);
+    message.info('请选择要复制到的时间段（可多选），然后点击确认复制');
+  };
+
+  const handleCancelCopy = () => {
+    setCopyMode(false);
+    setScheduleToCopy(null);
+    setSelectedCopyTargets(new Set());
+  };
+
+  const handleSelectCopyTarget = (targetDayKey, targetTimeIndex) => {
+    // 使用与cellKey相同的格式
+    const pagePrefix = timetable?.isWeekly ? 'weekly' : `week-${currentWeek}`;
+    const targetKey = `${pagePrefix}-${targetDayKey}-${targetTimeIndex}`;
+    const newTargets = new Set(selectedCopyTargets);
+    
+    if (newTargets.has(targetKey)) {
+      newTargets.delete(targetKey);
+    } else {
+      newTargets.add(targetKey);
+    }
+    
+    setSelectedCopyTargets(newTargets);
+  };
+
+  const handleConfirmCopy = async () => {
+    if (!scheduleToCopy || selectedCopyTargets.size === 0) {
+      message.warning('请先选择要复制到的时间段');
+      return;
+    }
+
+    setCopyLoading(true);
+    try {
+      const promises = Array.from(selectedCopyTargets).map(async (targetKey) => {
+        const [targetDayKey, targetTimeIndex] = targetKey.split('-');
+        const targetTimeSlot = timeSlots[parseInt(targetTimeIndex)];
+        const [startTimeStr, endTimeStr] = targetTimeSlot.split('-');
+        const startTime = `${startTimeStr}:00`;
+        const endTime = `${endTimeStr}:00`;
+
+        let payload = {
+          studentName: scheduleToCopy.studentName,
+          dayOfWeek: targetDayKey.toUpperCase(),
+          startTime,
+          endTime,
+          note: '复制创建',
+        };
+
+        // 如果是日期范围课表，需要计算目标日期
+        if (!timetable.isWeekly) {
+          const weekDates = getCurrentWeekDates();
+          if (weekDates.start) {
+            const dayIndex = weekDays.findIndex(day => day.key === targetDayKey);
+            const targetDate = weekDates.start.add(dayIndex, 'day');
+            payload.scheduleDate = targetDate.format('YYYY-MM-DD');
+          }
+        }
+
+        return createSchedule(timetableId, payload);
+      });
+
+      const results = await Promise.all(promises);
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.length - successCount;
+
+      if (successCount > 0) {
+        await refreshSchedulesQuietly();
+        message.success(`成功复制 ${successCount} 个课程${failCount > 0 ? `，失败 ${failCount} 个` : ''}`);
+      } else {
+        message.error('复制失败');
+      }
+
+      handleCancelCopy();
+    } catch (err) {
+      message.error('网络错误，复制失败');
+      handleCancelCopy();
+    } finally {
+      setCopyLoading(false);
     }
   };
 
@@ -858,12 +1030,12 @@ const ViewTimetable = ({ user }) => {
     try {
       const response = await createSchedulesBatch(timetableId, schedulesToCreate);
       if (response.success) {
-        message.success(`成功添加 ${schedulesToCreate.length} 个课程安排`);
         setBatchScheduleModalVisible(false);
         setBatchStudentName('');
         setSelectedCells(new Set());
         setMultiSelectMode(false);
-        fetchSchedules();
+        await refreshSchedulesQuietly();
+        message.success(`成功添加 ${schedulesToCreate.length} 个课程安排`);
       } else {
         message.error(response.message || '批量添加失败');
       }
@@ -1006,7 +1178,10 @@ const ViewTimetable = ({ user }) => {
                 handleCellSelection(cellKey, index, record.key);
               } else if (moveMode) {
                 e.stopPropagation();
-                handleMoveSchedule(day.key, record.key);
+                handleSelectMoveTarget(day.key, record.key);
+              } else if (copyMode) {
+                e.stopPropagation();
+                handleSelectCopyTarget(day.key, record.key);
               }
             };
 
@@ -1048,9 +1223,9 @@ const ViewTimetable = ({ user }) => {
               try {
                 const resp = await createSchedule(timetableId, payload);
                 if (resp.success) {
-                  message.success('添加成功');
                   setOpenPopoverKey(null);
-                  fetchSchedules();
+                  await refreshSchedulesQuietly();
+                  message.success('添加成功');
                 } else {
                   message.error(resp.message || '添加失败');
                 }
@@ -1082,20 +1257,86 @@ const ViewTimetable = ({ user }) => {
             }
 
             if (moveMode) {
+              const isSelected = selectedMoveTarget === cellKey;
+              return (
+                                  <div
+                    style={{
+                      height: '48px',
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? '#e6f4ff' : 'transparent',
+                      border: '1px solid #f0f0f0',
+                      position: 'relative'
+                    }}
+                    onClick={handleCellClick}
+                    title={isSelected ? '点击取消选择' : '点击选择此处移动课程'}
+                  >
+                    {/* 右上角的单选钮 */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        width: '12px',
+                        height: '12px',
+                        border: isSelected ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                        borderRadius: '50%', // 圆形单选钮
+                        backgroundColor: isSelected ? '#1890ff' : 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      {isSelected && (
+                        <div style={{ 
+                          width: '4px', 
+                          height: '4px', 
+                          backgroundColor: 'white', 
+                          borderRadius: '50%' 
+                        }} />
+                      )}
+                    </div>
+                  </div>
+              );
+            }
+
+            if (copyMode) {
+              const isSelected = selectedCopyTargets.has(cellKey);
+              
               return (
                 <div
                   style={{
                     height: '48px',
                     cursor: 'pointer',
-                    backgroundColor: '#f6ffed',
-                    border: '2px dashed #52c41a',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                    backgroundColor: isSelected ? '#f0f9ff' : 'transparent',
+                    border: '1px solid #f0f0f0',
+                    position: 'relative'
                   }}
                   onClick={handleCellClick}
-                  title="点击此处移动课程"
+                  title={isSelected ? '点击取消选择' : '点击选择此处复制课程'}
                 >
+                  {/* 右上角的小复选框 */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      width: '12px',
+                      height: '12px',
+                      border: isSelected ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                      borderRadius: '2px',
+                      backgroundColor: isSelected ? '#1890ff' : 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '8px',
+                      fontWeight: 'bold',
+                      color: 'white',
+                      pointerEvents: 'none' // 防止复选框阻止父元素的点击事件
+                    }}
+                  >
+                    {isSelected ? '✓' : ''}
+                  </div>
                 </div>
               );
             }
@@ -1129,6 +1370,7 @@ const ViewTimetable = ({ user }) => {
                     onUpdateName={(newName) => handleSaveStudentName(student, newName)}
                     onExport={handleExportStudentSchedule}
                     onMove={handleStartMove}
+                    onCopy={handleStartCopy}
                     timetable={timetable}
                     isArchived={timetable?.isArchived}
                     onClose={() => setOpenPopoverKey(null)}
@@ -1139,8 +1381,9 @@ const ViewTimetable = ({ user }) => {
             </div>
           );
 
-          // 在移动模式下，有内容的单元格不可点击
-          if (moveMode) {
+          // 在移动模式或复制模式下，有内容的单元格不可点击
+          if (moveMode || copyMode) {
+            const modeText = moveMode ? '移动模式下无法操作已有课程' : '复制模式下无法操作已有课程';
             return (
               <div style={{ 
                 height: '100%', 
@@ -1166,7 +1409,7 @@ const ViewTimetable = ({ user }) => {
                       lineHeight: '1.2',
                       borderTop: idx > 0 ? '1px solid #fff' : 'none',
                     }}
-                    title="移动模式下无法操作已有课程"
+                    title={modeText}
                   >
                     {(() => {
                       const isTruncated = student.studentName.length > 4;
@@ -1286,16 +1529,16 @@ const ViewTimetable = ({ user }) => {
       {!timetable?.isArchived && (
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: moveMode || copyMode ? 'flex-end' : 'space-between',
           alignItems: 'center',
           marginBottom: '1rem',
           padding: '8px 12px',
-          backgroundColor: multiSelectMode ? '#f0f9ff' : (moveMode ? '#fff7e6' : '#fafafa'),
+          backgroundColor: multiSelectMode ? '#f0f9ff' : (moveMode ? '#e6f4ff' : (copyMode ? '#f6ffed' : '#fafafa')),
           borderRadius: '6px',
-          border: multiSelectMode ? '1px solid #bae7ff' : (moveMode ? '1px solid #ffd591' : '1px solid #f0f0f0')
+          border: multiSelectMode ? '1px solid #bae7ff' : (moveMode ? '1px solid #91caff' : (copyMode ? '1px solid #b7eb8f' : '1px solid #f0f0f0'))
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {!moveMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', justifyContent: moveMode || copyMode ? 'space-between' : 'flex-start' }}>
+            {!moveMode && !copyMode && (
               <Button
                 type={multiSelectMode ? 'default' : 'default'}
                 size="small"
@@ -1312,21 +1555,75 @@ const ViewTimetable = ({ user }) => {
 
             {moveMode && (
               <>
-                <span style={{ fontSize: '14px', color: '#fa8c16', fontWeight: 'bold' }}>
-                  移动模式：请选择空白时间段移动课程
+                <span style={{ fontSize: '14px', color: '#1890ff', fontWeight: 'bold' }}>
+                  {moveTargetText}
                 </span>
-                <Button
-                  type="default"
-                  size="small"
-                  onClick={handleCancelMove}
-                  style={{
-                    backgroundColor: '#fff2f0',
-                    borderColor: '#ffccc7',
-                    color: '#cf1322'
-                  }}
-                >
-                  取消移动
-                </Button>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <Button
+                    type="default"
+                    size="small"
+                    onClick={handleCancelMove}
+                    style={{
+                      backgroundColor: '#fff2f0',
+                      borderColor: '#ffccc7',
+                      color: '#cf1322'
+                    }}
+                  >
+                    取消移动
+                  </Button>
+                  {selectedMoveTarget && (
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={moveLoading}
+                      onClick={handleConfirmMove}
+                      disabled={moveLoading}
+                      style={{
+                        backgroundColor: '#1890ff',
+                        borderColor: '#1890ff',
+                        color: '#ffffff'
+                      }}
+                    >
+                      确认移动
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {copyMode && (
+              <>
+                <span style={{ fontSize: '14px', color: '#722ed1', fontWeight: 'bold' }}>
+                  请选择要复制到的时间段
+                </span>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <Button
+                    type="default"
+                    size="small"
+                    onClick={handleCancelCopy}
+                    style={{
+                      backgroundColor: '#fff2f0',
+                      borderColor: '#ffccc7',
+                      color: '#cf1322'
+                    }}
+                  >
+                    取消复制
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="small"
+                    loading={copyLoading}
+                    onClick={handleConfirmCopy}
+                    disabled={selectedCopyTargets.size === 0 || copyLoading}
+                    style={{
+                      backgroundColor: '#1890ff',
+                      borderColor: '#1890ff',
+                      color: '#ffffff'
+                    }}
+                  >
+                    确认复制 ({selectedCopyTargets.size})
+                  </Button>
+                </div>
               </>
             )}
 
