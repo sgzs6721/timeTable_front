@@ -431,8 +431,21 @@ const MergePreview = ({ user }) => {
           // 生成周列表
           const weeks = generateWeeksList(mergedStartDate, mergedEndDate);
           setWeeksList(weeks);
-          setCurrentWeekIndex(0);
+
+          // --- 新增：定位到当天所在的周 ---
+          const today = dayjs();
+          if (today.isSameOrAfter(mergedStartDate) && today.isSameOrBefore(mergedEndDate)) {
+            const currentWeekIndex = weeks.findIndex(week => 
+              today.isSameOrAfter(dayjs(week.start)) && today.isSameOrBefore(dayjs(week.end))
+            );
+            if (currentWeekIndex !== -1) {
+              setCurrentWeekIndex(currentWeekIndex);
+            }
+          }
+          // --- 新增结束 ---
         }
+      } else {
+        setWeeksList([]); // 周固定课表则清空周列表
       }
 
       setMergedTimetable(baseTimetable);

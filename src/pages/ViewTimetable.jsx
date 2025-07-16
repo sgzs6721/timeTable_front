@@ -1420,17 +1420,36 @@ const ViewTimetable = ({ user }) => {
           );
 
           // 在移动模式或复制模式下，有内容的单元格不可点击
-          if (moveMode || copyMode) {
-            const modeText = moveMode ? '移动模式下无法操作已有课程' : '复制模式下无法操作已有课程';
+          if (moveMode || copyMode || multiSelectMode) {
+            const isSourceCellForMove = moveMode && scheduleToMove && schedules.some(s => s.id === scheduleToMove.id);
+            const isSourceCellForCopy = copyMode && scheduleToCopy && schedules.some(s => s.id === scheduleToCopy.id);
+            const isSourceCell = isSourceCellForMove || isSourceCellForCopy;
+
+            let modeText = '此模式下无法操作已有课程';
+            if (moveMode) modeText = '移动模式下无法操作已有课程';
+            if (copyMode) modeText = '复制模式下无法操作已有课程';
+            if (multiSelectMode) modeText = '多选模式下无法选择已有课程的单元格';
+
+            let sourceCellTitle = '';
+            if (isSourceCellForMove) sourceCellTitle = `正在移动: ${scheduleToMove.studentName}`;
+            if (isSourceCellForCopy) sourceCellTitle = `正在复制: ${scheduleToCopy.studentName}`;
+
+            const sourceHighlightColor = isSourceCellForCopy ? '#722ed1' : '#ff4d4f'; // 紫色用于复制，红色用于移动
+            const sourceHighlightBoxShadow = isSourceCellForCopy ? '0 0 8px rgba(114, 46, 209, 0.7)' : '0 0 8px rgba(255, 77, 79, 0.7)';
+
             return (
-              <div style={{ 
-                height: '100%', 
-                minHeight: '48px', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                width: '100%', 
+              <div style={{
+                height: '100%',
+                minHeight: '48px',
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%',
                 cursor: 'not-allowed',
-                opacity: 0.6 
+                // 高亮源单元格
+                border: isSourceCell ? `2px solid ${sourceHighlightColor}` : 'none',
+                boxShadow: isSourceCell ? sourceHighlightBoxShadow : 'none',
+                borderRadius: isSourceCell ? '4px' : '0',
+                opacity: isSourceCell ? 1 : 0.6
               }}>
                 {schedules.map((student, idx) => (
                   <div
@@ -1447,7 +1466,7 @@ const ViewTimetable = ({ user }) => {
                       lineHeight: '1.2',
                       borderTop: idx > 0 ? '1px solid #fff' : 'none',
                     }}
-                    title={modeText}
+                    title={isSourceCell ? sourceCellTitle : modeText}
                   >
                     {(() => {
                       const isTruncated = student.studentName.length > 4;
