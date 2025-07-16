@@ -682,7 +682,7 @@ const ViewTimetable = ({ user }) => {
     setScheduleToCopy(schedule);
     setSelectedCopyTargets(new Set());
     setOpenPopoverKey(null);
-    message.info('请选择要复制到的时间段（可多选），然后点击确认复制');
+    message.info('选择要复制到的时间段（可多选），点击确认复制');
   };
 
   const handleCancelCopy = () => {
@@ -1347,11 +1347,21 @@ const ViewTimetable = ({ user }) => {
                     cursor: 'pointer',
                     backgroundColor: isSelected ? '#f0f9ff' : 'transparent',
                     border: '1px solid #f0f0f0',
-                    position: 'relative'
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'flex-start', // Align to top to control position with padding
+                    justifyContent: 'center',
+                    paddingTop: isSelected ? '25px' : '0', // Push text down
                   }}
                   onClick={handleCellClick}
-                  title={isSelected ? '点击取消选择' : '点击选择此处复制课程'}
+                  title={isSelected ? '点击取消选择' : `复制 "${scheduleToCopy?.studentName}" 到此`}
                 >
+                  {/* 显示被复制的学生姓名 */}
+                  {isSelected && scheduleToCopy && (
+                    <span style={{ fontSize: '12px', color: '#722ed1' }}>
+                      {scheduleToCopy.studentName}
+                    </span>
+                  )}
                   {/* 右上角的小复选框 */}
                   <div
                     style={{
