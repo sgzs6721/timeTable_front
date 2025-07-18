@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // 定义API主机常量
 const LOCAL_API_HOST = 'http://localhost:8088';
-const REMOTE_API_HOST = 'http://timetable.devtesting.top'; // 可根据实际情况修改
+const REMOTE_API_HOST = 'http://timetabledev.devtesting.top'; // 可根据实际情况修改
 // 开发环境使用远程服务器
 const CURRENT_API_HOST = REMOTE_API_HOST;
 

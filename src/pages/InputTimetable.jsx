@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, message, Tabs, Space, Typography, Alert, Spin, Radio, Table, Tag, Modal, List } from 'antd';
-import { AudioOutlined, StopOutlined, ArrowLeftOutlined, SendOutlined, EditOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { AudioOutlined, StopOutlined, LeftOutlined, SendOutlined, EditOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, addScheduleByVoice, addScheduleByText, addScheduleByFormat } from '../services/timetable';
 
@@ -43,7 +43,7 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     try {
       const response = await getTimetable(timetableId);
       if (response.success) {
-        setTimetable(response.data);
+        setTimetable(response.data.timetable);
       } else {
         message.error(response.message || '获取课表失败');
         navigate('/dashboard');
@@ -110,8 +110,6 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     setSubmitting(true);
     try {
       const type = timetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE';
-      // Voice input should probably always use AI parser, or you can add a switch for it too.
-      // For now, it defaults to 'ai' as per existing logic.
       const response = await addScheduleByVoice(timetableId, audioBlob, type);
       if (response.success) {
         message.success('语音录入成功！课程已添加到课表中');
@@ -175,7 +173,8 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   const placeholderText = timetable?.isWeekly
     ? "例如:\n小明 周一,周三 9-10, 16-17\n李四 周二,周四 18-20"
     : "例如:\n王五 8.14-8.16, 8.20 10-11\n赵六 9.1 14:00-15:00";
-
+    
+  // Moved these example components out of the main component to avoid re-creation on every render
   const WeeklyExamples = () => (
     <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
       <Typography.Title level={4}>周固定课表 - 录入格式示例</Typography.Title>
@@ -232,6 +231,42 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     </div>
   );
 
+  if (loading) {
+    return (
+      <div className="page-container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  const alertTitle = (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+      <span>录入说明</span>
+      <Tag color={parser === 'ai' ? 'purple' : 'green'}>{timetable?.isWeekly ? '周固定课表' : '日期范围课表'}</Tag>
+    </div>
+  );
+
+  const formatParserDescription = (
+    <span>
+      每个学员占一行，可批量录入。<br />
+      <a onClick={() => setExamplesModalVisible(true)} style={{ textDecoration: 'underline' }}>
+        查看详细格式与示例
+        <ExclamationCircleOutlined style={{ marginLeft: 4 }} />
+      </a>
+    </span>
+  );
+
+  const aiParserDescription = timetable?.isWeekly ? (
+    <span>
+      AI智能解析：请输入包含<b>学员</b>、<b>星期</b>及<b>时间</b>的自然语言。
+    </span>
+  ) : (
+    <span>
+      AI智能解析：请输入包含<b>学员</b>、<b>日期</b>及<b>时间</b>的自然语言。<br />
+      日期支持复杂表达，如 "7.11到7.30的单数日" 或 "7月每周一三五"。
+    </span>
+  );
+
   const textTabContent = (
     <div style={{ padding: '20px 0' }}>
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -242,82 +277,42 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
           buttonStyle="solid"
         >
           <Radio.Button value="format">格式解析</Radio.Button>
-          <Radio.Button value="ai" disabled>AI解析</Radio.Button>
+          <Radio.Button value="ai">AI解析</Radio.Button>
         </Radio.Group>
       </div>
 
-      <Alert
-        message={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>录入说明</span>
-            {timetable && (
-              <Tag color={timetable.isWeekly ? 'blue' : 'green'}>
-                {timetable.isWeekly ? '周固定课表' : '日期范围课表'}
-              </Tag>
-            )}
-          </div>
-        }
-        description={
-          <div>
-            每个学员占一行，可批量录入。
-            <Button type="link" icon={<QuestionCircleOutlined />} onClick={() => setExamplesModalVisible(true)} style={{ padding: '0 5px' }}>
-              查看详细格式与示例
-            </Button>
-          </div>
-        }
-        type="info"
-        showIcon
-        style={{ marginBottom: 24 }}
-      />
-      <TextArea
-        rows={6}
-        value={textInputValue}
-        placeholder={placeholderText}
-        onChange={(e) => {
-          setTextInputValue(e.target.value);
-          if (parsedResults.length > 0) {
-            setParsedResults([]);
-          }
-        }}
-      />
-      {parsedResults.length > 0 && (
-        <div style={{ marginTop: '24px' }}>
-          <Typography.Title level={5}>解析预览</Typography.Title>
-          {parsedResults.map((item, index) => (
-            <Alert
-              key={index}
-              style={{ marginBottom: '8px' }}
-              type={item.errorMessage ? 'error' : 'success'}
-              showIcon
-              icon={item.errorMessage ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
-              message={item.errorMessage ? `第 ${index + 1} 行解析失败` : `第 ${index + 1} 行解析成功`}
-              description={
-                item.errorMessage 
-                ? <div><strong>输入:</strong> {item.studentName}<br/><strong>原因:</strong> {item.errorMessage}</div>
-                : <div><strong>学员:</strong> {item.studentName}, <strong>时间:</strong> {item.time}, <strong>{timetable.isWeekly ? '星期' : '日期'}:</strong> {timetable.isWeekly ? item.dayOfWeek : item.date}</div>
-              }
-            />
-          ))}
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
+      <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px', overflow: 'hidden', margin: '24px 0' }}>
+        <Alert
+          message={alertTitle}
+          description={parser === 'ai' ? aiParserDescription : formatParserDescription}
+          type="info"
+          showIcon
+          style={{ border: 'none', borderRadius: 0 }}
+        />
+        <div style={{ height: '1px', backgroundColor: '#f0f0f0', margin: '0 1rem' }} />
+        <TextArea
+          value={textInputValue}
+          onChange={(e) => setTextInputValue(e.target.value)}
+          placeholder={placeholderText}
+          autoSize={{ minRows: 6, maxRows: 12 }}
+          bordered={false}
+          style={{ resize: 'none', width: '100%', padding: '12px' }}
+        />
+      </div>
+
+      {/* 提交与返回按钮 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem' }}>
         <Button
-          type="default"
-          danger
-          onClick={() => navigate('/dashboard')}
-          size="large"
-          style={{ flex: 1, height: '40px' }}
+          onClick={() => navigate(`/view-timetable/${timetableId}`)}
+          style={{ flex: 1, borderColor: '#ff4d4f', color: '#ff4d4f' }}
         >
           返回
         </Button>
         <Button
           type="primary"
-          className="text-submit-button"
-          size="large"
-          loading={submitting}
           onClick={submitTextInput}
-          disabled={submitting}
-          style={{ flex: 1, height: '40px' }}
+          loading={submitting}
+          style={{ flex: 1, background: 'linear-gradient(to right, #6a11cb 0%, #2575fc 100%)', borderColor: 'transparent' }}
         >
           提交
         </Button>
@@ -335,75 +330,85 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   );
 
   const voiceTabContent = (
-    <div className="voice-input-container">
-      <Alert
-        message="录入说明"
-        description="请选择录入时间（日期时间或星期时间），然后输入人名。系统会根据日期（星期）和时间将人名填入课表。"
-        type="info"
-        showIcon
-        style={{ marginBottom: 24 }}
-      />
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        {isRecording && (
-          <Text strong style={{ fontSize: '18px', color: '#ff4d4f' }}>
-            录音中... {formatTime(recordingTime)}
-          </Text>
-        )}
-      </div>
-      <div style={{ textAlign: 'center' }}>
+    <div style={{ textAlign: 'center', padding: '40px 0' }}>
+      <Space direction="vertical" size="large">
+        <Typography.Text type="secondary">
+          {isRecording ? "录音中..." : "点击开始录音，说完后再次点击结束并提交"}
+        </Typography.Text>
         <Button
-          type={isRecording ? "danger" : "primary"}
-          icon={isRecording ? <StopOutlined /> : <AudioOutlined />}
-          className="voice-button"
-          size="large"
-          loading={submitting}
+          type="primary"
+          shape="circle"
           onClick={isRecording ? stopRecording : startRecording}
-          disabled={submitting}
-        >
-          {isRecording ? '停止录音' : '开始录音'}
-        </Button>
-      </div>
-      <div style={{ textAlign: 'center', marginTop: 16, color: '#666' }}>
-        {isRecording ? '点击停止录音按钮完成录入' : '点击麦克风按钮开始语音录入'}
-      </div>
+          icon={isRecording ? <StopOutlined /> : <AudioOutlined />}
+          style={{
+            width: 80,
+            height: 80,
+            fontSize: 36,
+            background: isRecording ? '#ff4d4f' : 'linear-gradient(to right, #6a11cb 0%, #2575fc 100%)',
+            animation: isRecording ? 'pulse 1.5s infinite' : 'none'
+          }}
+          loading={submitting}
+        />
+        {isRecording && <Text>{formatTime(recordingTime)}</Text>}
+      </Space>
     </div>
   );
 
-  const items = [
-    { key: 'text', label: '文字录入', children: textTabContent },
-    { key: 'voice', label: '语音录入', children: voiceTabContent, disabled: true },
-  ];
-
-  if (loading) {
-    return (
-      <div className="page-container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
-
   return (
-    <div className="page-container">
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
-        <Space align="center" size="large">
-          <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
-          <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
-        </Space>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
-        <Space>
-          {/* Maybe some actions here */}
-        </Space>
+    <div className="page-container" style={{ maxWidth: 800, margin: '0 auto' }}>
+       {/* 标题部分 */}
+       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
+        {/* Row 1: Button and Title */}
+        <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Button
+              type="text"
+              onClick={() => navigate(`/view-timetable/${timetableId}`)}
+              icon={<LeftOutlined style={{ fontSize: 18 }} />}
+              style={{
+                position: 'absolute',
+                left: 0,
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                border: '1px solid #d9d9d9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            />
+            <Space>
+                <CalendarOutlined style={{ fontSize: '22px', color: '#8a2be2' }} />
+                <h1 style={{ margin: 0, fontSize: '22px' }}>课表录入</h1>
+            </Space>
+        </div>
+
+        {/* Row 2: Subtitle */}
+        {timetable?.name && (
+            <div style={{ marginTop: '8px' }}>
+                <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+                    {timetable.name}
+                </Typography.Text>
+            </div>
+        )}
       </div>
 
-      <Tabs activeKey={activeTab} onChange={setActiveTab} centered>
-        <Tabs.TabPane tab="文字录入" key="text">
-          {textTabContent}
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="语音录入" key="voice" disabled>
-          {voiceTabContent}
-        </Tabs.TabPane>
-      </Tabs>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        centered
+        items={[
+          {
+            key: 'text',
+            label: '文字录入',
+            children: textTabContent,
+          },
+          {
+            key: 'voice',
+            label: '语音录入',
+            children: voiceTabContent,
+          },
+        ]}
+      />
     </div>
   );
 };
