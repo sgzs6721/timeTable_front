@@ -786,11 +786,12 @@ const ViewTimetable = ({ user }) => {
       let schedulesToExport;
       if (timetable && !timetable.isWeekly) {
         const response = await getTimetableSchedules(timetableId);
-        if (response.success) {
+        // 检查响应是否成功
+        if (response && response.success) {
           schedulesToExport = response.data;
         } else {
           message.destroy('exporting');
-          message.error(response.message || '获取全部课程安排失败');
+          message.error(response?.message || '获取全部课程安排失败');
           return;
         }
       } else {
@@ -802,7 +803,6 @@ const ViewTimetable = ({ user }) => {
 
       if (studentSchedules.length === 0) {
         message.info('该学生在本课表没有课程');
-        message.destroy('exporting');
         return;
       }
 
@@ -814,21 +814,72 @@ const ViewTimetable = ({ user }) => {
       if (timetable.isWeekly) {
         // 周固定课表
         content += studentSchedules
-          .map(s => `星期${dayMap[s.dayOfWeek.toUpperCase()] || s.dayOfWeek}, ${s.startTime.substring(0, 5)}~${s.endTime.substring(0, 5)}`)
+          .map(s => {
+            const dayOfWeek = s.dayOfWeek ? s.dayOfWeek.toUpperCase() : '';
+            
+            // 改进的映射逻辑
+            let dayText = dayMap[dayOfWeek];
+            if (!dayText) {
+              // 如果dayMap中没有找到，尝试其他可能的格式
+              if (dayOfWeek.includes('MONDAY') || dayOfWeek.includes('一')) dayText = '一';
+              else if (dayOfWeek.includes('TUESDAY') || dayOfWeek.includes('二')) dayText = '二';
+              else if (dayOfWeek.includes('WEDNESDAY') || dayOfWeek.includes('三')) dayText = '三';
+              else if (dayOfWeek.includes('THURSDAY') || dayOfWeek.includes('四')) dayText = '四';
+              else if (dayOfWeek.includes('FRIDAY') || dayOfWeek.includes('五')) dayText = '五';
+              else if (dayOfWeek.includes('SATURDAY') || dayOfWeek.includes('六')) dayText = '六';
+              else if (dayOfWeek.includes('SUNDAY') || dayOfWeek.includes('日') || dayOfWeek.includes('天')) dayText = '日';
+              else dayText = s.dayOfWeek || '未知';
+            }
+            
+            return `星期${dayText}, ${s.startTime.substring(0, 5)}~${s.endTime.substring(0, 5)}`;
+          })
           .join('\n');
       } else {
-        // 日期范围课表
+        // 日期范围课表 - 根据scheduleDate计算星期几，并按日期排序
         content += studentSchedules
-          .map(s => `${s.scheduleDate}, 星期${dayMap[s.dayOfWeek.toUpperCase()] || s.dayOfWeek}, ${s.startTime.substring(0, 5)}~${s.endTime.substring(0, 5)}`)
+          .sort((a, b) => {
+            // 按scheduleDate从早到晚排序
+            const dateA = new Date(a.scheduleDate);
+            const dateB = new Date(b.scheduleDate);
+            return dateA - dateB;
+          })
+          .map(s => {
+            let dayText = '未知';
+            
+            // 如果有scheduleDate，根据日期计算星期几
+            if (s.scheduleDate) {
+              const date = new Date(s.scheduleDate);
+              const dayOfWeek = date.getDay(); // 0=周日, 1=周一, ..., 6=周六
+              const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+              dayText = weekDays[dayOfWeek];
+            } else if (s.dayOfWeek) {
+              // 如果dayOfWeek存在，使用映射逻辑
+              const dayOfWeek = s.dayOfWeek.toUpperCase();
+              let mappedDayText = dayMap[dayOfWeek];
+              if (!mappedDayText) {
+                if (dayOfWeek.includes('MONDAY') || dayOfWeek.includes('一')) mappedDayText = '一';
+                else if (dayOfWeek.includes('TUESDAY') || dayOfWeek.includes('二')) mappedDayText = '二';
+                else if (dayOfWeek.includes('WEDNESDAY') || dayOfWeek.includes('三')) mappedDayText = '三';
+                else if (dayOfWeek.includes('THURSDAY') || dayOfWeek.includes('四')) mappedDayText = '四';
+                else if (dayOfWeek.includes('FRIDAY') || dayOfWeek.includes('五')) mappedDayText = '五';
+                else if (dayOfWeek.includes('SATURDAY') || dayOfWeek.includes('六')) mappedDayText = '六';
+                else if (dayOfWeek.includes('SUNDAY') || dayOfWeek.includes('日') || dayOfWeek.includes('天')) mappedDayText = '日';
+                else mappedDayText = s.dayOfWeek;
+              }
+              dayText = mappedDayText;
+            }
+            
+            return `${s.scheduleDate}, 星期${dayText}, ${s.startTime.substring(0, 5)}~${s.endTime.substring(0, 5)}`;
+          })
           .join('\n');
       }
 
-      message.destroy('exporting');
       setExportContent(content);
       setExportModalVisible(true);
       setOpenPopoverKey(null);
     } catch (error) {
       message.destroy('exporting');
+      console.error('导出失败:', error);
       message.error('导出失败，请检查网络连接');
     }
   };

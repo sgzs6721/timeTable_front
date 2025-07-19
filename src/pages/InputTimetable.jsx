@@ -95,6 +95,17 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     }
   };
 
+  // 取消提交
+  const cancelSubmit = () => {
+    setSubmitting(false);
+    message.info('已取消提交');
+  };
+
+  // 返回主页面
+  const goToHome = () => {
+    navigate('/dashboard');
+  };
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -212,7 +223,30 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
         </Radio.Group>
       </div>
 
-      <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px', overflow: 'hidden', margin: '24px 0' }}>
+      <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px', overflow: 'hidden', margin: '24px 0', position: 'relative' }}>
+        {/* 提交时的蒙板 - 只覆盖输入区域 */}
+        {submitting && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            borderRadius: '6px'
+          }}>
+            <Spin size="large" />
+            <div style={{ marginTop: '16px', color: '#666' }}>
+              {parser === 'ai' ? 'AI正在解析中...' : '正在解析中...'}
+            </div>
+          </div>
+        )}
+
         <Alert
           message={alertTitle}
           description={parser === 'ai' ? aiParserDescription : formatParserDescription}
@@ -234,17 +268,25 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
       {/* 提交与返回按钮 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem' }}>
         <Button
-          onClick={() => navigate(`/view-timetable/${timetableId}`)}
-          style={{ flex: 1, borderColor: '#ff4d4f', color: '#ff4d4f' }}
+          onClick={submitting ? cancelSubmit : goToHome}
+          style={{ 
+            flex: 1, 
+            borderColor: submitting ? '#faad14' : '#ff4d4f', 
+            color: submitting ? '#faad14' : '#ff4d4f' 
+          }}
         >
-          返回
+          {submitting ? '取消' : '返回'}
         </Button>
         <Button
           type="primary"
           onClick={submitTextInput}
           loading={submitting}
           disabled={submitting}
-          style={{ flex: 1, background: 'linear-gradient(to right, #6a11cb 0%, #2575fc 100%)', borderColor: 'transparent' }}
+          style={{ 
+            flex: 1,
+            opacity: submitting ? 0.6 : 1,
+            cursor: submitting ? 'not-allowed' : 'pointer'
+          }}
         >
           提交
         </Button>
@@ -280,7 +322,7 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
         <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Button
               type="text"
-              onClick={() => navigate(`/view-timetable/${timetableId}`)}
+              onClick={goToHome}
               icon={<LeftOutlined style={{ fontSize: 18 }} />}
               style={{
                 position: 'absolute',
