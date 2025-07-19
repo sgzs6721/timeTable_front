@@ -95,12 +95,7 @@ export const createSchedulesBatchForce = async (timetableId, schedulesData) => {
   }
 };
 
-// 通过语音输入课程安排 - 已禁用，现在使用浏览器语音识别 + 文本API
-export const addScheduleByVoice = async (timetableId, audioData, type) => {
-  console.error('❌ 语音API已禁用！前端应该使用浏览器语音识别 + addScheduleByText');
-  console.error('❌ 调用栈:', new Error().stack);
-  throw new Error('语音API已禁用，请使用浏览器语音识别功能');
-};
+
 
 // 通过文本输入课程安排
 export const addScheduleByText = async (timetableId, text, type, parser = 'ai') => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Input, message, Tabs, Space, Typography, Alert, Spin, Radio, Table, Tag, Modal, List } from 'antd';
-import { AudioOutlined, StopOutlined, LeftOutlined, SendOutlined, EditOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Button, Input, message, Space, Typography, Alert, Spin, Radio, Table, Tag, Modal, List } from 'antd';
+import { LeftOutlined, SendOutlined, EditOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, addScheduleByText, addScheduleByFormat } from '../services/timetable';
 
@@ -10,80 +10,21 @@ const { Text } = Typography;
 const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
   const [timetable, setTimetable] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('text');
   const [parser, setParser] = useState('format');
-  const [recordingTime, setRecordingTime] = useState(0);
   const [parsedResults, setParsedResults] = useState([]);
   const [examplesModalVisible, setExamplesModalVisible] = useState(false);
-  const [speechRecognitionSupported, setSpeechRecognitionSupported] = useState(false);
-
-  const mediaRecorderRef = useRef(null);
-  const recordingTimerRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const speechRecognitionRef = useRef(null);
 
   const navigate = useNavigate();
   const { timetableId } = useParams();
+
+
 
   useEffect(() => {
     if (!timetable) {
       fetchTimetable();
     }
-    setActiveTab('text'); // 默认选中文字录入
-    
-    // 检查浏览器是否支持语音识别
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      setSpeechRecognitionSupported(true);
-      
-      // 初始化语音识别
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'zh-CN';
-      
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        console.log('语音识别结果:', transcript);
-        handleSpeechResult(transcript);
-      };
-      
-      recognition.onerror = (event) => {
-        console.error('语音识别错误:', event.error);
-        setIsRecording(false);
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-        message.error('语音识别失败: ' + event.error);
-      };
-      
-      recognition.onend = () => {
-        setIsRecording(false);
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-      };
-      
-      speechRecognitionRef.current = recognition;
-    } else {
-      setSpeechRecognitionSupported(false);
-      console.warn('浏览器不支持语音识别');
-    }
-    
-    return () => {
-      // 清理定时器
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-      }
-      // 停止语音识别
-      if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.stop();
-      }
-    };
+
   }, [timetableId]);
 
   const fetchTimetable = async () => {
@@ -104,99 +45,19 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     }
   };
 
-  const startRecording = async () => {
-    if (!speechRecognitionSupported) {
-      message.error('当前浏览器不支持语音识别功能');
-      return;
-    }
 
-    try {
-      // 使用Web Speech API进行语音识别
-      if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.start();
-        setIsRecording(true);
-        setRecordingTime(0);
-        
-        // 开始计时
-        recordingTimerRef.current = setInterval(() => {
-          setRecordingTime(prev => prev + 1);
-        }, 1000);
-        
-        message.info('开始语音识别，请说话...');
-      }
-    } catch (error) {
-      message.error('启动语音识别失败: ' + error.message);
-    }
-  };
-
-  const stopRecording = () => {
-    if (speechRecognitionRef.current && isRecording) {
-      speechRecognitionRef.current.stop();
-      setIsRecording(false);
-      
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-    }
-  };
-
-  const handleSpeechResult = async (transcript) => {
-    console.log('🎤 DEBUG: handleSpeechResult被调用，参数:', transcript);
-    console.log('🎤 DEBUG: 即将调用addScheduleByText而不是addScheduleByVoice');
-    console.log('处理语音识别结果:', transcript);
-    setSubmitting(true);
-    
-    try {
-      const type = timetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE';
-      
-      // 直接使用文本解析API，而不是语音API
-      console.log('🎤 DEBUG: 准备调用addScheduleByText');
-      console.log('🎤 DEBUG: 参数:', { timetableId, transcript, type, parser: 'ai' });
-      const response = await addScheduleByText(timetableId, transcript, type, 'ai');
-      console.log('🎤 DEBUG: API响应:', response);
-      
-      if (response.success && response.data) {
-        setParsedResults(response.data);
-        
-        const successfulSchedules = response.data.filter(item => !item.errorMessage);
-        const failedSchedules = response.data.filter(item => item.errorMessage);
-
-        if (failedSchedules.length > 0) {
-          message.warning(`语音识别成功，但有 ${failedSchedules.length} 行解析失败，请根据提示修改。`);
-        } else {
-          message.success('语音识别和解析成功！请确认排课信息。');
-          navigate(`/timetables/${timetableId}/confirm-schedule`, { 
-            state: { 
-              data: successfulSchedules, 
-              timetableType: type 
-            } 
-          });
-        }
-      } else {
-        console.error('🎤 DEBUG: API调用成功但返回失败结果:', response);
-        message.error('语音识别成功，但无法解析出有效的排课信息: ' + (response.message || '未知错误'));
-        // 临时注释：不要跳转到文本页面，直接显示错误
-        // setTextInputValue(transcript);
-        // setActiveTab('text');
-      }
-    } catch (error) {
-      console.error('🎤 DEBUG: API调用异常:', error);
-      message.error('语音处理失败: ' + error.message);
-      // 临时注释：不要跳转到文本页面，直接显示错误
-      // setTextInputValue(transcript);
-      // setActiveTab('text');
-    } finally {
-      setSubmitting(false);
-      setRecordingTime(0);
-    }
-  };
 
 
 
   const submitTextInput = async () => {
     if (!textInputValue.trim()) {
       message.warning('请输入课程安排信息');
+      return;
+    }
+    
+    // 检查timetable是否已加载
+    if (!timetable) {
+      message.error('课表信息未加载完成，请稍后再试');
       return;
     }
     
@@ -382,6 +243,7 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
           type="primary"
           onClick={submitTextInput}
           loading={submitting}
+          disabled={submitting}
           style={{ flex: 1, background: 'linear-gradient(to right, #6a11cb 0%, #2575fc 100%)', borderColor: 'transparent' }}
         >
           提交
@@ -399,54 +261,19 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
     </div>
   );
 
-  const voiceTabContent = (
-    <div style={{ textAlign: 'center', padding: '40px 0' }}>
-      <Space direction="vertical" size="large">
-        {speechRecognitionSupported ? (
-          <>
-            <Typography.Text type="secondary">
-              {isRecording ? "正在语音识别..." : "点击开始语音识别，说完后再次点击结束"}
-            </Typography.Text>
-            <Button
-              type="primary"
-              shape="circle"
-              onClick={isRecording ? stopRecording : startRecording}
-              icon={isRecording ? <StopOutlined /> : <AudioOutlined />}
-              style={{
-                width: 80,
-                height: 80,
-                fontSize: 36,
-                background: isRecording ? '#ff4d4f' : 'linear-gradient(to right, #6a11cb 0%, #2575fc 100%)',
-                animation: isRecording ? 'pulse 1.5s infinite' : 'none'
-              }}
-              loading={submitting}
-            />
-            {isRecording && <Text>{formatTime(recordingTime)}</Text>}
-            {submitting && (
-              <div>
-                <Spin />
-                <Text style={{ marginLeft: '8px' }}>正在解析课程信息...</Text>
-              </div>
-            )}
-          </>
-        ) : (
-          <div>
-            <Typography.Text type="secondary">
-              当前浏览器不支持语音识别功能
-            </Typography.Text>
-            <div style={{ marginTop: '10px' }}>
-              <Typography.Text type="secondary">
-                建议使用 Chrome、Edge 或 Safari 浏览器
-              </Typography.Text>
-            </div>
-          </div>
-        )}
-      </Space>
-    </div>
-  );
+
 
   return (
     <div className="page-container" style={{ maxWidth: 800, margin: '0 auto' }}>
+      {/* 课表加载状态提示 */}
+      {!timetable && (
+        <div style={{ textAlign: 'center', padding: '20px', background: '#f0f8ff', borderRadius: '6px', marginBottom: '16px' }}>
+          <Typography.Text type="secondary">
+            📋 正在加载课表信息...
+          </Typography.Text>
+        </div>
+      )}
+      
        {/* 标题部分 */}
        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
         {/* Row 1: Button and Title */}
@@ -483,23 +310,7 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
         )}
       </div>
 
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        centered
-        items={[
-          {
-            key: 'text',
-            label: '文字录入',
-            children: textTabContent,
-          },
-          {
-            key: 'voice',
-            label: '语音录入',
-            children: voiceTabContent,
-          },
-        ]}
-      />
+      {textTabContent}
     </div>
   );
 };
