@@ -95,26 +95,11 @@ export const createSchedulesBatchForce = async (timetableId, schedulesData) => {
   }
 };
 
-// 通过语音输入课程安排
+// 通过语音输入课程安排 - 已禁用，现在使用浏览器语音识别 + 文本API
 export const addScheduleByVoice = async (timetableId, audioData, type) => {
-  try {
-    const formData = new FormData();
-    formData.append('audio', audioData);
-    formData.append('type', type);
-
-    const response = await api.post(
-      `/timetables/${timetableId}/schedules/voice`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-    return response;
-  } catch (error) {
-    throw error;
-  }
+  console.error('❌ 语音API已禁用！前端应该使用浏览器语音识别 + addScheduleByText');
+  console.error('❌ 调用栈:', new Error().stack);
+  throw new Error('语音API已禁用，请使用浏览器语音识别功能');
 };
 
 // 通过文本输入课程安排
