@@ -498,7 +498,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
                           <div style={{ 
                             display: 'flex', 
                             flexDirection: 'column', 
-                            gap: '8px',
+                            gap: '4px',
                             justifyContent: 'center',
                             alignItems: 'center'
                           }}>
@@ -506,10 +506,14 @@ const UserManagement = ({ activeTab = 'users' }) => {
                               type="primary"
                               icon={<CheckOutlined />}
                               onClick={() => handleApproveUser(request.id)}
+                              size="small"
                               style={{ 
                                 backgroundColor: '#52c41a', 
                                 borderColor: '#52c41a',
-                                width: '80px'
+                                width: '70px',
+                                height: '28px',
+                                fontSize: '12px',
+                                padding: '0 8px'
                               }}
                               title="批准注册申请"
                             >
@@ -520,8 +524,12 @@ const UserManagement = ({ activeTab = 'users' }) => {
                               danger
                               icon={<CloseOutlined />}
                               onClick={() => handleRejectUser(request.id)}
+                              size="small"
                               style={{
-                                width: '80px'
+                                width: '70px',
+                                height: '28px',
+                                fontSize: '12px',
+                                padding: '0 8px'
                               }}
                               title="拒绝注册申请"
                             >
