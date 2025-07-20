@@ -783,22 +783,16 @@ const ViewTimetable = ({ user }) => {
     try {
       message.loading({ content: '正在导出全部课时...', key: 'exporting' });
 
-      let schedulesToExport;
-      if (timetable && !timetable.isWeekly) {
-        const response = await getTimetableSchedules(timetableId);
-        // 检查响应是否成功
-        if (response && response.success) {
-          schedulesToExport = response.data;
-        } else {
-          message.destroy('exporting');
-          message.error(response?.message || '获取全部课程安排失败');
-          return;
-        }
-      } else {
-        schedulesToExport = allSchedules;
+      // 使用新的接口直接获取该学生的课程安排
+      const response = await getTimetableSchedulesByStudent(timetableId, studentName);
+      
+      if (!response || !response.success) {
+        message.destroy('exporting');
+        message.error(response?.message || '获取学生课程安排失败');
+        return;
       }
 
-      const studentSchedules = schedulesToExport.filter(s => s.studentName === studentName);
+      const studentSchedules = response.data;
       message.destroy('exporting');
 
       if (studentSchedules.length === 0) {

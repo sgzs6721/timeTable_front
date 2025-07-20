@@ -43,6 +43,19 @@ export const getTimetableSchedules = async (timetableId, week = null) => {
   }
 };
 
+// 根据学生姓名获取课表的课程数据
+export const getTimetableSchedulesByStudent = async (timetableId, studentName, week = null) => {
+  try {
+    const url = week
+      ? `/timetables/${timetableId}/schedules/student/${encodeURIComponent(studentName)}?week=${week}`
+      : `/timetables/${timetableId}/schedules/student/${encodeURIComponent(studentName)}`;
+    const response = await api.get(url);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 创建新排课
 export const createSchedule = async (timetableId, scheduleData) => {
   try {
