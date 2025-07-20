@@ -1,7 +1,8 @@
-import React from 'react';
-import { Layout, Menu, Button, Dropdown, Avatar } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Layout, Menu, Button, Dropdown, Avatar, Badge } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined } from '@ant-design/icons';
+import { getPendingUsers } from '../services/admin';
 import logo from '../assets/logo.png';
 
 const { Header } = Layout;
@@ -9,6 +10,34 @@ const { Header } = Layout;
 const AppHeader = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // 获取待审批用户数量
+  const fetchPendingCount = async () => {
+    if (user?.role?.toUpperCase() === 'ADMIN') {
+      try {
+        const response = await getPendingUsers();
+        if (response.success) {
+          setPendingCount(response.data?.length || 0);
+        }
+      } catch (error) {
+        console.error('获取待审批用户数量失败:', error);
+      }
+    }
+  };
+
+  // 组件挂载时获取数据
+  useEffect(() => {
+    fetchPendingCount();
+  }, [user]);
+
+  // 定期检查待审批数量（每30秒检查一次）
+  useEffect(() => {
+    if (user?.role?.toUpperCase() === 'ADMIN') {
+      const interval = setInterval(fetchPendingCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   const menuItems = [
     // {
@@ -53,7 +82,25 @@ const AppHeader = ({ user, onLogout }) => {
     userMenuItems.unshift({
       key: 'admin',
       icon: <SettingOutlined />,
-      label: '管理员',
+      label: (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>管理员</span>
+          {pendingCount > 0 && (
+            <Badge 
+              count={pendingCount} 
+              size="small" 
+              style={{ 
+                backgroundColor: '#ff4d4f',
+                fontSize: '10px',
+                lineHeight: '14px',
+                minWidth: '16px',
+                height: '16px',
+                padding: '0 4px'
+              }}
+            />
+          )}
+        </div>
+      ),
       onClick: () => navigate('/admin'),
     }, { type: 'divider' });
   }
@@ -95,12 +142,25 @@ const AppHeader = ({ user, onLogout }) => {
               <span style={{ marginRight: '8px' }}>
                 {user?.nickname || user?.username}
               </span>
-              <Avatar
+              <Badge 
+                count={user?.role?.toUpperCase() === 'ADMIN' && pendingCount > 0 ? pendingCount : 0}
                 size="small"
-                style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+                style={{ 
+                  backgroundColor: '#ff4d4f',
+                  fontSize: '10px',
+                  lineHeight: '14px',
+                  minWidth: '16px',
+                  height: '16px',
+                  padding: '0 4px'
+                }}
               >
-                {(user?.nickname || user?.username)?.[0]?.toUpperCase()}
-              </Avatar>
+                <Avatar
+                  size="small"
+                  style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+                >
+                  {(user?.nickname || user?.username)?.[0]?.toUpperCase()}
+                </Avatar>
+              </Badge>
             </Button>
           </Dropdown>
         </div>

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, Button, Space } from 'antd';
-import { CalendarOutlined, LeftOutlined, CrownOutlined } from '@ant-design/icons';
+import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
@@ -10,6 +10,7 @@ import './AdminPanel.css';
 const AdminPanel = ({ user }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('timetables');
 
   const tabItems = [
     {
@@ -30,7 +31,17 @@ const AdminPanel = ({ user }) => {
           <span>权限管理</span>
         </Space>
       ),
-      children: <UserManagement />,
+      children: <UserManagement activeTab="users" />,
+    },
+    {
+      key: 'pending',
+      label: (
+        <Space>
+          <UserAddOutlined />
+          <span>注册申请</span>
+        </Space>
+      ),
+      children: <UserManagement activeTab="pending" />,
     },
   ];
 
@@ -90,6 +101,7 @@ const AdminPanel = ({ user }) => {
           size="large"
           renderTabBar={isMobile ? renderTabBar : undefined}
           className={!isMobile ? "desktop-tabs with-gradient-border" : ""}
+          onChange={(key) => setActiveTab(key)}
         />
       </div>
     </div>

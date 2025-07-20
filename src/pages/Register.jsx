@@ -1,21 +1,29 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Divider } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Form, Input, Button, Card, message, Divider, Result } from 'antd';
+import { UserOutlined, LockOutlined, SmileOutlined, CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../services/auth';
 import logo from '../assets/logo.png';
 
 const Register = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
+  const navigate = useNavigate();
 
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const response = await register(values);
+      // 移除确认密码字段，添加昵称字段
+      const { confirmPassword, ...registrationData } = values;
+      const response = await register(registrationData);
       if (response.success) {
-        localStorage.setItem('token', response.data.token);
-        onLogin(response.data.user);
-        message.success('注册成功');
+        setUserInfo({
+          username: values.username,
+          nickname: values.nickname
+        });
+        setRegistrationSuccess(true);
+        message.success('注册申请已提交，请等待管理员确认');
       } else {
         message.error(response.message || '注册失败');
       }
@@ -25,6 +33,89 @@ const Register = ({ onLogin }) => {
       setLoading(false);
     }
   };
+
+  const handleBackToLogin = () => {
+    navigate('/login');
+  };
+
+  const handleBackToRegister = () => {
+    setRegistrationSuccess(false);
+    setUserInfo(null);
+  };
+
+  // 注册成功后的停留页面
+  if (registrationSuccess) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '24px'
+      }}>
+        <Card 
+          style={{ 
+            width: 600, 
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            textAlign: 'center'
+          }}
+        >
+          <Result
+            icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+            status="success"
+            title="注册申请提交成功！"
+            subTitle={
+              <div style={{ textAlign: 'left', marginTop: '16px' }}>
+                <p style={{ marginBottom: '8px' }}>
+                  <strong>用户名：</strong>{userInfo?.username}
+                </p>
+                <p style={{ marginBottom: '8px' }}>
+                  <strong>昵称：</strong>{userInfo?.nickname}
+                </p>
+                <p style={{ marginBottom: '16px' }}>
+                  <strong>申请时间：</strong>{new Date().toLocaleString()}
+                </p>
+                <div style={{ 
+                  backgroundColor: '#f6ffed', 
+                  border: '1px solid #b7eb8f', 
+                  borderRadius: '6px', 
+                  padding: '12px',
+                  marginTop: '16px'
+                }}>
+                  <p style={{ margin: 0, color: '#52c41a', fontSize: '14px' }}>
+                    📋 您的注册申请已提交，请等待管理员审核。
+                  </p>
+                  <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '13px' }}>
+                    审核通过后，您就可以使用用户名和密码登录系统了。
+                  </p>
+                </div>
+              </div>
+            }
+            extra={[
+              <Button 
+                key="login" 
+                type="primary" 
+                icon={<ArrowLeftOutlined />}
+                onClick={handleBackToLogin}
+                size="large"
+                style={{ marginRight: '12px' }}
+              >
+                返回登录
+              </Button>,
+              <Button 
+                key="register" 
+                onClick={handleBackToRegister}
+                size="large"
+              >
+                继续注册
+              </Button>
+            ]}
+          />
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div style={{ 
@@ -81,6 +172,19 @@ const Register = ({ onLogin }) => {
           </Form.Item>
 
           <Form.Item
+            name="nickname"
+            rules={[
+              { required: true, message: '请输入昵称!' },
+              { max: 50, message: '昵称不能超过50个字符!' }
+            ]}
+          >
+            <Input 
+              prefix={<SmileOutlined />} 
+              placeholder="昵称" 
+            />
+          </Form.Item>
+
+          <Form.Item
             name="password"
             rules={[
               { required: true, message: '请输入密码!' },
@@ -122,9 +226,18 @@ const Register = ({ onLogin }) => {
               block
               style={{ height: '45px' }}
             >
-              注册
+              提交注册申请
             </Button>
           </Form.Item>
+
+          <div style={{ 
+            textAlign: 'center', 
+            color: '#666', 
+            fontSize: '14px',
+            marginBottom: '16px'
+          }}>
+            注册申请提交后需要管理员确认才能登录
+          </div>
 
           <Divider>已有账号？</Divider>
           

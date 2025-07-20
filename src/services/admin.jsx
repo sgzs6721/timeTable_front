@@ -87,4 +87,44 @@ export const getBatchTimetablesInfo = async (timetableIds) => {
   } catch (error) {
     throw error;
   }
+};
+
+// 获取待审批的用户注册申请
+export const getPendingUsers = async () => {
+  try {
+    const response = await api.get('/admin/users/pending');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 批准用户注册申请
+export const approveUserRegistration = async (userId) => {
+  try {
+    const response = await api.put(`/admin/users/${userId}/approve`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 拒绝用户注册申请
+export const rejectUserRegistration = async (userId) => {
+  try {
+    const response = await api.put(`/admin/users/${userId}/reject`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取所有注册申请记录（包括已处理的）
+export const getAllRegistrationRequests = async () => {
+  try {
+    const response = await api.get('/admin/users/registration-requests');
+    return response;
+  } catch (error) {
+    throw error;
+  }
 }; 

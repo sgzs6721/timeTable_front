@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip } from 'antd';
-import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined } from '@ant-design/icons';
-import { getAllUsers, updateUserRole, resetUserPassword, deleteUser, updateUserNickname } from '../services/admin';
+import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
+import { getAllUsers, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
 import './UserManagement.css';
 
 const { Option } = Select;
 
-const UserManagement = () => {
+const UserManagement = ({ activeTab = 'users' }) => {
   const [users, setUsers] = useState([]);
+  const [registrationRequests, setRegistrationRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [requestsLoading, setRequestsLoading] = useState(false);
   const [roleModalVisible, setRoleModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
@@ -22,7 +24,10 @@ const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+    if (activeTab === 'pending') {
+      fetchRegistrationRequests();
+    }
+  }, [activeTab]);
 
   const fetchUsers = async () => {
     try {
@@ -37,6 +42,69 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRegistrationRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      const response = await getAllRegistrationRequests();
+      if (response.success) {
+        setRegistrationRequests(response.data);
+      } else {
+        message.error(response.message || '获取注册申请记录失败');
+      }
+    } catch (error) {
+      message.error('获取注册申请记录失败，请检查网络连接');
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handleApproveUser = async (userId) => {
+    Modal.confirm({
+      title: '确认批准用户注册申请',
+      content: '确定要批准该用户的注册申请吗？批准后用户将可以登录系统。',
+      okText: '批准',
+      okType: 'primary',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await approveUserRegistration(userId);
+          if (response.success) {
+            message.success('用户注册申请已批准');
+            fetchRegistrationRequests();
+            fetchUsers(); // 刷新用户列表
+          } else {
+            message.error(response.message || '批准失败');
+          }
+        } catch (error) {
+          message.error('批准失败，请检查网络连接');
+        }
+      },
+    });
+  };
+
+  const handleRejectUser = async (userId) => {
+    Modal.confirm({
+      title: '确认拒绝用户注册申请',
+      content: '确定要拒绝该用户的注册申请吗？拒绝后用户将无法登录系统。',
+      okText: '拒绝',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await rejectUserRegistration(userId);
+          if (response.success) {
+            message.success('用户注册申请已拒绝');
+            fetchRegistrationRequests();
+          } else {
+            message.error(response.message || '拒绝失败');
+          }
+        } catch (error) {
+          message.error('拒绝失败，请检查网络连接');
+        }
+      },
+    });
   };
 
   const handleEditRole = (user) => {
@@ -257,9 +325,178 @@ const UserManagement = () => {
     },
   ];
 
+  const pendingColumns = [
+    {
+      title: '用户名',
+      dataIndex: 'username',
+      key: 'username',
+      align: 'left',
+      render: (text, record) => (
+        <Space>
+          <ClockCircleOutlined style={{ color: '#faad14' }} />
+          <span style={{ fontWeight: 'bold' }}>{text}</span>
+        </Space>
+      ),
+    },
+    {
+      title: '昵称',
+      dataIndex: 'nickname',
+      key: 'nickname',
+      align: 'center',
+      render: (text) => text || '-',
+    },
+    {
+      title: '申请时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      align: 'center',
+      render: (date) => new Date(date).toLocaleString(),
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      align: 'center',
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="primary"
+            size="small"
+            icon={<CheckOutlined />}
+            onClick={() => handleApproveUser(record.id)}
+            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+          >
+            批准
+          </Button>
+          <Button
+            type="primary"
+            danger
+            size="small"
+            icon={<CloseOutlined />}
+            onClick={() => handleRejectUser(record.id)}
+          >
+            拒绝
+          </Button>
+        </Space>
+      ),
+    },
+  ];
+
+  // 根据activeTab显示不同的内容
+  if (activeTab === 'pending') {
+    return (
+      <div>
+        {registrationRequests.length === 0 ? (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '60px 20px',
+            color: '#999',
+            fontSize: '16px'
+          }}>
+            <ClockCircleOutlined style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }} />
+            暂无注册申请记录
+          </div>
+        ) : (
+          <div style={{ padding: '16px 0' }}>
+            {registrationRequests.map((request) => {
+              const isPending = request.status === 'PENDING';
+              const isApproved = request.status === 'APPROVED';
+              const isRejected = request.status === 'REJECTED';
+              
+              return (
+                <div
+                  key={request.id}
+                  style={{
+                    border: '1px solid #f0f0f0',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    marginBottom: '16px',
+                    backgroundColor: '#fff',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    transition: 'all 0.3s ease',
+                    opacity: isPending ? 1 : 0.7
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                        {isPending && <ClockCircleOutlined style={{ color: '#faad14', fontSize: '18px', marginRight: '8px' }} />}
+                        {isApproved && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '18px', marginRight: '8px' }} />}
+                        {isRejected && <StopOutlined style={{ color: '#ff4d4f', fontSize: '18px', marginRight: '8px' }} />}
+                        <span style={{ 
+                          fontWeight: 'bold', 
+                          fontSize: '16px',
+                          color: '#262626'
+                        }}>
+                          {request.username}
+                        </span>
+                        <Tag 
+                          color={isPending ? 'orange' : isApproved ? 'green' : 'red'} 
+                          style={{ marginLeft: '8px' }}
+                        >
+                          {isPending ? '待审批' : isApproved ? '已批准' : '已拒绝'}
+                        </Tag>
+                      </div>
+                      
+                      <div style={{ marginBottom: '8px' }}>
+                        <span style={{ color: '#8c8c8c', marginRight: '8px' }}>昵称：</span>
+                        <span style={{ color: '#262626' }}>{request.nickname || '未设置'}</span>
+                      </div>
+                      
+                      <div>
+                        <span style={{ color: '#8c8c8c', marginRight: '8px' }}>申请时间：</span>
+                        <span style={{ color: '#262626' }}>
+                          {new Date(request.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {isPending && (
+                      <div style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '8px',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}>
+                        <Button
+                          type="primary"
+                          icon={<CheckOutlined />}
+                          onClick={() => handleApproveUser(request.id)}
+                          style={{ 
+                            backgroundColor: '#52c41a', 
+                            borderColor: '#52c41a',
+                            width: '80px'
+                          }}
+                          title="批准注册申请"
+                        >
+                          批准
+                        </Button>
+                        <Button
+                          type="primary"
+                          danger
+                          icon={<CloseOutlined />}
+                          onClick={() => handleRejectUser(request.id)}
+                          style={{
+                            width: '80px'
+                          }}
+                          title="拒绝注册申请"
+                        >
+                          拒绝
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
-
       <Table
         columns={columns}
         dataSource={users}
@@ -347,16 +584,15 @@ const UserManagement = () => {
                 onChange={(e) => setNewPassword(e.target.value)}
                 style={{ marginTop: 8 }}
                 placeholder="请输入新密码（至少6个字符）"
-                autoComplete="new-password"
               />
             </div>
           </div>
         )}
       </Modal>
 
-      {/* 编辑昵称Modal */}
+      {/* 修改昵称Modal */}
       <Modal
-        title="编辑用户昵称"
+        title="修改用户昵称"
         open={nicknameModalVisible}
         onOk={handleUpdateNickname}
         onCancel={() => {
@@ -370,14 +606,13 @@ const UserManagement = () => {
         {editingUser && (
           <div style={{ padding: '16px 0' }}>
             <p><strong>用户名：</strong>{editingUser.username}</p>
-            <p><strong>当前昵称：</strong>{editingUser.nickname || '未设置'}</p>
             <div style={{ marginTop: 16 }}>
-              <label><strong>新昵称：</strong></label>
+              <label><strong>昵称：</strong></label>
               <Input
                 value={newNickname}
                 onChange={(e) => setNewNickname(e.target.value)}
-                placeholder="请输入新昵称（可为空）"
                 style={{ marginTop: 8 }}
+                placeholder="请输入昵称（可选）"
                 maxLength={50}
               />
             </div>
