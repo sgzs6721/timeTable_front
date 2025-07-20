@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip } from 'antd';
+import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip, Spin } from 'antd';
 import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
 import { getAllUsers, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
 import './UserManagement.css';
@@ -331,12 +331,26 @@ const UserManagement = ({ activeTab = 'users' }) => {
       dataIndex: 'username',
       key: 'username',
       align: 'left',
-      render: (text, record) => (
-        <Space>
-          <ClockCircleOutlined style={{ color: '#faad14' }} />
-          <span style={{ fontWeight: 'bold' }}>{text}</span>
-        </Space>
-      ),
+      render: (text, record) => {
+        const isPending = record.status === 'PENDING';
+        const isApproved = record.status === 'APPROVED';
+        const isRejected = record.status === 'REJECTED';
+        
+        return (
+          <Space>
+            {isPending && <ClockCircleOutlined style={{ color: '#faad14' }} />}
+            {isApproved && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
+            {isRejected && <StopOutlined style={{ color: '#ff4d4f' }} />}
+            <span style={{ fontWeight: 'bold' }}>{text}</span>
+            <Tag 
+              color={isPending ? 'orange' : isApproved ? 'green' : 'red'} 
+              size="small"
+            >
+              {isPending ? '待审批' : isApproved ? '已批准' : '已拒绝'}
+            </Tag>
+          </Space>
+        );
+      },
     },
     {
       title: '昵称',
@@ -356,28 +370,36 @@ const UserManagement = ({ activeTab = 'users' }) => {
       title: '操作',
       key: 'actions',
       align: 'center',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="primary"
-            size="small"
-            icon={<CheckOutlined />}
-            onClick={() => handleApproveUser(record.id)}
-            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
-          >
-            批准
-          </Button>
-          <Button
-            type="primary"
-            danger
-            size="small"
-            icon={<CloseOutlined />}
-            onClick={() => handleRejectUser(record.id)}
-          >
-            拒绝
-          </Button>
-        </Space>
-      ),
+      render: (_, record) => {
+        const isPending = record.status === 'PENDING';
+        
+        if (!isPending) {
+          return <span style={{ color: '#999' }}>-</span>;
+        }
+        
+        return (
+          <Space>
+            <Button
+              type="primary"
+              size="small"
+              icon={<CheckOutlined />}
+              onClick={() => handleApproveUser(record.id)}
+              style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+            >
+              批准
+            </Button>
+            <Button
+              type="primary"
+              danger
+              size="small"
+              icon={<CloseOutlined />}
+              onClick={() => handleRejectUser(record.id)}
+            >
+              拒绝
+            </Button>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -385,112 +407,136 @@ const UserManagement = ({ activeTab = 'users' }) => {
   if (activeTab === 'pending') {
     return (
       <div>
-        {registrationRequests.length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '60px 20px',
-            color: '#999',
-            fontSize: '16px'
-          }}>
-            <ClockCircleOutlined style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }} />
-            暂无注册申请记录
-          </div>
-        ) : (
-          <div style={{ padding: '16px 0' }}>
-            {registrationRequests.map((request) => {
-              const isPending = request.status === 'PENDING';
-              const isApproved = request.status === 'APPROVED';
-              const isRejected = request.status === 'REJECTED';
-              
-              return (
-                <div
-                  key={request.id}
-                  style={{
-                    border: '1px solid #f0f0f0',
-                    borderRadius: '8px',
-                    padding: '20px',
-                    marginBottom: '16px',
-                    backgroundColor: '#fff',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                    transition: 'all 0.3s ease',
-                    opacity: isPending ? 1 : 0.7
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
-                        {isPending && <ClockCircleOutlined style={{ color: '#faad14', fontSize: '18px', marginRight: '8px' }} />}
-                        {isApproved && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '18px', marginRight: '8px' }} />}
-                        {isRejected && <StopOutlined style={{ color: '#ff4d4f', fontSize: '18px', marginRight: '8px' }} />}
-                        <span style={{ 
-                          fontWeight: 'bold', 
-                          fontSize: '16px',
-                          color: '#262626'
+        <Spin spinning={requestsLoading} tip="加载中...">
+          <div style={{ minHeight: '200px' }}>
+            {!requestsLoading && registrationRequests.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '60px 20px',
+                color: '#999',
+                fontSize: '16px'
+              }}>
+                <ClockCircleOutlined style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }} />
+                暂无注册申请记录
+              </div>
+            ) : !requestsLoading && (
+              <div style={{ padding: '16px 0' }}>
+                {registrationRequests.map((request) => {
+                  const isPending = request.status === 'PENDING';
+                  const isApproved = request.status === 'APPROVED';
+                  const isRejected = request.status === 'REJECTED';
+                  
+                  return (
+                    <div
+                      key={request.id}
+                                          style={{
+                      border: '1px solid #f0f0f0',
+                      borderRadius: '8px',
+                      padding: '14px 16px',
+                      marginBottom: '12px',
+                      backgroundColor: '#fff',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                      transition: 'all 0.3s ease',
+                      opacity: isPending ? 1 : 0.7
+                    }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                                                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            {isPending && <ClockCircleOutlined style={{ color: '#faad14', fontSize: '16px', marginRight: '6px' }} />}
+                            {isApproved && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '6px' }} />}
+                            {isRejected && <StopOutlined style={{ color: '#ff4d4f', fontSize: '16px', marginRight: '6px' }} />}
+                            <span style={{ 
+                              fontWeight: 'bold', 
+                              fontSize: '15px',
+                              color: '#262626',
+                              marginRight: '12px',
+                              maxWidth: '120px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block'
+                            }}>
+                              {request.username}
+                            </span>
+                            <span style={{ 
+                              color: '#8c8c8c', 
+                              fontSize: '13px',
+                              maxWidth: '150px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block'
+                            }}>
+                              昵称：{request.nickname || '未设置'}
+                            </span>
+                          </div>
+                          <Tag 
+                            color={isPending ? 'orange' : isApproved ? 'green' : 'red'} 
+                            size="small"
+                          >
+                            {isPending ? '待审批' : isApproved ? '已批准' : '已拒绝'}
+                          </Tag>
+                        </div>
+                        
+                        <div style={{ 
+                          color: '#8c8c8c', 
+                          fontSize: '13px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
                         }}>
-                          {request.username}
-                        </span>
-                        <Tag 
-                          color={isPending ? 'orange' : isApproved ? 'green' : 'red'} 
-                          style={{ marginLeft: '8px' }}
-                        >
-                          {isPending ? '待审批' : isApproved ? '已批准' : '已拒绝'}
-                        </Tag>
-                      </div>
-                      
-                      <div style={{ marginBottom: '8px' }}>
-                        <span style={{ color: '#8c8c8c', marginRight: '8px' }}>昵称：</span>
-                        <span style={{ color: '#262626' }}>{request.nickname || '未设置'}</span>
-                      </div>
-                      
-                      <div>
-                        <span style={{ color: '#8c8c8c', marginRight: '8px' }}>申请时间：</span>
-                        <span style={{ color: '#262626' }}>
-                          {new Date(request.createdAt).toLocaleString()}
-                        </span>
+                          <span>申请时间：</span>
+                          <span style={{ color: '#262626' }}>
+                            {new Date(request.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        </div>
+                        
+                        {isPending && (
+                          <div style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '8px',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}>
+                            <Button
+                              type="primary"
+                              icon={<CheckOutlined />}
+                              onClick={() => handleApproveUser(request.id)}
+                              style={{ 
+                                backgroundColor: '#52c41a', 
+                                borderColor: '#52c41a',
+                                width: '80px'
+                              }}
+                              title="批准注册申请"
+                            >
+                              批准
+                            </Button>
+                            <Button
+                              type="primary"
+                              danger
+                              icon={<CloseOutlined />}
+                              onClick={() => handleRejectUser(request.id)}
+                              style={{
+                                width: '80px'
+                              }}
+                              title="拒绝注册申请"
+                            >
+                              拒绝
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    
-                    {isPending && (
-                      <div style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '8px',
-                        justifyContent: 'center',
-                        alignItems: 'center'
-                      }}>
-                        <Button
-                          type="primary"
-                          icon={<CheckOutlined />}
-                          onClick={() => handleApproveUser(request.id)}
-                          style={{ 
-                            backgroundColor: '#52c41a', 
-                            borderColor: '#52c41a',
-                            width: '80px'
-                          }}
-                          title="批准注册申请"
-                        >
-                          批准
-                        </Button>
-                        <Button
-                          type="primary"
-                          danger
-                          icon={<CloseOutlined />}
-                          onClick={() => handleRejectUser(request.id)}
-                          style={{
-                            width: '80px'
-                          }}
-                          title="拒绝注册申请"
-                        >
-                          拒绝
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
+        </Spin>
       </div>
     );
   }

@@ -273,10 +273,10 @@ const TimetableManagement = ({ user }) => {
         )}
       </div>
 
-      {loading ? <Spin /> : (
-        <List
-          dataSource={displayTimetables}
-          renderItem={item => {
+      <List
+        dataSource={displayTimetables}
+        loading={loading}
+        renderItem={item => {
             const nameColors = ['#10239e','#ad6800','#006d75','#237804','#9e1068','#a8071a','#391085','#0050b3'];
             const displayName = item.nickname || item.username || item.userName || '';
           const keyVal = displayName.split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
@@ -372,7 +372,6 @@ const TimetableManagement = ({ user }) => {
             );
           }}
         />
-      )}
     </div>
   );
 };
