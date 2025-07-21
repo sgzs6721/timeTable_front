@@ -1,16 +1,31 @@
-import React, { useState } from 'react';
-import { Tabs, Button, Space } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Tabs, Button, Space, Badge } from 'antd';
 import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
 import TimetableManagement from './TimetableManagement';
 import './AdminPanel.css';
+import { getAllRegistrationRequests } from '../services/admin';
 
 const AdminPanel = ({ user }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('timetables');
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    // 拉取待审批数量
+    const fetchPending = async () => {
+      try {
+        const res = await getAllRegistrationRequests();
+        if (res.success) {
+          setPendingCount(res.data.filter(r => r.status === 'PENDING').length);
+        }
+      } catch {}
+    };
+    fetchPending();
+  }, []);
 
   const tabItems = [
     {
@@ -39,6 +54,7 @@ const AdminPanel = ({ user }) => {
         <Space>
           <UserAddOutlined />
           <span>注册申请</span>
+          {pendingCount > 0 && <Badge dot style={{ marginLeft: 2 }} />}
         </Space>
       ),
       children: <UserManagement activeTab="pending" />,

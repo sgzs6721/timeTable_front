@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip, Spin } from 'antd';
+import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip, Spin, Badge, Tabs } from 'antd';
 import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
 import { getAllUsers, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
 import './UserManagement.css';
@@ -403,33 +403,33 @@ const UserManagement = ({ activeTab = 'users' }) => {
     },
   ];
 
-  // 根据activeTab显示不同的内容
+  // 统计待审批数量
+  const pendingCount = registrationRequests.filter(r => r.status === 'PENDING').length;
+
   if (activeTab === 'pending') {
     return (
-      <div>
-        <Spin spinning={requestsLoading} tip="加载中...">
-          <div style={{ minHeight: '200px' }}>
-            {!requestsLoading && registrationRequests.length === 0 ? (
-              <div style={{ 
-                textAlign: 'center', 
-                padding: '60px 20px',
-                color: '#999',
-                fontSize: '16px'
-              }}>
-                <ClockCircleOutlined style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }} />
-                暂无注册申请记录
-              </div>
-            ) : !requestsLoading && (
-              <div style={{ padding: '16px 0' }}>
-                {registrationRequests.map((request) => {
-                  const isPending = request.status === 'PENDING';
-                  const isApproved = request.status === 'APPROVED';
-                  const isRejected = request.status === 'REJECTED';
-                  
-                  return (
-                    <div
-                      key={request.id}
-                                          style={{
+      <Spin spinning={requestsLoading} tip="加载中...">
+        <div style={{ minHeight: '200px' }}>
+          {!requestsLoading && registrationRequests.length === 0 ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '60px 20px',
+              color: '#999',
+              fontSize: '16px'
+            }}>
+              <ClockCircleOutlined style={{ fontSize: '48px', marginBottom: '16px', display: 'block' }} />
+              暂无注册申请记录
+            </div>
+          ) : !requestsLoading && (
+            <div style={{ padding: '16px 0' }}>
+              {registrationRequests.map((request) => {
+                const isPending = request.status === 'PENDING';
+                const isApproved = request.status === 'APPROVED';
+                const isRejected = request.status === 'REJECTED';
+                return (
+                  <div
+                    key={request.id}
+                    style={{
                       border: '1px solid #f0f0f0',
                       borderRadius: '8px',
                       padding: '14px 16px',
@@ -439,10 +439,10 @@ const UserManagement = ({ activeTab = 'users' }) => {
                       transition: 'all 0.3s ease',
                       opacity: isPending ? 1 : 0.7
                     }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1 }}>
-                                                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center' }}>
                             {isPending && <ClockCircleOutlined style={{ color: '#faad14', fontSize: '16px', marginRight: '6px' }} />}
                             {isApproved && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '6px' }} />}
@@ -479,7 +479,6 @@ const UserManagement = ({ activeTab = 'users' }) => {
                             {isPending ? '待审批' : isApproved ? '已批准' : '已拒绝'}
                           </Tag>
                         </div>
-                        
                         <div style={{ 
                           color: '#8c8c8c', 
                           fontSize: '13px',
@@ -492,188 +491,76 @@ const UserManagement = ({ activeTab = 'users' }) => {
                             {new Date(request.createdAt).toLocaleString()}
                           </span>
                         </div>
-                        </div>
-                        
-                        {isPending && (
-                          <div style={{ 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            gap: '4px',
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                          }}>
-                            <Button
-                              type="primary"
-                              icon={<CheckOutlined />}
-                              onClick={() => handleApproveUser(request.id)}
-                              size="small"
-                              style={{ 
-                                backgroundColor: '#52c41a', 
-                                borderColor: '#52c41a',
-                                width: '70px',
-                                height: '28px',
-                                fontSize: '12px',
-                                padding: '0 8px'
-                              }}
-                              title="批准注册申请"
-                            >
-                              批准
-                            </Button>
-                            <Button
-                              type="primary"
-                              danger
-                              icon={<CloseOutlined />}
-                              onClick={() => handleRejectUser(request.id)}
-                              size="small"
-                              style={{
-                                width: '70px',
-                                height: '28px',
-                                fontSize: '12px',
-                                padding: '0 8px'
-                              }}
-                              title="拒绝注册申请"
-                            >
-                              拒绝
-                            </Button>
-                          </div>
-                        )}
                       </div>
+                      {isPending && (
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '4px',
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}>
+                          <Button
+                            type="primary"
+                            icon={<CheckOutlined />}
+                            onClick={() => handleApproveUser(request.id)}
+                            size="small"
+                            style={{ 
+                              backgroundColor: '#52c41a', 
+                              borderColor: '#52c41a',
+                              width: '70px',
+                              height: '28px',
+                              fontSize: '12px',
+                              padding: '0 8px'
+                            }}
+                            title="批准注册申请"
+                          >
+                            批准
+                          </Button>
+                          <Button
+                            type="primary"
+                            danger
+                            icon={<CloseOutlined />}
+                            onClick={() => handleRejectUser(request.id)}
+                            size="small"
+                            style={{
+                              width: '70px',
+                              height: '28px',
+                              fontSize: '12px',
+                              padding: '0 8px'
+                            }}
+                            title="拒绝注册申请"
+                          >
+                            拒绝
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </Spin>
-      </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Spin>
     );
   }
 
+  // 权限管理内容
   return (
-    <div>
-      <Table
-        columns={columns}
-        dataSource={users}
-        loading={loading}
-        rowKey="id"
-        pagination={{
-          pageSize: 10,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
-        }}
-        scroll={{ x: 'max-content' }}
-      />
-
-      {/* 修改权限Modal */}
-      <Modal
-        title="修改用户权限"
-        open={roleModalVisible}
-        onOk={handleUpdateRole}
-        onCancel={() => {
-          setRoleModalVisible(false);
-          setRoleLoading(false);
-        }}
-        okText="确认修改"
-        cancelText="取消"
-        confirmLoading={roleLoading}
-      >
-        {editingUser && (
-          <div style={{ padding: '16px 0' }}>
-            <p><strong>用户名：</strong>{editingUser.username}</p>
-            <p><strong>当前角色：</strong>
-              <Tag 
-                color={editingUser.role === 'ADMIN' ? 'red' : 'blue'} 
-                style={{ marginLeft: 8 }}
-              >
-                {editingUser.role === 'ADMIN' ? '管理员' : '普通用户'}
-              </Tag>
-            </p>
-            <div style={{ marginTop: 16 }}>
-              <label><strong>选择新角色：</strong></label>
-              <Select
-                value={selectedRole}
-                onChange={setSelectedRole}
-                style={{ width: '100%', marginTop: 8 }}
-                placeholder="请选择角色"
-              >
-                <Option value="USER">
-                  <Space>
-                    <UserOutlined />
-                    <span>普通用户</span>
-                  </Space>
-                </Option>
-                <Option value="ADMIN">
-                  <Space>
-                    <CrownOutlined />
-                    <span>管理员</span>
-                  </Space>
-                </Option>
-              </Select>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* 重置密码Modal */}
-      <Modal
-        title="重置用户密码"
-        open={passwordModalVisible}
-        onOk={handleUpdatePassword}
-        onCancel={() => {
-          setPasswordModalVisible(false);
-          setPasswordLoading(false);
-        }}
-        okText="确认重置"
-        cancelText="取消"
-        confirmLoading={passwordLoading}
-      >
-        {editingUser && (
-          <div style={{ padding: '16px 0' }}>
-            <p><strong>用户名：</strong>{editingUser.username}</p>
-            <div style={{ marginTop: 16 }}>
-              <label><strong>新密码：</strong></label>
-              <Input.Password
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                style={{ marginTop: 8 }}
-                placeholder="请输入新密码（至少6个字符）"
-              />
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* 修改昵称Modal */}
-      <Modal
-        title="修改用户昵称"
-        open={nicknameModalVisible}
-        onOk={handleUpdateNickname}
-        onCancel={() => {
-          setNicknameModalVisible(false);
-          setNicknameLoading(false);
-        }}
-        okText="确认修改"
-        cancelText="取消"
-        confirmLoading={nicknameLoading}
-      >
-        {editingUser && (
-          <div style={{ padding: '16px 0' }}>
-            <p><strong>用户名：</strong>{editingUser.username}</p>
-            <div style={{ marginTop: 16 }}>
-              <label><strong>昵称：</strong></label>
-              <Input
-                value={newNickname}
-                onChange={(e) => setNewNickname(e.target.value)}
-                style={{ marginTop: 8 }}
-                placeholder="请输入昵称（可选）"
-                maxLength={50}
-              />
-            </div>
-          </div>
-        )}
-      </Modal>
-    </div>
+    <Table
+      columns={columns}
+      dataSource={users}
+      loading={loading}
+      rowKey="id"
+      pagination={{
+        pageSize: 10,
+        showSizeChanger: true,
+        showQuickJumper: true,
+        showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+      }}
+      scroll={{ x: 'max-content' }}
+    />
   );
 };
 
