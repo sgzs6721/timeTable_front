@@ -224,6 +224,16 @@ export const setActiveTimetable = async (timetableId) => {
   }
 };
 
+// 获取所有活动课表的指定日期课程信息
+export const getActiveSchedulesByDate = async (date) => {
+  try {
+    const response = await api.get(`/admin/active-timetables/schedules?date=${date}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 归档课表
 export const archiveTimetableApi = async (timetableId) => {
   try {
