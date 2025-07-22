@@ -35,57 +35,9 @@ const dayMap = {
 
 const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose, deleteLoading }) => {
   const [name, setName] = React.useState(schedule.studentName);
-  const [copyOtherCoaches, setCopyOtherCoaches] = React.useState(false);
-  const [otherCoachesData, setOtherCoachesData] = React.useState([]);
-  const [loadingOtherCoaches, setLoadingOtherCoaches] = React.useState(false);
   const isNameChanged = name !== schedule.studentName;
 
-  // 处理复选框变化
-  const handleCopyOtherCoachesChange = async (checked) => {
-    setCopyOtherCoaches(checked);
 
-    if (checked) {
-      setLoadingOtherCoaches(true);
-      try {
-        // 获取当前课程的日期
-        let targetDate;
-        if (timetable.isWeekly) {
-          // 周课表：需要根据当前显示的周数计算具体日期
-          // 这里需要从父组件传入当前周的信息，暂时使用当前日期作为示例
-          const today = dayjs();
-          const dayOfWeekMap = {
-            'MONDAY': 1,
-            'TUESDAY': 2,
-            'WEDNESDAY': 3,
-            'THURSDAY': 4,
-            'FRIDAY': 5,
-            'SATURDAY': 6,
-            'SUNDAY': 0
-          };
-          const targetDayOfWeek = dayOfWeekMap[schedule.dayOfWeek];
-          targetDate = today.day(targetDayOfWeek).format('YYYY-MM-DD');
-        } else {
-          // 日期范围课表：直接使用课程日期
-          targetDate = schedule.scheduleDate;
-        }
-
-        const response = await getActiveSchedulesByDate(targetDate);
-        if (response.success) {
-          setOtherCoachesData(response.data);
-        } else {
-          message.error('获取其他教练课程失败');
-          setCopyOtherCoaches(false);
-        }
-      } catch (error) {
-        message.error('获取其他教练课程失败');
-        setCopyOtherCoaches(false);
-      } finally {
-        setLoadingOtherCoaches(false);
-      }
-    } else {
-      setOtherCoachesData([]);
-    }
-  };
 
   return (
     <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
@@ -135,42 +87,9 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
         </p>
       )}
 
-      {/* 复制时包含其他教练课程复选框 */}
-      {!isArchived && (
-        <div style={{ marginTop: '8px', marginBottom: '8px' }}>
-          <Checkbox
-            checked={copyOtherCoaches}
-            onChange={(e) => handleCopyOtherCoachesChange(e.target.checked)}
-            disabled={loadingOtherCoaches}
-          >
-            复制其他教练课程
-          </Checkbox>
-          {loadingOtherCoaches && (
-            <Spin size="small" style={{ marginLeft: '8px' }} />
-          )}
-        </div>
-      )}
 
-      {/* 显示其他教练课程信息 */}
-      {copyOtherCoaches && otherCoachesData && otherCoachesData.timetables && otherCoachesData.timetables.length > 0 && (
-        <div style={{ marginBottom: '8px', maxHeight: '150px', overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: '4px', padding: '8px' }}>
-          <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
-            其他教练课程 ({otherCoachesData.date}):
-          </div>
-          {otherCoachesData.timetables.map((timetableInfo, index) => (
-            <div key={index} style={{ marginBottom: '4px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1890ff' }}>
-                {timetableInfo.ownerName} - {timetableInfo.timetableName}
-              </div>
-              {timetableInfo.schedules.map((sch, schIndex) => (
-                <div key={schIndex} style={{ fontSize: '11px', color: '#666', marginLeft: '8px' }}>
-                  {sch.startTime.substring(0, 5)}-{sch.endTime.substring(0, 5)} {sch.studentName}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+
+
 
       <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
         <Button
@@ -203,7 +122,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
             <Button
               type="default"
               size="small"
-              onClick={() => onCopy(schedule, copyOtherCoaches ? otherCoachesData : null)}
+              onClick={() => onCopy(schedule, null)}
               style={{
                 flex: 1,
                 backgroundColor: '#722ed1',
@@ -2105,9 +2024,6 @@ const ViewTimetable = ({ user }) => {
               >
                 复制其他教练课程
               </Checkbox>
-              {loadingOtherCoachesInModal && (
-                <Spin size="small" style={{ marginLeft: '8px' }} />
-              )}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <Button type="primary" onClick={() => copyToClipboard(generateCopyTextForDay(daySchedulesForCopy, currentDayDate, currentDayLabel, copyOtherCoachesInModal, otherCoachesDataInModal))}>
@@ -2128,7 +2044,7 @@ const ViewTimetable = ({ user }) => {
         width={600}
       >
         {/* 显示其他教练课程信息 */}
-        {otherCoachesDataInModal && otherCoachesDataInModal.timetables && otherCoachesDataInModal.timetables.length > 0 && (
+        {(loadingOtherCoachesInModal || (otherCoachesDataInModal && otherCoachesDataInModal.timetables && otherCoachesDataInModal.timetables.length > 0)) && (
           <div style={{ marginBottom: '16px', border: '1px solid #f0f0f0', borderRadius: '4px' }}>
             {/* 折叠标题栏 */}
             <div
@@ -2145,38 +2061,43 @@ const ViewTimetable = ({ user }) => {
               onClick={() => setOtherCoachesExpanded(!otherCoachesExpanded)}
             >
               <div style={{ fontSize: '14px', color: '#666', fontWeight: 'bold' }}>
-                其他教练课程 ({otherCoachesDataInModal.date})
+                其他教练课程 ({otherCoachesDataInModal?.date || (currentDayDate ? currentDayDate.format('YYYY-MM-DD') : '')})
               </div>
-              <div style={{ color: '#1890ff' }}>
+              <div style={{ color: '#1890ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {loadingOtherCoachesInModal && (
+                  <Spin size="small" />
+                )}
                 {otherCoachesExpanded ? <UpOutlined /> : <DownOutlined />}
               </div>
             </div>
 
             {/* 可折叠的内容区域 */}
-            <div
-              style={{
-                maxHeight: otherCoachesExpanded ? '200px' : '0px',
-                overflow: 'hidden',
-                transition: 'max-height 0.3s ease-in-out'
-              }}
-            >
-              <div style={{ padding: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                {otherCoachesDataInModal.timetables
-                  .filter(timetableInfo => timetableInfo.timetableId.toString() !== timetableId)
-                  .map((timetableInfo, index) => (
-                    <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>
-                        {timetableInfo.ownerName} - {timetableInfo.timetableName}
-                      </div>
-                      {timetableInfo.schedules.map((sch, schIndex) => (
-                        <div key={schIndex} style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
-                          {sch.startTime.substring(0, 5)}-{sch.endTime.substring(0, 5)} {sch.studentName}
+            {!loadingOtherCoachesInModal && otherCoachesDataInModal && otherCoachesDataInModal.timetables && (
+              <div
+                style={{
+                  maxHeight: otherCoachesExpanded ? '200px' : '0px',
+                  overflow: 'hidden',
+                  transition: 'max-height 0.3s ease-in-out'
+                }}
+              >
+                <div style={{ padding: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {otherCoachesDataInModal.timetables
+                    .filter(timetableInfo => timetableInfo.timetableId.toString() !== timetableId)
+                    .map((timetableInfo, index) => (
+                      <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>
+                          {timetableInfo.ownerName} - {timetableInfo.timetableName}
                         </div>
-                      ))}
-                    </div>
-                  ))}
+                        {timetableInfo.schedules.map((sch, schIndex) => (
+                          <div key={schIndex} style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
+                            {sch.startTime.substring(0, 5)}-{sch.endTime.substring(0, 5)} {sch.studentName}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
