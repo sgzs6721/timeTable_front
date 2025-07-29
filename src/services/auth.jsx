@@ -1,12 +1,17 @@
 import axios from 'axios';
+import { getApiBaseUrl, TIMEOUT, HEADERS } from '../config/api.js';
 
-// 使用环境变量配置API地址，如果没有配置则使用默认地址
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8088/timetable/api';
+// 使用统一配置
+const API_BASE_URL = getApiBaseUrl();
+
+console.log('API_BASE_URL:', API_BASE_URL);
 
 // 创建axios实例
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000, // 60秒超时
+  timeout: TIMEOUT,
+  headers: HEADERS,
+  maxRedirects: 3,
 });
 
 // 请求拦截器
@@ -16,6 +21,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // 强制设置为HTTP请求，防止重定向
+    config.headers['X-Forwarded-Proto'] = 'http';
+    config.headers['X-Requested-With'] = 'XMLHttpRequest';
+    console.log('API请求:', config.method?.toUpperCase(), config.url, '-> 完整路径:', config.baseURL + config.url);
     return config;
   },
   (error) => {
@@ -26,9 +35,11 @@ api.interceptors.request.use(
 // 响应拦截器
 api.interceptors.response.use(
   (response) => {
+    console.log('API响应:', response.status, response.config.url);
     return response.data;
   },
   (error) => {
+    console.error('API错误:', error.response?.status, error.config?.url, error.message);
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

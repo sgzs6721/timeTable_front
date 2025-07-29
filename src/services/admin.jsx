@@ -89,15 +89,15 @@ export const getBatchTimetablesInfo = async (timetableIds) => {
   }
 };
 
-// 获取待审批的用户注册申请
-export const getPendingUsers = async () => {
-  try {
-    const response = await api.get('/admin/users/pending');
-    return response;
-  } catch (error) {
-    throw error;
-  }
-};
+// 获取待审批的用户注册申请（已废弃，使用 getAllRegistrationRequests 代替）
+// export const getPendingUsers = async () => {
+//   try {
+//     const response = await api.get('/admin/users/pending');
+//     return response;
+//   } catch (error) {
+//     throw error;
+//   }
+// };
 
 // 批准用户注册申请
 export const approveUserRegistration = async (userId) => {

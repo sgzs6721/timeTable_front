@@ -21,9 +21,9 @@
     "vite": "^4.4.5"
   },
   "scripts": {
-    "preview": "vite",
+    "dev": "vite",
     "build": "vite build",
-    "serve": "vite preview",
+    "preview": "vite preview",
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production"
   },

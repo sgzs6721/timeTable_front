@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Button, Dropdown, Avatar, Badge } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined } from '@ant-design/icons';
-import { getPendingUsers } from '../services/admin';
+import { getAllRegistrationRequests } from '../services/admin';
 import logo from '../assets/logo.png';
 
 const { Header } = Layout;
@@ -16,9 +16,11 @@ const AppHeader = ({ user, onLogout }) => {
   const fetchPendingCount = async () => {
     if (user?.role?.toUpperCase() === 'ADMIN') {
       try {
-        const response = await getPendingUsers();
+        const response = await getAllRegistrationRequests();
         if (response.success) {
-          setPendingCount(response.data?.length || 0);
+          // 只统计状态为 PENDING 的申请
+          const pendingRequests = response.data?.filter(r => r.status === 'PENDING') || [];
+          setPendingCount(pendingRequests.length);
         }
       } catch (error) {
         console.error('获取待审批用户数量失败:', error);
