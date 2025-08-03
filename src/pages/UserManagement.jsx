@@ -14,6 +14,8 @@ const UserManagement = ({ activeTab = 'users' }) => {
   const [roleModalVisible, setRoleModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
+
+
   const [editingUser, setEditingUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -32,10 +34,10 @@ const UserManagement = ({ activeTab = 'users' }) => {
   const fetchUsers = async () => {
     try {
       const response = await getAllUsers();
-      if (response.success) {
-        setUsers(response.data);
+      if (response && response.success) {
+        setUsers(response.data || []);
       } else {
-        message.error(response.message || '获取用户列表失败');
+        message.error(response?.message || '获取用户列表失败');
       }
     } catch (error) {
       message.error('获取用户列表失败，请检查网络连接');
@@ -260,7 +262,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
             <Tooltip title={`用户名: ${text}${record.nickname ? ` | 昵称: ${record.nickname}` : ''}`} placement="topLeft" mouseEnterDelay={0.2}>
               <span 
                 style={{ fontWeight: 'bold', cursor: 'pointer', color: '#1890ff' }}
-                onClick={() => handleEditNickname(record)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleEditNickname(record);
+                }}
               >
                 {showText}
               </span>
@@ -294,7 +300,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
               type="text" 
               className="action-button"
               icon={<CrownOutlined />}
-              onClick={() => handleEditRole(record)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleEditRole(record);
+              }}
               title="变更权限"
               style={{ fontSize: '16px', color: '#722ed1', padding: '0 6px' }}
             />
@@ -302,7 +312,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
               type="text" 
               className="action-button"
               icon={<KeyOutlined />}
-              onClick={() => handleResetPassword(record)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleResetPassword(record);
+              }}
               title="重置密码"
               style={{ fontSize: '16px', color: '#fa8c16', padding: '0 6px' }}
             />
@@ -310,7 +324,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
               type="text"
               className="action-button"
               icon={<DeleteOutlined />}
-              onClick={() => handleDeleteUser(record)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDeleteUser(record);
+              }}
               title="删除用户"
               disabled={record.role === 'ADMIN'}
               style={{
@@ -383,7 +401,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
               type="primary"
               size="small"
               icon={<CheckOutlined />}
-              onClick={() => handleApproveUser(record.id)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleApproveUser(record.id);
+              }}
               style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
             >
               批准
@@ -393,7 +415,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
               danger
               size="small"
               icon={<CloseOutlined />}
-              onClick={() => handleRejectUser(record.id)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleRejectUser(record.id);
+              }}
             >
               拒绝
             </Button>
@@ -503,7 +529,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
                           <Button
                             type="primary"
                             icon={<CheckOutlined />}
-                            onClick={() => handleApproveUser(request.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleApproveUser(request.id);
+                            }}
                             size="small"
                             style={{ 
                               backgroundColor: '#52c41a', 
@@ -521,7 +551,11 @@ const UserManagement = ({ activeTab = 'users' }) => {
                             type="primary"
                             danger
                             icon={<CloseOutlined />}
-                            onClick={() => handleRejectUser(request.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRejectUser(request.id);
+                            }}
                             size="small"
                             style={{
                               width: '70px',
@@ -548,19 +582,97 @@ const UserManagement = ({ activeTab = 'users' }) => {
 
   // 权限管理内容
   return (
-    <Table
-      columns={columns}
-      dataSource={users}
-      loading={loading}
-      rowKey="id"
-      pagination={{
-        pageSize: 10,
-        showSizeChanger: true,
-        showQuickJumper: true,
-        showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
-      }}
-      scroll={{ x: 'max-content' }}
-    />
+    <>
+      <Table
+        columns={columns}
+        dataSource={users}
+        loading={loading}
+        rowKey="id"
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+        }}
+        scroll={{ x: 'max-content' }}
+      />
+      
+      {/* 角色编辑模态框 */}
+      <Modal
+        title="编辑用户角色"
+        open={roleModalVisible}
+        onOk={handleUpdateRole}
+        onCancel={() => setRoleModalVisible(false)}
+        confirmLoading={roleLoading}
+        okText="确认"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>用户：{editingUser?.username}</p>
+          <p>当前角色：{editingUser?.role === 'ADMIN' ? '管理员' : '普通用户'}</p>
+        </div>
+        <div>
+          <label>新角色：</label>
+          <Select
+            value={selectedRole}
+            onChange={setSelectedRole}
+            style={{ width: '100%', marginTop: 8 }}
+          >
+            <Option value="USER">普通用户</Option>
+            <Option value="ADMIN">管理员</Option>
+          </Select>
+        </div>
+      </Modal>
+
+      {/* 密码重置模态框 */}
+      <Modal
+        title="重置用户密码"
+        open={passwordModalVisible}
+        onOk={handleUpdatePassword}
+        onCancel={() => setPasswordModalVisible(false)}
+        confirmLoading={passwordLoading}
+        okText="确认重置"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>用户：{editingUser?.username}</p>
+        </div>
+        <div>
+          <label>新密码：</label>
+          <Input.Password
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="请输入新密码（至少6个字符）"
+            style={{ marginTop: 8 }}
+          />
+        </div>
+      </Modal>
+
+      {/* 昵称编辑模态框 */}
+      <Modal
+        title="编辑用户昵称"
+        open={nicknameModalVisible}
+        onOk={handleUpdateNickname}
+        onCancel={() => setNicknameModalVisible(false)}
+        confirmLoading={nicknameLoading}
+        okText="确认"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>用户：{editingUser?.username}</p>
+          <p>当前昵称：{editingUser?.nickname || '未设置'}</p>
+        </div>
+        <div>
+          <label>新昵称：</label>
+          <Input
+            value={newNickname}
+            onChange={(e) => setNewNickname(e.target.value)}
+            placeholder="请输入新昵称（可选）"
+            style={{ marginTop: 8 }}
+          />
+        </div>
+      </Modal>
+    </>
   );
 };
 

@@ -24,7 +24,6 @@ api.interceptors.request.use(
     // 强制设置为HTTP请求，防止重定向
     config.headers['X-Forwarded-Proto'] = 'http';
     config.headers['X-Requested-With'] = 'XMLHttpRequest';
-    console.log('API请求:', config.method?.toUpperCase(), config.url, '-> 完整路径:', config.baseURL + config.url);
     return config;
   },
   (error) => {
@@ -35,11 +34,9 @@ api.interceptors.request.use(
 // 响应拦截器
 api.interceptors.response.use(
   (response) => {
-    console.log('API响应:', response.status, response.config.url);
     return response.data;
   },
   (error) => {
-    console.error('API错误:', error.response?.status, error.config?.url, error.message);
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -50,7 +47,13 @@ api.interceptors.response.use(
     if (error.response?.data) {
       return Promise.resolve(error.response.data);
     }
-    return Promise.reject(error);
+    // 如果没有响应数据，创建一个错误响应对象
+    const errorResponse = {
+      success: false,
+      message: error.message || '网络请求失败',
+      data: null
+    };
+    return Promise.resolve(errorResponse);
   }
 );
 
