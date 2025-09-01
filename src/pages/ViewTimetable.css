@@ -1,45 +1,58 @@
 /* ViewTimetable.css */
-
-.compact-timetable-container {
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  margin: 4px;
+.page-container {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.compact-timetable .ant-table {
-  border-radius: 8px;
-  overflow: hidden;
+@media (max-width: 768px) {
+  .page-container {
+    padding: 0.75rem;
+  }
 }
 
 .compact-timetable .ant-table-thead > tr > th {
-  background-color: #fafafa !important;
-  font-weight: bold;
-  text-align: center;
+  text-align: center !important;
+  padding: 8px 4px;
+  font-size: 14px;
 }
 
-.timetable-time-column .time-cell {
+.compact-timetable .ant-table-tbody > tr > td {
+  padding: 0;
+  height: 48px;
+}
+
+.time-cell {
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   height: 100%;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.day-header {
-  text-align: center;
-}
-
-.day-name {
-  font-weight: bold;
-}
-
-.day-date {
   font-size: 12px;
   color: #888;
 }
 
-.timetable-day-column {
-  padding: 0 !important; /* Override default Ant Design cell padding */
+.time-part {
+  line-height: 1.2;
+}
+
+.day-date {
+  font-size: 11px;
+  line-height: 1.1;
+  color: #666;
+}
+
+.student-name-truncated {
+  /* No special styles needed now, just a class for identification */
+}
+
+/* New style to remove padding from the content wrapper div */
+.schedule-cell-content {
+  height: 100%;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  cursor: pointer;
+  padding: 0px !important; /* Force remove padding */
 } 

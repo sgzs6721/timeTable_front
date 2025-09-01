@@ -1661,7 +1661,7 @@ const ViewTimetable = ({ user }) => {
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
               {day.label}
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
+            <div className="day-date">
               {currentDate.format('MM/DD')}
             </div>
           </div>
@@ -1677,7 +1677,7 @@ const ViewTimetable = ({ user }) => {
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
               {day.label}
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
+            <div className="day-date">
               {currentDate.format('MM/DD')}
             </div>
           </div>
@@ -1703,7 +1703,7 @@ const ViewTimetable = ({ user }) => {
           style: { padding: '0px' }
         }),
         render: (text, record) => {
-          const schedules = currentWeekSchedules.filter(s => {
+          const schedules = allSchedules.filter(s => {
             const timeKey = `${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`;
             let scheduleDayKey;
             if (timetable.isWeekly) {
@@ -2030,7 +2030,7 @@ const ViewTimetable = ({ user }) => {
               open={openPopoverKey === cellKey}
               onOpenChange={handleOpenChange}
             >
-              <div style={{ height: '100%', minHeight: '48px', display: 'flex', flexDirection: 'column', width: '100%', cursor: 'pointer' }}>
+              <div className="schedule-cell-content">
                 {schedules.map((student, idx) => (
                   <div
                     key={student.id}
@@ -2331,6 +2331,7 @@ const ViewTimetable = ({ user }) => {
           size="small"
           bordered
           className="compact-timetable"
+          style={{ tableLayout: 'fixed' }}
         />
       </div>
 
