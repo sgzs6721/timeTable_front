@@ -127,4 +127,18 @@ export const getAllRegistrationRequests = async () => {
   } catch (error) {
     throw error;
   }
+};
+
+// 复制课表到指定用户
+export const copyTimetableToUser = async (sourceTimetableId, targetUserId, newTimetableName) => {
+  try {
+    const response = await api.post('/admin/timetables/copy', {
+      sourceTimetableId,
+      targetUserId,
+      newTimetableName
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
 }; 

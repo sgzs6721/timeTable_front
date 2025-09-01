@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser } from '../services/timetable';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import './Dashboard.css';
@@ -138,6 +138,10 @@ const Dashboard = ({ user }) => {
   // 编辑课表名称相关状态
   const [editingTimetableId, setEditingTimetableId] = useState(null);
   const [editingTimetableName, setEditingTimetableName] = useState('');
+
+  // 复制课表相关状态
+  const [copyTimetableModalVisible, setCopyTimetableModalVisible] = useState(false);
+  const [selectedTimetableForCopy, setSelectedTimetableForCopy] = useState(null);
 
   // 复制其他教练课程相关状态
   const [copyOtherCoachesToday, setCopyOtherCoachesToday] = useState(true);
@@ -483,6 +487,78 @@ const Dashboard = ({ user }) => {
   const handleCancelEditTimetableName = () => {
     setEditingTimetableId(null);
     setEditingTimetableName('');
+  };
+
+  // 处理复制课表
+  const handleCopyTimetable = (timetable) => {
+    setSelectedTimetableForCopy(timetable);
+    setEditingTimetableName(`${timetable.name} (复制)`);
+    setCopyTimetableModalVisible(true);
+  };
+
+  // 确认复制课表
+  const handleConfirmCopyTimetable = async () => {
+    if (!editingTimetableName.trim()) {
+      message.warning('请输入新课表名称');
+      return;
+    }
+
+    if (!selectedTimetableForCopy) {
+      message.error('请选择要复制的课表');
+      return;
+    }
+
+    try {
+      message.loading({ content: '正在复制课表...', key: 'copy' });
+      
+      // 调用后端复制接口，目标用户是当前用户
+      const result = await copyTimetableToUser(
+        selectedTimetableForCopy.id,
+        user.id,
+        editingTimetableName.trim()
+      );
+
+      if (result.success) {
+        message.success({ content: '课表复制成功', key: 'copy' });
+        
+        // 重新获取课表列表
+        const timetablesResponse = await getTimetables();
+        if (timetablesResponse.success) {
+          const allTimetables = timetablesResponse.data;
+          const activeTimetables = allTimetables.filter(t => !t.isArchived);
+          setTimetables(activeTimetables);
+
+          // 更新课程数量
+          const scheduleCounts = {};
+          await Promise.all(
+            activeTimetables.map(async (timetable) => {
+              try {
+                const scheduleResponse = await getTimetableSchedules(timetable.id);
+                if (scheduleResponse.success && scheduleResponse.data) {
+                  scheduleCounts[timetable.id] = scheduleResponse.data.length;
+                } else {
+                  scheduleCounts[timetable.id] = 0;
+                }
+              } catch (error) {
+                console.error(`获取课表 ${timetable.id} 的课程数量失败:`, error);
+                scheduleCounts[timetable.id] = 0;
+              }
+            })
+          );
+          setTimetableScheduleCounts(scheduleCounts);
+        }
+
+        // 关闭模态框
+        setCopyTimetableModalVisible(false);
+        setSelectedTimetableForCopy(null);
+        setEditingTimetableName('');
+      } else {
+        message.error({ content: result.message || '复制失败', key: 'copy' });
+      }
+    } catch (error) {
+      message.error({ content: '复制失败，请检查网络连接', key: 'copy' });
+      console.error('复制课表失败:', error);
+    }
   };
 
   const handleShowTodaysCourses = async (timetable) => {
@@ -1146,6 +1222,16 @@ const Dashboard = ({ user }) => {
                             onClick={() => handleStartEditTimetableName(item.id, item.name)}
                             style={{ color: '#8c8c8c', padding: '0 4px', marginLeft: 2 }}
                           />
+                          {timetableScheduleCounts[item.id] > 0 && (
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CopyOutlined />}
+                              onClick={() => handleCopyTimetable(item)}
+                              style={{ color: '#8c8c8c', padding: '0 4px', marginLeft: 2 }}
+                              title="复制课表"
+                            />
+                          )}
                         </>
                       )}
                     </div>
@@ -1435,6 +1521,46 @@ const Dashboard = ({ user }) => {
           }}
         />
       )}
+
+      {/* 复制课表模态框 */}
+      <Modal
+        title="复制课表"
+        open={copyTimetableModalVisible}
+        onCancel={() => {
+          setCopyTimetableModalVisible(false);
+          setSelectedTimetableForCopy(null);
+        }}
+        onOk={handleConfirmCopyTimetable}
+        okText="确认复制"
+        cancelText="取消"
+        width={500}
+      >
+        <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f6f8fa', borderRadius: '6px' }}>
+          <div style={{ fontWeight: 500, marginBottom: '4px' }}>源课表信息：</div>
+          <div style={{ color: '#666' }}>
+            {selectedTimetableForCopy?.name} ({selectedTimetableForCopy?.isWeekly ? '周固定课表' : '日期范围课表'})
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontWeight: 500, marginBottom: '8px' }}>新课表名称：</div>
+          <Input
+            placeholder={`${selectedTimetableForCopy?.name || ''} (复制)`}
+            maxLength={100}
+            showCount
+            value={editingTimetableName}
+            onChange={(e) => setEditingTimetableName(e.target.value)}
+          />
+        </div>
+
+        <div style={{ padding: '12px', backgroundColor: '#fff7e6', borderRadius: '6px', border: '1px solid #ffd666' }}>
+          <div style={{ fontSize: '12px', color: '#d46b08' }}>
+            <div>• 复制后的课表将包含原课表的所有课程信息</div>
+            <div>• 如果当前没有活动课表，复制的课表将自动设为活动状态</div>
+            <div>• 每个用户最多只能有5个非归档课表</div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

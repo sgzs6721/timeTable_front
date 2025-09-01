@@ -201,6 +201,8 @@ const ViewTimetable = ({ user }) => {
   const [currentWeekInstance, setCurrentWeekInstance] = useState(null);
   const [hasCurrentWeekInstance, setHasCurrentWeekInstance] = useState(false);
   const [instanceLoading, setInstanceLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [instanceDataLoading, setInstanceDataLoading] = useState(false);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [totalWeeks, setTotalWeeks] = useState(1);
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
@@ -671,16 +673,27 @@ const ViewTimetable = ({ user }) => {
   }, [timetableId]);
 
   useEffect(() => {
+    console.log('useEffect 触发，timetable:', timetable?.id, 'viewMode:', viewMode);
     if (timetable && viewMode) {
       if (viewMode === 'template') {
+        console.log('切换到模板视图，调用 fetchSchedules');
         fetchSchedules();
       } else if (viewMode === 'instance') {
+        console.log('切换到实例视图，调用 fetchInstanceSchedules');
         fetchInstanceSchedules();
       }
     }
-  }, [timetable, currentWeek, viewMode]);
+  }, [timetable, viewMode]); // 移除currentWeek依赖，避免重复调用
+
+  // 为日期范围课表添加单独的useEffect处理currentWeek变化
+  useEffect(() => {
+    if (timetable && viewMode === 'template' && !timetable.isWeekly && currentWeek) {
+      fetchSchedules();
+    }
+  }, [currentWeek]); // 只在currentWeek变化时触发
 
   const fetchTimetable = async () => {
+    setLoading(true);
     try {
       const response = await getTimetable(timetableId);
       if (response.success) {
@@ -733,6 +746,8 @@ const ViewTimetable = ({ user }) => {
     } catch (error) {
       message.error('获取课表失败，请检查网络连接');
       navigate('/dashboard');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -754,116 +769,101 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
-  // 检查是否有当前周实例
-  const checkWeeklyInstance = async () => {
-    try {
-      const response = await checkCurrentWeekInstance(timetableId);
-      if (response.success) {
-        setHasCurrentWeekInstance(response.data.hasCurrentWeekInstance);
-      }
-    } catch (error) {
-      console.error('检查当前周实例失败:', error);
-    }
-  };
 
-  // 初始化周实例（自动创建并切换到实例视图）
+
+  // 初始化周实例（只设置视图模式，不重复调用API）
   const initializeWeeklyInstance = async (tableId) => {
     try {
-      // 先检查是否已有实例
-      const checkResponse = await checkCurrentWeekInstance(tableId);
-      console.log('检查周实例结果:', checkResponse);
-      
-      if (checkResponse.success) {
-        const hasInstance = checkResponse.data.hasCurrentWeekInstance;
-        console.log('是否有当前周实例:', hasInstance);
-        
-        if (hasInstance) {
-          // 已有实例，直接切换到实例视图
-          console.log('已有实例，切换到实例视图');
-          setHasCurrentWeekInstance(true);
-          setViewMode('instance');
-        } else {
-          // 没有实例，自动创建
-          console.log('没有实例，开始创建...');
-          setInstanceLoading(true);
-          try {
-            const generateResponse = await generateCurrentWeekInstance(tableId);
-            console.log('创建实例结果:', generateResponse);
-            
-            if (generateResponse.success) {
-              setCurrentWeekInstance(generateResponse.data);
-              setHasCurrentWeekInstance(true);
-              setViewMode('instance');
-              message.success('已自动生成当前周课程安排');
-              console.log('实例创建成功，已切换到实例视图');
-            } else {
-              console.error('生成当前周实例失败:', generateResponse.message || generateResponse);
-              message.error('生成当前周实例失败：' + (generateResponse.message || '服务器错误'));
-              // 生成失败时保持模板视图
-              setViewMode('template');
-            }
-          } catch (error) {
-            console.error('生成当前周实例请求失败:', error);
-            // 在开发环境或后端不可用时，静默处理错误
-            if (error.response?.status === 500 || error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
-              console.warn('后端服务不可用，保持模板视图');
-            } else {
-              message.error('生成当前周实例失败：' + (error.message || '网络错误'));
-            }
-            // 生成失败时保持模板视图
-            setViewMode('template');
-          }
-          setInstanceLoading(false);
-        }
-      }
+      // 对于周固定课表，默认切换到实例视图
+      // 具体的检查、生成、获取数据逻辑由 fetchInstanceSchedules 处理
+      setViewMode('instance');
     } catch (error) {
       console.error('初始化周实例失败:', error);
       setViewMode('template');
-      setInstanceLoading(false);
     }
   };
 
   // 获取当前周实例的课程
   const fetchInstanceSchedules = async () => {
-    setLoading(true);
+    console.log('fetchInstanceSchedules 被调用，instanceDataLoading:', instanceDataLoading, 'isGenerating:', isGenerating);
+    
+    // 防止重复调用
+    if (instanceDataLoading || isGenerating) {
+      console.log('正在加载或生成中，跳过重复调用');
+      return;
+    }
+    
+    console.log('开始获取实例数据...');
+    setInstanceDataLoading(true);
     try {
-      const response = await getCurrentWeekInstance(timetableId);
-      if (response.success && response.data.hasInstance) {
-        setCurrentWeekInstance(response.data.instance);
-        setAllSchedules(response.data.schedules);
+      // 先检查是否有当前周实例
+      const checkResponse = await checkCurrentWeekInstance(timetableId);
+      if (checkResponse.success) {
+        const hasInstance = checkResponse.data.hasCurrentWeekInstance;
+        
+        if (hasInstance) {
+          // 有实例，获取实例数据
+          const response = await getCurrentWeekInstance(timetableId);
+          if (response.success && response.data.hasInstance) {
+            setCurrentWeekInstance(response.data.instance);
+            setAllSchedules(response.data.schedules);
+            setHasCurrentWeekInstance(true);
+          } else {
+            setCurrentWeekInstance(null);
+            setAllSchedules([]);
+            setHasCurrentWeekInstance(false);
+          }
+        } else {
+          // 没有实例，生成一个
+          console.log('开始生成当前周实例...');
+          setIsGenerating(true);
+          try {
+            const generateResponse = await generateCurrentWeekInstance(timetableId);
+            console.log('生成实例结果:', generateResponse);
+            
+            if (generateResponse.success) {
+              setCurrentWeekInstance(generateResponse.data);
+              setHasCurrentWeekInstance(true);
+              // 生成后调用getCurrentWeekInstance获取完整的课程数据
+              console.log('生成成功，开始获取课程数据...');
+              const instanceResponse = await getCurrentWeekInstance(timetableId);
+              if (instanceResponse.success && instanceResponse.data.hasInstance) {
+                setAllSchedules(instanceResponse.data.schedules);
+                console.log('获取课程数据成功，课程数量:', instanceResponse.data.schedules.length);
+              } else {
+                setAllSchedules([]);
+                console.log('获取课程数据失败或没有课程');
+              }
+            } else {
+              setCurrentWeekInstance(null);
+              setAllSchedules([]);
+              setHasCurrentWeekInstance(false);
+              message.error('生成当前周实例失败');
+            }
+          } finally {
+            setIsGenerating(false);
+          }
+        }
       } else {
         setCurrentWeekInstance(null);
         setAllSchedules([]);
+        setHasCurrentWeekInstance(false);
       }
     } catch (error) {
+      console.error('获取当前周实例失败:', error);
       message.error('获取当前周实例失败，请检查网络连接');
+      setCurrentWeekInstance(null);
+      setAllSchedules([]);
+      setHasCurrentWeekInstance(false);
     } finally {
-      setLoading(false);
+      setInstanceDataLoading(false);
     }
   };
 
   // 切换到当前周实例视图
   const switchToInstanceView = async () => {
-    if (!hasCurrentWeekInstance) {
-      setInstanceLoading(true);
-      try {
-        const response = await generateCurrentWeekInstance(timetableId);
-        if (response.success) {
-          setCurrentWeekInstance(response.data);
-          setHasCurrentWeekInstance(true);
-          setViewMode('instance');
-          message.success('当前周实例生成成功');
-        } else {
-          message.error(response.message || '生成当前周实例失败');
-        }
-      } catch (error) {
-        message.error('生成当前周实例失败，请检查网络连接');
-      } finally {
-        setInstanceLoading(false);
-      }
-    } else {
-      setViewMode('instance');
-    }
+    setViewMode('instance');
+    // 具体的检查、生成、获取数据逻辑由 fetchInstanceSchedules 处理
   };
 
   // 切换到固定课表视图
@@ -2327,7 +2327,7 @@ const ViewTimetable = ({ user }) => {
           columns={generateColumns()}
           dataSource={tableDataSource}
           pagination={false}
-          loading={loading}
+          loading={viewMode === 'instance' ? instanceDataLoading : loading}
           size="small"
           bordered
           className="compact-timetable"

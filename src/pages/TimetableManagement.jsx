@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin, Modal } from 'antd';
-import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled } from '@ant-design/icons';
+import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables, updateTimetableStatus } from '../services/admin';
+import CopyTimetableModal from '../components/CopyTimetableModal';
 
 const ActiveBadge = () => (
     <div style={{
@@ -29,6 +30,8 @@ const TimetableManagement = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [selectedTimetables, setSelectedTimetables] = useState([]);
   const [batchMode, setBatchMode] = useState(false);
+  const [copyModalVisible, setCopyModalVisible] = useState(false);
+  const [selectedTimetableForCopy, setSelectedTimetableForCopy] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -216,6 +219,17 @@ const TimetableManagement = ({ user }) => {
     }
   };
 
+  // 处理复制课表
+  const handleCopyTimetable = (timetable) => {
+    setSelectedTimetableForCopy(timetable);
+    setCopyModalVisible(true);
+  };
+
+  const handleCopySuccess = () => {
+    // 复制成功后刷新课表列表
+    fetchAllTimetables();
+  };
+
   const displayTimetables = batchMode
     ? allTimetables.filter(item => item.scheduleCount > 0 && item.isActive === 1)
     : allTimetables;
@@ -296,7 +310,7 @@ const TimetableManagement = ({ user }) => {
                 }}
               >
                 {item.isActive ? <ActiveBadge /> : (
-                  !batchMode && (
+                  !batchMode && !item.isActive && (
                     <Button
                       size="small"
                       type="primary"
@@ -330,22 +344,48 @@ const TimetableManagement = ({ user }) => {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <Tooltip title={item.name}>
-                      <a 
-                        onClick={() => navigate(`/view-timetable/${item.id}`)}
-                        style={{
-                          color,
-                          fontSize: '16px',
-                          fontWeight: 500,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          flex: '0 1 auto',
-                        }}
-                      >
-                        {item.name}
-                      </a>
-                    </Tooltip>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tooltip title={item.name}>
+                        <a 
+                          onClick={() => navigate(`/view-timetable/${item.id}`)}
+                          style={{
+                            color,
+                            fontSize: '16px',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            flex: '0 1 auto',
+                          }}
+                        >
+                          {item.name}
+                        </a>
+                      </Tooltip>
+                      {!batchMode && item.scheduleCount > 0 && (
+                        <Button
+                          size="small"
+                          icon={<CopyOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyTimetable(item);
+                          }}
+                          title="复制课表"
+                          style={{
+                            height: '20px',
+                            width: '20px',
+                            padding: '0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            color: '#666',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                      )}
+                    </div>
                     <div>
                       <Tag color={item.isWeekly ? "geekblue" : "purple"}>
                         {item.isWeekly ? '周固定课表' : '日期范围课表'}
@@ -361,17 +401,29 @@ const TimetableManagement = ({ user }) => {
                     </span>
                   </div>
                   {/* 第三行：创建日期+课程数量，同一行，普通文本 */}
-                  <div style={{ color: '#888', fontSize: 13, marginTop: 2, display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <span>
-                      创建日期：{item.createdAt ? (item.createdAt.length > 10 ? item.createdAt.slice(0, 10) : item.createdAt) : ''}
-                    </span>
-                    <span>{item.scheduleCount || 0} 个课程</span>
+                  <div style={{ color: '#888', fontSize: 13, marginTop: 2, display: 'flex', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <span>
+                        创建日期：{item.createdAt ? (item.createdAt.length > 10 ? item.createdAt.slice(0, 10) : item.createdAt) : ''}
+                      </span>
+                      <span>{item.scheduleCount || 0} 个课程</span>
+                    </div>
                   </div>
                 </div>
               </List.Item>
             );
           }}
         />
+
+      <CopyTimetableModal
+        visible={copyModalVisible}
+        onCancel={() => {
+          setCopyModalVisible(false);
+          setSelectedTimetableForCopy(null);
+        }}
+        onSuccess={handleCopySuccess}
+        timetable={selectedTimetableForCopy}
+      />
     </div>
   );
 };
