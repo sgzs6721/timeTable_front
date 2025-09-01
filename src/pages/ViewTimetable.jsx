@@ -543,8 +543,9 @@ const ViewTimetable = ({ user }) => {
         setTimetable(timetableData);
         setTimetableOwner(owner);
         
-        // 对于周固定课表，默认显示当前周实例
-        if (timetableData.isWeekly && !timetableData.startDate && !timetableData.endDate) {
+        // 对于周固定课表，尝试默认显示当前周实例
+        // 临时禁用自动生成，避免500错误
+        if (false && timetableData.isWeekly && !timetableData.startDate && !timetableData.endDate) {
           await initializeWeeklyInstance(timetableData.id);
         }
         if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
@@ -622,22 +623,45 @@ const ViewTimetable = ({ user }) => {
     try {
       // 先检查是否已有实例
       const checkResponse = await checkCurrentWeekInstance(tableId);
+      console.log('检查周实例结果:', checkResponse);
+      
       if (checkResponse.success) {
-        if (checkResponse.data.hasCurrentWeekInstance) {
+        const hasInstance = checkResponse.data.hasCurrentWeekInstance;
+        console.log('是否有当前周实例:', hasInstance);
+        
+        if (hasInstance) {
           // 已有实例，直接切换到实例视图
+          console.log('已有实例，切换到实例视图');
           setHasCurrentWeekInstance(true);
           setViewMode('instance');
         } else {
           // 没有实例，自动创建
+          console.log('没有实例，开始创建...');
           setInstanceLoading(true);
-          const generateResponse = await generateCurrentWeekInstance(tableId);
-          if (generateResponse.success) {
-            setCurrentWeekInstance(generateResponse.data);
-            setHasCurrentWeekInstance(true);
-            setViewMode('instance');
-            message.success('已自动生成当前周课程安排');
-          } else {
-            console.error('生成当前周实例失败:', generateResponse.message);
+          try {
+            const generateResponse = await generateCurrentWeekInstance(tableId);
+            console.log('创建实例结果:', generateResponse);
+            
+            if (generateResponse.success) {
+              setCurrentWeekInstance(generateResponse.data);
+              setHasCurrentWeekInstance(true);
+              setViewMode('instance');
+              message.success('已自动生成当前周课程安排');
+              console.log('实例创建成功，已切换到实例视图');
+            } else {
+              console.error('生成当前周实例失败:', generateResponse.message || generateResponse);
+              message.error('生成当前周实例失败：' + (generateResponse.message || '服务器错误'));
+              // 生成失败时保持模板视图
+              setViewMode('template');
+            }
+          } catch (error) {
+            console.error('生成当前周实例请求失败:', error);
+            // 在开发环境或后端不可用时，静默处理错误
+            if (error.response?.status === 500 || error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+              console.warn('后端服务不可用，保持模板视图');
+            } else {
+              message.error('生成当前周实例失败：' + (error.message || '网络错误'));
+            }
             // 生成失败时保持模板视图
             setViewMode('template');
           }
@@ -1406,6 +1430,34 @@ const ViewTimetable = ({ user }) => {
     return allSchedules || [];
   }, [allSchedules]);
 
+  // 计算一周总课时数和节数
+  const weeklyStats = useMemo(() => {
+    // 根据当前视图模式选择数据源
+    let schedules = [];
+    
+    if (viewMode === 'instance' && currentWeekInstance?.schedules) {
+      // 当前周实例模式：使用实例课程数据
+      schedules = currentWeekInstance.schedules;
+    } else {
+      // 固定课表模式：使用当前周课程数据
+      schedules = currentWeekSchedules;
+    }
+    
+    if (!schedules.length) return { hours: 0, count: 0 };
+    
+    const totalHours = schedules.reduce((total, schedule) => {
+      const startTime = dayjs(schedule.startTime, 'HH:mm:ss');
+      const endTime = dayjs(schedule.endTime, 'HH:mm:ss');
+      const duration = endTime.diff(startTime, 'hour', true); // 精确到小数
+      return total + duration;
+    }, 0);
+    
+    return {
+      hours: totalHours,
+      count: schedules.length
+    };
+  }, [currentWeekSchedules, currentWeekInstance?.schedules, viewMode]);
+
   const handleWeekChange = (week) => {
     setCurrentWeek(week);
   };
@@ -1907,6 +1959,7 @@ const ViewTimetable = ({ user }) => {
         <div style={{
           flex: 1,
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center'
         }}>
@@ -1914,6 +1967,7 @@ const ViewTimetable = ({ user }) => {
             <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
             <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
           </Space>
+
         </div>
         {!isWeChatBrowser() && (
           <div style={{
@@ -1967,6 +2021,17 @@ const ViewTimetable = ({ user }) => {
                 >
                   {multiSelectMode ? '退出多选' : '多选排课'}
                 </Button>
+              )}
+              
+              {/* 课时信息显示 */}
+              {!moveMode && !copyMode && weeklyStats.count > 0 && (
+                <span style={{ 
+                  fontSize: '14px', 
+                  color: '#666',
+                  marginLeft: '8px'
+                }}>
+                  {viewMode === 'template' ? '每周' : '本周'}{weeklyStats.count}节课
+                </span>
               )}
             </div>
 
@@ -2085,7 +2150,7 @@ const ViewTimetable = ({ user }) => {
                     `共选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
                   )}
                 </span>
-                {selectedCells.size > 0 && !moveMode && (
+                {(selectedCells.size > 0 && !moveMode) && (
                   <Button
                     type="primary"
                     size="small"
