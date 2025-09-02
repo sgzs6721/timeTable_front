@@ -30,6 +30,16 @@ export const getTimetable = async (timetableId) => {
   }
 };
 
+// 获取日期范围课表的周列表与课程数量
+export const getWeeksWithCountsApi = async (timetableId) => {
+  try {
+    const response = await api.get(`/timetables/${timetableId}/weeks`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 获取课表的课程数据
 export const getTimetableSchedules = async (timetableId, week = null) => {
   try {
@@ -222,6 +232,41 @@ export const setActiveTimetable = async (timetableId) => {
   } catch (error) {
     throw error;
   }
+};
+
+// 转换：日期范围 -> 周固定
+export const convertDateToWeeklyApi = async (timetableId, weekStart) => {
+  try {
+    const response = await api.post(`/timetables/${timetableId}/convert/date-to-weekly`, { weekStart });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 转换：周固定 -> 日期范围
+export const convertWeeklyToDateApi = async (timetableId, startDate, endDate) => {
+  try {
+    const response = await api.post(`/timetables/${timetableId}/convert/weekly-to-date`, { startDate, endDate });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 复制并转换（保留原课表）
+export const copyConvertDateToWeeklyApi = async (timetableId, weekStart, newName) => {
+  try {
+    const response = await api.post(`/timetables/${timetableId}/convert/date-to-weekly/copy`, { weekStart, newName });
+    return response;
+  } catch (error) { throw error; }
+};
+
+export const copyConvertWeeklyToDateApi = async (timetableId, startDate, endDate, newName) => {
+  try {
+    const response = await api.post(`/timetables/${timetableId}/convert/weekly-to-date/copy`, { startDate, endDate, newName });
+    return response;
+  } catch (error) { throw error; }
 };
 
 // 获取所有活动课表的指定日期课程信息

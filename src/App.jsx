@@ -13,6 +13,7 @@ import AppHeader from './components/AppHeader';
 import MergePreview from './pages/MergePreview';
 import UserProfile from './pages/UserProfile';
 import ArchivedTimetables from './pages/ArchivedTimetables';
+import ConvertPreview from './pages/ConvertPreview';
 import './App.css';
 
 const { Content } = Layout;
@@ -113,6 +114,10 @@ function App() {
             <Route
               path="/archived-timetables"
               element={user ? <ArchivedTimetables /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/convert-preview"
+              element={user ? <ConvertPreview /> : <Navigate to="/login" />}
             />
             <Route
               path="/"

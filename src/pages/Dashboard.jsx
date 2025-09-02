@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox } from 'antd';
-import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined } from '@ant-design/icons';
+import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select } from 'antd';
+import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi } from '../services/timetable';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import './Dashboard.css';
@@ -142,6 +142,12 @@ const Dashboard = ({ user }) => {
   // 复制课表相关状态
   const [copyTimetableModalVisible, setCopyTimetableModalVisible] = useState(false);
   const [selectedTimetableForCopy, setSelectedTimetableForCopy] = useState(null);
+  // 转换相关
+  const [convertModal, setConvertModal] = useState({ visible: false, mode: null, timetable: null });
+  const [weekOptions, setWeekOptions] = useState([]);
+  const [selectedWeekStart, setSelectedWeekStart] = useState(null);
+  const [dateRange, setDateRange] = useState([]);
+
 
   // 复制其他教练课程相关状态
   const [copyOtherCoachesToday, setCopyOtherCoachesToday] = useState(true);
@@ -1213,28 +1219,53 @@ const Dashboard = ({ user }) => {
                           />
                         </div>
                       ) : (
-                        <>
-                          <a onClick={() => handleViewTimetable(item.id)} style={{ fontWeight: 600, fontSize: 17 }}>{item.name}</a>
+                        <a onClick={() => handleViewTimetable(item.id)} style={{ fontWeight: 600, fontSize: 17 }}>{item.name}</a>
+                      )}
+                    </div>
+                    {!editingTimetableId && (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<EditOutlined />}
+                          onClick={() => handleStartEditTimetableName(item.id, item.name)}
+                          style={{ color: '#1890ff', padding: '0 4px' }}
+                        />
+                        {timetableScheduleCounts[item.id] > 0 && (
                           <Button
                             type="text"
                             size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => handleStartEditTimetableName(item.id, item.name)}
-                            style={{ color: '#8c8c8c', padding: '0 4px', marginLeft: 2 }}
+                            icon={<CopyOutlined />}
+                            onClick={() => handleCopyTimetable(item)}
+                            style={{ color: '#52c41a', padding: '0 4px' }}
+                            title="复制课表"
                           />
-                          {timetableScheduleCounts[item.id] > 0 && (
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<CopyOutlined />}
-                              onClick={() => handleCopyTimetable(item)}
-                              style={{ color: '#8c8c8c', padding: '0 4px', marginLeft: 2 }}
-                              title="复制课表"
-                            />
-                          )}
-                        </>
-                      )}
-                    </div>
+                        )}
+                        {timetableScheduleCounts[item.id] > 0 && (
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<RetweetOutlined />}
+                            onClick={async () => {
+                              if (item.isWeekly) {
+                                setConvertModal({ visible: true, mode: 'weeklyToDate', timetable: item });
+                              } else {
+                                try {
+                                  const res = await getWeeksWithCountsApi(item.id);
+                                  if (res.success) {
+                                    const options = res.data.filter(w=>w.count>0).map(w=>({ value: w.weekStart, label: `${w.weekStart} ~ ${w.weekEnd} (${w.count}节课)` }));
+                                    setWeekOptions(options);
+                                    setConvertModal({ visible: true, mode: 'dateToWeekly', timetable: item });
+                                  } else { message.error(res.message || '获取周列表失败'); }
+                                } catch { message.error('获取周列表失败'); }
+                              }
+                            }}
+                            style={{ color: '#fa8c16', padding: '0 4px' }}
+                            title={item.isWeekly ? '转为日期类课表' : '按某周转为周固定'}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 }
                 description={
@@ -1245,20 +1276,22 @@ const Dashboard = ({ user }) => {
                       ) : (
                         <div>{`${item.startDate} 至 ${item.endDate}`}</div>
                       )}
-                       <Tag
-                         style={item.isWeekly
-                           ? { backgroundColor: '#e6f7ff', borderColor: 'transparent', color: '#1890ff' }
-                           : { backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }
-                         }
-                       >
-                          {item.isWeekly ? '周固定课表' : '日期范围课表'}
-                        </Tag>
                     </div>
-                    <div style={{ color: '#888', fontSize: '12px' }}>
-                      <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
-                      <span style={{ marginLeft: '16px' }}>共</span>
-                      <span style={{ color: '#1890ff' }}>{timetableScheduleCounts[item.id] || 0}</span>
-                      <span>课程</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
+                      <div>
+                        <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
+                        <span style={{ marginLeft: '16px' }}>共</span>
+                        <span style={{ color: '#1890ff' }}>{timetableScheduleCounts[item.id] || 0}</span>
+                        <span>课程</span>
+                      </div>
+                      <Tag
+                        style={item.isWeekly
+                          ? { backgroundColor: '#e6f7ff', borderColor: 'transparent', color: '#1890ff' }
+                          : { backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }
+                        }
+                      >
+                        {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                      </Tag>
                     </div>
                   </>
                 }
@@ -1561,6 +1594,80 @@ const Dashboard = ({ user }) => {
           </div>
         </div>
       </Modal>
+
+      {/* 转换弹窗 */}
+      <Modal
+        open={convertModal.visible}
+        title={convertModal.mode === 'dateToWeekly' ? '转为周固定课表' : '转为日期范围课表'}
+        onCancel={() => { setConvertModal({ visible: false, mode: null, timetable: null }); setSelectedWeekStart(null); setDateRange([]); }}
+        onOk={async () => {
+          if (!convertModal.timetable) return;
+          try {
+            if (convertModal.mode === 'dateToWeekly') {
+              if (!selectedWeekStart) { message.warning('请选择一周'); return; }
+              // 跳转到预览页面
+              const ws = dayjs(selectedWeekStart);
+              const we = ws.add(6, 'day');
+              navigate('/convert-preview', {
+                state: {
+                  type: 'date-to-weekly',
+                  sourceTimetable: convertModal.timetable,
+                  weekStart: selectedWeekStart,
+                  weekEnd: we.format('YYYY-MM-DD'),
+                  newTimetableName: `${convertModal.timetable.name}-周固定`,
+                  currentUserId: user?.id
+                }
+              });
+            } else {
+              if (!dateRange || dateRange.length !== 2) { message.warning('请选择日期范围'); return; }
+              const startDate = dayjs(dateRange[0]).format('YYYY-MM-DD');
+              const endDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
+              // 跳转到预览页面
+              navigate('/convert-preview', {
+                state: {
+                  type: 'weekly-to-date',
+                  sourceTimetable: convertModal.timetable,
+                  startDate: startDate,
+                  endDate: endDate,
+                  newTimetableName: `${convertModal.timetable.name}-日期`,
+                  currentUserId: user?.id
+                }
+              });
+            }
+          } catch { message.error('操作失败'); }
+        }}
+        okText="确认"
+        cancelText="取消"
+      >
+        {convertModal.mode === 'dateToWeekly' ? (
+          <div>
+            <div style={{ marginBottom: 8 }}>选择包含课程的一周：</div>
+            <Select
+              options={weekOptions}
+              onChange={setSelectedWeekStart}
+              style={{ width: '100%' }}
+              placeholder="周一日期 ~ 周日日期 (课程数)"
+            />
+          </div>
+        ) : convertModal.mode === 'weeklyToDate' ? (
+          <div>
+            <div style={{ marginBottom: 8 }}>开始日期：</div>
+            <DatePicker
+              style={{ width: '100%', marginBottom: 12 }}
+              value={dateRange?.[0] || null}
+              onChange={(v) => setDateRange([v, dateRange?.[1] || null])}
+            />
+            <div style={{ marginBottom: 8 }}>结束日期：</div>
+            <DatePicker
+              style={{ width: '100%' }}
+              value={dateRange?.[1] || null}
+              onChange={(v) => setDateRange([dateRange?.[0] || null, v])}
+            />
+          </div>
+        ) : null}
+      </Modal>
+
+
     </div>
   );
 };
