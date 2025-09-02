@@ -3,6 +3,7 @@ import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag,
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi } from '../services/timetable';
+import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import './Dashboard.css';
@@ -570,14 +571,58 @@ const Dashboard = ({ user }) => {
   const handleShowTodaysCourses = async (timetable) => {
     try {
       message.loading({ content: '正在查询课程安排...', key: 'courses' });
-      const response = await getTimetableSchedules(timetable.id);
-
-      if (!response.success) {
-        message.destroy('courses');
-        message.error(response.message || '获取课程安排失败');
-        return;
+      
+      let allSchedules = [];
+      
+      if (timetable.isWeekly) {
+        // 对于周固定课表，获取当前周实例数据
+        try {
+          // 先检查是否有当前周实例
+          const checkResponse = await checkCurrentWeekInstance(timetable.id);
+          if (checkResponse.success && checkResponse.data.hasCurrentWeekInstance) {
+            // 有实例，获取实例数据
+            const response = await getCurrentWeekInstance(timetable.id);
+            if (response.success && response.data.hasInstance) {
+              allSchedules = response.data.schedules;
+            } else {
+              message.destroy('courses');
+              message.error('获取当前周实例失败');
+              return;
+            }
+          } else {
+            // 没有实例，生成一个
+            const generateResponse = await generateCurrentWeekInstance(timetable.id);
+            if (generateResponse.success) {
+              // 生成后获取课程数据
+              const instanceResponse = await getCurrentWeekInstance(timetable.id);
+              if (instanceResponse.success && instanceResponse.data.hasInstance) {
+                allSchedules = instanceResponse.data.schedules;
+              } else {
+                message.destroy('courses');
+                message.error('生成实例后获取课程数据失败');
+                return;
+              }
+            } else {
+              message.destroy('courses');
+              message.error('生成当前周实例失败');
+              return;
+            }
+          }
+        } catch (error) {
+          message.destroy('courses');
+          message.error('获取周固定课表实例失败');
+          return;
+        }
+      } else {
+        // 对于日期范围课表，使用原来的方式
+        const response = await getTimetableSchedules(timetable.id);
+        if (!response.success) {
+          message.destroy('courses');
+          message.error(response.message || '获取课程安排失败');
+          return;
+        }
+        allSchedules = response.data;
       }
-      const allSchedules = response.data;
 
       // 保存当前课表信息和所有课程数据
       setCurrentTimetable(timetable);
@@ -599,12 +644,15 @@ const Dashboard = ({ user }) => {
         let subTitle = '';
 
         if (isWeekly) {
-          // 数据库中存储的是英文格式，需要映射
+          // 对于周固定课表，数据已经是本周实例，直接按星期几过滤
           const weekDayMapEn = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
           const weekDayMapCn = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
           const dayOfWeekEn = weekDayMapEn[targetDate.day()];
           const dayOfWeekCn = weekDayMapCn[targetDate.day()];
+          
+          // 直接按星期几过滤本周实例中的课程
           schedulesForDay = allSchedules.filter(s => s.dayOfWeek === dayOfWeekEn);
+          
           subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${dayOfWeekCn})`;
         } else {
           const dateStr = targetDate.format('YYYY-MM-DD');

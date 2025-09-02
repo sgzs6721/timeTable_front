@@ -10,8 +10,8 @@ import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, 
 const ActiveBadge = () => (
     <div style={{
       position: 'absolute',
-      bottom: 0,
-      right: 0,
+      top: 0,
+      left: 0,
       width: 18,
       height: 18,
       background: '#389e0d',
