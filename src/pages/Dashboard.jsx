@@ -1650,39 +1650,66 @@ const Dashboard = ({ user }) => {
         onCancel={() => { setConvertModal({ visible: false, mode: null, timetable: null }); setSelectedWeekStart(null); setDateRange([]); }}
         onOk={async () => {
           if (!convertModal.timetable) return;
+          
+          // 显示loading消息
+          message.loading({ content: '正在准备转换预览...', key: 'convert', duration: 0 });
+          
           try {
             if (convertModal.mode === 'dateToWeekly') {
-              if (!selectedWeekStart) { message.warning('请选择一周'); return; }
-              // 跳转到预览页面
-              const ws = dayjs(selectedWeekStart);
-              const we = ws.add(6, 'day');
-              navigate('/convert-preview', {
-                state: {
-                  type: 'date-to-weekly',
-                  sourceTimetable: convertModal.timetable,
-                  weekStart: selectedWeekStart,
-                  weekEnd: we.format('YYYY-MM-DD'),
-                  newTimetableName: `${convertModal.timetable.name}-周固定`,
-                  currentUserId: user?.id
-                }
-              });
+              if (!selectedWeekStart) { 
+                message.warning('请选择一周'); 
+                message.destroy('convert');
+                return; 
+              }
+              
+              // 延迟跳转，让用户看到loading效果
+              setTimeout(() => {
+                // 清除loading消息
+                // message.destroy('convert'); // 移除此行
+                
+                const ws = dayjs(selectedWeekStart);
+                const we = ws.add(6, 'day');
+                navigate('/convert-preview', {
+                  state: {
+                    type: 'date-to-weekly',
+                    sourceTimetable: convertModal.timetable,
+                    weekStart: selectedWeekStart,
+                    weekEnd: we.format('YYYY-MM-DD'),
+                    newTimetableName: `${convertModal.timetable.name}-周固定`,
+                    currentUserId: user?.id
+                  }
+                });
+              }, 800);
+              
             } else {
-              if (!dateRange || dateRange.length !== 2) { message.warning('请选择日期范围'); return; }
-              const startDate = dayjs(dateRange[0]).format('YYYY-MM-DD');
-              const endDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
-              // 跳转到预览页面
-              navigate('/convert-preview', {
-                state: {
-                  type: 'weekly-to-date',
-                  sourceTimetable: convertModal.timetable,
-                  startDate: startDate,
-                  endDate: endDate,
-                  newTimetableName: `${convertModal.timetable.name}-日期`,
-                  currentUserId: user?.id
-                }
-              });
+              if (!dateRange || dateRange.length !== 2) { 
+                message.warning('请选择日期范围'); 
+                message.destroy('convert');
+                return; 
+              }
+              
+              // 延迟跳转，让用户看到loading效果
+              setTimeout(() => {
+                // 清除loading消息
+                
+                const startDate = dayjs(dateRange[0]).format('YYYY-MM-DD');
+                const endDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
+                navigate('/convert-preview', {
+                  state: {
+                    type: 'weekly-to-date',
+                    sourceTimetable: convertModal.timetable,
+                    startDate: startDate,
+                    endDate: endDate,
+                    newTimetableName: `${convertModal.timetable.name}-日期`,
+                    currentUserId: user?.id
+                  }
+                });
+              }, 800);
             }
-          } catch { message.error('操作失败'); }
+          } catch (error) { 
+            message.error('操作失败'); 
+            message.destroy('convert');
+          }
         }}
         okText="确认"
         cancelText="取消"

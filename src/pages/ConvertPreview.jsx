@@ -15,6 +15,7 @@ const ConvertPreview = () => {
   const [convertModeModalVisible, setConvertModeModalVisible] = useState(false);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [totalWeeks, setTotalWeeks] = useState(1);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     if (!location.state) {
@@ -22,8 +23,13 @@ const ConvertPreview = () => {
       navigate(-1);
       return;
     }
-    generatePreview();
-  }, [location.state, currentWeek]);
+    
+    // 只在初始化时调用一次
+    if (!initialized) {
+      generatePreview();
+      setInitialized(true);
+    }
+  }, [initialized]); // 只依赖initialized状态
 
   const generatePreview = async () => {
     const { type, sourceTimetable, weekStart, weekEnd, startDate, endDate, newTimetableName } = location.state;
@@ -164,12 +170,15 @@ const ConvertPreview = () => {
           title: `将按 ${ws.format('YYYY-MM-DD')} ~ ${we.format('YYYY-MM-DD')} 的课程\n生成周固定课表`,
           columns,
           dataSource,
-          weekStart,
-          weekEnd,
-          newTimetableName,
+          weekStart: ws.format('YYYY-MM-DD'),
+          weekEnd: we.format('YYYY-MM-DD'),
+          newTimetableName: location.state.newTimetableName,
           sourceTimetable: location.state.sourceTimetable,
           currentUserId: location.state.currentUserId
         });
+        
+        // 清除转换loading消息，因为预览内容已经加载完成
+        message.destroy('convert');
       } else {
         // 周固定转日期范围：显示当前周的预览，支持分页
         const weekly = (all.data || []).filter(s => s.dayOfWeek);
@@ -325,9 +334,14 @@ const ConvertPreview = () => {
           sourceTimetable: location.state.sourceTimetable,
           currentUserId: location.state.currentUserId
         });
+        
+        // 清除转换loading消息，因为预览内容已经加载完成
+        message.destroy('convert');
       }
     } catch (error) {
       message.error('生成预览失败');
+      // 出错时也要清除loading消息
+      message.destroy('convert');
     } finally {
       setLoading(false);
     }
@@ -674,16 +688,17 @@ const ConvertPreview = () => {
         } else {
           resp = await copyConvertWeeklyToDateApi(
             previewData.sourceTimetable.id,
-            previewData.startDate,
-            previewData.endDate,
+            dayjs(previewData.startDate).format('YYYY-MM-DD'),
+            dayjs(previewData.endDate).format('YYYY-MM-DD'),
             `新${previewData.sourceTimetable.name}`
           );
         }
         
         if (resp.success) {
+          // 生成新课表成功，保留原课表
           message.success('新课表创建成功！');
           
-          // 直接返回原页面（用户已选择保留原课表）
+          // 返回原页面
           const currentUserId = location.state.currentUserId;
           if (currentUserId === 1) {
             navigate('/admin/timetables');
@@ -704,20 +719,18 @@ const ConvertPreview = () => {
         } else {
           resp = await copyConvertWeeklyToDateApi(
             previewData.sourceTimetable.id,
-            previewData.startDate,
-            previewData.endDate,
+            dayjs(previewData.startDate).format('YYYY-MM-DD'),
+            dayjs(previewData.endDate).format('YYYY-MM-DD'),
             previewData.sourceTimetable.name
           );
         }
         
         if (resp.success) {
-          message.success('新课表创建成功，原课表已删除！');
-          
           // 直接删除原课表
           try {
             const deleteResp = await deleteTimetable(previewData.sourceTimetable.id);
             if (deleteResp.success) {
-              message.success('原课表已删除');
+              message.success('新课表创建成功，原课表已删除！');
             } else {
               message.error('删除原课表失败');
             }

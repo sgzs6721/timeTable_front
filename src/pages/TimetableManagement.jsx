@@ -38,6 +38,7 @@ const TimetableManagement = ({ user }) => {
   const [weekOptions, setWeekOptions] = useState([]);
   const [selectedWeekStart, setSelectedWeekStart] = useState(null);
   const [dateRange, setDateRange] = useState([]);
+  const [converting, setConverting] = useState(false);
 
   const navigate = useNavigate();
 
@@ -484,45 +485,86 @@ const TimetableManagement = ({ user }) => {
       <Modal
         open={convertModal.visible}
         title={convertModal.mode === 'dateToWeekly' ? '转为周固定课表' : '转为日期范围课表'}
-        onCancel={() => { setConvertModal({ visible: false, mode: null, timetable: null }); setSelectedWeekStart(null); setDateRange([]); }}
+        onCancel={() => { 
+          setConvertModal({ visible: false, mode: null, timetable: null }); 
+          setSelectedWeekStart(null); 
+          setDateRange([]); 
+          setConverting(false);
+        }}
         onOk={async () => {
           if (!convertModal.timetable) return;
+          
+          // 设置loading状态
+          setConverting(true);
+          
           try {
             if (convertModal.mode === 'dateToWeekly') {
-              if (!selectedWeekStart) { message.warning('请选择一周'); return; }
-              // 跳转到预览页面
-              const ws = dayjs(selectedWeekStart);
-              const we = ws.add(6, 'day');
-              navigate('/convert-preview', {
-                state: {
-                  type: 'date-to-weekly',
-                  sourceTimetable: convertModal.timetable,
-                  weekStart: selectedWeekStart,
-                  weekEnd: we.format('YYYY-MM-DD'),
-                  newTimetableName: `${convertModal.timetable.name}-周固定`,
-                  currentUserId: user?.id
-                }
-              });
+              if (!selectedWeekStart) { 
+                message.warning('请选择一周'); 
+                setConverting(false);
+                return; 
+              }
+              
+              // 显示loading消息
+              message.loading({ content: '正在准备转换预览...', key: 'convert', duration: 0 });
+              
+              // 延迟跳转，让用户看到loading效果
+              setTimeout(() => {
+                // 清除loading消息
+                
+                const ws = dayjs(selectedWeekStart);
+                const we = ws.add(6, 'day');
+                navigate('/convert-preview', {
+                  state: {
+                    type: 'date-to-weekly',
+                    sourceTimetable: convertModal.timetable,
+                    weekStart: selectedWeekStart,
+                    weekEnd: we.format('YYYY-MM-DD'),
+                    newTimetableName: `${convertModal.timetable.name}-周固定`,
+                    currentUserId: user?.id
+                  }
+                });
+              }, 800);
+              
             } else {
-              if (!dateRange || dateRange.length !== 2) { message.warning('请选择日期范围'); return; }
-              const startDate = dayjs(dateRange[0]).format('YYYY-MM-DD');
-              const endDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
-              // 跳转到预览页面
-              navigate('/convert-preview', {
-                state: {
-                  type: 'weekly-to-date',
-                  sourceTimetable: convertModal.timetable,
-                  startDate: startDate,
-                  endDate: endDate,
-                  newTimetableName: `${convertModal.timetable.name}-日期`,
-                  currentUserId: user?.id
-                }
-              });
+              if (!dateRange || dateRange.length !== 2) { 
+                message.warning('请选择日期范围'); 
+                setConverting(false);
+                return; 
+              }
+              
+              // 显示loading消息
+              message.loading({ content: '正在准备转换预览...', key: 'convert', duration: 0 });
+              
+              // 延迟跳转，让用户看到loading效果
+              setTimeout(() => {
+                // 清除loading消息
+                
+                const startDate = dayjs(dateRange[0]).format('YYYY-MM-DD');
+                const endDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
+                navigate('/convert-preview', {
+                  state: {
+                    type: 'weekly-to-date',
+                    sourceTimetable: convertModal.timetable,
+                    startDate: startDate,
+                    endDate: endDate,
+                    newTimetableName: `${convertModal.timetable.name}-日期`,
+                    currentUserId: user?.id
+                  }
+                });
+              }, 800);
             }
-          } catch { message.error('操作失败'); }
+          } catch (error) { 
+            message.error('操作失败'); 
+            setConverting(false);
+            message.destroy('convert');
+          }
         }}
         okText="确认"
         cancelText="取消"
+        confirmLoading={converting}
+        maskClosable={!converting}
+        closable={!converting}
       >
         {convertModal.mode === 'dateToWeekly' ? (
           <div>
@@ -532,6 +574,7 @@ const TimetableManagement = ({ user }) => {
               onChange={setSelectedWeekStart}
               style={{ width: '100%' }}
               placeholder="周一日期 ~ 周日日期 (课程数)"
+              disabled={converting}
             />
           </div>
         ) : convertModal.mode === 'weeklyToDate' ? (
@@ -541,15 +584,29 @@ const TimetableManagement = ({ user }) => {
               style={{ width: '100%', marginBottom: 12 }}
               value={dateRange?.[0] || null}
               onChange={(v) => setDateRange([v, dateRange?.[1] || null])}
+              disabled={converting}
             />
             <div style={{ marginBottom: 8 }}>结束日期：</div>
             <DatePicker
               style={{ width: '100%' }}
               value={dateRange?.[1] || null}
               onChange={(v) => setDateRange([dateRange?.[0] || null, v])}
+              disabled={converting}
             />
           </div>
         ) : null}
+        
+        {converting && (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '20px 0',
+            color: '#666',
+            fontSize: '14px'
+          }}>
+            <Spin size="small" style={{ marginRight: '8px' }} />
+            正在处理转换请求，请稍候...
+          </div>
+        )}
       </Modal>
 
 
