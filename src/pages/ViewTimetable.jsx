@@ -947,12 +947,22 @@ const ViewTimetable = ({ user }) => {
 
   // 切换到当前周实例视图
   const switchToInstanceView = async () => {
+    // 切换视图时自动退出多选模式
+    if (multiSelectMode) {
+      setMultiSelectMode(false);
+      setSelectedCells(new Set());
+    }
     setViewMode('instance');
     // 具体的检查、生成、获取数据逻辑由 fetchInstanceSchedules 处理
   };
 
   // 切换到固定课表视图
   const switchToTemplateView = () => {
+    // 切换视图时自动退出多选模式
+    if (multiSelectMode) {
+      setMultiSelectMode(false);
+      setSelectedCells(new Set());
+    }
     setViewMode('template');
   };
 
@@ -2333,150 +2343,69 @@ const ViewTimetable = ({ user }) => {
 
 
 
-      {/* 功能控制区域 - 在实例视图时隐藏，因为内容已移到图例区域 */}
-      {!timetable?.isArchived && viewMode !== 'instance' && (
+      {/* 移动和复制模式的控制区域 */}
+      {!timetable?.isArchived && (moveMode || copyMode) && (
         <div style={{
           display: 'flex',
-          justifyContent: (moveMode || copyMode || multiSelectMode || (timetable?.isWeekly && !timetable.startDate)) ? 'space-between' : 'flex-start',
+          justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '1rem',
           padding: '8px 12px',
-          backgroundColor: multiSelectMode ? '#f0f9ff' : (moveMode ? '#e6f4ff' : (copyMode ? '#f6ffed' : '#fafafa')),
+          backgroundColor: moveMode ? '#e6f4ff' : '#f6ffed',
           borderRadius: '6px',
-          border: multiSelectMode ? '1px solid #bae7ff' : (moveMode ? '1px solid #91caff' : (copyMode ? '1px solid #b7eb8f' : '1px solid #f0f0f0'))
+          border: moveMode ? '1px solid #91caff' : '1px solid #b7eb8f'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', justifyContent: (moveMode || copyMode || multiSelectMode || (timetable?.isWeekly && !timetable.startDate)) ? 'space-between' : 'flex-start' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {/* 在非实例视图时显示多选排课按钮和课时信息 */}
-              {viewMode !== 'instance' && !moveMode && !copyMode && (
-                <Button
-                  type={multiSelectMode ? 'default' : 'default'}
-                  size="small"
-                  onClick={toggleMultiSelectMode}
-                  style={multiSelectMode ? {
-                    backgroundColor: '#fff2f0',
-                    borderColor: '#ffccc7',
-                    color: '#cf1322'
-                  } : {}}
-                >
-                  {multiSelectMode ? '退出多选' : '多选排课'}
-                </Button>
-              )}
-              
-              {/* 课时信息显示 - 在非实例视图时显示 */}
-              {viewMode !== 'instance' && !multiSelectMode && !moveMode && !copyMode && weeklyStats.count > 0 && (
-                <span style={{ 
-                  fontSize: '14px', 
-                  color: '#666',
-                  marginLeft: '8px'
-                }}>
-                  {timetable?.isWeekly && viewMode === 'template' ? '每周' : '本周'}
-                  <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
-                    {weeklyStats.count}
-                  </span>
-                  节课
-                </span>
-              )}
-            </div>
-
-
-            {moveMode && (
-              <>
-                <span style={{ fontSize: '14px', color: '#1890ff', fontWeight: 'bold' }}>
-                  {moveTargetText}
-                </span>
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <Button
-                    type="default"
-                    size="small"
-                    onClick={handleCancelMove}
-                    style={{
-                      backgroundColor: '#fff2f0',
-                      borderColor: '#ffccc7',
-                      color: '#cf1322'
-                    }}
-                  >
-                    取消移动
-                  </Button>
-                  {selectedMoveTarget && (
-                    <Button
-                      type="primary"
-                      size="small"
-                      loading={moveLoading}
-                      onClick={handleConfirmMove}
-                      disabled={moveLoading}
-                      style={{
-                        backgroundColor: '#1890ff',
-                        borderColor: '#1890ff',
-                        color: '#ffffff'
-                      }}
-                    >
-                      确认移动
-                    </Button>
-                  )}
-                </div>
-              </>
+          <span style={{ 
+            fontSize: '14px', 
+            color: moveMode ? '#1890ff' : '#722ed1', 
+            fontWeight: 'bold' 
+          }}>
+            {moveMode ? moveTargetText : '请选择要复制到的时间段'}
+          </span>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <Button
+              type="default"
+              size="small"
+              onClick={moveMode ? handleCancelMove : handleCancelCopy}
+              style={{
+                backgroundColor: '#fff2f0',
+                borderColor: '#ffccc7',
+                color: '#cf1322'
+              }}
+            >
+              {moveMode ? '取消移动' : '取消复制'}
+            </Button>
+            {moveMode && selectedMoveTarget && (
+              <Button
+                type="primary"
+                size="small"
+                loading={moveLoading}
+                onClick={handleConfirmMove}
+                disabled={moveLoading}
+                style={{
+                  backgroundColor: '#1890ff',
+                  borderColor: '#1890ff',
+                  color: '#ffffff'
+                }}
+              >
+                确认移动
+              </Button>
             )}
-
             {copyMode && (
-              <>
-                <span style={{ fontSize: '14px', color: '#722ed1', fontWeight: 'bold' }}>
-                  请选择要复制到的时间段
-                </span>
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <Button
-                    type="default"
-                    size="small"
-                    onClick={handleCancelCopy}
-                    style={{
-                      backgroundColor: '#fff2f0',
-                      borderColor: '#ffccc7',
-                      color: '#cf1322'
-                    }}
-                  >
-                    取消复制
-                  </Button>
-                  <Button
-                    type="primary"
-                    size="small"
-                    loading={copyLoading}
-                    onClick={handleConfirmCopy}
-                    disabled={selectedCopyTargets.size === 0 || copyLoading}
-                    style={{
-                      backgroundColor: '#1890ff',
-                      borderColor: '#1890ff',
-                      color: '#ffffff'
-                    }}
-                  >
-                    确认复制 ({selectedCopyTargets.size})
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {multiSelectMode && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '16px' 
-              }}>
-                <span style={{ fontSize: '14px', color: '#666' }}>
-                  {timetable?.isWeekly ? (
-                    `已选择 ${selectedCells.size} 个时间段`
-                  ) : (
-                    `共选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
-                  )}
-                </span>
-                {(selectedCells.size > 0 && !moveMode) && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    onClick={openBatchScheduleModal}
-                  >
-                    批量排课
-                  </Button>
-                )}
-              </div>
+              <Button
+                type="primary"
+                size="small"
+                loading={copyLoading}
+                onClick={handleConfirmCopy}
+                disabled={selectedCopyTargets.size === 0 || copyLoading}
+                style={{
+                  backgroundColor: '#1890ff',
+                  borderColor: '#1890ff',
+                  color: '#ffffff'
+                }}
+              >
+                确认复制 ({selectedCopyTargets.size})
+              </Button>
             )}
           </div>
         </div>
@@ -2484,8 +2413,8 @@ const ViewTimetable = ({ user }) => {
 
 
 
-      {/* 周实例视图的图例说明和视图切换按钮 */}
-      {viewMode === 'instance' && (
+      {/* 图例说明和视图切换按钮 */}
+      {timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
         <div style={{ 
           marginBottom: '12px', 
           padding: '8px 12px', 
@@ -2498,26 +2427,37 @@ const ViewTimetable = ({ user }) => {
           {/* 第一行：图例和视图切换按钮 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ 
-                  width: '12px', 
-                  height: '12px', 
-                  border: '2px solid #52c41a', 
-                  borderRadius: '2px',
-                  backgroundColor: 'transparent'
-                }}></div>
-                <span>本周新增课程</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ 
-                  width: '12px', 
-                  height: '12px', 
-                  border: '2px solid #faad14', 
-                  borderRadius: '2px',
-                  backgroundColor: 'transparent'
-                }}></div>
-                <span>本周修改课程</span>
-              </div>
+              {/* 在实例视图时显示图例 */}
+              {viewMode === 'instance' && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ 
+                      width: '12px', 
+                      height: '12px', 
+                      border: '2px solid #52c41a', 
+                      borderRadius: '2px',
+                      backgroundColor: 'transparent'
+                    }}></div>
+                    <span>本周新增课程</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ 
+                      width: '12px', 
+                      height: '12px', 
+                      border: '2px solid #faad14', 
+                      borderRadius: '2px',
+                      backgroundColor: 'transparent'
+                    }}></div>
+                    <span>本周修改课程</span>
+                  </div>
+                </>
+              )}
+              {/* 在固定课表视图时显示提示信息 */}
+              {viewMode === 'template' && (
+                <span style={{ color: '#666', fontSize: '12px' }}>
+                  固定课表模板视图
+                </span>
+              )}
             </div>
             
             {/* 视图切换按钮 */}
@@ -2641,33 +2581,63 @@ const ViewTimetable = ({ user }) => {
           }}></div>
           
           {/* 第二行：多选排课按钮和课时信息 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'flex-start' }}>
-            <Button
-              type={multiSelectMode ? 'default' : 'default'}
-              size="small"
-              onClick={toggleMultiSelectMode}
-              style={multiSelectMode ? {
-                backgroundColor: '#fff2f0',
-                borderColor: '#ffccc7',
-                color: '#cf1322'
-              } : {}}
-            >
-              {multiSelectMode ? '退出多选' : '多选排课'}
-            </Button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* 左侧：多选排课按钮 */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+              {!moveMode && !copyMode && (
+                <Button
+                  type={multiSelectMode ? 'default' : 'default'}
+                  size="small"
+                  onClick={toggleMultiSelectMode}
+                  style={multiSelectMode ? {
+                    backgroundColor: '#fff2f0',
+                    borderColor: '#ffccc7',
+                    color: '#cf1322'
+                  } : {}}
+                >
+                  {multiSelectMode ? '退出多选' : '多选排课'}
+                </Button>
+              )}
+            </div>
             
-            {/* 课时信息显示 */}
-            {!multiSelectMode && weeklyStats.count > 0 && (
-              <span style={{ 
-                fontSize: '14px', 
-                color: '#666'
-              }}>
-                本周
-                <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
-                  {weeklyStats.count}
+            {/* 中间：多选状态信息 */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+              {multiSelectMode && (
+                <span style={{ fontSize: '14px', color: '#666' }}>
+                  {timetable?.isWeekly ? (
+                    `已选择 ${selectedCells.size} 个时间段`
+                  ) : (
+                    `共选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
+                  )}
                 </span>
-                节课
-              </span>
-            )}
+              )}
+              {/* 非多选模式时显示课时信息 */}
+              {!multiSelectMode && !moveMode && !copyMode && weeklyStats.count > 0 && (
+                <span style={{ 
+                  fontSize: '14px', 
+                  color: '#666'
+                }}>
+                  {viewMode === 'instance' ? '本周' : (timetable?.isWeekly ? '每周' : '本周')}
+                  <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
+                    {weeklyStats.count}
+                  </span>
+                  节课
+                </span>
+              )}
+            </div>
+            
+            {/* 右侧：批量排课按钮 */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+              {multiSelectMode && selectedCells.size > 0 && !moveMode && (
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={openBatchScheduleModal}
+                >
+                  批量排课
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
