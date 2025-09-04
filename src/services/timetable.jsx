@@ -176,6 +176,16 @@ export const deleteSchedule = async (timetableId, scheduleId) => {
   }
 };
 
+// 清空课表的所有课程
+export const clearTimetableSchedules = async (timetableId) => {
+  try {
+    const response = await api.delete(`/timetables/${timetableId}/schedules/clear`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 更新课程安排
 export const updateSchedule = async (timetableId, scheduleId, scheduleData) => {
   try {

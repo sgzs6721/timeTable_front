@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select } from 'antd';
-import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined } from '@ant-design/icons';
+import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules } from '../services/timetable';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -334,6 +334,36 @@ const Dashboard = ({ user }) => {
     });
   };
 
+  // 清空课表
+  const handleClearTimetable = (timetable) => {
+    Modal.confirm({
+      title: '确认清空课表',
+      content: `确定要清空课表"${timetable.name}"的所有课程吗？此操作不可恢复。`,
+      okText: '清空',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          // 调用批量清空API
+          const response = await clearTimetableSchedules(timetable.id);
+          if (response.success) {
+            message.success(`课表清空成功，共删除 ${response.data} 个课程`);
+            
+            // 更新课程数量
+            setTimetableScheduleCounts(prev => ({
+              ...prev,
+              [timetable.id]: 0
+            }));
+          } else {
+            message.error(response.message || '清空失败');
+          }
+        } catch (error) {
+          message.error('清空失败');
+        }
+      },
+    });
+  };
+
   // 删除课表
   const handleDeleteTimetable = (id) => {
     Modal.confirm({
@@ -384,27 +414,87 @@ const Dashboard = ({ user }) => {
     const isOnlyOne = timetables.length === 1;
     const isActive = item.isActive;
     const setActiveDisabled = isOnlyOne || isActive;
+    const hasSchedules = timetableScheduleCounts[item.id] > 0;
 
     return {
       items: [
         {
           key: 'active',
           label: '设为活动课表',
+          icon: <StarFilled style={{ color: !setActiveDisabled ? '#52c41a' : '#bfbfbf' }} />,
           disabled: setActiveDisabled,
           onClick: () => handleSetActiveTimetable(item.id),
-          style: !setActiveDisabled ? { color: '#52c41a' } : undefined,
+          style: { 
+            color: !setActiveDisabled ? '#262626' : '#bfbfbf',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'copy',
+          label: '复制课表',
+          icon: <CopyOutlined style={{ color: hasSchedules ? '#52c41a' : '#bfbfbf' }} />,
+          disabled: !hasSchedules,
+          onClick: () => handleCopyTimetable(item),
+          style: { 
+            color: hasSchedules ? '#262626' : '#bfbfbf',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'convert',
+          label: item.isWeekly ? '转为日期类课表' : '按某周转为周固定',
+          icon: <RetweetOutlined style={{ color: hasSchedules ? '#fa8c16' : '#bfbfbf' }} />,
+          disabled: !hasSchedules,
+          onClick: async () => {
+            if (item.isWeekly) {
+              setConvertModal({ visible: true, mode: 'weeklyToDate', timetable: item });
+            } else {
+              try {
+                const res = await getWeeksWithCountsApi(item.id);
+                if (res.success) {
+                  const options = res.data.filter(w=>w.count>0).map(w=>({ value: w.weekStart, label: `${w.weekStart} ~ ${w.weekEnd} (${w.count}节课)` }));
+                  setWeekOptions(options);
+                  setConvertModal({ visible: true, mode: 'dateToWeekly', timetable: item });
+                } else { message.error(res.message || '获取周列表失败'); }
+              } catch { message.error('获取周列表失败'); }
+            }
+          },
+          style: { 
+            color: hasSchedules ? '#262626' : '#bfbfbf',
+            fontWeight: '500'
+          },
         },
         {
           key: 'archive',
           label: '归档',
+          icon: <InboxOutlined style={{ color: '#faad14' }} />,
           onClick: () => handleArchiveTimetable(item.id),
-          style: { color: '#faad14' },
+          style: { 
+            color: '#262626',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'clear',
+          label: '清空课表',
+          icon: <DeleteOutlined style={{ color: hasSchedules ? '#ff7875' : '#bfbfbf' }} />,
+          disabled: !hasSchedules,
+          onClick: () => handleClearTimetable(item),
+          style: { 
+            color: hasSchedules ? '#262626' : '#bfbfbf',
+            fontWeight: '500'
+          },
         },
         {
           key: 'delete',
           label: '删除课表',
+          icon: <CloseOutlined style={{ color: '#ff4d4f' }} />,
           danger: true,
           onClick: () => handleDeleteTimetable(item.id),
+          style: { 
+            color: '#262626',
+            fontWeight: '500'
+          },
         },
       ],
     };
@@ -1279,39 +1369,6 @@ const Dashboard = ({ user }) => {
                           onClick={() => handleStartEditTimetableName(item.id, item.name)}
                           style={{ color: '#1890ff', padding: '0 4px' }}
                         />
-                        {timetableScheduleCounts[item.id] > 0 && (
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<CopyOutlined />}
-                            onClick={() => handleCopyTimetable(item)}
-                            style={{ color: '#52c41a', padding: '0 4px' }}
-                            title="复制课表"
-                          />
-                        )}
-                        {timetableScheduleCounts[item.id] > 0 && (
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<RetweetOutlined />}
-                            onClick={async () => {
-                              if (item.isWeekly) {
-                                setConvertModal({ visible: true, mode: 'weeklyToDate', timetable: item });
-                              } else {
-                                try {
-                                  const res = await getWeeksWithCountsApi(item.id);
-                                  if (res.success) {
-                                    const options = res.data.filter(w=>w.count>0).map(w=>({ value: w.weekStart, label: `${w.weekStart} ~ ${w.weekEnd} (${w.count}节课)` }));
-                                    setWeekOptions(options);
-                                    setConvertModal({ visible: true, mode: 'dateToWeekly', timetable: item });
-                                  } else { message.error(res.message || '获取周列表失败'); }
-                                } catch { message.error('获取周列表失败'); }
-                              }
-                            }}
-                            style={{ color: '#fa8c16', padding: '0 4px' }}
-                            title={item.isWeekly ? '转为日期类课表' : '按某周转为周固定'}
-                          />
-                        )}
                       </div>
                     )}
                   </div>
