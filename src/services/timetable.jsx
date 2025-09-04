@@ -177,9 +177,10 @@ export const deleteSchedule = async (timetableId, scheduleId) => {
 };
 
 // 清空课表的所有课程
-export const clearTimetableSchedules = async (timetableId) => {
+export const clearTimetableSchedules = async (timetableId, options = {}) => {
   try {
-    const response = await api.delete(`/timetables/${timetableId}/schedules/clear`);
+    const { alsoClearCurrentWeek = false } = options;
+    const response = await api.delete(`/timetables/${timetableId}/schedules/clear`, { params: { alsoClearCurrentWeek } });
     return response;
   } catch (error) {
     throw error;

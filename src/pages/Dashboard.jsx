@@ -338,14 +338,23 @@ const Dashboard = ({ user }) => {
   const handleClearTimetable = (timetable) => {
     Modal.confirm({
       title: '确认清空课表',
-      content: `确定要清空课表"${timetable.name}"的所有课程吗？此操作不可恢复。`,
+      content: (
+        <div>
+          <div>{`确定要清空课表"${timetable.name}"的所有课程吗？此操作不可恢复。`}</div>
+          {timetable.isWeekly === 1 && (
+            <div style={{ marginTop: 12 }}>
+              <Checkbox id="alsoClearCurrentWeekCheckbox">同时清空本周实例中的课程</Checkbox>
+            </div>
+          )}
+        </div>
+      ),
       okText: '清空',
       okType: 'danger',
       cancelText: '取消',
       onOk: async () => {
         try {
-          // 调用批量清空API
-          const response = await clearTimetableSchedules(timetable.id);
+          const alsoClearCurrentWeek = timetable.isWeekly === 1 && document.getElementById('alsoClearCurrentWeekCheckbox')?.checked;
+          const response = await clearTimetableSchedules(timetable.id, { alsoClearCurrentWeek });
           if (response.success) {
             message.success(`课表清空成功，共删除 ${response.data} 个课程`);
             

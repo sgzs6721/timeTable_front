@@ -19,6 +19,16 @@ export const updateTimetableStatus = async (id, data) => {
   }
 };
 
+// 管理员更新课表详情（名称、描述等）
+export const updateTimetableDetails = async (id, data) => {
+  try {
+    const response = await api.put(`/admin/timetables/${id}/details`, data);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 获取所有用户列表
 export const getAllUsers = async () => {
   try {
@@ -154,11 +164,12 @@ export const deleteTimetableByAdmin = async (timetableId) => {
 };
 
 // 管理员清空课表的所有课程
-export const clearTimetableSchedulesByAdmin = async (timetableId) => {
+export const clearTimetableSchedulesByAdmin = async (timetableId, options = {}) => {
   try {
-    const response = await api.delete(`/admin/timetables/${timetableId}/schedules/clear`);
+    const { alsoClearCurrentWeek = false } = options;
+    const response = await api.delete(`/admin/timetables/${timetableId}/schedules/clear`, { params: { alsoClearCurrentWeek } });
     return response;
   } catch (error) {
     throw error;
   }
-}; 
+};

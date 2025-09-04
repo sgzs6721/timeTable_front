@@ -85,7 +85,16 @@ export const syncTemplateToInstances = (timetableId) => {
   return api.post(`/weekly-instances/sync/${timetableId}`, {});
 };
 
+export const restoreCurrentWeekInstanceToTemplate = (timetableId) => {
+  return api.post(`/weekly-instances/restore/${timetableId}`, {});
+};
+
 // 检查课表是否有当前周实例
 export const checkCurrentWeekInstance = (timetableId) => {
   return api.get(`/weekly-instances/check/${timetableId}`);
+};
+
+// 清空当前周实例中的课程
+export const clearCurrentWeekInstanceSchedules = (timetableId) => {
+  return api.delete(`/weekly-instances/current/${timetableId}/schedules`);
 };

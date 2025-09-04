@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown } from 'antd';
+import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate } from '../services/timetable';
 import { 
   getCurrentWeekInstance, 
   generateCurrentWeekInstance, 
   checkCurrentWeekInstance,
+  clearCurrentWeekInstanceSchedules,
+  syncTemplateToInstances,
+  restoreCurrentWeekInstanceToTemplate,
   createInstanceSchedule,
   createInstanceSchedulesBatch,
   updateInstanceSchedule,
@@ -42,7 +45,7 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose, deleteLoading }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose, deleteLoading, updateLoading }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const isNameChanged = name !== schedule.studentName;
 
@@ -74,7 +77,8 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
           <Button
             size="small"
             onClick={() => onUpdateName(name)}
-            disabled={!isNameChanged}
+            disabled={!isNameChanged || updateLoading}
+            loading={updateLoading}
             style={{
               backgroundColor: isNameChanged ? '#faad14' : undefined,
               borderColor: isNameChanged ? '#faad14' : undefined,
@@ -163,7 +167,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
   );
 };
 
-const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
+const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading }) => {
   const [name, setName] = React.useState('');
 
   return (
@@ -173,15 +177,18 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
         placeholder="学生姓名"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        disabled={addLoading}
       />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-        <Button size="small" onClick={onCancel} style={{ marginRight: 8 }}>
+        <Button size="small" onClick={onCancel} style={{ marginRight: 8 }} disabled={addLoading}>
           取消
         </Button>
         <Button
           type="primary"
           size="small"
           onClick={() => onAdd(name)}
+          loading={addLoading}
+          disabled={addLoading}
         >
           添加
         </Button>
@@ -247,6 +254,10 @@ const ViewTimetable = ({ user }) => {
 
   // 删除功能状态
   const [deleteLoading, setDeleteLoading] = useState(false);
+  
+  // 修改和添加功能状态
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
@@ -347,6 +358,7 @@ const ViewTimetable = ({ user }) => {
       payload.scheduleDate = scheduleDate;
     }
 
+    setAddLoading(true);
     try {
       let resp;
       if (viewMode === 'instance' && currentWeekInstance) {
@@ -364,6 +376,8 @@ const ViewTimetable = ({ user }) => {
       }
     } catch (err) {
       message.error('网络错误，添加失败');
+    } finally {
+      setAddLoading(false);
     }
   };
 
@@ -417,15 +431,18 @@ const ViewTimetable = ({ user }) => {
           onChange={(e) => setNewScheduleInfo({ ...newScheduleInfo, studentName: e.target.value })}
           onPressEnter={() => handleAddSchedule(day.key, timeIndex, newScheduleInfo.studentName)}
           style={{ marginBottom: '8px' }}
+          disabled={addLoading}
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <Button size="small" onClick={() => handlePopoverVisibleChange(popoverKey, false)}>
+          <Button size="small" onClick={() => handlePopoverVisibleChange(popoverKey, false)} disabled={addLoading}>
             取消
           </Button>
           <Button
             type="primary"
             size="small"
             onClick={() => handleAddSchedule(day.key, timeIndex, newScheduleInfo.studentName)}
+            loading={addLoading}
+            disabled={addLoading}
           >
             添加
           </Button>
@@ -539,12 +556,23 @@ const ViewTimetable = ({ user }) => {
     let targetDate = null;
 
     if (timetable.isWeekly) {
-      schedulesForDay = allSchedules.filter(s => s.dayOfWeek.toLowerCase() === day.key);
-      modalTitle = `${timetable.name} - ${day.label}`;
-      // 对于周固定课表，计算本周对应的日期
-      const today = dayjs();
-      const currentWeekStart = today.startOf('week');
-      targetDate = currentWeekStart.add(dayIndex, 'day');
+      // 对于周固定课表，总是尝试使用实例数据
+      if (currentWeekInstance) {
+        // 有当前周实例：显示实例中的课程，使用实例的周开始日期
+        const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
+        targetDate = instanceStartDate.add(dayIndex, 'day');
+        const dateStr = targetDate.format('YYYY-MM-DD');
+        schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+        modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
+      } else {
+        // 没有当前周实例：显示固定课表模板的课程
+        schedulesForDay = allSchedules.filter(s => s.dayOfWeek.toLowerCase() === day.key);
+        modalTitle = `${timetable.name} - ${day.label}`;
+        // 对于周固定课表，计算本周对应的日期
+        const today = dayjs();
+        const currentWeekStart = today.startOf('week');
+        targetDate = currentWeekStart.add(dayIndex, 'day');
+      }
     } else {
       const weekDates = getCurrentWeekDates();
       if (weekDates.start) {
@@ -774,8 +802,8 @@ const ViewTimetable = ({ user }) => {
   // 初始化周实例（只设置视图模式，不重复调用API）
   const initializeWeeklyInstance = async (tableId) => {
     try {
-      // 对于周固定课表，默认切换到实例视图
-      // 具体的检查、生成、获取数据逻辑由 fetchInstanceSchedules 处理
+      // 对于周固定课表，总是尝试切换到实例视图
+      // 如果没有当前周实例，fetchInstanceSchedules会处理生成逻辑
       setViewMode('instance');
     } catch (error) {
       console.error('初始化周实例失败:', error);
@@ -930,6 +958,7 @@ const ViewTimetable = ({ user }) => {
     const payload = {
       studentName: newName.trim(),
     };
+    setUpdateLoading(true);
     try {
       let response;
       if (viewMode === 'instance') {
@@ -949,6 +978,8 @@ const ViewTimetable = ({ user }) => {
       }
     } catch (error) {
       message.error('操作失败，请重试');
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
@@ -1774,6 +1805,7 @@ const ViewTimetable = ({ user }) => {
                 payload.scheduleDate = scheduleDate;
               }
 
+              setAddLoading(true);
               try {
                 let resp;
                 if (viewMode === 'instance' && currentWeekInstance) {
@@ -1793,6 +1825,8 @@ const ViewTimetable = ({ user }) => {
                 }
               } catch (err) {
                 message.error('网络错误，添加失败');
+              } finally {
+                setAddLoading(false);
               }
             };
 
@@ -1917,7 +1951,7 @@ const ViewTimetable = ({ user }) => {
               <Popover
                 placement={getSmartPlacement(index, record.key)}
                 title={null}
-                content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} /> }
+                content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} /> }
                 trigger={multiSelectMode ? "contextMenu" : "click"}
                 open={!timetable?.isArchived && openPopoverKey === cellKey}
                 onOpenChange={handleOpenChange}
@@ -1947,6 +1981,7 @@ const ViewTimetable = ({ user }) => {
                     isArchived={timetable?.isArchived}
                     onClose={() => setOpenPopoverKey(null)}
                     deleteLoading={deleteLoading}
+                    updateLoading={updateLoading}
                   />
                   {idx < schedules.length - 1 && <hr style={{ margin: '8px 0' }} />}
                 </div>
@@ -2230,23 +2265,104 @@ const ViewTimetable = ({ user }) => {
             {/* 视图切换按钮 - 右对齐，多选模式时隐藏 */}
             {Boolean(!multiSelectMode && !moveMode && !copyMode && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) && (
               <div style={{ display: 'flex', gap: '8px' }}>
-                <Button
-                  type="default"
-                  size="small"
-                  onClick={switchToInstanceView}
-                  loading={instanceLoading}
-                  disabled={instanceLoading}
-                  style={viewMode === 'instance' ? { 
-                    fontSize: '12px',
-                    backgroundColor: '#fa8c16',
-                    borderColor: '#fa8c16',
-                    color: 'white'
-                  } : { 
-                    fontSize: '12px' 
-                  }}
-                >
-                  本周
-                </Button>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Button
+                    type="default"
+                    size="small"
+                    onClick={switchToInstanceView}
+                    loading={instanceLoading}
+                    disabled={instanceLoading}
+                    style={viewMode === 'instance' ? { 
+                      fontSize: '12px',
+                      backgroundColor: '#fa8c16',
+                      borderColor: '#fa8c16',
+                      color: 'white',
+                      borderTopRightRadius: 0,
+                      borderBottomRightRadius: 0,
+                      borderRight: 'none'
+                    } : { 
+                      fontSize: '12px',
+                      borderTopRightRadius: 0,
+                      borderBottomRightRadius: 0,
+                      borderRight: 'none'
+                    }}
+                  >
+                    本周
+                  </Button>
+                  <Dropdown
+                    menu={{
+                      items: [
+                        {
+                          key: 'clear',
+                          label: '清空本周',
+                          icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
+                          onClick: async () => {
+                            Modal.confirm({
+                              title: '清空本周课表',
+                              content: '确定清空当前周实例中的所有课程吗？此操作不可恢复。',
+                              okText: '清空',
+                              okType: 'danger',
+                              cancelText: '取消',
+                              onOk: async () => {
+                                const resp = await clearCurrentWeekInstanceSchedules(timetableId);
+                                if (resp.success) {
+                                  message.success('已清空本周课表');
+                                  await refreshSchedulesQuietly();
+                                } else {
+                                  message.error(resp.message || '操作失败');
+                                }
+                              }
+                            });
+                          }
+                        },
+                        {
+                          key: 'restore',
+                          label: '恢复为固定课表',
+                          icon: <UndoOutlined />,
+                          onClick: async () => {
+                            Modal.confirm({
+                              title: '恢复为固定课表',
+                              content: '将完全清空本周实例中的所有课程，并重新从固定课表同步。此操作不可恢复，确定继续？',
+                              okText: '恢复',
+                              okType: 'danger',
+                              cancelText: '取消',
+                              onOk: async () => {
+                                const res2 = await restoreCurrentWeekInstanceToTemplate(timetableId);
+                                if (res2.success) {
+                                  message.success('已完全恢复为固定课表');
+                                  await refreshSchedulesQuietly();
+                                } else {
+                                  message.error(res2.message || '恢复失败');
+                                }
+                              }
+                            });
+                          }
+                        }
+                      ]
+                    }}
+                  >
+                    <Button
+                      type="default"
+                      size="small"
+                      style={viewMode === 'instance' ? { 
+                        fontSize: '12px',
+                        backgroundColor: '#fa8c16',
+                        borderColor: '#fa8c16',
+                        color: 'white',
+                        borderTopLeftRadius: 0,
+                        borderBottomLeftRadius: 0,
+                        padding: '4px 8px'
+                      } : { 
+                        fontSize: '12px',
+                        borderTopLeftRadius: 0,
+                        borderBottomLeftRadius: 0,
+                        padding: '4px 8px'
+                      }}
+                    >
+                      <DownOutlined style={{ fontSize: 10 }} />
+                    </Button>
+                  </Dropdown>
+                </div>
                 <Button
                   type={viewMode === 'template' ? 'primary' : 'default'}
                   size="small"
@@ -2373,7 +2489,7 @@ const ViewTimetable = ({ user }) => {
           fontSize: '12px',
           color: '#586069'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'flex-start' }}>
             <span style={{ fontWeight: '500' }}>图例说明：</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <div style={{ 
@@ -2395,6 +2511,7 @@ const ViewTimetable = ({ user }) => {
               }}></div>
               <span>已修改的课程</span>
             </div>
+            {/* 操作按钮已移除，根据需求保持图例区域简洁 */}
           </div>
         </div>
       )}

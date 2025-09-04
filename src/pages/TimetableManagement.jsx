@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin, Modal, DatePicker, Select, Table, Dropdown, Input } from 'antd';
 import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined, RetweetOutlined, MoreOutlined, InboxOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined, ClearOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getAllTimetables, updateTimetableStatus, deleteTimetableByAdmin, clearTimetableSchedulesByAdmin } from '../services/admin';
+import { getAllTimetables, updateTimetableStatus, updateTimetableDetails, deleteTimetableByAdmin, clearTimetableSchedulesByAdmin } from '../services/admin';
 import CopyTimetableModal from '../components/CopyTimetableModal';
 import dayjs from 'dayjs';
 import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules, updateTimetable, clearTimetableSchedules } from '../services/timetable';
@@ -374,13 +374,23 @@ const TimetableManagement = ({ user }) => {
   const handleClearTimetable = (timetable) => {
     Modal.confirm({
       title: '确认清空课表',
-      content: `确定要清空课表"${timetable.name}"的所有课程吗？此操作不可恢复。`,
+      content: (
+        <div>
+          <div>{`确定要清空课表"${timetable.name}"的所有课程吗？此操作不可恢复。`}</div>
+          {timetable.isWeekly === 1 && (
+            <div style={{ marginTop: 12 }}>
+              <Checkbox id="alsoClearCurrentWeekCheckboxAdmin">同时清空本周实例中的课程</Checkbox>
+            </div>
+          )}
+        </div>
+      ),
       okText: '清空',
       okType: 'danger',
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await clearTimetableSchedulesByAdmin(timetable.id);
+          const alsoClearCurrentWeek = timetable.isWeekly === 1 && document.getElementById('alsoClearCurrentWeekCheckboxAdmin')?.checked;
+          const response = await clearTimetableSchedulesByAdmin(timetable.id, { alsoClearCurrentWeek });
           if (response.success) {
             message.success(`课表清空成功，共删除 ${response.data} 个课程`);
             fetchAllTimetables();
@@ -424,7 +434,7 @@ const TimetableManagement = ({ user }) => {
         endDate: currentTimetable.endDate || null
       };
 
-      const response = await updateTimetable(timetableId, updateData);
+      const response = await updateTimetableDetails(timetableId, updateData);
 
       if (response.success) {
         message.success('课表名称修改成功');
