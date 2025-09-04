@@ -585,21 +585,22 @@ const TimetableManagement = ({ user }) => {
                       </Dropdown>
                     )}
                   </div>
-                  <div style={{ color: '#666', fontSize: 13, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
-                    <span>
-                      <UserOutlined /> {item.nickname || item.username || item.user?.username || item.userName || `ID:${item.userId || '-'}`}
-                    </span>
-                    <span style={{ marginLeft: 10 }}>
-                      {item.isWeekly ? '每周重复' : `${item.startDate} 至 ${item.endDate}`}
-                    </span>
-                  </div>
-                  {/* 第三行：创建日期+课程数量+课表类型标签，同一行，普通文本 */}
-                  <div style={{ color: '#888', fontSize: 13, marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                      <span>
-                        创建日期：{item.createdAt ? (item.createdAt.length > 10 ? item.createdAt.slice(0, 10) : item.createdAt) : ''}
-                      </span>
-                      <span>{item.scheduleCount || 0} 个课程</span>
+                  <div style={{ color: '#888', fontSize: 13, marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ color: '#666', display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
+                        <span>
+                          <UserOutlined /> {item.nickname || item.username || item.user?.username || item.userName || `ID:${item.userId || '-'}`}
+                        </span>
+                        <span>
+                          {item.isWeekly ? '每周重复' : `${item.startDate} 至 ${item.endDate}`}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <span>
+                          创建日期：{item.createdAt ? (item.createdAt.length > 10 ? item.createdAt.slice(0, 10) : item.createdAt) : ''}
+                        </span>
+                        <span>{item.scheduleCount || 0} 个课程</span>
+                      </div>
                     </div>
                     <Tag color={item.isWeekly ? "geekblue" : "purple"}>
                       {item.isWeekly ? '周固定课表' : '日期范围课表'}
