@@ -2333,8 +2333,8 @@ const ViewTimetable = ({ user }) => {
 
 
 
-      {/* 功能控制区域 */}
-      {!timetable?.isArchived && (
+      {/* 功能控制区域 - 在实例视图时隐藏，因为内容已移到图例区域 */}
+      {!timetable?.isArchived && viewMode !== 'instance' && (
         <div style={{
           display: 'flex',
           justifyContent: (moveMode || copyMode || multiSelectMode || (timetable?.isWeekly && !timetable.startDate)) ? 'space-between' : 'flex-start',
@@ -2347,7 +2347,8 @@ const ViewTimetable = ({ user }) => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', justifyContent: (moveMode || copyMode || multiSelectMode || (timetable?.isWeekly && !timetable.startDate)) ? 'space-between' : 'flex-start' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {!moveMode && !copyMode && (
+              {/* 在非实例视图时显示多选排课按钮和课时信息 */}
+              {viewMode !== 'instance' && !moveMode && !copyMode && (
                 <Button
                   type={multiSelectMode ? 'default' : 'default'}
                   size="small"
@@ -2362,8 +2363,8 @@ const ViewTimetable = ({ user }) => {
                 </Button>
               )}
               
-              {/* 课时信息显示 */}
-              {!multiSelectMode && !moveMode && !copyMode && weeklyStats.count > 0 && (
+              {/* 课时信息显示 - 在非实例视图时显示 */}
+              {viewMode !== 'instance' && !multiSelectMode && !moveMode && !copyMode && weeklyStats.count > 0 && (
                 <span style={{ 
                   fontSize: '14px', 
                   color: '#666',
@@ -2378,117 +2379,6 @@ const ViewTimetable = ({ user }) => {
               )}
             </div>
 
-            {/* 视图切换按钮 - 右对齐，多选模式时隐藏 */}
-            {Boolean(!multiSelectMode && !moveMode && !copyMode && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) && (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <Button
-                    type="default"
-                    size="small"
-                    onClick={switchToInstanceView}
-                    loading={instanceLoading}
-                    disabled={instanceLoading}
-                    style={viewMode === 'instance' ? { 
-                      fontSize: '12px',
-                      backgroundColor: '#fa8c16',
-                      borderColor: '#fa8c16',
-                      color: 'white',
-                      borderTopRightRadius: 0,
-                      borderBottomRightRadius: 0,
-                      borderRight: 'none'
-                    } : { 
-                      fontSize: '12px',
-                      borderTopRightRadius: 0,
-                      borderBottomRightRadius: 0,
-                      borderRight: 'none'
-                    }}
-                  >
-                    本周
-                  </Button>
-                  <Dropdown
-                    menu={{
-                      items: [
-                        {
-                          key: 'clear',
-                          label: '清空本周',
-                          icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
-                          onClick: async () => {
-                            Modal.confirm({
-                              title: '清空本周课表',
-                              content: '确定清空当前周实例中的所有课程吗？此操作不可恢复。',
-                              okText: '清空',
-                              okType: 'danger',
-                              cancelText: '取消',
-                              onOk: async () => {
-                                const resp = await clearCurrentWeekInstanceSchedules(timetableId);
-                                if (resp.success) {
-                                  message.success('已清空本周课表');
-                                  await refreshSchedulesQuietly();
-                                } else {
-                                  message.error(resp.message || '操作失败');
-                                }
-                              }
-                            });
-                          }
-                        },
-                        {
-                          key: 'restore',
-                          label: '恢复为固定课表',
-                          icon: <UndoOutlined />,
-                          onClick: async () => {
-                            Modal.confirm({
-                              title: '恢复为固定课表',
-                              content: '将完全清空本周实例中的所有课程，并重新从固定课表同步。此操作不可恢复，确定继续？',
-                              okText: '恢复',
-                              okType: 'danger',
-                              cancelText: '取消',
-                              onOk: async () => {
-                                const res2 = await restoreCurrentWeekInstanceToTemplate(timetableId);
-                                if (res2.success) {
-                                  message.success('已完全恢复为固定课表');
-                                  await refreshSchedulesQuietly();
-                                } else {
-                                  message.error(res2.message || '恢复失败');
-                                }
-                              }
-                            });
-                          }
-                        }
-                      ]
-                    }}
-                  >
-                    <Button
-                      type="default"
-                      size="small"
-                      style={viewMode === 'instance' ? { 
-                        fontSize: '12px',
-                        backgroundColor: '#fa8c16',
-                        borderColor: '#fa8c16',
-                        color: 'white',
-                        borderTopLeftRadius: 0,
-                        borderBottomLeftRadius: 0,
-                        padding: '4px 8px'
-                      } : { 
-                        fontSize: '12px',
-                        borderTopLeftRadius: 0,
-                        borderBottomLeftRadius: 0,
-                        padding: '4px 8px'
-                      }}
-                    >
-                      <DownOutlined style={{ fontSize: 10 }} />
-                    </Button>
-                  </Dropdown>
-                </div>
-                <Button
-                  type={viewMode === 'template' ? 'primary' : 'default'}
-                  size="small"
-                  onClick={switchToTemplateView}
-                  style={{ fontSize: '12px' }}
-                >
-                  固定课表
-                </Button>
-              </div>
-            )}
 
             {moveMode && (
               <>
@@ -2594,7 +2484,7 @@ const ViewTimetable = ({ user }) => {
 
 
 
-      {/* 周实例视图的图例说明 */}
+      {/* 周实例视图的图例说明和视图切换按钮 */}
       {viewMode === 'instance' && (
         <div style={{ 
           marginBottom: '12px', 
@@ -2605,29 +2495,179 @@ const ViewTimetable = ({ user }) => {
           fontSize: '12px',
           color: '#586069'
         }}>
+          {/* 第一行：图例和视图切换按钮 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ 
+                  width: '12px', 
+                  height: '12px', 
+                  border: '2px solid #52c41a', 
+                  borderRadius: '2px',
+                  backgroundColor: 'transparent'
+                }}></div>
+                <span>本周新增课程</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ 
+                  width: '12px', 
+                  height: '12px', 
+                  border: '2px solid #faad14', 
+                  borderRadius: '2px',
+                  backgroundColor: 'transparent'
+                }}></div>
+                <span>本周修改课程</span>
+              </div>
+            </div>
+            
+            {/* 视图切换按钮 */}
+            {Boolean(timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Button
+                    type="default"
+                    size="small"
+                    onClick={switchToInstanceView}
+                    loading={instanceLoading}
+                    disabled={instanceLoading}
+                    style={viewMode === 'instance' ? { 
+                      fontSize: '12px',
+                      backgroundColor: '#fa8c16',
+                      borderColor: '#fa8c16',
+                      color: 'white',
+                      borderTopRightRadius: 0,
+                      borderBottomRightRadius: 0,
+                      borderRight: 'none'
+                    } : { 
+                      fontSize: '12px',
+                      borderTopRightRadius: 0,
+                      borderBottomRightRadius: 0,
+                      borderRight: 'none'
+                    }}
+                  >
+                    本周
+                  </Button>
+                  <Dropdown
+                    menu={{
+                      items: [
+                        {
+                          key: 'clear',
+                          label: '清空本周',
+                          icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
+                          onClick: async () => {
+                            Modal.confirm({
+                              title: '清空本周课表',
+                              content: '确定清空当前周实例中的所有课程吗？此操作不可恢复。',
+                              okText: '清空',
+                              okType: 'danger',
+                              cancelText: '取消',
+                              onOk: async () => {
+                                const resp = await clearCurrentWeekInstanceSchedules(timetableId);
+                                if (resp.success) {
+                                  message.success('已清空本周课表');
+                                  await refreshSchedulesQuietly();
+                                } else {
+                                  message.error(resp.message || '操作失败');
+                                }
+                              }
+                            });
+                          }
+                        },
+                        {
+                          key: 'restore',
+                          label: '恢复固定课表',
+                          icon: <UndoOutlined />,
+                          onClick: async () => {
+                            Modal.confirm({
+                              title: '恢复固定课表',
+                              content: '将完全清空本周实例中的所有课程，并重新从固定课表同步。此操作不可恢复，确定继续？',
+                              okText: '恢复',
+                              okType: 'danger',
+                              cancelText: '取消',
+                              onOk: async () => {
+                                const res2 = await restoreCurrentWeekInstanceToTemplate(timetableId);
+                                if (res2.success) {
+                                  message.success('已完全恢复为固定课表');
+                                  await refreshSchedulesQuietly();
+                                } else {
+                                  message.error(res2.message || '恢复失败');
+                                }
+                              }
+                            });
+                          }
+                        }
+                      ]
+                    }}
+                  >
+                    <Button
+                      type="default"
+                      size="small"
+                      style={viewMode === 'instance' ? { 
+                        fontSize: '12px',
+                        backgroundColor: '#fa8c16',
+                        borderColor: '#fa8c16',
+                        color: 'white',
+                        borderTopLeftRadius: 0,
+                        borderBottomLeftRadius: 0,
+                        padding: '4px 8px'
+                      } : { 
+                        fontSize: '12px',
+                        borderTopLeftRadius: 0,
+                        borderBottomLeftRadius: 0,
+                        padding: '4px 8px'
+                      }}
+                    >
+                      <DownOutlined style={{ fontSize: 10 }} />
+                    </Button>
+                  </Dropdown>
+                </div>
+                <Button
+                  type={viewMode === 'template' ? 'primary' : 'default'}
+                  size="small"
+                  onClick={switchToTemplateView}
+                  style={{ fontSize: '12px' }}
+                >
+                  固定课表
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          {/* 分隔线 */}
+          <div style={{ 
+            height: '1px', 
+            backgroundColor: '#e1e4e8', 
+            margin: '8px 0' 
+          }}></div>
+          
+          {/* 第二行：多选排课按钮和课时信息 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'flex-start' }}>
-            <span style={{ fontWeight: '500' }}>图例说明：</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <div style={{ 
-                width: '12px', 
-                height: '12px', 
-                border: '2px solid #52c41a', 
-                borderRadius: '2px',
-                backgroundColor: 'transparent'
-              }}></div>
-              <span>手动添加的课程</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <div style={{ 
-                width: '12px', 
-                height: '12px', 
-                border: '2px solid #faad14', 
-                borderRadius: '2px',
-                backgroundColor: 'transparent'
-              }}></div>
-              <span>已修改的课程</span>
-            </div>
-            {/* 操作按钮已移除，根据需求保持图例区域简洁 */}
+            <Button
+              type={multiSelectMode ? 'default' : 'default'}
+              size="small"
+              onClick={toggleMultiSelectMode}
+              style={multiSelectMode ? {
+                backgroundColor: '#fff2f0',
+                borderColor: '#ffccc7',
+                color: '#cf1322'
+              } : {}}
+            >
+              {multiSelectMode ? '退出多选' : '多选排课'}
+            </Button>
+            
+            {/* 课时信息显示 */}
+            {!multiSelectMode && weeklyStats.count > 0 && (
+              <span style={{ 
+                fontSize: '14px', 
+                color: '#666'
+              }}>
+                本周
+                <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
+                  {weeklyStats.count}
+                </span>
+                节课
+              </span>
+            )}
           </div>
         </div>
       )}
