@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin, Modal, DatePicker, Select, Table } from 'antd';
-import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined, RetweetOutlined } from '@ant-design/icons';
+import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin, Modal, DatePicker, Select, Table, Dropdown, Input } from 'antd';
+import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined, RetweetOutlined, MoreOutlined, InboxOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables, updateTimetableStatus } from '../services/admin';
 import CopyTimetableModal from '../components/CopyTimetableModal';
 import dayjs from 'dayjs';
-import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules } from '../services/timetable';
+import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules, updateTimetable } from '../services/timetable';
 
 const ActiveBadge = () => (
     <div style={{
@@ -40,11 +40,93 @@ const TimetableManagement = ({ user }) => {
   const [dateRange, setDateRange] = useState([]);
   const [converting, setConverting] = useState(false);
 
+  // 编辑课表名称相关状态
+  const [editingTimetableId, setEditingTimetableId] = useState(null);
+  const [editingTimetableName, setEditingTimetableName] = useState('');
+
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchAllTimetables();
   }, []);
+
+  // 获取操作菜单
+  const getActionMenu = (item) => {
+    const hasSchedules = item.scheduleCount > 0;
+    const isActive = item.isActive;
+
+    return {
+      items: [
+        {
+          key: 'active',
+          label: '设为活动课表',
+          icon: <StarFilled style={{ color: !isActive ? '#52c41a' : '#bfbfbf' }} />,
+          disabled: isActive,
+          onClick: () => handleSetActive(item.id),
+          style: { 
+            color: !isActive ? '#262626' : '#bfbfbf',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'copy',
+          label: '复制课表',
+          icon: <CopyOutlined style={{ color: hasSchedules ? '#52c41a' : '#bfbfbf' }} />,
+          disabled: !hasSchedules,
+          onClick: () => handleCopyTimetable(item),
+          style: { 
+            color: hasSchedules ? '#262626' : '#bfbfbf',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'convert',
+          label: item.isWeekly ? '转为日期类课表' : '按某周转为周固定',
+          icon: <RetweetOutlined style={{ color: hasSchedules ? '#fa8c16' : '#bfbfbf' }} />,
+          disabled: !hasSchedules,
+          onClick: async () => {
+            if (item.isWeekly) {
+              setConvertModal({ visible: true, mode: 'weeklyToDate', timetable: item });
+            } else {
+              try {
+                const res = await getWeeksWithCountsApi(item.id);
+                if (res.success) {
+                  const options = res.data.filter(w=>w.count>0).map(w=>({ value: w.weekStart, label: `${w.weekStart} ~ ${w.weekEnd} (${w.count}节课)` }));
+                  setWeekOptions(options);
+                  setConvertModal({ visible: true, mode: 'dateToWeekly', timetable: item });
+                } else { message.error(res.message || '获取周列表失败'); }
+              } catch { message.error('获取周列表失败'); }
+            }
+          },
+          style: { 
+            color: hasSchedules ? '#262626' : '#bfbfbf',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'archive',
+          label: '归档',
+          icon: <InboxOutlined style={{ color: '#faad14' }} />,
+          onClick: () => handleArchiveTimetable(item.id),
+          style: { 
+            color: '#262626',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'delete',
+          label: '删除课表',
+          icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
+          danger: true,
+          onClick: () => handleDeleteTimetable(item.id),
+          style: { 
+            color: '#262626',
+            fontWeight: '500'
+          },
+        },
+      ],
+    };
+  };
 
   const fetchAllTimetables = async () => {
     try {
@@ -238,6 +320,101 @@ const TimetableManagement = ({ user }) => {
     fetchAllTimetables();
   };
 
+  // 归档课表
+  const handleArchiveTimetable = async (timetableId) => {
+    try {
+      const response = await updateTimetableStatus(timetableId, 'ARCHIVED');
+      if (response.success) {
+        message.success('课表归档成功');
+        fetchAllTimetables();
+      } else {
+        message.error(response.message || '归档失败');
+      }
+    } catch (error) {
+      message.error('归档失败');
+    }
+  };
+
+  // 删除课表
+  const handleDeleteTimetable = (timetableId) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个课表吗？此操作不可恢复。',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await deleteTimetable(timetableId);
+          if (response.success) {
+            message.success('课表删除成功');
+            fetchAllTimetables();
+          } else {
+            message.error(response.message || '删除失败');
+          }
+        } catch (error) {
+          message.error('删除失败');
+        }
+      },
+    });
+  };
+
+  // 开始编辑课表名称
+  const handleStartEditTimetableName = (timetableId, currentName) => {
+    setEditingTimetableId(timetableId);
+    setEditingTimetableName(currentName);
+  };
+
+  // 保存课表名称
+  const handleSaveTimetableName = async (timetableId) => {
+    if (!editingTimetableName.trim()) {
+      message.warning('课表名称不能为空');
+      return;
+    }
+
+    try {
+      // 获取当前课表的完整信息
+      const currentTimetable = allTimetables.find(t => t.id === timetableId);
+      if (!currentTimetable) {
+        message.error('找不到对应的课表');
+        return;
+      }
+
+      // 构造完整的更新请求，保持其他字段不变，只修改name
+      const updateData = {
+        name: editingTimetableName.trim(),
+        description: currentTimetable.description || '',
+        type: currentTimetable.isWeekly ? 'WEEKLY' : 'DATE_RANGE',
+        startDate: currentTimetable.startDate || null,
+        endDate: currentTimetable.endDate || null
+      };
+
+      const response = await updateTimetable(timetableId, updateData);
+
+      if (response.success) {
+        message.success('课表名称修改成功');
+        // 更新本地数据
+        setAllTimetables(allTimetables.map(item =>
+          item.id === timetableId
+            ? { ...item, name: editingTimetableName.trim() }
+            : item
+        ));
+        setEditingTimetableId(null);
+        setEditingTimetableName('');
+      } else {
+        message.error(response.message || '修改失败');
+      }
+    } catch (error) {
+      message.error('修改失败，请重试');
+    }
+  };
+
+  // 取消编辑课表名称
+  const handleCancelEditTimetableName = () => {
+    setEditingTimetableId(null);
+    setEditingTimetableName('');
+  };
+
   const displayTimetables = batchMode
     ? allTimetables.filter(item => item.scheduleCount > 0 && item.isActive === 1)
     : allTimetables;
@@ -334,116 +511,79 @@ const TimetableManagement = ({ user }) => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Tooltip title={item.name}>
-                        <a 
-                          onClick={() => navigate(`/view-timetable/${item.id}`)}
-                          style={{
-                            color,
-                            fontSize: '16px',
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            flex: '0 1 auto',
-                          }}
-                        >
-                          {item.name}
-                        </a>
-                      </Tooltip>
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {!batchMode && !item.isActive && (
-                        <Button
-                          size="small"
-                          icon={<StarFilled />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSetActive(item.id);
-                          }}
-                          title="设为活动课表"
-                          style={{
-                            height: '20px',
-                            width: '20px',
-                            padding: '0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            color: '#52c41a',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        />
-                      )}
-                      {!batchMode && item.scheduleCount > 0 && (
-                        <Button
-                          size="small"
-                          icon={<CopyOutlined />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyTimetable(item);
-                          }}
-                          title="复制课表"
-                          style={{
-                            height: '20px',
-                            width: '20px',
-                            padding: '0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            color: '#1890ff',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        />
-                      )}
-                      {!batchMode && item.scheduleCount > 0 && (
-                        <Button
-                          size="small"
-                          icon={<RetweetOutlined />}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            // 打开转换弹窗
-                            if (item.isWeekly) {
-                              setConvertModal({ visible: true, mode: 'weeklyToDate', timetable: item });
-                            } else {
-                              // 先拉取可选周
-                              try {
-                                const res = await getWeeksWithCountsApi(item.id);
-                                if (res.success) {
-                                  const options = res.data
-                                    .filter(w => w.count > 0)
-                                    .map(w => ({ value: w.weekStart, label: `${w.weekStart} ~ ${w.weekEnd} (${w.count}节课)` }));
-                                  setWeekOptions(options);
-                                  setConvertModal({ visible: true, mode: 'dateToWeekly', timetable: item });
-                                } else {
-                                  message.error(res.message || '获取周列表失败');
-                                }
-                              } catch {
-                                message.error('获取周列表失败');
-                              }
-                            }
-                          }}
-                          title={item.isWeekly ? '转为日期类课表' : '按某周转为周固定'}
-                          style={{
-                            height: '20px',
-                            width: '20px',
-                            padding: '0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            color: '#fa8c16',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        />
+                      {editingTimetableId === item.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Input
+                            size="small"
+                            value={editingTimetableName}
+                            onChange={(e) => setEditingTimetableName(e.target.value)}
+                            onPressEnter={() => handleSaveTimetableName(item.id)}
+                            style={{ width: '200px' }}
+                            autoFocus
+                          />
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<CheckOutlined />}
+                            onClick={() => handleSaveTimetableName(item.id)}
+                            style={{ color: '#52c41a' }}
+                          />
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<CloseOutlined />}
+                            onClick={handleCancelEditTimetableName}
+                            style={{ color: '#ff4d4f' }}
+                          />
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Tooltip title={item.name}>
+                            <a 
+                              onClick={() => navigate(`/view-timetable/${item.id}`)}
+                              style={{
+                                color,
+                                fontSize: '16px',
+                                fontWeight: 500,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                flex: '0 1 auto',
+                              }}
+                            >
+                              {item.name}
+                            </a>
+                          </Tooltip>
+                          {!batchMode && (
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => handleStartEditTimetableName(item.id, item.name)}
+                              style={{ color: '#1890ff', padding: '0 4px' }}
+                            />
+                          )}
+                        </div>
                       )}
                     </div>
+                    {!batchMode && !editingTimetableId && (
+                      <Dropdown menu={getActionMenu(item)} trigger={["click"]} placement="bottomRight">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<MoreOutlined />}
+                          style={{
+                            color: '#666',
+                            padding: '0 4px',
+                            height: '24px',
+                            width: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        />
+                      </Dropdown>
+                    )}
                   </div>
                   <div style={{ color: '#666', fontSize: 13, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
                     <span>
