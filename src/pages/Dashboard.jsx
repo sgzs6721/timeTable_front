@@ -1374,31 +1374,31 @@ const Dashboard = ({ user }) => {
                   </div>
                 }
                 description={
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
-                      {item.isWeekly ? (
-                        <div>星期一至星期日</div>
-                      ) : (
-                        <div>{`${item.startDate} 至 ${item.endDate}`}</div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div>
+                        {item.isWeekly ? (
+                          <div>星期一至星期日</div>
+                        ) : (
+                          <div>{`${item.startDate} 至 ${item.endDate}`}</div>
+                        )}
+                      </div>
                       <div>
                         <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
                         <span style={{ marginLeft: '16px' }}>共</span>
                         <span style={{ color: '#1890ff' }}>{timetableScheduleCounts[item.id] || 0}</span>
                         <span>课程</span>
                       </div>
-                      <Tag
-                        style={item.isWeekly
-                          ? { backgroundColor: '#e6f7ff', borderColor: 'transparent', color: '#1890ff' }
-                          : { backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }
-                        }
-                      >
-                        {item.isWeekly ? '周固定课表' : '日期范围课表'}
-                      </Tag>
                     </div>
-                  </>
+                    <Tag
+                      style={item.isWeekly
+                        ? { backgroundColor: '#e6f7ff', borderColor: 'transparent', color: '#1890ff' }
+                        : { backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }
+                      }
+                    >
+                      {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                    </Tag>
+                  </div>
                 }
               />
             </List.Item>
