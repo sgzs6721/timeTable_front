@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin, Modal, DatePicker, Select, Table, Dropdown, Input } from 'antd';
-import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined, RetweetOutlined, MoreOutlined, InboxOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined, RetweetOutlined, MoreOutlined, InboxOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined, ClearOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getAllTimetables, updateTimetableStatus } from '../services/admin';
+import { getAllTimetables, updateTimetableStatus, deleteTimetableByAdmin, clearTimetableSchedulesByAdmin } from '../services/admin';
 import CopyTimetableModal from '../components/CopyTimetableModal';
 import dayjs from 'dayjs';
-import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules, updateTimetable } from '../services/timetable';
+import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules, updateTimetable, clearTimetableSchedules } from '../services/timetable';
 
 const ActiveBadge = () => (
     <div style={{
@@ -110,6 +110,17 @@ const TimetableManagement = ({ user }) => {
           onClick: () => handleArchiveTimetable(item.id),
           style: { 
             color: '#262626',
+            fontWeight: '500'
+          },
+        },
+        {
+          key: 'clear',
+          label: '清空课表',
+          icon: <ClearOutlined style={{ color: hasSchedules ? '#ff7875' : '#bfbfbf' }} />,
+          disabled: !hasSchedules,
+          onClick: () => handleClearTimetable(item),
+          style: { 
+            color: hasSchedules ? '#262626' : '#bfbfbf',
             fontWeight: '500'
           },
         },
@@ -345,7 +356,7 @@ const TimetableManagement = ({ user }) => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await deleteTimetable(timetableId);
+          const response = await deleteTimetableByAdmin(timetableId);
           if (response.success) {
             message.success('课表删除成功');
             fetchAllTimetables();
@@ -354,6 +365,30 @@ const TimetableManagement = ({ user }) => {
           }
         } catch (error) {
           message.error('删除失败');
+        }
+      },
+    });
+  };
+
+  // 清空课表
+  const handleClearTimetable = (timetable) => {
+    Modal.confirm({
+      title: '确认清空课表',
+      content: `确定要清空课表"${timetable.name}"的所有课程吗？此操作不可恢复。`,
+      okText: '清空',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await clearTimetableSchedulesByAdmin(timetable.id);
+          if (response.success) {
+            message.success(`课表清空成功，共删除 ${response.data} 个课程`);
+            fetchAllTimetables();
+          } else {
+            message.error(response.message || '清空失败');
+          }
+        } catch (error) {
+          message.error('清空失败');
         }
       },
     });

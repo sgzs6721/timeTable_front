@@ -1986,37 +1986,57 @@ const ViewTimetable = ({ user }) => {
                 borderRadius: isSourceCell ? '4px' : '0',
                 opacity: isSourceCell ? 1 : 0.6
               }}>
-                {schedules.map((student, idx) => (
-                  <div
-                    key={student.id}
-                    style={{
-                      backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#333',
-                      fontSize: '12px',
-                      wordBreak: 'break-word',
-                      lineHeight: '1.2',
-                      borderTop: idx > 0 ? '1px solid #fff' : 'none',
-                    }}
-                    title={isSourceCell ? sourceCellTitle : modeText}
-                  >
-                    {(() => {
-                      const isTruncated = student.studentName.length > 4;
-                      const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
-                      return (
-                        <span
-                          className={isTruncated ? 'student-name-truncated' : ''}
-                          title={isTruncated ? student.studentName : undefined}
-                        >
-                          {content}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                ))}
+                {schedules.map((student, idx) => {
+                  // 在周实例视图中检查课程的特殊状态
+                  const isManualAdded = viewMode === 'instance' && student.isManualAdded;
+                  const isModified = viewMode === 'instance' && student.isModified;
+                  
+                  // 根据状态设置不同的样式
+                  let borderColor = '';
+                  let titleText = isSourceCell ? sourceCellTitle : modeText;
+                  
+                  if (isManualAdded) {
+                    borderColor = '#52c41a';
+                    titleText = isSourceCell ? sourceCellTitle : `手动添加的课程 - ${modeText}`;
+                  } else if (isModified) {
+                    borderColor = '#faad14';
+                    titleText = isSourceCell ? sourceCellTitle : `已修改的课程 - ${modeText}`;
+                  }
+                  
+                  return (
+                    <div
+                      key={student.id}
+                      style={{
+                        backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#333',
+                        fontSize: '12px',
+                        wordBreak: 'break-word',
+                        lineHeight: '1.2',
+                        borderTop: idx > 0 ? '1px solid #fff' : 'none',
+                        border: borderColor ? `2px solid ${borderColor}` : 'none',
+                        position: 'relative',
+                      }}
+                      title={titleText}
+                    >
+                      {(() => {
+                        const isTruncated = student.studentName.length > 4;
+                        const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
+                        return (
+                          <span
+                            className={isTruncated ? 'student-name-truncated' : ''}
+                            title={isTruncated ? student.studentName : undefined}
+                          >
+                            {content}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
               </div>
             );
           }
@@ -2031,37 +2051,57 @@ const ViewTimetable = ({ user }) => {
               onOpenChange={handleOpenChange}
             >
               <div className="schedule-cell-content">
-                {schedules.map((student, idx) => (
-                  <div
-                    key={student.id}
-                    style={{
-                      backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#333',
-                      fontSize: '12px',
-                      wordBreak: 'break-word',
-                      lineHeight: '1.2',
-                      borderTop: idx > 0 ? '1px solid #fff' : 'none',
-                    }}
-                    title={`点击查看详情或删除`}
-                  >
-                    {(() => {
-                      const isTruncated = student.studentName.length > 4;
-                      const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
-                      return (
-                        <span
-                          className={isTruncated ? 'student-name-truncated' : ''}
-                          title={isTruncated ? student.studentName : undefined}
-                        >
-                          {content}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                ))}
+                {schedules.map((student, idx) => {
+                  // 在周实例视图中检查课程的特殊状态
+                  const isManualAdded = viewMode === 'instance' && student.isManualAdded;
+                  const isModified = viewMode === 'instance' && student.isModified;
+                  
+                  // 根据状态设置不同的样式
+                  let borderColor = '';
+                  let titleText = '点击查看详情或删除';
+                  
+                  if (isManualAdded) {
+                    borderColor = '#52c41a';
+                    titleText = '手动添加的课程 - 点击查看详情或删除';
+                  } else if (isModified) {
+                    borderColor = '#faad14';
+                    titleText = '已修改的课程 - 点击查看详情或删除';
+                  }
+                  
+                  return (
+                    <div
+                      key={student.id}
+                      style={{
+                        backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#333',
+                        fontSize: '12px',
+                        wordBreak: 'break-word',
+                        lineHeight: '1.2',
+                        borderTop: idx > 0 ? '1px solid #fff' : 'none',
+                        border: borderColor ? `2px solid ${borderColor}` : 'none',
+                        position: 'relative',
+                      }}
+                      title={titleText}
+                    >
+                      {(() => {
+                        const isTruncated = student.studentName.length > 4;
+                        const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
+                        return (
+                          <span
+                            className={isTruncated ? 'student-name-truncated' : ''}
+                            title={isTruncated ? student.studentName : undefined}
+                          >
+                            {content}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
               </div>
             </Popover>
           );
@@ -2321,6 +2361,43 @@ const ViewTimetable = ({ user }) => {
       )}
 
 
+
+      {/* 周实例视图的图例说明 */}
+      {viewMode === 'instance' && (
+        <div style={{ 
+          marginBottom: '12px', 
+          padding: '8px 12px', 
+          backgroundColor: '#f6f8fa', 
+          borderRadius: '6px',
+          border: '1px solid #e1e4e8',
+          fontSize: '12px',
+          color: '#586069'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontWeight: '500' }}>图例说明：</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ 
+                width: '12px', 
+                height: '12px', 
+                border: '2px solid #52c41a', 
+                borderRadius: '2px',
+                backgroundColor: 'transparent'
+              }}></div>
+              <span>手动添加的课程</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ 
+                width: '12px', 
+                height: '12px', 
+                border: '2px solid #faad14', 
+                borderRadius: '2px',
+                backgroundColor: 'transparent'
+              }}></div>
+              <span>已修改的课程</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="compact-timetable-container" ref={tableRef}>
         <Table

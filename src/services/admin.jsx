@@ -141,4 +141,24 @@ export const copyTimetableToUser = async (sourceTimetableId, targetUserId, newTi
   } catch (error) {
     throw error;
   }
+};
+
+// 管理员删除课表
+export const deleteTimetableByAdmin = async (timetableId) => {
+  try {
+    const response = await api.delete(`/admin/timetables/${timetableId}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 管理员清空课表的所有课程
+export const clearTimetableSchedulesByAdmin = async (timetableId) => {
+  try {
+    const response = await api.delete(`/admin/timetables/${timetableId}/schedules/clear`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
 }; 
