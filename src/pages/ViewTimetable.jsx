@@ -45,16 +45,43 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose, deleteLoading, updateLoading }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const isNameChanged = name !== schedule.studentName;
+
+  // 获取对应的固定课表模板内容
+  const getTemplateSchedule = () => {
+    if (!timetable || !timetable.isWeekly || viewMode !== 'instance' || !templateSchedules) {
+      return null;
+    }
+    
+    return templateSchedules.find(template => 
+      template.dayOfWeek === schedule.dayOfWeek &&
+      template.startTime === schedule.startTime &&
+      template.endTime === schedule.endTime
+    );
+  };
+
+  const templateSchedule = getTemplateSchedule();
+  const isModified = templateSchedule && (
+    templateSchedule.studentName !== schedule.studentName ||
+    templateSchedule.subject !== schedule.subject ||
+    templateSchedule.note !== schedule.note
+  );
 
 
 
   return (
     <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
-      {/* 关闭图标 */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+      {/* 时间信息和关闭图标在同一行 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ fontSize: '12px', color: '#666' }}>
+          {timetable.isWeekly ? (
+            `星期${dayMap[schedule.dayOfWeek.toUpperCase()] || schedule.dayOfWeek}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`
+          ) : (
+            `${dayjs(schedule.scheduleDate).format('MM/DD')}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`
+          )}
+        </div>
         <Button
           type="text"
           size="small"
@@ -63,6 +90,21 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
           style={{ padding: '0', minWidth: 'auto', height: 'auto' }}
         />
       </div>
+
+      {/* 如果是已修改的课程，显示固定课表原始内容 */}
+      {isModified && templateSchedule && (
+        <div style={{ 
+          backgroundColor: '#f6f6f6', 
+          padding: '6px 8px', 
+          borderRadius: '4px', 
+          marginBottom: '8px',
+          border: '1px solid #d9d9d9',
+          fontSize: '12px',
+          color: '#666'
+        }}>
+          固定课表原始内容: <strong>{templateSchedule.studentName}</strong>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', textAlign: 'left', gap: 4 }}>
         <strong>学生:</strong>
@@ -90,15 +132,6 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
         )}
       </div>
 
-      {timetable.isWeekly ? (
-        <p style={{ margin: '8px 0', textAlign: 'left' }}>
-          {`星期${dayMap[schedule.dayOfWeek.toUpperCase()] || schedule.dayOfWeek}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`}
-        </p>
-      ) : (
-        <p style={{ margin: '8px 0', textAlign: 'left' }}>
-          {`${schedule.scheduleDate}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`}
-        </p>
-      )}
 
 
 
@@ -167,11 +200,22 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
   );
 };
 
-const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading }) => {
+const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) => {
   const [name, setName] = React.useState('');
 
   return (
     <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
+      {/* 时间信息显示 */}
+      {timeInfo && (
+        <div style={{ 
+          fontSize: '12px', 
+          color: '#666', 
+          marginBottom: '8px',
+          textAlign: 'center'
+        }}>
+          {timeInfo}
+        </div>
+      )}
       <Input
         size="small"
         placeholder="学生姓名"
@@ -201,6 +245,7 @@ const ViewTimetable = ({ user }) => {
   const [timetable, setTimetable] = useState(null);
   const [timetableOwner, setTimetableOwner] = useState(null);
   const [allSchedules, setAllSchedules] = useState([]);
+  const [templateSchedules, setTemplateSchedules] = useState([]); // 存储固定课表模板数据用于比较
   const [loading, setLoading] = useState(true);
   
   // 周实例相关状态
@@ -787,6 +832,10 @@ const ViewTimetable = ({ user }) => {
       const response = await getTimetableSchedules(timetableId, week);
       if (response.success) {
         setAllSchedules(response.data);
+        // 如果是周固定课表，同时保存模板数据用于比较
+        if (timetable && timetable.isWeekly) {
+          setTemplateSchedules(response.data);
+        }
       } else {
         message.error(response.message || '获取课程安排失败');
       }
@@ -824,6 +873,14 @@ const ViewTimetable = ({ user }) => {
     console.log('开始获取实例数据...');
     setInstanceDataLoading(true);
     try {
+      // 如果是周固定课表且还没有模板数据，先获取模板数据
+      if (timetable && timetable.isWeekly && templateSchedules.length === 0) {
+        const templateResponse = await getTimetableSchedules(timetableId, null);
+        if (templateResponse.success) {
+          setTemplateSchedules(templateResponse.data);
+        }
+      }
+
       // 先检查是否有当前周实例
       const checkResponse = await checkCurrentWeekInstance(timetableId);
       if (checkResponse.success) {
@@ -897,6 +954,38 @@ const ViewTimetable = ({ user }) => {
   // 切换到固定课表视图
   const switchToTemplateView = () => {
     setViewMode('template');
+  };
+
+  // 比较固定课表和实例课程，确定边框颜色
+  const getScheduleBorderColor = (instanceSchedule) => {
+    if (!timetable || !timetable.isWeekly || viewMode !== 'instance') {
+      return ''; // 非周固定课表或非实例视图，不显示特殊边框
+    }
+
+    // 查找对应的固定课表模板课程
+    const templateSchedule = templateSchedules.find(template => 
+      template.dayOfWeek === instanceSchedule.dayOfWeek &&
+      template.startTime === instanceSchedule.startTime &&
+      template.endTime === instanceSchedule.endTime
+    );
+
+    if (!templateSchedule) {
+      // 固定课表中没有，但实例中有 - 绿色边框（手动添加）
+      return '#52c41a';
+    } else {
+      // 固定课表中有，检查内容是否一致
+      const isContentSame = 
+        templateSchedule.studentName === instanceSchedule.studentName &&
+        templateSchedule.subject === instanceSchedule.subject &&
+        templateSchedule.note === instanceSchedule.note;
+      
+      if (!isContentSame) {
+        // 内容不一致 - 橙色边框（已修改）
+        return '#faad14';
+      }
+    }
+
+    return ''; // 内容一致，不显示特殊边框
   };
 
   // 局部刷新函数，不影响页面loading状态
@@ -1947,11 +2036,18 @@ const ViewTimetable = ({ user }) => {
               );
             }
 
+            // 生成时间信息
+            const timeInfo = timetable.isWeekly 
+              ? `星期${dayMap[day.key.toUpperCase()] || day.key}, ${record.time}`
+              : weekDates && weekDates.start 
+                ? `${weekDates.start.add(index, 'day').format('MM/DD')}, ${record.time}`
+                : `${record.time}`;
+
             return (
               <Popover
                 placement={getSmartPlacement(index, record.key)}
                 title={null}
-                content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} /> }
+                content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} /> }
                 trigger={multiSelectMode ? "contextMenu" : "click"}
                 open={!timetable?.isArchived && openPopoverKey === cellKey}
                 onOpenChange={handleOpenChange}
@@ -1982,6 +2078,8 @@ const ViewTimetable = ({ user }) => {
                     onClose={() => setOpenPopoverKey(null)}
                     deleteLoading={deleteLoading}
                     updateLoading={updateLoading}
+                    templateSchedules={templateSchedules}
+                    viewMode={viewMode}
                   />
                   {idx < schedules.length - 1 && <hr style={{ margin: '8px 0' }} />}
                 </div>
@@ -2030,7 +2128,16 @@ const ViewTimetable = ({ user }) => {
                   let borderColor = '';
                   let titleText = isSourceCell ? sourceCellTitle : modeText;
                   
-                  if (isManualAdded) {
+                  // 优先使用比较逻辑确定的边框颜色
+                  const comparisonBorderColor = getScheduleBorderColor(student);
+                  if (comparisonBorderColor) {
+                    borderColor = comparisonBorderColor;
+                    if (comparisonBorderColor === '#52c41a') {
+                      titleText = isSourceCell ? sourceCellTitle : `手动添加的课程 - ${modeText}`;
+                    } else if (comparisonBorderColor === '#faad14') {
+                      titleText = isSourceCell ? sourceCellTitle : `已修改的课程 - ${modeText}`;
+                    }
+                  } else if (isManualAdded) {
                     borderColor = '#52c41a';
                     titleText = isSourceCell ? sourceCellTitle : `手动添加的课程 - ${modeText}`;
                   } else if (isModified) {
@@ -2095,7 +2202,16 @@ const ViewTimetable = ({ user }) => {
                   let borderColor = '';
                   let titleText = '点击查看详情或删除';
                   
-                  if (isManualAdded) {
+                  // 优先使用比较逻辑确定的边框颜色
+                  const comparisonBorderColor = getScheduleBorderColor(student);
+                  if (comparisonBorderColor) {
+                    borderColor = comparisonBorderColor;
+                    if (comparisonBorderColor === '#52c41a') {
+                      titleText = '手动添加的课程 - 点击查看详情或删除';
+                    } else if (comparisonBorderColor === '#faad14') {
+                      titleText = '已修改的课程 - 点击查看详情或删除';
+                    }
+                  } else if (isManualAdded) {
                     borderColor = '#52c41a';
                     titleText = '手动添加的课程 - 点击查看详情或删除';
                   } else if (isModified) {
