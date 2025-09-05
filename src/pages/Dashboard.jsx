@@ -124,7 +124,7 @@ const Dashboard = ({ user }) => {
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
   
   // 管理员概览相关状态
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('timetables');
   const [coachesStatistics, setCoachesStatistics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [todaysCoursesData, setTodaysCoursesData] = useState([]);
@@ -1372,54 +1372,64 @@ const Dashboard = ({ user }) => {
                           value={editingTimetableName}
                           onChange={(e) => setEditingTimetableName(e.target.value)}
                           onPressEnter={() => handleSaveTimetableName(item.id)}
-                          onBlur={() => handleSaveTimetableName(item.id)}
+                          style={{ width: '200px' }}
                           autoFocus
                         />
                         <Button
-                          type="link"
+                          type="text"
                           size="small"
                           icon={<CheckOutlined />}
                           onClick={() => handleSaveTimetableName(item.id)}
+                          style={{ color: '#52c41a' }}
                         />
                         <Button
-                          type="link"
+                          type="text"
                           size="small"
                           icon={<CloseOutlined />}
-                          onClick={() => {
-                            setEditingTimetableId(null);
-                            setEditingTimetableName('');
-                          }}
+                          onClick={handleCancelEditTimetableName}
+                          style={{ color: '#ff4d4f' }}
                         />
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '16px', fontWeight: '500' }}>{item.name}</span>
+                        <a onClick={() => handleViewTimetable(item.id)} style={{ fontWeight: 600, fontSize: 17 }}>{item.name}</a>
                         <Button
                           type="text"
                           size="small"
                           icon={<EditOutlined />}
-                          onClick={() => {
-                            setEditingTimetableId(item.id);
-                            setEditingTimetableName(item.name);
-                          }}
+                          onClick={() => handleStartEditTimetableName(item.id, item.name)}
+                          style={{ color: '#1890ff', padding: '0 4px' }}
                         />
                       </div>
                     )}
                   </div>
-                  <Tag color={item.isWeekly ? 'blue' : 'green'}>
-                    {item.isWeekly ? '周固定课表' : '日期范围课表'}
-                  </Tag>
                 </div>
               }
               description={
-                <div style={{ color: '#666', fontSize: '14px' }}>
-                  <div>{item.isWeekly ? '星期一至星期日' : `${item.startDate} 至 ${item.endDate}`}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
-                    <span>
-                      共 <span style={{ color: '#8a2be2', fontWeight: 600 }}>{timetableScheduleCounts[item.id] || 0}</span> 课程
-                    </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div>
+                      {item.isWeekly ? (
+                        <div>星期一至星期日</div>
+                      ) : (
+                        <div>{`${item.startDate} 至 ${item.endDate}`}</div>
+                      )}
+                    </div>
+                    <div>
+                      <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
+                      <span style={{ marginLeft: '16px' }}>共</span>
+                      <span style={{ color: '#1890ff' }}>{timetableScheduleCounts[item.id] || 0}</span>
+                      <span>课程</span>
+                    </div>
                   </div>
+                  <Tag
+                    style={item.isWeekly
+                      ? { backgroundColor: '#e6f7ff', borderColor: 'transparent', color: '#1890ff' }
+                      : { backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }
+                    }
+                  >
+                    {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                  </Tag>
                 </div>
               }
             />
@@ -1877,7 +1887,7 @@ const Dashboard = ({ user }) => {
                       {(c.nickname || c.username)?.[0]?.toUpperCase()}
                     </Avatar>
                     <span style={{ marginLeft: 8, fontWeight: 500 }}>{c.nickname || c.username}</span>
-                    <Tag color="green" style={{ marginLeft: 8 }}>{c.todayCourses} 节</Tag>
+                    <span style={{ marginLeft: 8, color: '#52c41a', fontWeight: 500 }}>{c.todayCourses}</span>
                   </div>
                   {/* 右侧：学员与时间（纯文本） */}
                   <div style={{ color: '#333', fontSize: 14 }}>
@@ -1906,7 +1916,7 @@ const Dashboard = ({ user }) => {
                 key: 'nickname',
                 align: 'center',
                 render: (text, record) => (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
                     <Avatar size="small" style={{ backgroundColor: getIconColor(record.id) }}>
                       {(text || record.username)?.[0]?.toUpperCase()}
                     </Avatar>
@@ -1932,9 +1942,9 @@ const Dashboard = ({ user }) => {
                 defaultSortOrder: 'descend',
                 sortDirections: ['descend', 'ascend'],
                 render: (value) => (
-                  <Tag color={value > 0 ? 'green' : 'default'}>
-                    {value} 节
-                  </Tag>
+                  <span style={{ color: value > 0 ? '#52c41a' : '#999', fontWeight: 500 }}>
+                    {value}
+                  </span>
                 )
               },
               {
@@ -1944,9 +1954,9 @@ const Dashboard = ({ user }) => {
                 align: 'center',
                 sorter: (a, b) => a.weeklyCourses - b.weeklyCourses,
                 render: (value) => (
-                  <Tag color="blue">
-                    {value} 节
-                  </Tag>
+                  <span style={{ color: '#1890ff', fontWeight: 500 }}>
+                    {value}
+                  </span>
                 )
               }
             ]}
