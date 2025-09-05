@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select } from 'antd';
-import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col } from 'antd';
+import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules } from '../services/timetable';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance } from '../services/weeklyInstance';
+import { getCoachesStatistics } from '../services/admin';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
 
 // 新增的组件，用于添加新课程
@@ -120,6 +122,11 @@ const Dashboard = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [timetableScheduleCounts, setTimetableScheduleCounts] = useState({});
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
+  
+  // 管理员概览相关状态
+  const [activeTab, setActiveTab] = useState('overview');
+  const [coachesStatistics, setCoachesStatistics] = useState(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [todaysCoursesData, setTodaysCoursesData] = useState([]);
   const [modalMainTitle, setModalMainTitle] = useState('');
   const [modalSubTitle, setModalSubTitle] = useState('');
@@ -161,6 +168,26 @@ const Dashboard = ({ user }) => {
   const [otherCoachesExpandedTomorrow, setOtherCoachesExpandedTomorrow] = useState(false);
 
   const navigate = useNavigate();
+
+  // 获取教练统计信息
+  const fetchCoachesStatistics = useCallback(async () => {
+    if (user?.role?.toUpperCase() !== 'ADMIN') return;
+    
+    setStatisticsLoading(true);
+    try {
+      const response = await getCoachesStatistics();
+      if (response.success) {
+        setCoachesStatistics(response.data);
+      } else {
+        message.error(response.message || '获取统计信息失败');
+      }
+    } catch (error) {
+      console.error('获取教练统计信息失败:', error);
+      message.error('获取统计信息失败，请稍后重试');
+    } finally {
+      setStatisticsLoading(false);
+    }
+  }, [user]);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((columnIndex) => {
@@ -258,7 +285,12 @@ const Dashboard = ({ user }) => {
       }
     };
     fetchTimetables();
-  }, []);
+    
+    // 如果是管理员，获取教练统计信息
+    if (user?.role?.toUpperCase() === 'ADMIN') {
+      fetchCoachesStatistics();
+    }
+  }, [user, fetchCoachesStatistics]);
 
   // 设为活动课表
   const handleSetActiveTimetable = (id) => {
@@ -1281,6 +1313,695 @@ const Dashboard = ({ user }) => {
   const iconColors = ['#722ED1','#1890ff','#52c41a','#faad14','#eb2f96','#fa541c','#13c2c2','#531dab'];
   const getIconColor = (id) => iconColors[id % iconColors.length];
 
+  // 渲染课表列表
+  const renderTimetableList = () => {
+    if (loading) {
+      return (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+        </div>
+      );
+    }
+
+    if (timetables.length === 0) {
+      return <Empty description="暂无课表，快去创建一个吧" />;
+    }
+
+    return (
+      <List
+        className="timetable-list"
+        itemLayout="horizontal"
+        dataSource={timetables}
+        renderItem={(item) => (
+          <List.Item
+            style={{ position: 'relative' }}
+            actions={[
+              <Button type="link" onClick={() => handleShowTodaysCourses(item)}>今明课程</Button>,
+              <Button type="link" onClick={() => handleInputTimetable(item)}>录入</Button>,
+              <Button type="link" onClick={() => handleViewTimetable(item.id)}>查看</Button>,
+              <Dropdown menu={getActionMenu(item)} trigger={["click"]} placement="bottomRight">
+                <Button type="link">操作</Button>
+              </Dropdown>
+            ]}
+          >
+            {item.isActive ? <ActiveBadge /> : null}
+            <List.Item.Meta
+              className="timetable-item-meta"
+              avatar={
+                <div style={{ margin: 12 }}>
+                <Avatar
+                  shape="square"
+                  size={48}
+                  icon={<CalendarOutlined />}
+                  style={{
+                    backgroundColor: '#f9f0ff',
+                    color: getIconColor(item.id),
+                    border: '1px solid #e0d7f7',
+                    borderRadius: '8px'
+                  }}
+                />
+                </div>
+              }
+              title={
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {editingTimetableId === item.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Input
+                          size="small"
+                          value={editingTimetableName}
+                          onChange={(e) => setEditingTimetableName(e.target.value)}
+                          onPressEnter={() => handleSaveTimetableName(item.id)}
+                          onBlur={() => handleSaveTimetableName(item.id)}
+                          autoFocus
+                        />
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<CheckOutlined />}
+                          onClick={() => handleSaveTimetableName(item.id)}
+                        />
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<CloseOutlined />}
+                          onClick={() => {
+                            setEditingTimetableId(null);
+                            setEditingTimetableName('');
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '16px', fontWeight: '500' }}>{item.name}</span>
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<EditOutlined />}
+                          onClick={() => {
+                            setEditingTimetableId(item.id);
+                            setEditingTimetableName(item.name);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <Tag color={item.isWeekly ? 'blue' : 'green'}>
+                    {item.isWeekly ? '周固定课表' : '日期范围课表'}
+                  </Tag>
+                </div>
+              }
+              description={
+                <div style={{ color: '#666', fontSize: '14px' }}>
+                  <div>{item.isWeekly ? '星期一至星期日' : `${item.startDate} 至 ${item.endDate}`}</div>
+                  <div>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</div>
+                  <div>共{timetableScheduleCounts[item.id] || 0}课程</div>
+                </div>
+              }
+            />
+          </List.Item>
+        )}
+      />
+    );
+  };
+
+  // 渲染模态框
+  const renderModals = () => (
+    <>
+      {/* 今明课程模态框 */}
+      <Modal
+        title={modalMainTitle}
+        open={todaysCoursesModalVisible}
+        onCancel={() => {
+          setTodaysCoursesModalVisible(false);
+          setTodaysCoursesData([]);
+          setTomorrowsCoursesData([]);
+          setTodaysSchedulesForCopy([]);
+          setOtherCoachesExpandedToday(false);
+          setOtherCoachesExpandedTomorrow(false);
+        }}
+        footer={null}
+        width={800}
+        style={{ top: 20 }}
+      >
+        <div style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
+          {modalSubTitle}
+        </div>
+        
+        <Tabs
+          defaultActiveKey="today"
+          items={[
+            {
+              key: 'today',
+              label: '今日课程',
+              children: (
+                <div>
+                  <Table
+                    columns={getColumns(studentColorMap)}
+                    dataSource={todaysCoursesData}
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: 400 }}
+                  />
+                  
+                  {/* 其他教练今日课程 */}
+                  {todaysCoursesData.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: '500' }}>其他教练今日课程</span>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => setOtherCoachesExpandedToday(!otherCoachesExpandedToday)}
+                          loading={loadingOtherCoachesToday}
+                        >
+                          {otherCoachesExpandedToday ? '收起' : '展开'}
+                        </Button>
+                      </div>
+                      {otherCoachesExpandedToday && (
+                        <div style={{ 
+                          maxHeight: '200px', 
+                          overflowY: 'auto',
+                          border: '1px solid #f0f0f0',
+                          borderRadius: '4px',
+                          padding: '8px'
+                        }}>
+                          {otherCoachesTodayData.length > 0 ? (
+                            otherCoachesTodayData.map((timetableInfo, index) => (
+                              <div key={index} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: index < otherCoachesTodayData.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                                <div style={{ fontWeight: '500', marginBottom: '4px' }}>{timetableInfo.ownerName}</div>
+                                {timetableInfo.schedules.length > 0 ? (
+                                  <div style={{ fontSize: '12px', color: '#666' }}>
+                                    {timetableInfo.schedules.map((schedule, sIndex) => (
+                                      <div key={sIndex}>
+                                        {schedule.startTime.substring(0,5)}-{schedule.endTime.substring(0,5)} {schedule.studentName}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '12px', color: '#999' }}>今日无课程</div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ textAlign: 'center', color: '#999', fontSize: '12px' }}>暂无其他教练课程</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* 复制按钮 */}
+                  <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                    <Button
+                      onClick={() => {
+                        const text = generateCopyText(todaysSchedulesForCopy, true, otherCoachesExpandedToday, otherCoachesTodayData);
+                        copyToClipboard(text);
+                      }}
+                    >
+                      复制今日课程
+                    </Button>
+                  </div>
+                </div>
+              )
+            },
+            {
+              key: 'tomorrow',
+              label: '明日课程',
+              children: (
+                <div>
+                  <Table
+                    columns={getColumns(studentColorMap)}
+                    dataSource={tomorrowsCoursesData}
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: 400 }}
+                  />
+                  
+                  {/* 其他教练明日课程 */}
+                  {tomorrowsCoursesData.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: '500' }}>其他教练明日课程</span>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => setOtherCoachesExpandedTomorrow(!otherCoachesExpandedTomorrow)}
+                          loading={loadingOtherCoachesTomorrow}
+                        >
+                          {otherCoachesExpandedTomorrow ? '收起' : '展开'}
+                        </Button>
+                      </div>
+                      {otherCoachesExpandedTomorrow && (
+                        <div style={{ 
+                          maxHeight: '200px', 
+                          overflowY: 'auto',
+                          border: '1px solid #f0f0f0',
+                          borderRadius: '4px',
+                          padding: '8px'
+                        }}>
+                          {otherCoachesTomorrowData.length > 0 ? (
+                            otherCoachesTomorrowData.map((timetableInfo, index) => (
+                              <div key={index} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: index < otherCoachesTomorrowData.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                                <div style={{ fontWeight: '500', marginBottom: '4px' }}>{timetableInfo.ownerName}</div>
+                                {timetableInfo.schedules.length > 0 ? (
+                                  <div style={{ fontSize: '12px', color: '#666' }}>
+                                    {timetableInfo.schedules.map((schedule, sIndex) => (
+                                      <div key={sIndex}>
+                                        {schedule.startTime.substring(0,5)}-{schedule.endTime.substring(0,5)} {schedule.studentName}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '12px', color: '#999' }}>明日无课程</div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ textAlign: 'center', color: '#999', fontSize: '12px' }}>暂无其他教练课程</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* 复制按钮 */}
+                  <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                    <Button
+                      onClick={() => {
+                        const text = generateCopyText(tomorrowsCoursesData, false, otherCoachesExpandedTomorrow, otherCoachesTomorrowData);
+                        copyToClipboard(text);
+                      }}
+                    >
+                      复制明日课程
+                    </Button>
+                  </div>
+                </div>
+              )
+            }
+          ]}
+        />
+      </Modal>
+
+      {/* 编辑课程模态框 */}
+      {editingSchedule && (
+        <EditScheduleModal
+          visible={editModalVisible}
+          schedule={editingSchedule}
+          timetable={currentTimetable}
+          onCancel={() => {
+            setEditModalVisible(false);
+            setEditingSchedule(null);
+          }}
+          onOk={(data) => {
+            if (editingSchedule) {
+              handleUpdateSchedule(editingSchedule, data.studentName);
+              setEditModalVisible(false);
+              setEditingSchedule(null);
+            }
+          }}
+        />
+      )}
+
+      {/* 复制课表模态框 */}
+      <Modal
+        title="复制课表"
+        open={copyTimetableModalVisible}
+        onCancel={() => {
+          setCopyTimetableModalVisible(false);
+          setSelectedTimetableForCopy(null);
+        }}
+        onOk={handleConfirmCopyTimetable}
+        okText="确认复制"
+        cancelText="取消"
+        width={500}
+      >
+        <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f6f8fa', borderRadius: '6px' }}>
+          <div style={{ fontWeight: 500, marginBottom: '4px' }}>源课表信息：</div>
+          <div style={{ color: '#666' }}>
+            {selectedTimetableForCopy?.name} ({selectedTimetableForCopy?.isWeekly ? '周固定课表' : '日期范围课表'})
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontWeight: 500, marginBottom: '8px' }}>新课表名称：</div>
+          <Input
+            placeholder={`${selectedTimetableForCopy?.name || ''} (复制)`}
+            maxLength={100}
+            showCount
+            value={editingTimetableName}
+            onChange={(e) => setEditingTimetableName(e.target.value)}
+          />
+        </div>
+
+        <div style={{ padding: '12px', backgroundColor: '#fff7e6', borderRadius: '6px', border: '1px solid #ffd666' }}>
+          <div style={{ fontSize: '12px', color: '#d46b08' }}>
+            <div>• 复制后的课表将包含原课表的所有课程信息</div>
+            <div>• 如果当前没有活动课表，复制的课表将自动设为活动状态</div>
+            <div>• 每个用户最多只能有5个非归档课表</div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 转换弹窗 */}
+      <Modal
+        open={convertModal.visible}
+        title={convertModal.mode === 'dateToWeekly' ? '转为周固定课表' : '转为日期范围课表'}
+        onCancel={() => { setConvertModal({ visible: false, mode: null, timetable: null }); setSelectedWeekStart(null); setDateRange([]); }}
+        onOk={async () => {
+          if (!convertModal.timetable) return;
+          
+          // 显示loading消息
+          message.loading({ content: '正在准备转换预览...', key: 'convert', duration: 0 });
+          
+          try {
+            if (convertModal.mode === 'dateToWeekly') {
+              if (!selectedWeekStart) { 
+                message.warning('请选择一周'); 
+                message.destroy('convert');
+                return; 
+              }
+              
+              // 延迟跳转，让用户看到loading效果
+              setTimeout(() => {
+                // 清除loading消息
+                // message.destroy('convert'); // 移除此行
+                
+                const ws = dayjs(selectedWeekStart);
+                const we = ws.add(6, 'day');
+                navigate('/convert-preview', {
+                  state: {
+                    type: 'date-to-weekly',
+                    sourceTimetable: convertModal.timetable,
+                    weekStart: selectedWeekStart,
+                    weekEnd: we.format('YYYY-MM-DD'),
+                    newTimetableName: `${convertModal.timetable.name}-周固定`,
+                    currentUserId: user?.id
+                  }
+                });
+              }, 800);
+              
+            } else {
+              if (!dateRange || dateRange.length !== 2) { 
+                message.warning('请选择日期范围'); 
+                message.destroy('convert');
+                return; 
+              }
+              
+              // 延迟跳转，让用户看到loading效果
+              setTimeout(() => {
+                // 清除loading消息
+                
+                const startDate = dayjs(dateRange[0]).format('YYYY-MM-DD');
+                const endDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
+                navigate('/convert-preview', {
+                  state: {
+                    type: 'weekly-to-date',
+                    sourceTimetable: convertModal.timetable,
+                    startDate: startDate,
+                    endDate: endDate,
+                    newTimetableName: `${convertModal.timetable.name}-日期`,
+                    currentUserId: user?.id
+                  }
+                });
+              }, 800);
+            }
+          } catch (error) { 
+            message.error('操作失败'); 
+            message.destroy('convert');
+          }
+        }}
+        okText="确认"
+        cancelText="取消"
+      >
+        {convertModal.mode === 'dateToWeekly' ? (
+          <div>
+            <div style={{ marginBottom: 8 }}>选择包含课程的一周：</div>
+            <Select
+              options={weekOptions}
+              onChange={setSelectedWeekStart}
+              style={{ width: '100%' }}
+              placeholder="周一日期 ~ 周日日期 (课程数)"
+            />
+          </div>
+        ) : convertModal.mode === 'weeklyToDate' ? (
+          <div>
+            <div style={{ marginBottom: 8 }}>开始日期：</div>
+            <DatePicker
+              style={{ width: '100%', marginBottom: 12 }}
+              value={dateRange?.[0] || null}
+              onChange={(v) => setDateRange([v, dateRange?.[1] || null])}
+            />
+            <div style={{ marginBottom: 8 }}>结束日期：</div>
+            <DatePicker
+              style={{ width: '100%' }}
+              value={dateRange?.[1] || null}
+              onChange={(v) => setDateRange([dateRange?.[0] || null, v])}
+            />
+          </div>
+        ) : null}
+      </Modal>
+    </>
+  );
+
+  // 管理员概览组件
+  const AdminOverview = () => {
+    if (!coachesStatistics) {
+      return (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+          <div style={{ marginTop: '16px' }}>加载教练统计信息中...</div>
+        </div>
+      );
+    }
+
+    const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses } = coachesStatistics;
+
+    // 额外拉取今日活动课表的课程，用于显示学员+时间（后端统计缺少明细时兜底）
+    const [todayCoachDetails, setTodayCoachDetails] = useState({});
+    useEffect(() => {
+      const todayStr = dayjs().format('YYYY-MM-DD');
+      getActiveSchedulesByDate(todayStr).then(res => {
+        if (res && res.success && res.data && res.data.timetables) {
+          const map = {};
+          res.data.timetables.forEach(t => {
+            const owner = t.ownerName || t.username || t.nickname;
+            const items = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+            if (items.length > 0) {
+              map[owner] = items;
+            }
+          });
+          setTodayCoachDetails(map);
+        }
+      }).catch(() => {});
+    }, [coachesStatistics]);
+
+    // 准备图表数据
+    const chartData = coaches.map(coach => ({
+      name: coach.nickname || coach.username,
+      todayCourses: coach.todayCourses,
+      weeklyCourses: coach.weeklyCourses
+    }));
+
+    const pieData = [
+      { name: '今日有课', value: coaches.filter(c => c.todayCourses > 0).length },
+      { name: '今日无课', value: coaches.filter(c => c.todayCourses === 0).length }
+    ];
+
+    const COLORS = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2'];
+
+    return (
+      <div>
+        {/* 统计卡片：每行两个 */}
+        <Row gutter={16} style={{ marginBottom: '16px' }}>
+          <Col span={12}>
+            <Card bodyStyle={{ textAlign: 'center' }}>
+              <Statistic
+                title="总教练数"
+                value={totalCoaches}
+                prefix={<UserOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card bodyStyle={{ textAlign: 'center' }}>
+              <Statistic
+                title="今日有课教练"
+                value={coaches.filter(c => c.todayCourses > 0).length}
+                suffix={`/ ${totalCoaches}`}
+                valueStyle={{ color: '#eb2f96' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+        <Row gutter={16} style={{ marginBottom: '24px' }}>
+          <Col span={12}>
+            <Card bodyStyle={{ textAlign: 'center' }}>
+              <Statistic
+                title="本周总课程"
+                value={totalWeeklyCourses}
+                prefix={<BarChartOutlined />}
+                valueStyle={{ color: '#faad14' }}
+              />
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card bodyStyle={{ textAlign: 'center' }}>
+              <Statistic
+                title="今日总课程"
+                value={totalTodayCourses}
+                prefix={<CalendarOutlined />}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 今日有课教练及课程明细 */}
+        <Card title="今日有课教练" size="small" style={{ marginBottom: '24px' }}>
+          {coaches.filter(c => c.todayCourses > 0).length === 0 ? (
+            <div style={{ color: '#999' }}>今日暂无课程</div>
+          ) : (
+            coaches
+              .filter(c => c.todayCourses > 0)
+              .map((c, idx) => (
+                <div key={idx} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: idx < coaches.filter(x=>x.todayCourses>0).length-1 ? '1px solid #f0f0f0' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {/* 左侧：教练 */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <Avatar size="small" style={{ backgroundColor: getIconColor(c.id) }}>
+                      {(c.nickname || c.username)?.[0]?.toUpperCase()}
+                    </Avatar>
+                    <span style={{ marginLeft: 8, fontWeight: 500 }}>{c.nickname || c.username}</span>
+                    <Tag color="green" style={{ marginLeft: 8 }}>{c.todayCourses} 节</Tag>
+                  </div>
+                  {/* 右侧：学员与时间（纯文本） */}
+                  <div style={{ color: '#333', fontSize: 14 }}>
+                    {(() => {
+                      const items = (c.todayCourseDetails && c.todayCourseDetails.length > 0
+                        ? c.todayCourseDetails.map((item) => `${String(item.startTime).slice(0,5)}-${String(item.endTime).slice(0,5)} ${item.studentName}`)
+                        : (todayCoachDetails[c.nickname || c.username] || []));
+                      return items.length > 0 ? items.join('；') : '—';
+                    })()}
+                  </div>
+                </div>
+              ))
+          )}
+        </Card>
+
+        {/* 图表区域已移除 */}
+
+        {/* 教练详情表格 */}
+        <Card title="教练详情" size="small">
+          <Table
+            dataSource={coaches}
+            columns={[
+              {
+                title: '教练',
+                dataIndex: 'nickname',
+                key: 'nickname',
+                align: 'center',
+                render: (text, record) => (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Avatar size="small" style={{ backgroundColor: getIconColor(record.id) }}>
+                      {(text || record.username)?.[0]?.toUpperCase()}
+                    </Avatar>
+                    <span style={{ marginLeft: '8px' }}>
+                      {text || record.username}
+                    </span>
+                  </div>
+                )
+              },
+              {
+                title: '课表数量',
+                dataIndex: 'timetableCount',
+                key: 'timetableCount',
+                align: 'center',
+                sorter: (a, b) => a.timetableCount - b.timetableCount,
+              },
+              {
+                title: '今日课程',
+                dataIndex: 'todayCourses',
+                key: 'todayCourses',
+                align: 'center',
+                sorter: (a, b) => a.todayCourses - b.todayCourses,
+                defaultSortOrder: 'descend',
+                sortDirections: ['descend', 'ascend'],
+                render: (value) => (
+                  <Tag color={value > 0 ? 'green' : 'default'}>
+                    {value} 节
+                  </Tag>
+                )
+              },
+              {
+                title: '本周课程',
+                dataIndex: 'weeklyCourses',
+                key: 'weeklyCourses',
+                align: 'center',
+                sorter: (a, b) => a.weeklyCourses - b.weeklyCourses,
+                render: (value) => (
+                  <Tag color="blue">
+                    {value} 节
+                  </Tag>
+                )
+              }
+            ]}
+            pagination={false}
+            size="small"
+            style={{ textAlign: 'center' }}
+          />
+        </Card>
+      </div>
+    );
+  };
+
+  // 如果是管理员，显示Tab界面
+  if (user?.role?.toUpperCase() === 'ADMIN') {
+    const tabItems = [
+      {
+        key: 'overview',
+        label: '教练概览',
+        children: <AdminOverview />
+      },
+      {
+        key: 'timetables',
+        label: '我的课表',
+        children: (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>
+              <h1 style={{ margin: 0, fontWeight: '700' }}>我的课表</h1>
+              <Button
+                type="link"
+                icon={<PlusOutlined />}
+                onClick={handleCreateTimetable}
+                style={{ position: 'absolute', right: 0 }}
+                disabled={timetables.length >= 5}
+              >
+                创建课表
+              </Button>
+            </div>
+            {/* 原有的课表列表内容 */}
+            {renderTimetableList()}
+          </div>
+        )
+      }
+    ];
+
+    return (
+      <div className="page-container">
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
+          size="large"
+        />
+        {/* 模态框等保持不变 */}
+        {renderModals()}
+      </div>
+    );
+  }
+
+  // 非管理员用户显示原有界面
   return (
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>

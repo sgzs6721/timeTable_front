@@ -173,3 +173,13 @@ export const clearTimetableSchedulesByAdmin = async (timetableId, options = {}) 
     throw error;
   }
 };
+
+// 获取所有教练的课程统计信息
+export const getCoachesStatistics = async () => {
+  try {
+    const response = await api.get('/admin/coaches/statistics');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
