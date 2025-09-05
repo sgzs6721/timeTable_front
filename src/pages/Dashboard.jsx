@@ -1414,8 +1414,12 @@ const Dashboard = ({ user }) => {
               description={
                 <div style={{ color: '#666', fontSize: '14px' }}>
                   <div>{item.isWeekly ? '星期一至星期日' : `${item.startDate} 至 ${item.endDate}`}</div>
-                  <div>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</div>
-                  <div>共{timetableScheduleCounts[item.id] || 0}课程</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
+                    <span>
+                      共 <span style={{ color: '#8a2be2', fontWeight: 600 }}>{timetableScheduleCounts[item.id] || 0}</span> 课程
+                    </span>
+                  </div>
                 </div>
               }
             />
@@ -1968,19 +1972,7 @@ const Dashboard = ({ user }) => {
         label: '我的课表',
         children: (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>
-              <h1 style={{ margin: 0, fontWeight: '700' }}>我的课表</h1>
-              <Button
-                type="link"
-                icon={<PlusOutlined />}
-                onClick={handleCreateTimetable}
-                style={{ position: 'absolute', right: 0 }}
-                disabled={timetables.length >= 5}
-              >
-                创建课表
-              </Button>
-            </div>
-            {/* 原有的课表列表内容 */}
+            {/* 管理员视图下，顶部标题去掉，创建按钮已移到 Tabs 右上角 */}
             {renderTimetableList()}
           </div>
         )
@@ -1994,6 +1986,18 @@ const Dashboard = ({ user }) => {
           onChange={setActiveTab}
           items={tabItems}
           size="large"
+          tabBarExtraContent={{
+            right: (
+              <Button
+                type="link"
+                icon={<PlusOutlined />}
+                onClick={handleCreateTimetable}
+                disabled={timetables.length >= 5}
+              >
+                创建课表
+              </Button>
+            )
+          }}
         />
         {/* 模态框等保持不变 */}
         {renderModals()}
