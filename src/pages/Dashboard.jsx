@@ -1874,15 +1874,14 @@ const Dashboard = ({ user }) => {
                   borderBottom: idx < coaches.filter(x=>x.todayCourses>0).length-1 ? '1px solid #f0f0f0' : 'none', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  justifyContent: 'space-between', 
                   minHeight: c.todayCourses <= 2 ? '50px' : '80px',
                   padding: c.todayCourses <= 2 ? '8px 0' : '12px 0'
                 }}>
-                  {/* 左侧：教练信息 - 上下居中 */}
+                  {/* 第一列：教练信息 - 占1/3 */}
                   <div style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    minWidth: '120px',
+                    width: '33.33%',
                     height: '100%'
                   }}>
                     <Avatar size="small" style={{ backgroundColor: getIconColor(c.id) }}>
@@ -1899,16 +1898,14 @@ const Dashboard = ({ user }) => {
                       <span style={{ color: '#52c41a', fontWeight: 500, fontSize: 12, marginTop: 4, lineHeight: '1.2' }}>{c.todayCourses}课时</span>
                     </div>
                   </div>
-                  {/* 右侧：学员与时间（时间对齐，名字对齐） */}
+                  {/* 第二列和第三列：学员数据 - 占2/3 */}
                   <div style={{ 
                     color: '#333', 
                     fontSize: 14, 
-                    textAlign: 'right', 
-                    flex: 1, 
-                    marginLeft: 16, 
+                    width: '66.66%',
                     display: 'flex', 
                     flexDirection: 'column', 
-                    justifyContent: 'center',
+                    justifyContent: 'flex-start',
                     height: '100%'
                   }}>
                     {(() => {
@@ -1937,32 +1934,71 @@ const Dashboard = ({ user }) => {
                           marginBottom: index < lines.length - 1 ? '4px' : '0',
                           lineHeight: '1.4',
                           display: 'flex',
-                          justifyContent: 'flex-end',
-                          gap: '8px'
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
                         }}>
-                          {lineItems.map((item, itemIndex) => (
-                            <span key={itemIndex} style={{ 
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
+                          {/* 第一列学员 */}
+                          <div style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            width: '48%'
+                          }}>
+                            <span style={{ 
+                              fontFamily: 'monospace',
+                              minWidth: '32px',
+                              textAlign: 'left'
                             }}>
-                              <span style={{ 
-                                fontFamily: 'monospace',
-                                minWidth: '32px',
-                                textAlign: 'left'
-                              }}>
-                                {item.time}
-                              </span>
-                              <span style={{ 
-                                minWidth: '36px',
-                                textAlign: 'left',
-                                fontFamily: 'monospace',
-                                color: '#1890ff'
-                              }}>
-                                {item.name.length === 2 ? item.name.split('').join('　') : item.name}
-                              </span>
+                              {lineItems[0]?.time || ''}
                             </span>
-                          ))}
+                            <span style={{ 
+                              minWidth: '36px',
+                              textAlign: 'left',
+                              fontFamily: 'monospace',
+                              color: lineItems[0] ? (() => {
+                                // 根据学员名字生成不同颜色
+                                const colors = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#722ed1', '#f5222d'];
+                                const hash = lineItems[0].name.split('').reduce((a, b) => {
+                                  a = ((a << 5) - a) + b.charCodeAt(0);
+                                  return a & a;
+                                }, 0);
+                                return colors[Math.abs(hash) % colors.length];
+                              })() : 'transparent'
+                            }}>
+                              {lineItems[0] ? (lineItems[0].name.length === 2 ? lineItems[0].name.split('').join('　') : lineItems[0].name) : ''}
+                            </span>
+                          </div>
+                          {/* 第二列学员 */}
+                          <div style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            width: '48%'
+                          }}>
+                            <span style={{ 
+                              fontFamily: 'monospace',
+                              minWidth: '32px',
+                              textAlign: 'left'
+                            }}>
+                              {lineItems[1]?.time || ''}
+                            </span>
+                            <span style={{ 
+                              minWidth: '36px',
+                              textAlign: 'left',
+                              fontFamily: 'monospace',
+                              color: lineItems[1] ? (() => {
+                                // 根据学员名字生成不同颜色
+                                const colors = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#722ed1', '#f5222d'];
+                                const hash = lineItems[1].name.split('').reduce((a, b) => {
+                                  a = ((a << 5) - a) + b.charCodeAt(0);
+                                  return a & a;
+                                }, 0);
+                                return colors[Math.abs(hash) % colors.length];
+                              })() : 'transparent'
+                            }}>
+                              {lineItems[1] ? (lineItems[1].name.length === 2 ? lineItems[1].name.split('').join('　') : lineItems[1].name) : ''}
+                            </span>
+                          </div>
                         </div>
                       ));
                     })()}
