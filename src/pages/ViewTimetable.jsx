@@ -3145,11 +3145,29 @@ const ViewTimetable = ({ user }) => {
                         <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>
                           {timetableInfo.ownerName} - {timetableInfo.timetableName}
                         </div>
-                        {timetableInfo.schedules.map((sch, schIndex) => (
-                          <div key={schIndex} style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
-                            {sch.startTime.substring(0, 5)}-{sch.endTime.substring(0, 5)} {sch.studentName}
-                          </div>
-                        ))}
+                        {(() => {
+                          // 每行显示两个课程
+                          const lines = [];
+                          for (let i = 0; i < timetableInfo.schedules.length; i += 2) {
+                            const lineItems = timetableInfo.schedules.slice(i, i + 2);
+                            lines.push(lineItems);
+                          }
+                          return lines.map((lineItems, lineIndex) => (
+                            <div key={lineIndex} style={{ 
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              marginBottom: lineIndex < lines.length - 1 ? '2px' : '0',
+                              marginLeft: '8px'
+                            }}>
+                              <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
+                                {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
+                              </span>
+                              <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
+                                {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
+                              </span>
+                            </div>
+                          ));
+                        })()}
                       </div>
                     ))}
                 </div>
@@ -3160,22 +3178,51 @@ const ViewTimetable = ({ user }) => {
 
         <Table
           columns={[
-            { title: '时间', dataIndex: 'time', key: 'time', width: '40%', align: 'center' },
+            { title: '时间', dataIndex: 'time1', key: 'time1', width: '20%', align: 'center' },
             {
               title: '学员',
-              dataIndex: 'studentName',
-              key: 'studentName',
-              width: '60%',
+              dataIndex: 'studentName1',
+              key: 'studentName1',
+              width: '30%',
               align: 'center',
               onCell: (record) => ({
                 style: {
-                  backgroundColor: record.studentName ? studentColorMap.get(record.studentName) : 'transparent',
+                  backgroundColor: record.studentName1 ? studentColorMap.get(record.studentName1) : 'transparent',
+                }
+              }),
+              render: (text) => text,
+            },
+            { title: '时间', dataIndex: 'time2', key: 'time2', width: '20%', align: 'center' },
+            {
+              title: '学员',
+              dataIndex: 'studentName2',
+              key: 'studentName2',
+              width: '30%',
+              align: 'center',
+              onCell: (record) => ({
+                style: {
+                  backgroundColor: record.studentName2 ? studentColorMap.get(record.studentName2) : 'transparent',
                 }
               }),
               render: (text) => text,
             },
           ]}
-          dataSource={dayScheduleData}
+          dataSource={(() => {
+            // 将单行数据转换为双列显示
+            const result = [];
+            for (let i = 0; i < dayScheduleData.length; i += 2) {
+              const row1 = dayScheduleData[i];
+              const row2 = dayScheduleData[i + 1];
+              result.push({
+                key: i,
+                time1: row1?.time || '',
+                studentName1: row1?.studentName || '',
+                time2: row2?.time || '',
+                studentName2: row2?.studentName || '',
+              });
+            }
+            return result;
+          })()}
           pagination={false}
           size="small"
           bordered

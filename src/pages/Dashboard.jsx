@@ -3,7 +3,7 @@ import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag,
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules } from '../services/timetable';
-import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule } from '../services/weeklyInstance';
+import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule } from '../services/weeklyInstance';
 import { getCoachesStatistics } from '../services/admin';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -11,7 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import './Dashboard.css';
 
 // 新增的组件，用于添加新课程
-const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
+const NewSchedulePopoverContent = ({ onAdd, onCancel, loading }) => {
   const [name, setName] = React.useState('');
 
   return (
@@ -21,15 +21,18 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
         placeholder="学生姓名"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        disabled={loading}
       />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-        <Button size="small" onClick={onCancel} style={{ marginRight: 8 }}>
+        <Button size="small" onClick={onCancel} style={{ marginRight: 8 }} disabled={loading}>
           取消
         </Button>
         <Button
           type="primary"
           size="small"
           onClick={() => onAdd(name)}
+          disabled={!name.trim() || loading}
+          loading={loading}
         >
           添加
         </Button>
@@ -39,7 +42,7 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel }) => {
 };
 
 // 新增的组件，用于修改现有课程
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, timetable }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, timetable, updateLoading, deleteLoading }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const isNameChanged = name !== schedule.studentName;
 
@@ -90,12 +93,22 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, ti
         <strong>时间:</strong> {schedule.startTime.substring(0,5)} - {schedule.endTime.substring(0,5)}
       </p>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-        <Button size="small" onClick={onCancel}>取消</Button>
-        <Button type="primary" danger size="small" onClick={onDelete}>删除</Button>
+        <Button size="small" onClick={onCancel} disabled={updateLoading || deleteLoading}>取消</Button>
+        <Button 
+          type="primary" 
+          danger 
+          size="small" 
+          onClick={onDelete}
+          loading={deleteLoading}
+          disabled={updateLoading}
+        >
+          删除
+        </Button>
         <Button
           size="small"
           onClick={() => onUpdateName(name)}
-          disabled={!isNameChanged}
+          disabled={!isNameChanged || updateLoading || deleteLoading}
+          loading={updateLoading}
           style={{
             backgroundColor: isNameChanged ? '#faad14' : undefined,
             borderColor: isNameChanged ? '#faad14' : undefined,
@@ -180,6 +193,11 @@ const Dashboard = ({ user }) => {
   const [loadingOtherCoachesTomorrow, setLoadingOtherCoachesTomorrow] = useState(false);
   const [otherCoachesExpandedToday, setOtherCoachesExpandedToday] = useState(false);
   const [otherCoachesExpandedTomorrow, setOtherCoachesExpandedTomorrow] = useState(false);
+
+  // 添加loading状态
+  const [addLoading, setAddLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -729,8 +747,6 @@ const Dashboard = ({ user }) => {
 
   const handleShowTodaysCourses = async (timetable) => {
     try {
-      message.loading({ content: '正在查询课程安排...', key: 'courses' });
-      
       let allSchedules = [];
       
       if (timetable.isWeekly) {
@@ -744,7 +760,6 @@ const Dashboard = ({ user }) => {
             if (response.success && response.data.hasInstance) {
               allSchedules = response.data.schedules;
             } else {
-              message.destroy('courses');
               message.error('获取当前周实例失败');
               return;
             }
@@ -757,18 +772,15 @@ const Dashboard = ({ user }) => {
               if (instanceResponse.success && instanceResponse.data.hasInstance) {
                 allSchedules = instanceResponse.data.schedules;
               } else {
-                message.destroy('courses');
                 message.error('生成实例后获取课程数据失败');
                 return;
               }
             } else {
-              message.destroy('courses');
               message.error('生成当前周实例失败');
               return;
             }
           }
         } catch (error) {
-          message.destroy('courses');
           message.error('获取周固定课表实例失败');
           return;
         }
@@ -776,7 +788,6 @@ const Dashboard = ({ user }) => {
         // 对于日期范围课表，使用原来的方式
         const response = await getTimetableSchedules(timetable.id);
         if (!response.success) {
-          message.destroy('courses');
           message.error(response.message || '获取课程安排失败');
           return;
         }
@@ -812,7 +823,7 @@ const Dashboard = ({ user }) => {
           // 直接按星期几过滤本周实例中的课程
           schedulesForDay = allSchedules.filter(s => s.dayOfWeek === dayOfWeekEn);
           
-          subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${dayOfWeekCn})`;
+          subTitle = `${targetDate.isSame(dayjs(), 'day') ? '今日' : '明日'}课程 (${targetDate.format('YYYY-MM-DD')} ${dayOfWeekCn})`;
         } else {
           const dateStr = targetDate.format('YYYY-MM-DD');
           schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
@@ -869,12 +880,10 @@ const Dashboard = ({ user }) => {
       setModalSubTitleTomorrow(tomorrowData.subTitle);
 
       if (todayData.tableData.length === 0 && tomorrowData.tableData.length === 0) {
-        message.destroy('courses');
         message.info('今天和明天都没有安排课程');
         return;
       }
 
-      message.destroy('courses');
       setStudentColorMap(newStudentColorMap);
       setModalMainTitle(timetable.name);
       setTodaysCoursesModalVisible(true);
@@ -912,7 +921,6 @@ const Dashboard = ({ user }) => {
         });
 
     } catch (error) {
-      message.destroy('courses');
       message.error('查询失败，请检查网络连接');
     }
   };
@@ -1011,6 +1019,7 @@ const Dashboard = ({ user }) => {
                 <NewSchedulePopoverContent
                   onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time1)}
                   onCancel={() => setOpenPopoverKey(null)}
+                  loading={addLoading}
                 />
               }
               trigger="click"
@@ -1033,6 +1042,8 @@ const Dashboard = ({ user }) => {
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
+                  updateLoading={updateLoading}
+                  deleteLoading={deleteLoading}
                 />
               }
               trigger="click"
@@ -1081,6 +1092,7 @@ const Dashboard = ({ user }) => {
                 <NewSchedulePopoverContent
                   onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time2)}
                   onCancel={() => setOpenPopoverKey(null)}
+                  loading={addLoading}
                 />
               }
               trigger="click"
@@ -1103,6 +1115,8 @@ const Dashboard = ({ user }) => {
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
+                  updateLoading={updateLoading}
+                  deleteLoading={deleteLoading}
                 />
               }
               trigger="click"
@@ -1154,6 +1168,7 @@ const Dashboard = ({ user }) => {
                 <NewSchedulePopoverContent
                   onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time1)}
                   onCancel={() => setOpenPopoverKey(null)}
+                  loading={addLoading}
                 />
               }
               trigger="click"
@@ -1176,6 +1191,8 @@ const Dashboard = ({ user }) => {
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
+                  updateLoading={updateLoading}
+                  deleteLoading={deleteLoading}
                 />
               }
               trigger="click"
@@ -1224,6 +1241,7 @@ const Dashboard = ({ user }) => {
                 <NewSchedulePopoverContent
                   onAdd={(studentName) => handleAddSchedule(studentName, targetDate, record.time2)}
                   onCancel={() => setOpenPopoverKey(null)}
+                  loading={addLoading}
                 />
               }
               trigger="click"
@@ -1246,6 +1264,8 @@ const Dashboard = ({ user }) => {
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
+                  updateLoading={updateLoading}
+                  deleteLoading={deleteLoading}
                 />
               }
               trigger="click"
@@ -1268,6 +1288,8 @@ const Dashboard = ({ user }) => {
       message.warning('学生姓名不能为空');
       return;
     }
+
+    setAddLoading(true);
 
     const [startHour, endHour] = displayTime.split('-');
     const startTime = `${startHour.padStart(2, '0')}:00:00`;
@@ -1293,7 +1315,39 @@ const Dashboard = ({ user }) => {
     }
 
     try {
-      const response = await createSchedule(currentTimetable.id, payload);
+      let response;
+      
+      // 检查是否有当前周实例
+      const instanceCheck = await checkCurrentWeekInstance(currentTimetable.id);
+      console.log('instanceCheck response:', instanceCheck);
+      
+      if (instanceCheck.success && instanceCheck.data.hasInstance) {
+        // 有实例，添加到实例中
+        const instanceId = instanceCheck.data.instanceId || instanceCheck.data.id;
+        console.log('Using existing instanceId:', instanceId);
+        if (!instanceId) {
+          message.error('无法获取实例ID');
+          return;
+        }
+        response = await createInstanceSchedule(instanceId, payload);
+      } else {
+        // 没有实例，先创建实例再添加
+        const createInstanceResponse = await generateCurrentWeekInstance(currentTimetable.id);
+        console.log('createInstanceResponse:', createInstanceResponse);
+        if (createInstanceResponse.success) {
+          const instanceId = createInstanceResponse.data.instanceId || createInstanceResponse.data.id;
+          console.log('Using new instanceId:', instanceId);
+          if (!instanceId) {
+            message.error('无法获取新创建的实例ID');
+            return;
+          }
+          response = await createInstanceSchedule(instanceId, payload);
+        } else {
+          message.error('创建周实例失败');
+          return;
+        }
+      }
+      
       if (response.success) {
         message.success('添加成功');
         setOpenPopoverKey(null);
@@ -1306,6 +1360,8 @@ const Dashboard = ({ user }) => {
       }
     } catch (error) {
       message.error('网络错误，添加失败');
+    } finally {
+      setAddLoading(false);
     }
   };
 
@@ -1315,6 +1371,7 @@ const Dashboard = ({ user }) => {
       return;
     }
 
+    setUpdateLoading(true);
     try {
       let response;
       // 检查是否是实例数据（通过schedule对象是否有instanceId字段来判断）
@@ -1342,10 +1399,13 @@ const Dashboard = ({ user }) => {
       }
     } catch (error) {
       message.error('操作失败，请重试');
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
   const handleDeleteSchedule = async (scheduleId, schedule) => {
+    setDeleteLoading(true);
     try {
       let response;
       // 检查是否是实例数据（通过schedule对象是否有instanceId字段来判断）
@@ -1369,6 +1429,8 @@ const Dashboard = ({ user }) => {
       }
     } catch (error) {
       message.error('操作失败，请重试');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -2455,11 +2517,29 @@ const Dashboard = ({ user }) => {
                             <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>
                               {timetableInfo.ownerName} - {timetableInfo.timetableName}
                             </div>
-                            {timetableInfo.schedules.map((sch, schIndex) => (
-                              <div key={schIndex} style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
-                                {sch.startTime.substring(0, 5)}-{sch.endTime.substring(0, 5)} {sch.studentName}
-                              </div>
-                            ))}
+                            {(() => {
+                              // 每行显示两个课程
+                              const lines = [];
+                              for (let i = 0; i < timetableInfo.schedules.length; i += 2) {
+                                const lineItems = timetableInfo.schedules.slice(i, i + 2);
+                                lines.push(lineItems);
+                              }
+                              return lines.map((lineItems, lineIndex) => (
+                                <div key={lineIndex} style={{ 
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  marginBottom: lineIndex < lines.length - 1 ? '2px' : '0',
+                                  marginLeft: '8px'
+                                }}>
+                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
+                                    {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
+                                  </span>
+                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
+                                    {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
+                                  </span>
+                                </div>
+                              ));
+                            })()}
                           </div>
                         ))}
                     </div>
@@ -2546,11 +2626,29 @@ const Dashboard = ({ user }) => {
                             <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>
                               {timetableInfo.ownerName} - {timetableInfo.timetableName}
                             </div>
-                            {timetableInfo.schedules.map((sch, schIndex) => (
-                              <div key={schIndex} style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
-                                {sch.startTime.substring(0, 5)}-{sch.endTime.substring(0, 5)} {sch.studentName}
-                              </div>
-                            ))}
+                            {(() => {
+                              // 每行显示两个课程
+                              const lines = [];
+                              for (let i = 0; i < timetableInfo.schedules.length; i += 2) {
+                                const lineItems = timetableInfo.schedules.slice(i, i + 2);
+                                lines.push(lineItems);
+                              }
+                              return lines.map((lineItems, lineIndex) => (
+                                <div key={lineIndex} style={{ 
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  marginBottom: lineIndex < lines.length - 1 ? '2px' : '0',
+                                  marginLeft: '8px'
+                                }}>
+                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
+                                    {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
+                                  </span>
+                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
+                                    {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
+                                  </span>
+                                </div>
+                              ));
+                            })()}
                           </div>
                         ))}
                     </div>
