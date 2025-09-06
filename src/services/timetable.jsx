@@ -353,3 +353,13 @@ export const copyTimetableToUser = async (sourceTimetableId, targetUserId, newTi
     throw error;
   }
 };
+
+// 批量删除课程
+export const deleteSchedulesBatch = async (timetableId, scheduleIds) => {
+  try {
+    const response = await api.delete(`/timetables/${timetableId}/schedules/batch/ids`, { data: scheduleIds });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};

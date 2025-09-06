@@ -98,3 +98,8 @@ export const checkCurrentWeekInstance = (timetableId) => {
 export const clearCurrentWeekInstanceSchedules = (timetableId) => {
   return api.delete(`/weekly-instances/current/${timetableId}/schedules`);
 };
+
+// 批量删除周实例中的课程
+export const deleteInstanceSchedulesBatch = (scheduleIds) => {
+  return api.delete('/weekly-instances/schedules/batch', { data: scheduleIds });
+};

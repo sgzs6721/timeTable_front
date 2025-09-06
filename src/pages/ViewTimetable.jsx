@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate } from '../services/timetable';
+import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch } from '../services/timetable';
 import { 
   getCurrentWeekInstance, 
   generateCurrentWeekInstance, 
@@ -13,7 +13,8 @@ import {
   createInstanceSchedule,
   createInstanceSchedulesBatch,
   updateInstanceSchedule,
-  deleteInstanceSchedule
+  deleteInstanceSchedule,
+  deleteInstanceSchedulesBatch
 } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -269,6 +270,10 @@ const ViewTimetable = ({ user }) => {
   const [selectedCells, setSelectedCells] = useState(new Set());
   const [batchScheduleModalVisible, setBatchScheduleModalVisible] = useState(false);
   const [batchStudentName, setBatchStudentName] = useState('');
+  
+  // 多选删除功能状态
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedSchedulesForDelete, setSelectedSchedulesForDelete] = useState(new Set());
 
   // Day schedule modal state
   const [dayScheduleModalVisible, setDayScheduleModalVisible] = useState(false);
@@ -601,16 +606,16 @@ const ViewTimetable = ({ user }) => {
     let targetDate = null;
 
     if (timetable.isWeekly) {
-      // 对于周固定课表，总是尝试使用实例数据
-      if (currentWeekInstance) {
-        // 有当前周实例：显示实例中的课程，使用实例的周开始日期
+      // 对于周固定课表，根据当前视图模式决定显示内容
+      if (viewMode === 'instance' && currentWeekInstance) {
+        // 实例视图且有当前周实例：显示实例中的课程，使用实例的周开始日期
         const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
         targetDate = instanceStartDate.add(dayIndex, 'day');
         const dateStr = targetDate.format('YYYY-MM-DD');
         schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
         modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
       } else {
-        // 没有当前周实例：显示固定课表模板的课程
+        // 模板视图或没有当前周实例：显示固定课表模板的课程
         schedulesForDay = allSchedules.filter(s => s.dayOfWeek.toLowerCase() === day.key);
         modalTitle = `${timetable.name} - ${day.label}`;
         // 对于周固定课表，计算本周对应的日期
@@ -947,10 +952,14 @@ const ViewTimetable = ({ user }) => {
 
   // 切换到当前周实例视图
   const switchToInstanceView = async () => {
-    // 切换视图时自动退出多选模式
+    // 切换视图时自动退出多选模式和删除模式
     if (multiSelectMode) {
       setMultiSelectMode(false);
       setSelectedCells(new Set());
+    }
+    if (deleteMode) {
+      setDeleteMode(false);
+      setSelectedSchedulesForDelete(new Set());
     }
     setViewMode('instance');
     // 具体的检查、生成、获取数据逻辑由 fetchInstanceSchedules 处理
@@ -958,10 +967,14 @@ const ViewTimetable = ({ user }) => {
 
   // 切换到固定课表视图
   const switchToTemplateView = () => {
-    // 切换视图时自动退出多选模式
+    // 切换视图时自动退出多选模式和删除模式
     if (multiSelectMode) {
       setMultiSelectMode(false);
       setSelectedCells(new Set());
+    }
+    if (deleteMode) {
+      setDeleteMode(false);
+      setSelectedSchedulesForDelete(new Set());
     }
     setViewMode('template');
   };
@@ -1565,6 +1578,133 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
+  // 多选删除功能处理函数
+  const toggleDeleteMode = () => {
+    const newMode = !deleteMode;
+    setDeleteMode(newMode);
+    setSelectedSchedulesForDelete(new Set()); // 切换模式时总是清空选择
+    setOpenPopoverKey(null);
+
+    // 如果是进入删除模式，显示提示
+    if (newMode) {
+      message.info('已进入删除模式，点击有内容的单元格进行选择');
+    }
+  };
+
+  // 处理删除模式下的单元格选择
+  const handleDeleteCellSelection = (cellKey, dayKey, timeKey) => {
+    const newSelected = new Set(selectedSchedulesForDelete);
+    if (newSelected.has(cellKey)) {
+      newSelected.delete(cellKey);
+    } else {
+      newSelected.add(cellKey);
+    }
+    setSelectedSchedulesForDelete(newSelected);
+  };
+
+  // 批量删除选中的课程
+  const handleBatchDelete = async () => {
+    if (selectedSchedulesForDelete.size === 0) {
+      message.warning('请先选择要删除的课程');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedSchedulesForDelete.size} 个课程吗？此操作不可撤销。`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          console.log('开始批量删除，选中的cellKey:', Array.from(selectedSchedulesForDelete));
+          console.log('当前allSchedules:', allSchedules);
+          
+          // 收集所有要删除的schedule ID
+          const scheduleIdsToDelete = [];
+          
+          for (const cellKey of selectedSchedulesForDelete) {
+            // 从cellKey中解析出schedule信息
+            // cellKey格式: ${day.key}-${record.key}，其中record.key是timeSlots的索引
+            const [dayKey, timeIndex] = cellKey.split('-');
+            const timeSlot = timeSlots[parseInt(timeIndex)];
+            console.log(`处理cellKey: ${cellKey}, dayKey: ${dayKey}, timeIndex: ${timeIndex}, timeSlot: ${timeSlot}`);
+            
+            const schedules = allSchedules.filter(s => {
+              const timeKeyFromSchedule = `${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`;
+              let scheduleDayKey;
+              if (timetable.isWeekly) {
+                scheduleDayKey = s.dayOfWeek.toLowerCase();
+              } else {
+                const scheduleDate = dayjs(s.scheduleDate);
+                const dayIndex = scheduleDate.day();
+                const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                scheduleDayKey = dayNames[dayIndex];
+              }
+              return timeKeyFromSchedule === timeSlot && scheduleDayKey === dayKey;
+            });
+            
+            console.log(`找到的schedules:`, schedules);
+
+            if (schedules.length > 0) {
+              const schedule = schedules[0];
+              console.log(`准备删除schedule:`, schedule);
+              scheduleIdsToDelete.push(schedule.id);
+            } else {
+              console.log('没有找到匹配的schedule');
+            }
+          }
+
+          // 使用批量删除接口
+          if (scheduleIdsToDelete.length > 0) {
+            console.log('准备批量删除的schedule IDs:', scheduleIdsToDelete);
+            if (viewMode === 'instance') {
+              console.log('调用deleteInstanceSchedulesBatch');
+              const response = await deleteInstanceSchedulesBatch(scheduleIdsToDelete);
+              if (response.success) {
+                message.success(`成功删除 ${response.data} 个课程`);
+              } else {
+                message.error(response.message || '批量删除失败');
+              }
+            } else {
+              console.log('调用deleteSchedulesBatch');
+              const response = await deleteSchedulesBatch(timetableId, scheduleIdsToDelete);
+              if (response.success) {
+                message.success(`成功删除 ${response.data} 个课程`);
+              } else {
+                message.error(response.message || '批量删除失败');
+              }
+            }
+          } else {
+            message.warning('没有找到要删除的课程');
+          }
+          
+          // 清空选择并退出删除模式
+          setSelectedSchedulesForDelete(new Set());
+          setDeleteMode(false);
+          
+          // 刷新数据
+          if (viewMode === 'template') {
+            const week = timetable && !timetable.isWeekly ? currentWeek : null;
+            const response = await getTimetableSchedules(timetableId, week);
+            if (response.success) {
+              setAllSchedules(response.data);
+            }
+          } else if (viewMode === 'instance') {
+            const response = await getCurrentWeekInstance(timetableId);
+            if (response.success && response.data.hasInstance) {
+              setCurrentWeekInstance(response.data.instance);
+              setAllSchedules(response.data.schedules);
+            }
+          }
+        } catch (error) {
+          console.error('批量删除失败:', error);
+          message.error('批量删除失败，请重试');
+        }
+      }
+    });
+  };
+
   const handleCellSelection = (cellKey, dayIndex, timeIndex) => {
     if (!multiSelectMode) return;
 
@@ -1860,6 +2000,10 @@ const ViewTimetable = ({ user }) => {
               if (multiSelectMode) {
                 e.stopPropagation();
                 handleCellSelection(cellKey, index, record.key);
+              } else if (deleteMode) {
+                // 删除模式下，空白单元格不可点击
+                e.stopPropagation();
+                return;
               } else if (moveMode) {
                 e.stopPropagation();
                 handleSelectMoveTarget(day.key, record.key);
@@ -2058,11 +2202,15 @@ const ViewTimetable = ({ user }) => {
                 placement={getSmartPlacement(index, record.key)}
                 title={null}
                 content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} /> }
-                trigger={multiSelectMode ? "contextMenu" : "click"}
-                open={!timetable?.isArchived && openPopoverKey === cellKey}
+                trigger={multiSelectMode ? "contextMenu" : (deleteMode ? "none" : "click")}
+                open={!timetable?.isArchived && !deleteMode && openPopoverKey === cellKey}
                 onOpenChange={handleOpenChange}
               >
-                <div style={{ height: '48px', cursor: 'pointer' }} />
+                <div style={{ 
+                  height: '48px', 
+                  cursor: deleteMode ? 'not-allowed' : 'pointer',
+                  opacity: deleteMode ? 0.5 : 1
+                }} />
               </Popover>
             );
           }
@@ -2097,7 +2245,7 @@ const ViewTimetable = ({ user }) => {
             </div>
           );
 
-          // 在移动模式或复制模式下，有内容的单元格不可点击
+          // 在移动模式、复制模式或多选模式下，有内容的单元格不可点击
           if (moveMode || copyMode || multiSelectMode) {
             const isSourceCellForMove = moveMode && scheduleToMove && schedules.some(s => s.id === scheduleToMove.id);
             const isSourceCellForCopy = copyMode && scheduleToCopy && schedules.some(s => s.id === scheduleToCopy.id);
@@ -2189,6 +2337,74 @@ const ViewTimetable = ({ user }) => {
                     </div>
                   );
                 })}
+              </div>
+            );
+          }
+
+          // 删除模式下的有内容单元格
+          if (deleteMode) {
+            const isSelected = selectedSchedulesForDelete.has(cellKey);
+            return (
+              <div
+                style={{
+                  height: '100%',
+                  minHeight: '48px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  width: '100%',
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? '#fff7e6' : 'transparent',
+                  border: isSelected ? '2px solid #fa8c16' : '1px solid #f0f0f0',
+                  borderRadius: '4px',
+                  position: 'relative'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteCellSelection(cellKey, day.key, record.key);
+                }}
+                title={isSelected ? '点击取消选择' : '点击选择删除'}
+              >
+                {schedules.map((student, idx) => (
+                  <div
+                    key={student.id}
+                    style={{
+                      backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#333',
+                      fontSize: '12px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.2',
+                      borderTop: idx > 0 ? '1px solid #fff' : 'none',
+                      padding: '2px 4px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {student.studentName}
+                  </div>
+                ))}
+                {/* 右上角的删除选择标记 */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '4px',
+                    right: '4px',
+                    width: '12px',
+                    height: '12px',
+                    border: isSelected ? '2px solid #fa8c16' : '1px solid #d9d9d9',
+                    borderRadius: '2px',
+                    backgroundColor: isSelected ? '#fa8c16' : 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '8px',
+                    color: isSelected ? 'white' : '#ccc'
+                  }}
+                >
+                  {isSelected ? '✓' : ''}
+                </div>
               </div>
             );
           }
@@ -2414,7 +2630,7 @@ const ViewTimetable = ({ user }) => {
 
 
       {/* 图例说明和视图切换按钮 */}
-      {timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
+      {timetable && (
         <div style={{ 
           marginBottom: '12px', 
           padding: '8px 12px', 
@@ -2428,7 +2644,7 @@ const ViewTimetable = ({ user }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {/* 在实例视图时显示图例 */}
-              {viewMode === 'instance' && (
+              {viewMode === 'instance' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ 
@@ -2453,20 +2669,28 @@ const ViewTimetable = ({ user }) => {
                 </>
               )}
               {/* 在固定课表视图时显示提示信息 */}
-              {viewMode === 'template' && (
+              {viewMode === 'template' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
                 <span style={{ color: '#666', fontSize: '12px' }}>
                   固定课表模板视图
                 </span>
               )}
+              {/* 日期范围课表显示提示信息 */}
+              {!timetable?.isWeekly && timetable?.startDate && timetable?.endDate && (
+                <span style={{ color: '#666', fontSize: '12px' }}>
+                  日期范围课表
+                </span>
+              )}
             </div>
             
-            {/* 视图切换按钮 */}
-            {Boolean(timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) && (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <Button
-                    type="default"
-                    size="small"
+            {/* 视图切换按钮和多选删除按钮 */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {/* 视图切换按钮只在周固定课表中显示 */}
+              {Boolean(timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <Button
+                      type="default"
+                      size="small"
                     onClick={switchToInstanceView}
                     loading={instanceLoading}
                     disabled={instanceLoading}
@@ -2569,8 +2793,9 @@ const ViewTimetable = ({ user }) => {
                 >
                   固定课表
                 </Button>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
           
           {/* 分隔线 */}
@@ -2584,7 +2809,7 @@ const ViewTimetable = ({ user }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {/* 左侧：多选排课按钮 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
-              {!moveMode && !copyMode && (
+              {!moveMode && !copyMode && !deleteMode && (
                 <Button
                   type={multiSelectMode ? 'default' : 'default'}
                   size="small"
@@ -2611,8 +2836,13 @@ const ViewTimetable = ({ user }) => {
                   )}
                 </span>
               )}
+              {deleteMode && (
+                <span style={{ fontSize: '14px', color: '#fa8c16' }}>
+                  已选择 {selectedSchedulesForDelete.size} 个课程
+                </span>
+              )}
               {/* 非多选模式时显示课时信息 */}
-              {!multiSelectMode && !moveMode && !copyMode && weeklyStats.count > 0 && (
+              {!multiSelectMode && !deleteMode && !moveMode && !copyMode && weeklyStats.count > 0 && (
                 <span style={{ 
                   fontSize: '14px', 
                   color: '#666'
@@ -2626,8 +2856,22 @@ const ViewTimetable = ({ user }) => {
               )}
             </div>
             
-            {/* 右侧：批量排课按钮 */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            {/* 右侧：多选删除按钮、批量排课按钮和批量删除按钮 */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              {!timetable?.isArchived && !moveMode && !copyMode && !multiSelectMode && (
+                <Button
+                  type={deleteMode ? 'default' : 'default'}
+                  size="small"
+                  onClick={toggleDeleteMode}
+                  style={deleteMode ? {
+                    backgroundColor: '#fff2f0',
+                    borderColor: '#ffccc7',
+                    color: '#cf1322'
+                  } : {}}
+                >
+                  {deleteMode ? '退出删除' : '多选删除'}
+                </Button>
+              )}
               {multiSelectMode && selectedCells.size > 0 && !moveMode && (
                 <Button
                   type="primary"
@@ -2635,6 +2879,16 @@ const ViewTimetable = ({ user }) => {
                   onClick={openBatchScheduleModal}
                 >
                   批量排课
+                </Button>
+              )}
+              {deleteMode && selectedSchedulesForDelete.size > 0 && (
+                <Button
+                  type="primary"
+                  danger
+                  size="small"
+                  onClick={handleBatchDelete}
+                >
+                  批量删除
                 </Button>
               )}
             </div>
