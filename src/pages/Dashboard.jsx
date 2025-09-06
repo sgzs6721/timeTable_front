@@ -3,7 +3,7 @@ import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag,
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules } from '../services/timetable';
-import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance } from '../services/weeklyInstance';
+import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule } from '../services/weeklyInstance';
 import { getCoachesStatistics } from '../services/admin';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -43,6 +43,20 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, ti
   const [name, setName] = React.useState(schedule.studentName);
   const isNameChanged = name !== schedule.studentName;
 
+  // 星期转换函数
+  const convertDayOfWeekToChinese = (dayOfWeek) => {
+    const dayMap = {
+      'MONDAY': '星期一',
+      'TUESDAY': '星期二', 
+      'WEDNESDAY': '星期三',
+      'THURSDAY': '星期四',
+      'FRIDAY': '星期五',
+      'SATURDAY': '星期六',
+      'SUNDAY': '星期日'
+    };
+    return dayMap[dayOfWeek] || dayOfWeek;
+  };
+
   return (
     <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
       {/* 关闭图标 */}
@@ -67,7 +81,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onCancel, ti
       </div>
 
       {timetable.isWeekly ? (
-        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {schedule.dayOfWeek}</p>
+        <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>星期:</strong> {convertDayOfWeekToChinese(schedule.dayOfWeek)}</p>
       ) : (
         <p style={{ margin: '4px 0', textAlign: 'left' }}><strong>日期:</strong> {schedule.scheduleDate}</p>
       )}
@@ -220,6 +234,12 @@ const Dashboard = ({ user }) => {
 
   // 兼容移动端的复制函数
   const copyToClipboard = async (text) => {
+    // 如果没有可复制的内容，直接弹出信息
+    if (!text || text === '没有可复制的课程') {
+      message.info(text || '没有可复制的课程');
+      return;
+    }
+
     try {
       // 优先使用现代 Clipboard API
       if (navigator.clipboard && window.isSecureContext) {
@@ -899,24 +919,40 @@ const Dashboard = ({ user }) => {
 
   // 生成复制文本
   const generateCopyText = (schedules, isToday = true, includeOtherCoaches = false, otherCoachesData = null) => {
-    if (!schedules || schedules.length === 0) return '没有可复制的课程';
+    // 调试：打印currentTimetable的结构
+    console.log('currentTimetable:', currentTimetable);
+    console.log('user:', user);
+    console.log('schedules:', schedules);
+    console.log('includeOtherCoaches:', includeOtherCoaches);
+    console.log('otherCoachesData:', otherCoachesData);
     
-    // 获取当前教练名称
-    const coachName = currentTimetable?.nickname || currentTimetable?.username || currentTimetable?.user?.username || '教练';
+    // 检查是否有任何可复制的内容
+    const hasCurrentCoachCourses = schedules && schedules.length > 0;
+    const hasOtherCoachesCourses = includeOtherCoaches && otherCoachesData && otherCoachesData.timetables && otherCoachesData.timetables.length > 0;
+    
+    if (!hasCurrentCoachCourses && !hasOtherCoachesCourses) {
+      return '没有可复制的课程';
+    }
+    
+    // 获取当前教练名称 - 优先使用当前登录用户的信息
+    const coachName = user?.nickname || user?.username || currentTimetable?.ownerName || currentTimetable?.nickname || currentTimetable?.username || currentTimetable?.user?.nickname || currentTimetable?.user?.username || '教练';
     
     // 构建标题
     const dateStr = isToday ? dayjs().format('YYYY年MM月DD日') : dayjs().add(1, 'day').format('YYYY年MM月DD日');
     const dayLabel = isToday ? '今日' : '明日';
     const title = `${dateStr} ${dayLabel}课程安排`;
     
+    let result = title;
+    
     // 构建当前教练的课程列表
-    const courseList = schedules.map(schedule => {
-        const startHour = parseInt(schedule.startTime.substring(0, 2));
-        const displayTime = `${startHour}-${startHour + 1}`;
-        return `${displayTime} ${schedule.studentName}`;
-    }).join('\n');
-
-    let result = `${title}\n${coachName}：\n${courseList}`;
+    if (hasCurrentCoachCourses) {
+      const courseList = schedules.map(schedule => {
+          const startHour = parseInt(schedule.startTime.substring(0, 2));
+          const displayTime = `${startHour}-${startHour + 1}`;
+          return `${displayTime} ${schedule.studentName}`;
+      }).join('\n');
+      result += `\n${coachName}：\n${courseList}`;
+    }
 
     // 如果需要包含其他教练的课程
     if (includeOtherCoaches && otherCoachesData && otherCoachesData.timetables && otherCoachesData.timetables.length > 0) {
@@ -945,14 +981,14 @@ const Dashboard = ({ user }) => {
       title: '时间',
       dataIndex: 'time1',
       key: 'time1',
-      width: '25%',
+      width: '20%',
       align: 'center',
     },
     {
       title: '学员',
       dataIndex: 'studentName1',
       key: 'studentName1',
-      width: '25%',
+      width: '30%',
       align: 'center',
       onCell: (record) => ({
         style: {
@@ -993,7 +1029,7 @@ const Dashboard = ({ user }) => {
               content={
                 <SchedulePopoverContent
                   schedule={record.schedule1}
-                  onDelete={() => handleDeleteSchedule(record.schedule1.id)}
+                  onDelete={() => handleDeleteSchedule(record.schedule1.id, record.schedule1)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
@@ -1015,14 +1051,14 @@ const Dashboard = ({ user }) => {
       title: '时间',
       dataIndex: 'time2',
       key: 'time2',
-      width: '25%',
+      width: '20%',
       align: 'center',
     },
     {
       title: '学员',
       dataIndex: 'studentName2',
       key: 'studentName2',
-      width: '25%',
+      width: '20%',
       align: 'center',
       onCell: (record) => ({
         style: {
@@ -1063,7 +1099,7 @@ const Dashboard = ({ user }) => {
               content={
                 <SchedulePopoverContent
                   schedule={record.schedule2}
-                  onDelete={() => handleDeleteSchedule(record.schedule2.id)}
+                  onDelete={() => handleDeleteSchedule(record.schedule2.id, record.schedule2)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
@@ -1088,14 +1124,14 @@ const Dashboard = ({ user }) => {
       title: '时间',
       dataIndex: 'time1',
       key: 'time1',
-      width: '25%',
+      width: '20%',
       align: 'center',
     },
     {
       title: '学员',
       dataIndex: 'studentName1',
       key: 'studentName1',
-      width: '25%',
+      width: '20%',
       align: 'center',
       onCell: (record) => ({
         style: {
@@ -1136,7 +1172,7 @@ const Dashboard = ({ user }) => {
               content={
                 <SchedulePopoverContent
                   schedule={record.schedule1}
-                  onDelete={() => handleDeleteSchedule(record.schedule1.id)}
+                  onDelete={() => handleDeleteSchedule(record.schedule1.id, record.schedule1)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule1, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
@@ -1158,14 +1194,14 @@ const Dashboard = ({ user }) => {
       title: '时间',
       dataIndex: 'time2',
       key: 'time2',
-      width: '25%',
+      width: '20%',
       align: 'center',
     },
     {
       title: '学员',
       dataIndex: 'studentName2',
       key: 'studentName2',
-      width: '25%',
+      width: '20%',
       align: 'center',
       onCell: (record) => ({
         style: {
@@ -1206,7 +1242,7 @@ const Dashboard = ({ user }) => {
               content={
                 <SchedulePopoverContent
                   schedule={record.schedule2}
-                  onDelete={() => handleDeleteSchedule(record.schedule2.id)}
+                  onDelete={() => handleDeleteSchedule(record.schedule2.id, record.schedule2)}
                   onUpdateName={(newName) => handleUpdateSchedule(record.schedule2, newName)}
                   onCancel={() => setOpenPopoverKey(null)}
                   timetable={currentTimetable}
@@ -1280,9 +1316,20 @@ const Dashboard = ({ user }) => {
     }
 
     try {
-      const response = await updateSchedule(currentTimetable.id, schedule.id, {
-        studentName: newName.trim(),
-      });
+      let response;
+      // 检查是否是实例数据（通过schedule对象是否有instanceId字段来判断）
+      if (schedule.instanceId || schedule.weeklyInstanceId) {
+        // 使用实例更新API
+        response = await updateInstanceSchedule(schedule.id, {
+          studentName: newName.trim(),
+        });
+      } else {
+        // 使用模板更新API
+        response = await updateSchedule(currentTimetable.id, schedule.id, {
+          studentName: newName.trim(),
+        });
+      }
+      
       if (response.success) {
         message.success('修改成功');
         setOpenPopoverKey(null);
@@ -1298,9 +1345,18 @@ const Dashboard = ({ user }) => {
     }
   };
 
-  const handleDeleteSchedule = async (scheduleId) => {
+  const handleDeleteSchedule = async (scheduleId, schedule) => {
     try {
-      const response = await deleteSchedule(currentTimetable.id, scheduleId);
+      let response;
+      // 检查是否是实例数据（通过schedule对象是否有instanceId字段来判断）
+      if (schedule && (schedule.instanceId || schedule.weeklyInstanceId)) {
+        // 使用实例删除API
+        response = await deleteInstanceSchedule(scheduleId);
+      } else {
+        // 使用模板删除API
+        response = await deleteSchedule(currentTimetable.id, scheduleId);
+      }
+      
       if (response.success) {
         message.success('删除成功');
         setOpenPopoverKey(null);
@@ -1483,7 +1539,6 @@ const Dashboard = ({ user }) => {
                     dataSource={todaysCoursesData}
                     pagination={false}
                     size="small"
-                    scroll={{ x: 400 }}
                   />
                   
                   {/* 其他教练今日课程 */}
@@ -1508,17 +1563,34 @@ const Dashboard = ({ user }) => {
                           borderRadius: '4px',
                           padding: '8px'
                         }}>
-                          {otherCoachesTodayData.length > 0 ? (
-                            otherCoachesTodayData.map((timetableInfo, index) => (
-                              <div key={index} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: index < otherCoachesTodayData.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                          {otherCoachesDataToday && otherCoachesDataToday.timetables && otherCoachesDataToday.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).length > 0 ? (
+                            otherCoachesDataToday.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).map((timetableInfo, index) => (
+                              <div key={index} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: index < otherCoachesDataToday.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                                 <div style={{ fontWeight: '500', marginBottom: '4px' }}>{timetableInfo.ownerName}</div>
                                 {timetableInfo.schedules.length > 0 ? (
                                   <div style={{ fontSize: '12px', color: '#666' }}>
-                                    {timetableInfo.schedules.map((schedule, sIndex) => (
-                                      <div key={sIndex}>
-                                        {schedule.startTime.substring(0,5)}-{schedule.endTime.substring(0,5)} {schedule.studentName}
-                                      </div>
-                                    ))}
+                                    {(() => {
+                                      // 每行显示两个课程
+                                      const lines = [];
+                                      for (let i = 0; i < timetableInfo.schedules.length; i += 2) {
+                                        const lineItems = timetableInfo.schedules.slice(i, i + 2);
+                                        lines.push(lineItems);
+                                      }
+                                      return lines.map((lineItems, lineIndex) => (
+                                        <div key={lineIndex} style={{ 
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          marginBottom: lineIndex < lines.length - 1 ? '2px' : '0'
+                                        }}>
+                                          <span style={{ width: '48%' }}>
+                                            {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
+                                          </span>
+                                          <span style={{ width: '48%' }}>
+                                            {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
+                                          </span>
+                                        </div>
+                                      ));
+                                    })()}
                                   </div>
                                 ) : (
                                   <div style={{ fontSize: '12px', color: '#999' }}>今日无课程</div>
@@ -1534,10 +1606,17 @@ const Dashboard = ({ user }) => {
                   )}
                   
                   {/* 复制按钮 */}
-                  <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                  <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Checkbox
+                      checked={copyOtherCoachesToday}
+                      onChange={(e) => setCopyOtherCoachesToday(e.target.checked)}
+                      disabled={loadingOtherCoachesToday}
+                    >
+                      复制其他教练课程
+                    </Checkbox>
                     <Button
                       onClick={() => {
-                        const text = generateCopyText(todaysSchedulesForCopy, true, otherCoachesExpandedToday, otherCoachesTodayData);
+                        const text = generateCopyText(todaysSchedulesForCopy, true, copyOtherCoachesToday, otherCoachesDataToday);
                         copyToClipboard(text);
                       }}
                     >
@@ -1557,11 +1636,10 @@ const Dashboard = ({ user }) => {
                     dataSource={tomorrowsCoursesData}
                     pagination={false}
                     size="small"
-                    scroll={{ x: 400 }}
                   />
                   
                   {/* 其他教练明日课程 */}
-                  {tomorrowsCoursesData.length > 0 && (
+                  {(loadingOtherCoachesTomorrow || (otherCoachesDataTomorrow && otherCoachesDataTomorrow.timetables && otherCoachesDataTomorrow.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).length > 0)) && (
                     <div style={{ marginTop: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontWeight: '500' }}>其他教练明日课程</span>
@@ -1582,17 +1660,34 @@ const Dashboard = ({ user }) => {
                           borderRadius: '4px',
                           padding: '8px'
                         }}>
-                          {otherCoachesTomorrowData.length > 0 ? (
-                            otherCoachesTomorrowData.map((timetableInfo, index) => (
-                              <div key={index} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: index < otherCoachesTomorrowData.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                          {otherCoachesDataTomorrow && otherCoachesDataTomorrow.timetables && otherCoachesDataTomorrow.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).length > 0 ? (
+                            otherCoachesDataTomorrow.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).map((timetableInfo, index) => (
+                              <div key={index} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: index < otherCoachesDataTomorrow.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                                 <div style={{ fontWeight: '500', marginBottom: '4px' }}>{timetableInfo.ownerName}</div>
                                 {timetableInfo.schedules.length > 0 ? (
                                   <div style={{ fontSize: '12px', color: '#666' }}>
-                                    {timetableInfo.schedules.map((schedule, sIndex) => (
-                                      <div key={sIndex}>
-                                        {schedule.startTime.substring(0,5)}-{schedule.endTime.substring(0,5)} {schedule.studentName}
-                                      </div>
-                                    ))}
+                                    {(() => {
+                                      // 每行显示两个课程
+                                      const lines = [];
+                                      for (let i = 0; i < timetableInfo.schedules.length; i += 2) {
+                                        const lineItems = timetableInfo.schedules.slice(i, i + 2);
+                                        lines.push(lineItems);
+                                      }
+                                      return lines.map((lineItems, lineIndex) => (
+                                        <div key={lineIndex} style={{ 
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          marginBottom: lineIndex < lines.length - 1 ? '2px' : '0'
+                                        }}>
+                                          <span style={{ width: '48%' }}>
+                                            {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
+                                          </span>
+                                          <span style={{ width: '48%' }}>
+                                            {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
+                                          </span>
+                                        </div>
+                                      ));
+                                    })()}
                                   </div>
                                 ) : (
                                   <div style={{ fontSize: '12px', color: '#999' }}>明日无课程</div>
@@ -1608,10 +1703,17 @@ const Dashboard = ({ user }) => {
                   )}
                   
                   {/* 复制按钮 */}
-                  <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                  <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Checkbox
+                      checked={copyOtherCoachesTomorrow}
+                      onChange={(e) => setCopyOtherCoachesTomorrow(e.target.checked)}
+                      disabled={loadingOtherCoachesTomorrow}
+                    >
+                      复制其他教练课程
+                    </Checkbox>
                     <Button
                       onClick={() => {
-                        const text = generateCopyText(tomorrowsCoursesData, false, otherCoachesExpandedTomorrow, otherCoachesTomorrowData);
+                        const text = generateCopyText(tomorrowsSchedulesForCopy, false, copyOtherCoachesTomorrow, otherCoachesDataTomorrow);
                         copyToClipboard(text);
                       }}
                     >
