@@ -177,7 +177,15 @@ const Dashboard = ({ user }) => {
     try {
       const response = await getCoachesStatistics();
       if (response.success) {
-        setCoachesStatistics(response.data);
+        // 为每个教练添加唯一的 key
+        const dataWithKeys = {
+          ...response.data,
+          coaches: response.data.coaches.map((coach, index) => ({
+            ...coach,
+            key: coach.id || `coach-${index}`
+          }))
+        };
+        setCoachesStatistics(dataWithKeys);
       } else {
         message.error(response.message || '获取统计信息失败');
       }
@@ -1829,7 +1837,7 @@ const Dashboard = ({ user }) => {
         {/* 统计卡片：每行三个 */}
         <Row gutter={16} style={{ marginBottom: '24px' }}>
           <Col span={8}>
-            <Card bodyStyle={{ textAlign: 'center' }}>
+            <Card styles={{ body: { textAlign: 'center' } }}>
               <Statistic
                 title="本周总课程"
                 value={totalWeeklyCourses}
@@ -1839,7 +1847,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Col>
           <Col span={8}>
-            <Card bodyStyle={{ textAlign: 'center' }}>
+            <Card styles={{ body: { textAlign: 'center' } }}>
               <Statistic
                 title="今日总课程"
                 value={totalTodayCourses}
@@ -1849,7 +1857,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Col>
           <Col span={8}>
-            <Card bodyStyle={{ textAlign: 'center' }}>
+            <Card styles={{ body: { textAlign: 'center' } }}>
               <Statistic
                 title="上周总课程"
                 value={0}
@@ -1861,7 +1869,24 @@ const Dashboard = ({ user }) => {
         </Row>
 
         {/* 今日有课教练及课程明细 */}
-        <Card title="今日有课教练" size="small" style={{ marginBottom: '24px' }} bodyStyle={{ padding: '16px 24px' }}>
+        <Card 
+          title={
+            <span>
+              今日有课教练
+              <span style={{ 
+                marginLeft: '8px', 
+                fontSize: '14px', 
+                fontWeight: 'normal',
+                color: '#1890ff'
+              }}>
+                {coaches.filter(c => c.todayCourses > 0).length}/{coaches.length}
+              </span>
+            </span>
+          } 
+          size="small" 
+          style={{ marginBottom: '24px' }} 
+          styles={{ body: { padding: '16px 24px' } }}
+        >
           {coaches.filter(c => c.todayCourses > 0).length === 0 ? (
             <div style={{ color: '#999' }}>今日暂无课程</div>
           ) : (
