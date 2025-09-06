@@ -124,7 +124,7 @@ const Dashboard = ({ user }) => {
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
   
   // 管理员概览相关状态
-  const [activeTab, setActiveTab] = useState('timetables');
+  const [activeTab, setActiveTab] = useState(user?.role?.toUpperCase() === 'ADMIN' ? 'overview' : 'timetables');
   const [coachesStatistics, setCoachesStatistics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [todaysCoursesData, setTodaysCoursesData] = useState([]);
@@ -1880,22 +1880,103 @@ const Dashboard = ({ user }) => {
             coaches
               .filter(c => c.todayCourses > 0)
               .map((c, idx) => (
-                <div key={idx} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: idx < coaches.filter(x=>x.todayCourses>0).length-1 ? '1px solid #f0f0f0' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  {/* 左侧：教练 */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div key={idx} style={{ 
+                  marginBottom: 12, 
+                  paddingBottom: 12, 
+                  borderBottom: idx < coaches.filter(x=>x.todayCourses>0).length-1 ? '1px solid #f0f0f0' : 'none', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  minHeight: c.todayCourses <= 2 ? '50px' : '80px',
+                  padding: c.todayCourses <= 2 ? '8px 0' : '12px 0'
+                }}>
+                  {/* 左侧：教练信息 - 上下居中 */}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    minWidth: '120px',
+                    height: '100%'
+                  }}>
                     <Avatar size="small" style={{ backgroundColor: getIconColor(c.id) }}>
                       {(c.nickname || c.username)?.[0]?.toUpperCase()}
                     </Avatar>
-                    <span style={{ marginLeft: 8, fontWeight: 500 }}>{c.nickname || c.username}</span>
-                    <span style={{ marginLeft: 8, color: '#52c41a', fontWeight: 500 }}>{c.todayCourses}</span>
+                    <div style={{ 
+                      marginLeft: 8, 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'center',
+                      height: '100%'
+                    }}>
+                      <span style={{ fontWeight: 500, fontSize: 14, lineHeight: '1.2' }}>{c.nickname || c.username}</span>
+                      <span style={{ color: '#52c41a', fontWeight: 500, fontSize: 12, marginTop: 4, lineHeight: '1.2' }}>{c.todayCourses}课时</span>
+                    </div>
                   </div>
-                  {/* 右侧：学员与时间（纯文本） */}
-                  <div style={{ color: '#333', fontSize: 14 }}>
+                  {/* 右侧：学员与时间（时间对齐，名字对齐） */}
+                  <div style={{ 
+                    color: '#333', 
+                    fontSize: 14, 
+                    textAlign: 'right', 
+                    flex: 1, 
+                    marginLeft: 16, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'center',
+                    height: '100%'
+                  }}>
                     {(() => {
                       const items = (c.todayCourseDetails && c.todayCourseDetails.length > 0
-                        ? c.todayCourseDetails.map((item) => `${String(item.startTime).slice(0,5)}-${String(item.endTime).slice(0,5)} ${item.studentName}`)
-                        : (todayCoachDetails[c.nickname || c.username] || []));
-                      return items.length > 0 ? items.join('；') : '—';
+                        ? c.todayCourseDetails.map((item) => {
+                            // 简化时间格式：10:00-11:00 -> 10-11
+                            const startHour = String(item.startTime).slice(0,2);
+                            const endHour = String(item.endTime).slice(0,2);
+                            return {
+                              time: `${startHour}-${endHour}`,
+                              name: item.studentName
+                            };
+                          })
+                        : []);
+                      
+                      if (items.length === 0) return '—';
+                      
+                      // 每行显示两个，用换行分隔
+                      const lines = [];
+                      for (let i = 0; i < items.length; i += 2) {
+                        const lineItems = items.slice(i, i + 2);
+                        lines.push(lineItems);
+                      }
+                      return lines.map((lineItems, index) => (
+                        <div key={index} style={{ 
+                          marginBottom: index < lines.length - 1 ? '4px' : '0',
+                          lineHeight: '1.4',
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          gap: '8px'
+                        }}>
+                          {lineItems.map((item, itemIndex) => (
+                            <span key={itemIndex} style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <span style={{ 
+                                fontFamily: 'monospace',
+                                minWidth: '32px',
+                                textAlign: 'left'
+                              }}>
+                                {item.time}
+                              </span>
+                              <span style={{ 
+                                minWidth: '36px',
+                                textAlign: 'left',
+                                fontFamily: 'monospace',
+                                color: '#1890ff'
+                              }}>
+                                {item.name.length === 2 ? item.name.split('').join('　') : item.name}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      ));
                     })()}
                   </div>
                 </div>
