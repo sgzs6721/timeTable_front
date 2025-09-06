@@ -23,7 +23,7 @@ const CreateTimetable = ({ user }) => {
       const response = await createTimetable(timetableData);
       if (response.success) {
         message.success('课表创建成功');
-        navigate('/dashboard');
+        navigate('/dashboard?tab=timetables');
       } else {
         message.error(response.message || '创建失败');
       }
@@ -42,7 +42,7 @@ const CreateTimetable = ({ user }) => {
   };
 
   const handleBack = () => {
-    navigate('/dashboard');
+    navigate('/dashboard?tab=timetables');
   };
 
   return (

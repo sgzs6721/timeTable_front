@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules } from '../services/timetable';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule } from '../services/weeklyInstance';
 import { getCoachesStatistics } from '../services/admin';
@@ -144,6 +144,7 @@ const ActiveBadge = () => (
 );
 
 const Dashboard = ({ user }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [timetables, setTimetables] = useState([]);
   const [archivedTimetables, setArchivedTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,7 +152,13 @@ const Dashboard = ({ user }) => {
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
   
   // 管理员概览相关状态
-  const [activeTab, setActiveTab] = useState(user?.role?.toUpperCase() === 'ADMIN' ? 'overview' : 'timetables');
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      return tabParam;
+    }
+    return user?.role?.toUpperCase() === 'ADMIN' ? 'overview' : 'timetables';
+  });
   const [coachesStatistics, setCoachesStatistics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [todaysCoursesData, setTodaysCoursesData] = useState([]);
@@ -200,6 +207,19 @@ const Dashboard = ({ user }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const navigate = useNavigate();
+
+  // 清除缓存数据
+  const clearCache = () => {
+    sessionStorage.removeItem('dashboard_timetables');
+    sessionStorage.removeItem('dashboard_schedule_counts');
+    sessionStorage.removeItem('dashboard_cache_timestamp');
+  };
+
+  // 处理tab切换，同时更新URL参数
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    setSearchParams({ tab: key });
+  };
 
   // 获取教练统计信息
   const fetchCoachesStatistics = useCallback(async () => {
@@ -297,6 +317,34 @@ const Dashboard = ({ user }) => {
 
   useEffect(() => {
     const fetchTimetables = async () => {
+      // 检查是否有缓存的课表数据
+      const cachedTimetables = sessionStorage.getItem('dashboard_timetables');
+      const cachedScheduleCounts = sessionStorage.getItem('dashboard_schedule_counts');
+      const cacheTimestamp = sessionStorage.getItem('dashboard_cache_timestamp');
+      
+      // 如果缓存存在且不超过5分钟，直接使用缓存数据
+      if (cachedTimetables && cachedScheduleCounts && cacheTimestamp) {
+        const now = Date.now();
+        const cacheAge = now - parseInt(cacheTimestamp);
+        if (cacheAge < 5 * 60 * 1000) { // 5分钟内
+          try {
+            const parsedTimetables = JSON.parse(cachedTimetables);
+            const parsedScheduleCounts = JSON.parse(cachedScheduleCounts);
+            
+            const activeTimetables = parsedTimetables.filter(t => !t.isArchived);
+            const archivedTimetables = parsedTimetables.filter(t => t.isArchived);
+            
+            setTimetables(activeTimetables);
+            setArchivedTimetables(archivedTimetables);
+            setTimetableScheduleCounts(parsedScheduleCounts);
+            setLoading(false);
+            return;
+          } catch (error) {
+            console.error('解析缓存数据失败:', error);
+          }
+        }
+      }
+      
       try {
         const response = await getTimetables();
         const allTimetables = response.data;
@@ -324,6 +372,11 @@ const Dashboard = ({ user }) => {
           })
         );
         setTimetableScheduleCounts(scheduleCounts);
+        
+        // 缓存数据
+        sessionStorage.setItem('dashboard_timetables', JSON.stringify(allTimetables));
+        sessionStorage.setItem('dashboard_schedule_counts', JSON.stringify(scheduleCounts));
+        sessionStorage.setItem('dashboard_cache_timestamp', Date.now().toString());
       } catch (error) {
         message.error('获取课表列表失败');
       } finally {
@@ -352,6 +405,7 @@ const Dashboard = ({ user }) => {
           if (res.success) {
             // 更新本地状态：全部课表 isActive = false, 该课表 = true
             setTimetables(prev => prev.map(t => ({ ...t, isActive: t.id === id ? true : false })));
+            clearCache(); // 清除缓存
             message.success({ content: '已设为活动课表', key: 'active' });
           } else {
             message.error({ content: res.message || '设置失败', key: 'active' });
@@ -382,6 +436,7 @@ const Dashboard = ({ user }) => {
             
             setTimetables(activeTimetables);
             setArchivedTimetables(archivedTimetables);
+            clearCache(); // 清除缓存
             
             // 更新课程数量
             const scheduleCounts = {};
@@ -471,6 +526,7 @@ const Dashboard = ({ user }) => {
           
           setTimetables(activeTimetables);
           setArchivedTimetables(archivedTimetables);
+          clearCache(); // 清除缓存
           
           // 更新课程数量
           const scheduleCounts = {};
@@ -2287,7 +2343,7 @@ const Dashboard = ({ user }) => {
       <div className="page-container">
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={handleTabChange}
           items={tabItems}
           size="large"
           tabBarExtraContent={{
