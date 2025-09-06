@@ -1826,31 +1826,9 @@ const Dashboard = ({ user }) => {
 
     return (
       <div>
-        {/* 统计卡片：每行两个 */}
-        <Row gutter={16} style={{ marginBottom: '16px' }}>
-          <Col span={12}>
-            <Card bodyStyle={{ textAlign: 'center' }}>
-              <Statistic
-                title="总教练数"
-                value={totalCoaches}
-                prefix={<UserOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card bodyStyle={{ textAlign: 'center' }}>
-              <Statistic
-                title="今日有课教练"
-                value={coaches.filter(c => c.todayCourses > 0).length}
-                suffix={`/ ${totalCoaches}`}
-                valueStyle={{ color: '#eb2f96' }}
-              />
-            </Card>
-          </Col>
-        </Row>
+        {/* 统计卡片：每行三个 */}
         <Row gutter={16} style={{ marginBottom: '24px' }}>
-          <Col span={12}>
+          <Col span={8}>
             <Card bodyStyle={{ textAlign: 'center' }}>
               <Statistic
                 title="本周总课程"
@@ -1860,7 +1838,7 @@ const Dashboard = ({ user }) => {
               />
             </Card>
           </Col>
-          <Col span={12}>
+          <Col span={8}>
             <Card bodyStyle={{ textAlign: 'center' }}>
               <Statistic
                 title="今日总课程"
@@ -1870,10 +1848,20 @@ const Dashboard = ({ user }) => {
               />
             </Card>
           </Col>
+          <Col span={8}>
+            <Card bodyStyle={{ textAlign: 'center' }}>
+              <Statistic
+                title="上周总课程"
+                value={0}
+                prefix={<BarChartOutlined />}
+                valueStyle={{ color: '#722ed1' }}
+              />
+            </Card>
+          </Col>
         </Row>
 
         {/* 今日有课教练及课程明细 */}
-        <Card title="今日有课教练" size="small" style={{ marginBottom: '24px' }}>
+        <Card title="今日有课教练" size="small" style={{ marginBottom: '24px' }} bodyStyle={{ padding: '16px 24px' }}>
           {coaches.filter(c => c.todayCourses > 0).length === 0 ? (
             <div style={{ color: '#999' }}>今日暂无课程</div>
           ) : (
