@@ -44,6 +44,7 @@ const TimetableManagement = ({ user }) => {
   const [editingTimetableId, setEditingTimetableId] = useState(null);
   const [editingTimetableName, setEditingTimetableName] = useState('');
 
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -307,6 +308,7 @@ const TimetableManagement = ({ user }) => {
     setBatchMode(false);
     setSelectedTimetables([]);
   };
+
 
   // 添加全选功能
   const handleSelectAll = () => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Button, Space, Badge } from 'antd';
-import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined } from '@ant-design/icons';
+import { Tabs, Button, Space, Badge, Dropdown } from 'antd';
+import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined, InboxOutlined, DownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
@@ -27,6 +27,18 @@ const AdminPanel = ({ user }) => {
     fetchPending();
   }, []);
 
+  // 查看课表下拉菜单配置
+  const getTimetableDropdownMenu = () => ({
+    items: [
+      {
+        key: 'archived',
+        label: '归档课表',
+        icon: <InboxOutlined />,
+        onClick: () => navigate('/admin-archived-timetables'),
+      },
+    ],
+  });
+
   const tabItems = [
     {
       key: 'timetables',
@@ -34,6 +46,9 @@ const AdminPanel = ({ user }) => {
         <Space>
           <CalendarOutlined />
           <span>查看课表</span>
+          <Dropdown menu={getTimetableDropdownMenu()} trigger={['click']} placement="bottomLeft">
+            <DownOutlined style={{ fontSize: '10px', cursor: 'pointer' }} />
+          </Dropdown>
         </Space>
       ),
       children: <TimetableManagement user={user} />,
@@ -120,6 +135,7 @@ const AdminPanel = ({ user }) => {
           onChange={(key) => setActiveTab(key)}
         />
       </div>
+
     </div>
   );
 };
