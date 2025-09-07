@@ -331,9 +331,10 @@ export const bulkDeleteTimetables = async (ids) => {
 };
 
 // 获取归档课表
-export const getArchivedTimetables = async () => {
+export const getArchivedTimetables = async (scope) => {
   try {
-    const response = await api.get('/timetables/archived');
+    const query = scope ? `?scope=${encodeURIComponent(scope)}` : '';
+    const response = await api.get(`/timetables/archived${query}`);
     return response;
   } catch (error) {
     throw error;

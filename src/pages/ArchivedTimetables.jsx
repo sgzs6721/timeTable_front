@@ -38,7 +38,7 @@ const ArchivedTimetables = () => {
   const fetchArchived = async () => {
     setLoading(true);
     try {
-      const res = await getArchivedTimetables();
+      const res = await getArchivedTimetables('self');
       if (res.success) {
         const archivedList = res.data.archivedList;
         setArchived(archivedList);

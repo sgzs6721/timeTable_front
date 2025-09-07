@@ -60,6 +60,7 @@ const AppHeader = ({ user, onLogout }) => {
         const nonArchivedCount = listItems.length;
         console.log('获取到的非归档课表数量:', nonArchivedCount);
         console.log('找到的List项目:', listItems);
+        // 无论是否管理员，头像菜单都进入个人归档页
         navigate('/archived-timetables', { state: { nonArchivedCount } });
       },
     },

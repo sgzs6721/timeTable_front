@@ -183,3 +183,13 @@ export const getCoachesStatistics = async () => {
     throw error;
   }
 };
+
+// 获取基于实例逻辑的指定日期课程（今日/明日）
+export const getInstanceSchedulesByDate = async (date) => {
+  try {
+    const response = await api.get(`/weekly-instances/by-date?date=${date}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
