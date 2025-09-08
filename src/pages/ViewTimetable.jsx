@@ -262,8 +262,15 @@ const ViewTimetable = ({ user }) => {
   const [instanceDataLoading, setInstanceDataLoading] = useState(false);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [totalWeeks, setTotalWeeks] = useState(1);
+  
+  // 每周实例分页相关状态
+  const [weeklyInstances, setWeeklyInstances] = useState([]);
+  const [currentInstanceIndex, setCurrentInstanceIndex] = useState(0);
+  const [instancesLoading, setInstancesLoading] = useState(false);
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [availableTimeModalVisible, setAvailableTimeModalVisible] = useState(false);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exportContent, setExportContent] = useState('');
@@ -312,6 +319,13 @@ const ViewTimetable = ({ user }) => {
   // 修改和添加功能状态
   const [updateLoading, setUpdateLoading] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+
+  const availableSlotsTitle = useMemo(() => {
+    if (viewMode === 'template') {
+      return '固定可排课时段';
+    }
+    return '本周可供排课时段';
+  }, [viewMode]);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
@@ -377,6 +391,69 @@ const ViewTimetable = ({ user }) => {
     if (!visible) {
       setNewScheduleInfo({ studentName: '' }); // 关闭时清空输入
     }
+  };
+
+  // 处理时间单元格点击，显示可供排课时段
+  const handleTimeCellClick = (timeSlot) => {
+    console.log('Time cell clicked:', timeSlot);
+    const availableSlots = [];
+    
+    // 定义时间段
+    const timeSlots = [
+      '09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00',
+      '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00'
+    ];
+    
+    // 遍历每一天
+    weekDays.forEach((day, dayIndex) => {
+      const isWeekend = dayIndex >= 5; // 周六(5)和周日(6)
+      const startHour = isWeekend ? 10 : 16; // 周末10点开始，工作日16点开始
+      const endHour = 20; // 都到20点结束
+      
+      // 获取该天已排课的时间段
+      const scheduledTimes = allSchedules
+        .filter(schedule => {
+          if (viewMode === 'instance' && currentWeekInstance) {
+            // 实例视图：按日期过滤
+            const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
+            const currentDate = instanceStartDate.add(dayIndex, 'day');
+            return schedule.scheduleDate === currentDate.format('YYYY-MM-DD');
+          } else {
+            // 模板视图：按星期几过滤
+            return schedule.dayOfWeek.toLowerCase() === day.key;
+          }
+        })
+        .map(schedule => `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`);
+      
+      // 检查每个时间段是否空闲
+      timeSlots.forEach(timeSlot => {
+        const [startTime] = timeSlot.split('-');
+        const hour = parseInt(startTime.split(':')[0]);
+        
+        // 检查是否在可选时间范围内
+        if (hour >= startHour && hour < endHour) {
+          // 周末午休时间排除
+          if (isWeekend && (hour === 12 || hour === 13)) {
+            return; // continue
+          }
+          // 检查是否已排课
+          if (!scheduledTimes.includes(timeSlot)) {
+            availableSlots.push({
+              day: day.label,
+              date: viewMode === 'instance' && currentWeekInstance 
+                ? dayjs(currentWeekInstance.weekStartDate).add(dayIndex, 'day').format('MM/DD')
+                : null,
+              timeSlot: timeSlot,
+              dayIndex: dayIndex
+            });
+          }
+        }
+      });
+    });
+    
+    console.log('Available slots:', availableSlots);
+    setAvailableTimeSlots(availableSlots);
+    setAvailableTimeModalVisible(true);
   };
   
   const handleAddSchedule = async (dayKey, timeIndex, studentName) => {
@@ -604,13 +681,15 @@ const ViewTimetable = ({ user }) => {
     touchStartRef.current = null;
   };
 
-  // 根据当前实例起始日期动态显示“本周/下周”文案
+  // 根据当前实例起始日期动态显示周标签
   const instanceWeekLabel = useMemo(() => {
     if (viewMode === 'instance' && currentWeekInstance?.weekStartDate) {
       const start = dayjs(currentWeekInstance.weekStartDate).startOf('day');
       const thisMonday = dayjs().startOf('week');
       if (start.isSame(thisMonday, 'day')) return '本周';
       if (start.isSame(thisMonday.add(1, 'week'), 'day')) return '下周';
+      // 如果是其他周，显示具体日期
+      return start.format('MM/DD');
     }
     return '本周';
   }, [viewMode, currentWeekInstance]);
@@ -774,9 +853,30 @@ const ViewTimetable = ({ user }) => {
       } else if (viewMode === 'instance') {
         console.log('切换到实例视图，调用 fetchInstanceSchedules');
         fetchInstanceSchedules();
+        // 如果是周固定课表，同时获取每周实例列表
+        if (timetable.isWeekly) {
+          fetchWeeklyInstances();
+        }
       }
     }
   }, [timetable, viewMode]); // 移除currentWeek依赖，避免重复调用
+
+  // 当获取到每周实例列表后，自动切换到本周实例
+  useEffect(() => {
+    if (weeklyInstances.length > 0 && viewMode === 'instance' && currentInstanceIndex === 0) {
+      // 检查是否应该切换到本周实例
+      const thisWeekStart = dayjs().startOf('week').format('YYYY-MM-DD');
+      const thisWeekIndex = weeklyInstances.findIndex(inst => 
+        dayjs(inst.weekStartDate).isSame(thisWeekStart, 'day')
+      );
+      
+      // 如果找到本周实例且当前不是本周实例，则自动切换
+      if (thisWeekIndex >= 0 && thisWeekIndex !== currentInstanceIndex) {
+        console.log('Auto switching to this week instance, index:', thisWeekIndex);
+        switchToWeekInstanceByIndex(thisWeekIndex);
+      }
+    }
+  }, [weeklyInstances, viewMode]); // 移除currentInstanceIndex依赖，避免循环触发
 
   // 为日期范围课表添加单独的useEffect处理currentWeek变化
   useEffect(() => {
@@ -978,6 +1078,89 @@ const ViewTimetable = ({ user }) => {
     }
     setViewMode('instance');
     // 具体的检查、生成、获取数据逻辑由 fetchInstanceSchedules 处理
+  };
+
+  // 获取每周实例列表
+  const fetchWeeklyInstances = async () => {
+    if (!timetableId || !timetable?.isWeekly) return;
+    
+    console.log('fetchWeeklyInstances called for timetableId:', timetableId);
+    setInstancesLoading(true);
+    try {
+      const response = await getWeeklyInstances(timetableId);
+      console.log('getWeeklyInstances response:', response);
+      if (response.success && Array.isArray(response.data)) {
+        // 按周开始日期排序
+        const sortedInstances = response.data.sort((a, b) => 
+          dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))
+        );
+        console.log('Sorted instances:', sortedInstances);
+        setWeeklyInstances(sortedInstances);
+        
+        // 只在初始化时设置索引，避免覆盖手动选择
+        if (weeklyInstances.length === 0) {
+          // 优先找到当前周实例的索引
+          if (currentWeekInstance?.id) {
+            const currentIndex = sortedInstances.findIndex(inst => inst.id === currentWeekInstance.id);
+            if (currentIndex >= 0) {
+              setCurrentInstanceIndex(currentIndex);
+            }
+          } else {
+            // 如果没有当前周实例，尝试找到本周的实例
+            const thisWeekStart = dayjs().startOf('week').format('YYYY-MM-DD');
+            const thisWeekIndex = sortedInstances.findIndex(inst => 
+              dayjs(inst.weekStartDate).isSame(thisWeekStart, 'day')
+            );
+            if (thisWeekIndex >= 0) {
+              setCurrentInstanceIndex(thisWeekIndex);
+            } else {
+              // 如果找不到本周实例，默认选择第一个
+              setCurrentInstanceIndex(0);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('获取每周实例列表失败:', error);
+    } finally {
+      setInstancesLoading(false);
+    }
+  };
+
+  // 切换到指定的周实例
+  const switchToWeekInstanceByIndex = async (instanceIndex) => {
+    console.log('switchToWeekInstance called with index:', instanceIndex, 'weeklyInstances:', weeklyInstances);
+    if (instanceIndex < 0 || instanceIndex >= weeklyInstances.length) {
+      console.log('Invalid instance index:', instanceIndex);
+      return;
+    }
+    
+    const targetInstance = weeklyInstances[instanceIndex];
+    console.log('Target instance:', targetInstance);
+    setCurrentInstanceIndex(instanceIndex);
+    setInstancesLoading(true);
+    
+    try {
+      // 获取指定周实例的课程数据
+      const response = await getInstanceSchedules(targetInstance.id);
+      if (response.success) {
+        setCurrentWeekInstance({
+          id: targetInstance.id,
+          weekStartDate: targetInstance.weekStartDate,
+          weekEndDate: targetInstance.weekEndDate,
+          schedules: response.data || []
+        });
+        setAllSchedules(response.data || []);
+        setViewMode('instance');
+      } else {
+        message.error('获取周实例数据失败');
+      }
+    } catch (error) {
+      console.error('切换周实例失败:', error);
+      message.error('切换周实例失败');
+    } finally {
+      setInstancesLoading(false);
+    }
   };
 
   // 切换到固定课表视图
@@ -1876,7 +2059,7 @@ const ViewTimetable = ({ user }) => {
       schedules = currentWeekSchedules;
     }
     
-    if (!schedules.length) return { hours: 0, count: 0 };
+    if (!schedules.length) return { hours: 0, count: 0, students: 0 };
     
     const totalHours = schedules.reduce((total, schedule) => {
       const startTime = dayjs(schedule.startTime, 'HH:mm:ss');
@@ -1885,9 +2068,18 @@ const ViewTimetable = ({ user }) => {
       return total + duration;
     }, 0);
     
+    // 计算学员数量（去重）
+    const uniqueStudents = new Set();
+    schedules.forEach(schedule => {
+      if (schedule.studentName) {
+        uniqueStudents.add(schedule.studentName);
+      }
+    });
+    
     return {
       hours: totalHours,
-      count: schedules.length
+      count: schedules.length,
+      students: uniqueStudents.size
     };
   }, [currentWeekSchedules, currentWeekInstance?.schedules, viewMode]);
 
@@ -1917,12 +2109,23 @@ const ViewTimetable = ({ user }) => {
 
     const columns = [
       {
-        title: '时间',
+        title: (
+          <span
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+            onClick={() => handleTimeCellClick('HEADER')}
+          >
+            时间
+          </span>
+        ),
         dataIndex: 'time',
         key: 'time',
         className: 'timetable-time-column',
         render: (time) => (
-          <div className="time-cell">
+          <div 
+            className="time-cell" 
+            style={{ cursor: 'pointer' }}
+            onClick={() => handleTimeCellClick(time)}
+          >
             {time.split('-').map((t, i) => (
               <div key={i} className="time-part">{t}</div>
             ))}
@@ -1933,14 +2136,19 @@ const ViewTimetable = ({ user }) => {
 
     weekDays.forEach((day, index) => {
       let columnTitle;
+      let isToday = false;
       
       // 在实例视图中，显示具体日期
       if (viewMode === 'instance' && currentWeekInstance) {
         const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
         const currentDate = instanceStartDate.add(index, 'day');
+        isToday = currentDate.isSame(dayjs(), 'day');
         columnTitle = (
           <div
-            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }}
+            style={{ 
+              textAlign: 'center', 
+              cursor: timetable.isArchived ? 'default' : 'pointer'
+            }}
             onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
           >
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
@@ -1954,9 +2162,13 @@ const ViewTimetable = ({ user }) => {
       } else if (!timetable.isWeekly && weekDates && weekDates.start) {
         // 日期范围课表的原有逻辑
         const currentDate = weekDates.start.add(index, 'day');
+        isToday = currentDate.isSame(dayjs(), 'day');
         columnTitle = (
           <div
-            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }}
+            style={{ 
+              textAlign: 'center', 
+              cursor: timetable.isArchived ? 'default' : 'pointer'
+            }}
             onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
           >
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
@@ -1967,13 +2179,19 @@ const ViewTimetable = ({ user }) => {
             </div>
           </div>
         );
-      } else {
-        // 固定课表视图，只显示星期几
-        columnTitle = (
-          <div
-            style={{ textAlign: 'center', cursor: timetable.isArchived ? 'default' : 'pointer' }}
-            onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
-          >
+        } else {
+          // 固定课表视图，只显示星期几
+          const today = dayjs();
+          isToday = today.day() === (index + 1) % 7;
+          columnTitle = (
+            <div
+              style={{ 
+                textAlign: 'center', 
+                cursor: timetable.isArchived ? 'default' : 'pointer',
+                ...(isToday && { backgroundColor: 'transparent', color: '#ffffff' })
+              }}
+              onClick={!timetable.isArchived ? () => handleShowDayCourses(day, index) : undefined}
+            >
             {day.label}
           </div>
         )
@@ -1984,6 +2202,12 @@ const ViewTimetable = ({ user }) => {
         dataIndex: day.key,
         key: day.key,
         className: 'timetable-day-column',
+        onHeaderCell: () => ({
+          className: isToday ? 'today-header' : '',
+          style: isToday
+            ? { backgroundColor: '#4a90e2', color: '#ffffff', fontWeight: 500 }
+            : undefined,
+        }),
         onCell: () => ({
           style: { padding: '0px' }
         }),
@@ -2733,7 +2957,7 @@ const ViewTimetable = ({ user }) => {
                         (() => {
                           // 判断当前是否在下周实例
                           const isOnNextWeek = viewMode === 'instance' && currentWeekInstance?.weekStartDate && dayjs(currentWeekInstance.weekStartDate).isSame(dayjs().startOf('week').add(1, 'week'), 'day');
-                          // 处于下周实例：始终提供“本周课表”切回
+                          // 处于下周实例：始终提供"本周课表"切回
                           if (isOnNextWeek) {
                             return {
                               key: 'thisWeek',
@@ -2964,13 +3188,23 @@ const ViewTimetable = ({ user }) => {
               {!multiSelectMode && !deleteMode && !moveMode && !copyMode && weeklyStats.count > 0 ? (
                 <span style={{ 
                   fontSize: '14px', 
-                  color: '#666'
+                  color: '#666',
+                  whiteSpace: 'nowrap'
                 }}>
-                  本周
+                  {viewMode === 'instance' && currentWeekInstance?.weekStartDate ? instanceWeekLabel : '本周'}
                   <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
                     {weeklyStats.count}
                   </span>
                   节课
+                  {weeklyStats.students > 0 && (
+                    <>
+                      <span style={{ margin: '0 4px' }}>学员</span>
+                      <span style={{ color: '#52c41a', fontWeight: 'bold', margin: '0 2px' }}>
+                        {weeklyStats.students}
+                      </span>
+                      <span>个</span>
+                    </>
+                  )}
                 </span>
               ) : null}
             </div>
@@ -3015,7 +3249,7 @@ const ViewTimetable = ({ user }) => {
         </div>
       )}
 
-      <div className="compact-timetable-container" ref={tableRef}>
+      <div className="compact-timetable-container" ref={tableRef} style={{ position: 'relative' }}>
         <Table
           columns={generateColumns()}
           dataSource={tableDataSource}
@@ -3026,7 +3260,99 @@ const ViewTimetable = ({ user }) => {
           className="compact-timetable"
           style={{ tableLayout: 'fixed' }}
         />
+        {/* 切换周实例时的蒙板和loading */}
+        {instancesLoading && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            borderRadius: '6px'
+          }}>
+            <Spin size="large" tip="切换周实例中..." />
+          </div>
+        )}
       </div>
+
+      {/* 每周实例分页控件 - 仅周固定课表且为实例视图时显示 */}
+      {timetable?.isWeekly && viewMode === 'instance' && weeklyInstances.length > 0 && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          marginTop: '0.5rem', 
+          gap: '1rem',
+          padding: '8px 0'
+        }}>
+          <Button
+            type="text"
+            onClick={() => switchToWeekInstanceByIndex(currentInstanceIndex - 1)}
+            disabled={currentInstanceIndex <= 0 || instancesLoading}
+            icon={<LeftOutlined style={{ fontSize: 14 }} />}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              border: '1px solid #d9d9d9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          />
+          
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {weeklyInstances.map((instance, index) => {
+              console.log('Rendering button for instance:', instance, 'index:', index, 'currentIndex:', currentInstanceIndex);
+              return (
+                <Button
+                  key={instance.id}
+                  type={index === currentInstanceIndex ? 'primary' : 'default'}
+                  size="small"
+                  onClick={() => {
+                    console.log('Button clicked for index:', index);
+                    switchToWeekInstanceByIndex(index);
+                  }}
+                  disabled={instancesLoading}
+                  style={{
+                    minWidth: '80px',
+                    fontSize: '12px',
+                    ...(index === currentInstanceIndex && {
+                      backgroundColor: '#1890ff !important',
+                      borderColor: '#1890ff !important',
+                      color: '#fff !important'
+                    })
+                  }}
+                  className={index === currentInstanceIndex ? 'selected-instance-btn' : ''}
+                >
+                  {dayjs(instance.weekStartDate).format('MM/DD')}
+                </Button>
+              );
+            })}
+          </div>
+          
+          <Button
+            type="text"
+            onClick={() => switchToWeekInstanceByIndex(currentInstanceIndex + 1)}
+            disabled={currentInstanceIndex >= weeklyInstances.length - 1 || instancesLoading}
+            icon={<RightOutlined style={{ fontSize: 14 }} />}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              border: '1px solid #d9d9d9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          />
+        </div>
+      )}
 
       {!timetable?.isWeekly && totalWeeks > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.5rem', gap: '1rem' }}>
@@ -3348,6 +3674,71 @@ const ViewTimetable = ({ user }) => {
         />
       </Modal>
 
+      {/* 可供排课时段模态框 */}
+      <Modal
+        title={availableSlotsTitle}
+        open={availableTimeModalVisible}
+        onCancel={() => setAvailableTimeModalVisible(false)}
+        footer={[
+          <Button key="copy" type="primary" onClick={() => {
+            // 分组复制：周一：16:00-17:00、18:00-19:00
+            const grouped = availableTimeSlots.reduce((acc, s) => {
+              const key = `${s.day}${s.date ? ` ${s.date}` : ''}`;
+              (acc[key] ||= []).push(s.timeSlot);
+              return acc;
+            }, {});
+            const lines = Object.entries(grouped).map(([k, arr]) => {
+              const sorted = arr.slice().sort((a, b) => parseInt(a.split(':')[0]) - parseInt(b.split(':')[0]));
+              return `${k}：${sorted.join('、')}`;
+            });
+            const text = lines.join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+              message.success('已复制到剪贴板');
+            }).catch(() => {
+              message.error('复制失败');
+            });
+          }}>
+            复制
+          </Button>,
+          <Button key="close" onClick={() => setAvailableTimeModalVisible(false)}>
+            关闭
+          </Button>
+        ]}
+        width={600}
+      >
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          {availableTimeSlots.length > 0 ? (
+            (() => {
+              const grouped = availableTimeSlots.reduce((acc, s) => {
+                const key = `${s.day}${s.date ? ` ${s.date}` : ''}`;
+                (acc[key] ||= []).push(s.timeSlot);
+                return acc;
+              }, {});
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {Object.entries(grouped).map(([title, times]) => {
+                    const sorted = times.slice().sort((a, b) => parseInt(a.split(':')[0]) - parseInt(b.split(':')[0]));
+                    return (
+                      <div key={title}>
+                        <div style={{ fontWeight: 600, color: '#1677ff', marginBottom: 8, fontSize: '15px' }}>{title}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {sorted.map(t => (
+                            <span key={t} style={{ padding: '4px 10px', background: '#f5f5f5', border: '1px solid #e5e7eb', borderRadius: 4, fontSize: 13, color: '#444' }}>{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()
+          ) : (
+            <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+              暂无空闲时段
+            </div>
+          )}
+        </div>
+      </Modal>
 
     </div>
   );

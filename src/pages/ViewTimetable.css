@@ -76,4 +76,41 @@
 div[data-reactroot] > div:first-child:not([class]):not([style]) {
   display: none !important;
 }
-*/ 
+*/
+
+/* 强制保持选中实例按钮的颜色样式 */
+.selected-instance-btn {
+  background-color: #1890ff !important;
+  border-color: #1890ff !important;
+  color: #fff !important;
+}
+
+.selected-instance-btn:hover {
+  background-color: #40a9ff !important;
+  border-color: #40a9ff !important;
+  color: #fff !important;
+}
+
+.selected-instance-btn:focus {
+  background-color: #1890ff !important;
+  border-color: #1890ff !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+.selected-instance-btn:active {
+  background-color: #096dd9 !important;
+  border-color: #096dd9 !important;
+  color: #fff !important;
+}
+
+/* 今天表头单元格背景色 */
+.ant-table-thead > tr > th.today-header {
+  background-color: #4a90e2 !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+.ant-table-thead > tr > th.today-header * {
+  color: #ffffff !important;
+} 
