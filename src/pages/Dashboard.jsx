@@ -148,6 +148,7 @@ const Dashboard = ({ user }) => {
   const [timetables, setTimetables] = useState([]);
   const [archivedTimetables, setArchivedTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingScheduleCounts, setLoadingScheduleCounts] = useState(false);
   const [timetableScheduleCounts, setTimetableScheduleCounts] = useState({});
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
   
@@ -341,12 +342,20 @@ const Dashboard = ({ user }) => {
             return;
           } catch (error) {
             console.error('解析缓存数据失败:', error);
+            // 清除损坏的缓存
+            sessionStorage.removeItem('dashboard_timetables');
+            sessionStorage.removeItem('dashboard_schedule_counts');
+            sessionStorage.removeItem('dashboard_cache_timestamp');
           }
         }
       }
       
       try {
-        const response = await getTimetables();
+        // 添加超时保护
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('请求超时')), 10000)
+        );
+        const response = await Promise.race([getTimetables(), timeoutPromise]);
         const allTimetables = response.data;
         const activeTimetables = allTimetables.filter(t => !t.isArchived);
         const archivedTimetables = allTimetables.filter(t => t.isArchived);
@@ -354,9 +363,15 @@ const Dashboard = ({ user }) => {
         setTimetables(activeTimetables);
         setArchivedTimetables(archivedTimetables);
 
-        // 获取每个课表的课程数量
+        // 先设置loading为false，让用户立即看到课表列表
+        setLoading(false);
+        
+        // 异步获取每个课表的课程数量，不阻塞UI
+        if (activeTimetables.length > 0) {
+          setLoadingScheduleCounts(true);
+        }
         const scheduleCounts = {};
-        await Promise.all(
+        Promise.all(
           activeTimetables.map(async (timetable) => {
             try {
               const scheduleResponse = await getTimetableSchedules(timetable.id);
@@ -370,13 +385,16 @@ const Dashboard = ({ user }) => {
               scheduleCounts[timetable.id] = 0;
             }
           })
-        );
-        setTimetableScheduleCounts(scheduleCounts);
-        
-        // 缓存数据
-        sessionStorage.setItem('dashboard_timetables', JSON.stringify(allTimetables));
-        sessionStorage.setItem('dashboard_schedule_counts', JSON.stringify(scheduleCounts));
-        sessionStorage.setItem('dashboard_cache_timestamp', Date.now().toString());
+        ).then(() => {
+          setTimetableScheduleCounts(scheduleCounts);
+          setLoadingScheduleCounts(false);
+          // 缓存数据
+          sessionStorage.setItem('dashboard_timetables', JSON.stringify(allTimetables));
+          sessionStorage.setItem('dashboard_schedule_counts', JSON.stringify(scheduleCounts));
+          sessionStorage.setItem('dashboard_cache_timestamp', Date.now().toString());
+        }).catch(() => {
+          setLoadingScheduleCounts(false);
+        });
       } catch (error) {
         message.error('获取课表列表失败');
       } finally {
@@ -389,7 +407,7 @@ const Dashboard = ({ user }) => {
     if (user?.role?.toUpperCase() === 'ADMIN') {
       fetchCoachesStatistics();
     }
-  }, [user, fetchCoachesStatistics]);
+  }, [user]); // 移除fetchCoachesStatistics依赖，避免无限循环
 
   // 设为活动课表
   const handleSetActiveTimetable = (id) => {
@@ -2008,8 +2026,8 @@ const Dashboard = ({ user }) => {
 
   // 管理员概览组件
   const AdminOverview = () => {
-    const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses } = coachesStatistics || {};
-
+    const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses, totalLastWeekCourses } = coachesStatistics || {};
+    
     // 今日/明日切换
     const [dayTab, setDayTab] = useState('today'); // 'today' | 'tomorrow'
     const [tomorrowCoachDetails, setTomorrowCoachDetails] = useState({});
@@ -2017,6 +2035,14 @@ const Dashboard = ({ user }) => {
 
     // 额外拉取今日活动课表的课程，用于显示学员+时间（后端统计缺少明细时兜底）
     const [todayCoachDetails, setTodayCoachDetails] = useState({});
+    
+    // 计算明日课时总数
+    const totalTomorrowCourses = Object.values(tomorrowCoachDetails).reduce((total, details) => {
+      return total + (details ? details.length : 0);
+    }, 0);
+    
+    // 计算上周课时总数 (暂时设为0，可以根据需要从后端获取)
+    // const totalLastWeekCourses = 0;
     useEffect(() => {
       if (!coachesStatistics) return;
       
@@ -2104,40 +2130,68 @@ const Dashboard = ({ user }) => {
 
     return (
       <div>
-        {/* 统计卡片：每行三个 */}
-        <Row gutter={16} style={{ marginBottom: '24px' }}>
-          <Col span={8}>
-            <Card styles={{ body: { textAlign: 'center' } }}>
+        {/* 统计卡片：每行四个 */}
+        <Row gutter={[8, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={6} sm={6}>
+            <Card
+              style={{ aspectRatio: '1 / 1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
+              styles={{ body: { padding: '12px 0', textAlign: 'center' } }}
+            >
               <Spin spinning={statisticsLoading} size="small">
                 <Statistic
-                  title="本周总课程"
+                  title="本周课时"
                   value={totalWeeklyCourses || 0}
                   prefix={<BarChartOutlined />}
                   valueStyle={{ color: '#faad14' }}
+                  titleStyle={{ whiteSpace: 'nowrap' }}
                 />
               </Spin>
             </Card>
           </Col>
-          <Col span={8}>
-            <Card styles={{ body: { textAlign: 'center' } }}>
+          <Col xs={6} sm={6}>
+            <Card
+              style={{ aspectRatio: '1 / 1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
+              styles={{ body: { padding: '12px 0', textAlign: 'center' } }}
+            >
               <Spin spinning={statisticsLoading} size="small">
                 <Statistic
-                  title="今日总课程"
+                  title="今日课时"
                   value={totalTodayCourses || 0}
                   prefix={<CalendarOutlined />}
                   valueStyle={{ color: '#52c41a' }}
+                  titleStyle={{ whiteSpace: 'nowrap' }}
                 />
               </Spin>
             </Card>
           </Col>
-          <Col span={8}>
-            <Card styles={{ body: { textAlign: 'center' } }}>
+          <Col xs={6} sm={6}>
+            <Card
+              style={{ aspectRatio: '1 / 1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
+              styles={{ body: { padding: '12px 0', textAlign: 'center' } }}
+            >
+              <Spin spinning={coachDetailsLoading || statisticsLoading} size="small">
+                <Statistic
+                  title="明日课时"
+                  value={totalTomorrowCourses || 0}
+                  prefix={<CalendarOutlined />}
+                  valueStyle={{ color: '#1890ff' }}
+                  titleStyle={{ whiteSpace: 'nowrap' }}
+                />
+              </Spin>
+            </Card>
+          </Col>
+          <Col xs={6} sm={6}>
+            <Card
+              style={{ aspectRatio: '1 / 1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
+              styles={{ body: { padding: '12px 0', textAlign: 'center' } }}
+            >
               <Spin spinning={statisticsLoading} size="small">
                 <Statistic
-                  title="上周总课程"
-                  value={0}
+                  title="上周课时"
+                  value={totalLastWeekCourses || 0}
                   prefix={<BarChartOutlined />}
                   valueStyle={{ color: '#722ed1' }}
+                  titleStyle={{ whiteSpace: 'nowrap' }}
                 />
               </Spin>
             </Card>
@@ -2150,7 +2204,7 @@ const Dashboard = ({ user }) => {
           style={{ marginBottom: '24px' }}
           styles={{ body: { padding: '0 24px 16px 24px' } }}
           title={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0' }}>
               <div>
                 <Button.Group>
                   <Button type={dayTab==='today' ? 'primary' : 'default'} size="small" onClick={()=>setDayTab('today')}>今日</Button>
@@ -2183,16 +2237,16 @@ const Dashboard = ({ user }) => {
                   paddingBottom: 12, 
                   borderBottom: idx < ((dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails)).length - 1) ? '1px solid #f0f0f0' : 'none', 
                   display: 'flex', 
-                  alignItems: 'stretch', 
-                  minHeight: '60px',
-                  padding: '12px 0'
+                  alignItems: 'center', 
+                  minHeight: '72px',
+                  padding: '16px 0'
                 }}>
                   {/* 第一列：教练信息 - 占1/3 */}
                   <div style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
                     width: '33.33%',
-                    height: '100%'
+                    flex: '0 0 33.33%'
                   }}>
                     <Avatar size="small" style={{ backgroundColor: getIconColor(coachId) }}>
                       {coachName?.[0]?.toUpperCase()}
@@ -2201,8 +2255,7 @@ const Dashboard = ({ user }) => {
                       marginLeft: 8, 
                       display: 'flex', 
                       flexDirection: 'column', 
-                      justifyContent: 'center',
-                      height: '100%'
+                      justifyContent: 'center'
                     }}>
                       <span style={{ fontWeight: 500, fontSize: 14, lineHeight: '1.2' }}>{coachName}</span>
                       <span style={{ color: '#52c41a', fontWeight: 500, fontSize: 12, marginTop: 4, lineHeight: '1.2' }}>{detailItems.length}课时</span>
@@ -2216,7 +2269,7 @@ const Dashboard = ({ user }) => {
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'center',
-                    minHeight: '36px'
+                    flex: 1
                   }}>
                     {(() => {
                       const rawItems = detailItems;
@@ -2460,6 +2513,21 @@ const Dashboard = ({ user }) => {
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>
         <h1 style={{ margin: 0, fontWeight: '700' }}>我的课表</h1>
+        {loadingScheduleCounts && (
+          <div style={{ 
+            position: 'absolute', 
+            left: '50%', 
+            transform: 'translateX(-50%)',
+            top: '40px',
+            fontSize: '12px',
+            color: '#999',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <Spin size="small" style={{ marginRight: '6px' }} />
+            正在统计课程数量...
+          </div>
+        )}
         <Button
           type="link"
           icon={<PlusOutlined />}
@@ -2472,8 +2540,18 @@ const Dashboard = ({ user }) => {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '50px' }}>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          padding: '80px 20px',
+          minHeight: '400px'
+        }}>
           <Spin size="large" />
+          <div style={{ marginTop: '16px', color: '#666', fontSize: '14px' }}>
+            正在加载课表数据...
+          </div>
         </div>
       ) : timetables.length === 0 ? (
         <Empty description="暂无课表，快去创建一个吧" />
