@@ -2233,13 +2233,11 @@ const Dashboard = ({ user }) => {
                 
                 return (
                 <div key={idx} style={{ 
-                  marginBottom: 12, 
-                  paddingBottom: 12, 
-                  borderBottom: idx < ((dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails)).length - 1) ? '1px solid #f0f0f0' : 'none', 
+                  paddingTop: '16px',
+                  paddingBottom: '16px',
+                  borderBottom: '1px solid #f0f0f0',
                   display: 'flex', 
-                  alignItems: 'center', 
-                  minHeight: '72px',
-                  padding: '16px 0'
+                  alignItems: 'center'
                 }}>
                   {/* 第一列：教练信息 - 占1/3 */}
                   <div style={{ 

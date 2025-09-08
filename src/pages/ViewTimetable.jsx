@@ -3676,7 +3676,14 @@ const ViewTimetable = ({ user }) => {
 
       {/* 可供排课时段模态框 */}
       <Modal
-        title={availableSlotsTitle}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span>{availableSlotsTitle}</span>
+            <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#666' }}>
+              （合计 {availableTimeSlots.length} 课时）
+            </span>
+          </div>
+        }
         open={availableTimeModalVisible}
         onCancel={() => setAvailableTimeModalVisible(false)}
         footer={[
@@ -3691,11 +3698,44 @@ const ViewTimetable = ({ user }) => {
               const sorted = arr.slice().sort((a, b) => parseInt(a.split(':')[0]) - parseInt(b.split(':')[0]));
               return `${k}：${sorted.join('、')}`;
             });
-            const text = lines.join('\n');
-            navigator.clipboard.writeText(text).then(() => {
+            const text = `${availableSlotsTitle} (合计${availableTimeSlots.length}课时)\n\n${lines.join('\n')}`;
+            
+            // 兼容的复制方法，支持手机浏览器
+            const copyToClipboard = (text) => {
+              // 方法1：使用现代 Clipboard API
+              if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+              } else {
+                // 方法2：使用传统的 execCommand 方法（兼容手机）
+                return new Promise((resolve, reject) => {
+                  const textArea = document.createElement('textarea');
+                  textArea.value = text;
+                  textArea.style.position = 'fixed';
+                  textArea.style.left = '-999999px';
+                  textArea.style.top = '-999999px';
+                  document.body.appendChild(textArea);
+                  textArea.focus();
+                  textArea.select();
+                  try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                      resolve();
+                    } else {
+                      reject(new Error('execCommand failed'));
+                    }
+                  } catch (err) {
+                    reject(err);
+                  } finally {
+                    document.body.removeChild(textArea);
+                  }
+                });
+              }
+            };
+            
+            copyToClipboard(text).then(() => {
               message.success('已复制到剪贴板');
             }).catch(() => {
-              message.error('复制失败');
+              message.error('复制失败，请手动复制');
             });
           }}>
             复制
