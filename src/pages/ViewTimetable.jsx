@@ -2522,7 +2522,10 @@ const ViewTimetable = ({ user }) => {
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <Button
           type="text"
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            console.log('返回按钮被点击');
+            navigate(-1);
+          }}
           icon={<LeftOutlined style={{ fontSize: 20 }} />}
           style={{
             position: 'absolute',
@@ -2533,7 +2536,8 @@ const ViewTimetable = ({ user }) => {
             border: '1px solid #d9d9d9',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            zIndex: 10
           }}
         />
         <div style={{
@@ -2653,13 +2657,15 @@ const ViewTimetable = ({ user }) => {
           borderRadius: '6px',
           border: '1px solid #e1e4e8',
           fontSize: '12px',
-          color: '#586069'
+          color: '#586069',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
           {/* 第一行：图例和视图切换按钮 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {/* 在实例视图时显示图例 */}
-              {viewMode === 'instance' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
+              {viewMode === 'instance' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ 
@@ -2682,25 +2688,19 @@ const ViewTimetable = ({ user }) => {
                     <span>本周修改课程</span>
                   </div>
                 </>
-              )}
+              ) : null}
               {/* 在固定课表视图时显示提示信息 */}
-              {viewMode === 'template' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
+              {viewMode === 'template' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate ? (
                 <span style={{ color: '#666', fontSize: '12px' }}>
                   固定课表模板视图
                 </span>
-              )}
-              {/* 日期范围课表显示提示信息 */}
-              {!timetable?.isWeekly && timetable?.startDate && timetable?.endDate && (
-                <span style={{ color: '#666', fontSize: '12px' }}>
-                  日期范围课表
-                </span>
-              )}
+              ) : null}
             </div>
             
             {/* 视图切换按钮和多选删除按钮 */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {/* 视图切换按钮只在周固定课表中显示 */}
-              {Boolean(timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) && (
+              {Boolean(timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) ? (
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Button
@@ -2906,22 +2906,24 @@ const ViewTimetable = ({ user }) => {
                   固定课表
                 </Button>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
           
-          {/* 分隔线 */}
-          <div style={{ 
-            height: '1px', 
-            backgroundColor: '#e1e4e8', 
-            margin: '8px 0' 
-          }}></div>
+          {/* 分隔线 - 只在固定课表时显示 */}
+          {timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
+            <div style={{
+              height: '1px',
+              backgroundColor: '#e1e4e8',
+              margin: '8px 0'
+            }}></div>
+          )}
           
           {/* 第二行：多选排课按钮和课时信息 */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '32px' }}>
             {/* 左侧：多选排课按钮 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
-              {!moveMode && !copyMode && !deleteMode && (
+              {!timetable?.isArchived && !moveMode && !copyMode && !deleteMode ? (
                 <Button
                   type={multiSelectMode ? 'default' : 'default'}
                   size="small"
@@ -2934,43 +2936,48 @@ const ViewTimetable = ({ user }) => {
                 >
                   {multiSelectMode ? '退出多选' : '多选排课'}
                 </Button>
-              )}
+              ) : null}
             </div>
             
             {/* 中间：多选状态信息 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-              {multiSelectMode && (
+              {multiSelectMode && selectedCells.size > 0 ? (
                 <span style={{ fontSize: '14px', color: '#666' }}>
                   {timetable?.isWeekly ? (
                     `已选择 ${selectedCells.size} 个时间段`
                   ) : (
-                    `共选择 ${selectedCells.size} 个时间段 (本页 ${getCurrentPageSelectionCount()} 个)`
+                    (() => {
+                      const currentPageCount = getCurrentPageSelectionCount();
+                      return currentPageCount > 0 
+                        ? `共选择 ${selectedCells.size} 个时间段 (本页 ${currentPageCount} 个)`
+                        : `共选择 ${selectedCells.size} 个时间段`;
+                    })()
                   )}
                 </span>
-              )}
-              {deleteMode && (
+              ) : null}
+              {deleteMode && selectedSchedulesForDelete.size > 0 ? (
                 <span style={{ fontSize: '14px', color: '#fa8c16' }}>
                   已选择 {selectedSchedulesForDelete.size} 个课程
                 </span>
-              )}
+              ) : null}
               {/* 非多选模式时显示课时信息 */}
-              {!multiSelectMode && !deleteMode && !moveMode && !copyMode && weeklyStats.count > 0 && (
+              {!multiSelectMode && !deleteMode && !moveMode && !copyMode && weeklyStats.count > 0 ? (
                 <span style={{ 
                   fontSize: '14px', 
                   color: '#666'
                 }}>
-                  {viewMode === 'instance' ? '本周' : (timetable?.isWeekly ? '每周' : '本周')}
+                  本周
                   <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
                     {weeklyStats.count}
                   </span>
                   节课
                 </span>
-              )}
+              ) : null}
             </div>
             
             {/* 右侧：多选删除按钮、批量排课按钮和批量删除按钮 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              {!timetable?.isArchived && !moveMode && !copyMode && !multiSelectMode && (
+              {!timetable?.isArchived && !moveMode && !copyMode && !multiSelectMode ? (
                 <Button
                   type={deleteMode ? 'default' : 'default'}
                   size="small"
@@ -2983,8 +2990,8 @@ const ViewTimetable = ({ user }) => {
                 >
                   {deleteMode ? '退出删除' : '多选删除'}
                 </Button>
-              )}
-              {multiSelectMode && selectedCells.size > 0 && !moveMode && (
+              ) : null}
+              {multiSelectMode && selectedCells.size > 0 && !moveMode ? (
                 <Button
                   type="primary"
                   size="small"
@@ -2992,8 +2999,8 @@ const ViewTimetable = ({ user }) => {
                 >
                   批量排课
                 </Button>
-              )}
-              {deleteMode && selectedSchedulesForDelete.size > 0 && (
+              ) : null}
+              {deleteMode && selectedSchedulesForDelete.size > 0 ? (
                 <Button
                   type="primary"
                   danger
@@ -3002,7 +3009,7 @@ const ViewTimetable = ({ user }) => {
                 >
                   批量删除
                 </Button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Button, Space, Badge, Dropdown } from 'antd';
+import { Tabs, Button, Space, Badge, Dropdown, Spin } from 'antd';
 import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined, InboxOutlined, DownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '../hooks/useMediaQuery';
@@ -13,6 +13,8 @@ const AdminPanel = ({ user }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('timetables');
   const [pendingCount, setPendingCount] = useState(0);
+  const [showArchived, setShowArchived] = useState(false);
+  const [timetableLoading, setTimetableLoading] = useState(false);
 
   useEffect(() => {
     // 拉取待审批数量
@@ -32,9 +34,12 @@ const AdminPanel = ({ user }) => {
     items: [
       {
         key: 'archived',
-        label: '归档课表',
+        label: showArchived ? '活跃课表' : '归档课表',
         icon: <InboxOutlined />,
-        onClick: () => navigate('/admin-archived-timetables'),
+        onClick: () => {
+          setTimetableLoading(true);
+          setShowArchived(!showArchived);
+        },
       },
     ],
   });
@@ -46,12 +51,70 @@ const AdminPanel = ({ user }) => {
         <Space>
           <CalendarOutlined />
           <span>查看课表</span>
-          <Dropdown menu={getTimetableDropdownMenu()} trigger={['click']} placement="bottomLeft">
-            <DownOutlined style={{ fontSize: '10px', cursor: 'pointer' }} />
-          </Dropdown>
         </Space>
       ),
-      children: <TimetableManagement user={user} />,
+      children: (
+        <div style={{ position: 'relative' }}>
+          {/* 课表类型切换按钮 */}
+          <div style={{ 
+            marginBottom: '16px', 
+            display: 'flex', 
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            <Button
+              onClick={() => {
+                setTimetableLoading(true);
+                setShowArchived(false);
+              }}
+              style={{ 
+                borderRadius: '6px 0 0 6px',
+                borderRight: 'none',
+                backgroundColor: !showArchived ? '#1890ff' : 'transparent',
+                borderColor: '#1890ff',
+                color: !showArchived ? '#fff' : '#1890ff'
+              }}
+            >
+              <CalendarOutlined />
+              活跃课表
+            </Button>
+            <Button
+              onClick={() => {
+                setTimetableLoading(true);
+                setShowArchived(true);
+              }}
+              style={{ 
+                borderRadius: '0 6px 6px 0',
+                borderLeft: 'none',
+                backgroundColor: showArchived ? '#ff8c00' : 'transparent',
+                borderColor: '#ff8c00',
+                color: showArchived ? '#fff' : '#ff8c00'
+              }}
+            >
+              <InboxOutlined />
+              归档课表
+            </Button>
+          </div>
+          
+          <TimetableManagement user={user} showArchived={showArchived} onLoadingChange={setTimetableLoading} />
+          {timetableLoading && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(255, 255, 255, 0.5)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}>
+              <Spin size="large" />
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       key: 'users',

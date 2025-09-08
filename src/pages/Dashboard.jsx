@@ -2008,94 +2008,96 @@ const Dashboard = ({ user }) => {
 
   // 管理员概览组件
   const AdminOverview = () => {
-    if (!coachesStatistics) {
-      return (
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <Spin size="large" />
-          <div style={{ marginTop: '16px' }}>加载教练统计信息中...</div>
-        </div>
-      );
-    }
-
-    const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses } = coachesStatistics;
+    const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses } = coachesStatistics || {};
 
     // 今日/明日切换
     const [dayTab, setDayTab] = useState('today'); // 'today' | 'tomorrow'
     const [tomorrowCoachDetails, setTomorrowCoachDetails] = useState({});
+    const [coachDetailsLoading, setCoachDetailsLoading] = useState(false);
 
     // 额外拉取今日活动课表的课程，用于显示学员+时间（后端统计缺少明细时兜底）
     const [todayCoachDetails, setTodayCoachDetails] = useState({});
     useEffect(() => {
+      if (!coachesStatistics) return;
+      
+      setCoachDetailsLoading(true);
       const todayStr = dayjs().format('YYYY-MM-DD');
-      getInstanceSchedulesByDate(todayStr).then(res => {
-        if (res && res.success && res.data && res.data.timetables) {
-          const map = {};
-          res.data.timetables.forEach(t => {
-            const owner = t.ownerName || t.username || t.nickname;
-            const items = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
-            if (items.length > 0) {
-              map[owner] = items;
-            }
-          });
-          if (Object.keys(map).length > 0) {
-            setTodayCoachDetails(map);
-          } else {
-            // 回退到旧接口，防止实例未生成等情况
-            getActiveSchedulesByDate(todayStr).then(res2 => {
-              if (res2 && res2.success && res2.data && res2.data.timetables) {
-                const map2 = {};
-                res2.data.timetables.forEach(t => {
-                  const owner2 = t.ownerName || t.username || t.nickname;
-                  const items2 = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
-                  if (items2.length > 0) map2[owner2] = items2;
-                });
-                setTodayCoachDetails(map2);
-              }
-            }).catch(()=>{});
-          }
-        }
-      }).catch(() => {});
-      // 预取明日数据
       const tomorrowStr = dayjs().add(1, 'day').format('YYYY-MM-DD');
-      getInstanceSchedulesByDate(tomorrowStr).then(res => {
-        if (res && res.success && res.data && res.data.timetables) {
-          const map = {};
-          res.data.timetables.forEach(t => {
-            const owner = t.ownerName || t.username || t.nickname;
-            const items = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
-            if (items.length > 0) {
-              map[owner] = items;
-            }
-          });
-          if (Object.keys(map).length > 0) {
-            setTomorrowCoachDetails(map);
-          } else {
-            getActiveSchedulesByDate(tomorrowStr).then(res2 => {
-              if (res2 && res2.success && res2.data && res2.data.timetables) {
-                const map2 = {};
-                res2.data.timetables.forEach(t => {
-                  const owner2 = t.ownerName || t.username || t.nickname;
-                  const items2 = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
-                  if (items2.length > 0) map2[owner2] = items2;
-                });
-                setTomorrowCoachDetails(map2);
+      
+      Promise.all([
+        // 获取今日数据
+        getInstanceSchedulesByDate(todayStr).then(res => {
+          if (res && res.success && res.data && res.data.timetables) {
+            const map = {};
+            res.data.timetables.forEach(t => {
+              const owner = t.ownerName || t.username || t.nickname;
+              const items = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+              if (items.length > 0) {
+                map[owner] = items;
               }
-            }).catch(()=>{});
+            });
+            if (Object.keys(map).length > 0) {
+              setTodayCoachDetails(map);
+            } else {
+              // 回退到旧接口，防止实例未生成等情况
+              return getActiveSchedulesByDate(todayStr).then(res2 => {
+                if (res2 && res2.success && res2.data && res2.data.timetables) {
+                  const map2 = {};
+                  res2.data.timetables.forEach(t => {
+                    const owner2 = t.ownerName || t.username || t.nickname;
+                    const items2 = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+                    if (items2.length > 0) map2[owner2] = items2;
+                  });
+                  setTodayCoachDetails(map2);
+                }
+              });
+            }
           }
-        }
-      }).catch(() => {});
+        }).catch(() => {}),
+        
+        // 获取明日数据
+        getInstanceSchedulesByDate(tomorrowStr).then(res => {
+          if (res && res.success && res.data && res.data.timetables) {
+            const map = {};
+            res.data.timetables.forEach(t => {
+              const owner = t.ownerName || t.username || t.nickname;
+              const items = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+              if (items.length > 0) {
+                map[owner] = items;
+              }
+            });
+            if (Object.keys(map).length > 0) {
+              setTomorrowCoachDetails(map);
+            } else {
+              return getActiveSchedulesByDate(tomorrowStr).then(res2 => {
+                if (res2 && res2.success && res2.data && res2.data.timetables) {
+                  const map2 = {};
+                  res2.data.timetables.forEach(t => {
+                    const owner2 = t.ownerName || t.username || t.nickname;
+                    const items2 = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+                    if (items2.length > 0) map2[owner2] = items2;
+                  });
+                  setTomorrowCoachDetails(map2);
+                }
+              });
+            }
+          }
+        }).catch(() => {})
+      ]).finally(() => {
+        setCoachDetailsLoading(false);
+      });
     }, [coachesStatistics]);
 
     // 准备图表数据
-    const chartData = coaches.map(coach => ({
+    const chartData = (coaches || []).map(coach => ({
       name: coach.nickname || coach.username,
       todayCourses: coach.todayCourses,
       weeklyCourses: coach.weeklyCourses
     }));
 
     const pieData = [
-      { name: '今日有课', value: coaches.filter(c => c.todayCourses > 0).length },
-      { name: '今日无课', value: coaches.filter(c => c.todayCourses === 0).length }
+      { name: '今日有课', value: (coaches || []).filter(c => c.todayCourses > 0).length },
+      { name: '今日无课', value: (coaches || []).filter(c => c.todayCourses === 0).length }
     ];
 
     const COLORS = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2'];
@@ -2106,32 +2108,38 @@ const Dashboard = ({ user }) => {
         <Row gutter={16} style={{ marginBottom: '24px' }}>
           <Col span={8}>
             <Card styles={{ body: { textAlign: 'center' } }}>
-              <Statistic
-                title="本周总课程"
-                value={totalWeeklyCourses}
-                prefix={<BarChartOutlined />}
-                valueStyle={{ color: '#faad14' }}
-              />
+              <Spin spinning={statisticsLoading} size="small">
+                <Statistic
+                  title="本周总课程"
+                  value={totalWeeklyCourses || 0}
+                  prefix={<BarChartOutlined />}
+                  valueStyle={{ color: '#faad14' }}
+                />
+              </Spin>
             </Card>
           </Col>
           <Col span={8}>
             <Card styles={{ body: { textAlign: 'center' } }}>
-              <Statistic
-                title="今日总课程"
-                value={totalTodayCourses}
-                prefix={<CalendarOutlined />}
-                valueStyle={{ color: '#52c41a' }}
-              />
+              <Spin spinning={statisticsLoading} size="small">
+                <Statistic
+                  title="今日总课程"
+                  value={totalTodayCourses || 0}
+                  prefix={<CalendarOutlined />}
+                  valueStyle={{ color: '#52c41a' }}
+                />
+              </Spin>
             </Card>
           </Col>
           <Col span={8}>
             <Card styles={{ body: { textAlign: 'center' } }}>
-              <Statistic
-                title="上周总课程"
-                value={0}
-                prefix={<BarChartOutlined />}
-                valueStyle={{ color: '#722ed1' }}
-              />
+              <Spin spinning={statisticsLoading} size="small">
+                <Statistic
+                  title="上周总课程"
+                  value={0}
+                  prefix={<BarChartOutlined />}
+                  valueStyle={{ color: '#722ed1' }}
+                />
+              </Spin>
             </Card>
           </Col>
         </Row>
@@ -2154,24 +2162,30 @@ const Dashboard = ({ user }) => {
                   dayTab==='today'
                     ? Object.keys(todayCoachDetails).length
                     : Object.keys(tomorrowCoachDetails).length
-                }/{coaches.length}
+                }/{coaches?.length || 0}
               </span>
             </div>
           }
         >
+          <Spin spinning={coachDetailsLoading || statisticsLoading}>
           {(dayTab==='today' ? Object.keys(todayCoachDetails).length === 0 : Object.keys(tomorrowCoachDetails).length === 0) ? (
             <div style={{ color: '#999' }}>{dayTab==='today' ? '今日' : '明日'}暂无课程</div>
           ) : (
             (dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails))
-              .map(([coachName, detailItems], idx) => (
+              .map(([coachName, detailItems], idx) => {
+                // 根据教练姓名找到对应的教练ID，用于保持颜色一致
+                const coach = (coaches || []).find(c => (c.nickname || c.username) === coachName);
+                const coachId = coach?.id || idx;
+                
+                return (
                 <div key={idx} style={{ 
                   marginBottom: 12, 
                   paddingBottom: 12, 
                   borderBottom: idx < ((dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails)).length - 1) ? '1px solid #f0f0f0' : 'none', 
                   display: 'flex', 
-                  alignItems: 'center', 
-                  minHeight: (detailItems.length) <= 2 ? '50px' : '80px',
-                  padding: (detailItems.length) <= 2 ? '8px 0' : '12px 0'
+                  alignItems: 'stretch', 
+                  minHeight: '60px',
+                  padding: '12px 0'
                 }}>
                   {/* 第一列：教练信息 - 占1/3 */}
                   <div style={{ 
@@ -2180,7 +2194,7 @@ const Dashboard = ({ user }) => {
                     width: '33.33%',
                     height: '100%'
                   }}>
-                    <Avatar size="small" style={{ backgroundColor: '#1890ff' }}>
+                    <Avatar size="small" style={{ backgroundColor: getIconColor(coachId) }}>
                       {coachName?.[0]?.toUpperCase()}
                     </Avatar>
                     <div style={{ 
@@ -2201,8 +2215,8 @@ const Dashboard = ({ user }) => {
                     width: '66.66%',
                     display: 'flex', 
                     flexDirection: 'column', 
-                    justifyContent: 'flex-start',
-                    height: '100%'
+                    justifyContent: 'center',
+                    minHeight: '36px'
                   }}>
                     {(() => {
                       const rawItems = detailItems;
@@ -2310,82 +2324,86 @@ const Dashboard = ({ user }) => {
                     })()}
                   </div>
                 </div>
-              ))
+                );
+              })
           )}
+          </Spin>
         </Card>
 
         {/* 图表区域已移除 */}
 
         {/* 教练详情表格 */}
         <Card title="教练详情" size="small">
-          <Table
-            dataSource={coaches}
-            columns={[
-              {
-                title: '教练',
-                dataIndex: 'nickname',
-                key: 'nickname',
-                align: 'center',
-                render: (text, record) => (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-                    <Avatar size="small" style={{ backgroundColor: getIconColor(record.id) }}>
-                      {(text || record.username)?.[0]?.toUpperCase()}
-                    </Avatar>
-                    <span style={{ marginLeft: '8px' }}>
-                      {text || record.username}
-                    </span>
-                  </div>
-                )
-              },
-              {
-                title: '课表数量',
-                dataIndex: 'timetableCount',
-                key: 'timetableCount',
-                align: 'center',
-                sorter: (a, b) => a.timetableCount - b.timetableCount,
-              },
-              {
-                title: dayTab === 'today' ? '今日课程' : '明日课程',
-                key: 'dynamicDayCourses',
-                align: 'center',
-                sorter: (a, b) => {
-                  const nameA = a.nickname || a.username;
-                  const nameB = b.nickname || b.username;
-                  const map = dayTab === 'today' ? todayCoachDetails : tomorrowCoachDetails;
-                  const valA = (map[nameA] || []).length;
-                  const valB = (map[nameB] || []).length;
-                  return valA - valB;
+          <Spin spinning={statisticsLoading}>
+            <Table
+              dataSource={coaches}
+              columns={[
+                {
+                  title: '教练',
+                  dataIndex: 'nickname',
+                  key: 'nickname',
+                  align: 'center',
+                  render: (text, record) => (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+                      <Avatar size="small" style={{ backgroundColor: getIconColor(record.id) }}>
+                        {(text || record.username)?.[0]?.toUpperCase()}
+                      </Avatar>
+                      <span style={{ marginLeft: '8px' }}>
+                        {text || record.username}
+                      </span>
+                    </div>
+                  )
                 },
-                defaultSortOrder: 'descend',
-                sortDirections: ['descend', 'ascend'],
-                render: (_, record) => {
-                  const name = record.nickname || record.username;
-                  const map = dayTab === 'today' ? todayCoachDetails : tomorrowCoachDetails;
-                  const value = (map[name] || []).length;
-                  return (
-                    <span style={{ color: value > 0 ? '#52c41a' : '#999', fontWeight: 500 }}>
+                {
+                  title: '课表数量',
+                  dataIndex: 'timetableCount',
+                  key: 'timetableCount',
+                  align: 'center',
+                  sorter: (a, b) => a.timetableCount - b.timetableCount,
+                },
+                {
+                  title: dayTab === 'today' ? '今日课程' : '明日课程',
+                  key: 'dynamicDayCourses',
+                  align: 'center',
+                  sorter: (a, b) => {
+                    const nameA = a.nickname || a.username;
+                    const nameB = b.nickname || b.username;
+                    const map = dayTab === 'today' ? todayCoachDetails : tomorrowCoachDetails;
+                    const valA = (map[nameA] || []).length;
+                    const valB = (map[nameB] || []).length;
+                    return valA - valB;
+                  },
+                  defaultSortOrder: 'descend',
+                  sortDirections: ['descend', 'ascend'],
+                  render: (_, record) => {
+                    const name = record.nickname || record.username;
+                    const map = dayTab === 'today' ? todayCoachDetails : tomorrowCoachDetails;
+                    const value = (map[name] || []).length;
+                    return (
+                      <span style={{ color: value > 0 ? '#52c41a' : '#999', fontWeight: 500 }}>
+                        {value}
+                      </span>
+                    );
+                  }
+                },
+                {
+                  title: '本周课程',
+                  dataIndex: 'weeklyCourses',
+                  key: 'weeklyCourses',
+                  align: 'center',
+                  sorter: (a, b) => a.weeklyCourses - b.weeklyCourses,
+                  render: (value) => (
+                    <span style={{ color: '#1890ff', fontWeight: 500 }}>
                       {value}
                     </span>
-                  );
+                  )
                 }
-              },
-              {
-                title: '本周课程',
-                dataIndex: 'weeklyCourses',
-                key: 'weeklyCourses',
-                align: 'center',
-                sorter: (a, b) => a.weeklyCourses - b.weeklyCourses,
-                render: (value) => (
-                  <span style={{ color: '#1890ff', fontWeight: 500 }}>
-                    {value}
-                  </span>
-                )
-              }
-            ]}
-            pagination={false}
-            size="small"
-            style={{ textAlign: 'center' }}
-          />
+              ]}
+              pagination={false}
+              size="small"
+              style={{ textAlign: 'center' }}
+            />
+          </Spin>
         </Card>
       </div>
     );

@@ -55,4 +55,25 @@
   width: 100%;
   cursor: pointer;
   padding: 0px !important; /* Force remove padding */
-} 
+}
+
+/* Hide any stray debug elements that might show "0" - temporarily disabled */
+/*
+.page-container > *:not(.ant-spin-nested-loading):not(button):not(div[class]):not(div[style*="margin"]):not(div[style*="padding"]):not(div[style*="display: flex"]):not(div[style*="background"]) {
+  display: none !important;
+}
+*/
+
+/* Specifically hide any standalone "0" text nodes - temporarily disabled */
+/*
+.page-container::before {
+  content: none !important;
+}
+*/
+
+/* Hide React dev tools or other debugging elements - temporarily disabled */
+/*
+div[data-reactroot] > div:first-child:not([class]):not([style]) {
+  display: none !important;
+}
+*/ 

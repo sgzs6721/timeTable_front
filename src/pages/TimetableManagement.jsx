@@ -5,16 +5,16 @@ import { useNavigate } from 'react-router-dom';
 import { getAllTimetables, updateTimetableStatus, updateTimetableDetails, deleteTimetableByAdmin, clearTimetableSchedulesByAdmin } from '../services/admin';
 import CopyTimetableModal from '../components/CopyTimetableModal';
 import dayjs from 'dayjs';
-import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules, updateTimetable, clearTimetableSchedules } from '../services/timetable';
+import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules, updateTimetable, clearTimetableSchedules, bulkRestoreTimetables, bulkDeleteTimetables } from '../services/timetable';
 
-const ActiveBadge = () => (
+const ActiveBadge = ({ isArchived = false }) => (
     <div style={{
       position: 'absolute',
       top: 0,
       left: 0,
       width: 18,
       height: 18,
-      background: '#389e0d',
+      background: isArchived ? '#ff8c00' : '#1890ff',
       borderTopLeftRadius: '8px',
       borderBottomRightRadius: '8px',
       display: 'flex',
@@ -27,7 +27,7 @@ const ActiveBadge = () => (
     </div>
   );
 
-const TimetableManagement = ({ user }) => {
+const TimetableManagement = ({ user, showArchived = false, onLoadingChange }) => {
   const [allTimetables, setAllTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTimetables, setSelectedTimetables] = useState([]);
@@ -44,109 +44,155 @@ const TimetableManagement = ({ user }) => {
   const [editingTimetableId, setEditingTimetableId] = useState(null);
   const [editingTimetableName, setEditingTimetableName] = useState('');
 
-
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchAllTimetables();
-  }, []);
+    // 切换课表类型时取消批量操作模式
+    if (batchMode) {
+      setBatchMode(false);
+      setSelectedTimetables([]);
+    }
+  }, [showArchived]);
 
   // 获取操作菜单
   const getActionMenu = (item) => {
     const hasSchedules = item.scheduleCount > 0;
     const isActive = item.isActive;
+    const isArchived = item.isArchived === 1;
 
-    return {
-      items: [
-        {
-          key: 'active',
-          label: '设为活动课表',
-          icon: <StarFilled style={{ color: !isActive ? '#52c41a' : '#bfbfbf' }} />,
-          disabled: isActive,
-          onClick: () => handleSetActive(item.id),
-          style: { 
-            color: !isActive ? '#262626' : '#bfbfbf',
-            fontWeight: '500'
-          },
+    const baseItems = [
+      {
+        key: 'copy',
+        label: '复制课表',
+        icon: <CopyOutlined style={{ color: hasSchedules ? '#52c41a' : '#bfbfbf' }} />,
+        disabled: !hasSchedules,
+        onClick: () => handleCopyTimetable(item),
+        style: { 
+          color: hasSchedules ? '#262626' : '#bfbfbf',
+          fontWeight: '500'
         },
-        {
-          key: 'copy',
-          label: '复制课表',
-          icon: <CopyOutlined style={{ color: hasSchedules ? '#52c41a' : '#bfbfbf' }} />,
-          disabled: !hasSchedules,
-          onClick: () => handleCopyTimetable(item),
-          style: { 
-            color: hasSchedules ? '#262626' : '#bfbfbf',
-            fontWeight: '500'
-          },
+      },
+      {
+        key: 'convert',
+        label: item.isWeekly ? '转为日期类课表' : '按某周转为周固定',
+        icon: <RetweetOutlined style={{ color: hasSchedules ? '#fa8c16' : '#bfbfbf' }} />,
+        disabled: !hasSchedules,
+        onClick: async () => {
+          if (item.isWeekly) {
+            setConvertModal({ visible: true, mode: 'weeklyToDate', timetable: item });
+          } else {
+            try {
+              const res = await getWeeksWithCountsApi(item.id);
+              if (res.success) {
+                const options = res.data.filter(w=>w.count>0).map(w=>({ value: w.weekStart, label: `${w.weekStart} ~ ${w.weekEnd} (${w.count}节课)` }));
+                setWeekOptions(options);
+                setConvertModal({ visible: true, mode: 'dateToWeekly', timetable: item });
+              } else { message.error(res.message || '获取周列表失败'); }
+            } catch { message.error('获取周列表失败'); }
+          }
         },
-        {
-          key: 'convert',
-          label: item.isWeekly ? '转为日期类课表' : '按某周转为周固定',
-          icon: <RetweetOutlined style={{ color: hasSchedules ? '#fa8c16' : '#bfbfbf' }} />,
-          disabled: !hasSchedules,
-          onClick: async () => {
-            if (item.isWeekly) {
-              setConvertModal({ visible: true, mode: 'weeklyToDate', timetable: item });
-            } else {
-              try {
-                const res = await getWeeksWithCountsApi(item.id);
-                if (res.success) {
-                  const options = res.data.filter(w=>w.count>0).map(w=>({ value: w.weekStart, label: `${w.weekStart} ~ ${w.weekEnd} (${w.count}节课)` }));
-                  setWeekOptions(options);
-                  setConvertModal({ visible: true, mode: 'dateToWeekly', timetable: item });
-                } else { message.error(res.message || '获取周列表失败'); }
-              } catch { message.error('获取周列表失败'); }
-            }
-          },
-          style: { 
-            color: hasSchedules ? '#262626' : '#bfbfbf',
-            fontWeight: '500'
-          },
+        style: { 
+          color: hasSchedules ? '#262626' : '#bfbfbf',
+          fontWeight: '500'
         },
-        {
-          key: 'archive',
-          label: '归档',
-          icon: <InboxOutlined style={{ color: '#faad14' }} />,
-          onClick: () => handleArchiveTimetable(item.id),
-          style: { 
-            color: '#262626',
-            fontWeight: '500'
-          },
+      },
+      {
+        key: 'clear',
+        label: '清空课表',
+        icon: <ClearOutlined style={{ color: hasSchedules ? '#ff7875' : '#bfbfbf' }} />,
+        disabled: !hasSchedules,
+        onClick: () => handleClearTimetable(item),
+        style: { 
+          color: hasSchedules ? '#262626' : '#bfbfbf',
+          fontWeight: '500'
         },
-        {
-          key: 'clear',
-          label: '清空课表',
-          icon: <ClearOutlined style={{ color: hasSchedules ? '#ff7875' : '#bfbfbf' }} />,
-          disabled: !hasSchedules,
-          onClick: () => handleClearTimetable(item),
-          style: { 
-            color: hasSchedules ? '#262626' : '#bfbfbf',
-            fontWeight: '500'
-          },
+      },
+      {
+        key: 'delete',
+        label: '删除课表',
+        icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
+        danger: true,
+        onClick: () => handleDeleteTimetable(item.id),
+        style: { 
+          color: '#262626',
+          fontWeight: '500'
         },
-        {
-          key: 'delete',
-          label: '删除课表',
-          icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
-          danger: true,
-          onClick: () => handleDeleteTimetable(item.id),
-          style: { 
-            color: '#262626',
-            fontWeight: '500'
+      },
+    ];
+
+    if (isArchived) {
+      // 归档课表的操作菜单 - 只显示恢复和删除功能
+      return {
+        items: [
+          {
+            key: 'restore',
+            label: '恢复课表',
+            icon: <RetweetOutlined style={{ color: '#52c41a' }} />,
+            onClick: () => handleRestoreTimetable(item.id),
+            style: { 
+              color: '#262626',
+              fontWeight: '500'
+            },
           },
-        },
-      ],
-    };
+          {
+            key: 'delete',
+            label: '删除课表',
+            icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
+            danger: true,
+            onClick: () => handleDeleteTimetable(item.id),
+            style: { 
+              color: '#262626',
+              fontWeight: '500'
+            },
+          },
+        ],
+      };
+    } else {
+      // 活跃课表的操作菜单
+      return {
+        items: [
+          {
+            key: 'active',
+            label: '设为活动课表',
+            icon: <StarFilled style={{ color: !isActive ? '#52c41a' : '#bfbfbf' }} />,
+            disabled: isActive,
+            onClick: () => handleSetActive(item.id),
+            style: { 
+              color: !isActive ? '#262626' : '#bfbfbf',
+              fontWeight: '500'
+            },
+          },
+          ...baseItems,
+          {
+            key: 'archive',
+            label: '归档',
+            icon: <InboxOutlined style={{ color: '#faad14' }} />,
+            onClick: () => handleArchiveTimetable(item.id),
+            style: { 
+              color: '#262626',
+              fontWeight: '500'
+            },
+          },
+        ],
+      };
+    }
   };
 
   const fetchAllTimetables = async () => {
     try {
       const response = await getAllTimetables();
       if (response.success) {
-        // 过滤掉已归档的课表，只显示活跃课表
-        const activeTimetables = response.data.filter(t => !t.isArchived || t.isArchived === 0);
-        const sortedData = activeTimetables.sort((a, b) => {
+        let filteredTimetables;
+        if (showArchived) {
+          // 显示归档课表
+          filteredTimetables = response.data.filter(t => t.isArchived === 1);
+        } else {
+          // 过滤掉已归档的课表，只显示活跃课表
+          filteredTimetables = response.data.filter(t => !t.isArchived || t.isArchived === 0);
+        }
+        
+        const sortedData = filteredTimetables.sort((a, b) => {
             const activeA = a.isActive ? 1 : 0;
             const activeB = b.isActive ? 1 : 0;
             if (activeB !== activeA) {
@@ -162,6 +208,10 @@ const TimetableManagement = ({ user }) => {
       message.error('获取课表数据失败，请检查网络连接');
     } finally {
       setLoading(false);
+      // 通知父组件数据加载完成
+      if (onLoadingChange) {
+        onLoadingChange(false);
+      }
     }
   };
 
@@ -333,6 +383,67 @@ const TimetableManagement = ({ user }) => {
     fetchAllTimetables();
   };
 
+  // 批量恢复课表
+  const handleBulkRestoreTimetables = () => {
+    if (selectedTimetables.length === 0) {
+      message.warning('请先选择要恢复的课表');
+      return;
+    }
+    
+    Modal.confirm({
+      title: '批量恢复课表',
+      content: `确定要恢复选中的 ${selectedTimetables.length} 个课表吗？`,
+      okText: '恢复',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await bulkRestoreTimetables(selectedTimetables);
+          if (response.success) {
+            message.success(`成功恢复 ${selectedTimetables.length} 个课表`);
+            fetchAllTimetables();
+            setSelectedTimetables([]);
+            setBatchMode(false);
+          } else {
+            message.error(response.message || '批量恢复失败');
+          }
+        } catch (error) {
+          message.error('批量恢复失败');
+        }
+      },
+    });
+  };
+
+  // 批量删除课表
+  const handleBulkDeleteTimetables = () => {
+    if (selectedTimetables.length === 0) {
+      message.warning('请先选择要删除的课表');
+      return;
+    }
+    
+    Modal.confirm({
+      title: '批量删除课表',
+      content: `确定要删除选中的 ${selectedTimetables.length} 个课表吗？此操作不可恢复。`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await bulkDeleteTimetables(selectedTimetables);
+          if (response.success) {
+            message.success(`成功删除 ${selectedTimetables.length} 个课表`);
+            fetchAllTimetables();
+            setSelectedTimetables([]);
+            setBatchMode(false);
+          } else {
+            message.error(response.message || '批量删除失败');
+          }
+        } catch (error) {
+          message.error('批量删除失败');
+        }
+      },
+    });
+  };
+
   // 归档课表
   const handleArchiveTimetable = async (timetableId) => {
     try {
@@ -345,6 +456,21 @@ const TimetableManagement = ({ user }) => {
       }
     } catch (error) {
       message.error('归档失败');
+    }
+  };
+
+  // 恢复课表
+  const handleRestoreTimetable = async (timetableId) => {
+    try {
+      const response = await updateTimetableStatus(timetableId, 'ACTIVE');
+      if (response.success) {
+        message.success('课表恢复成功');
+        fetchAllTimetables();
+      } else {
+        message.error(response.message || '恢复失败');
+      }
+    } catch (error) {
+      message.error('恢复失败');
     }
   };
 
@@ -463,7 +589,15 @@ const TimetableManagement = ({ user }) => {
   };
 
   const displayTimetables = batchMode
-    ? allTimetables.filter(item => item.scheduleCount > 0 && item.isActive === 1)
+    ? allTimetables.filter(item => {
+        if (showArchived) {
+          // 归档模式下显示所有归档课表
+          return item.isArchived === 1;
+        } else {
+          // 活跃模式下显示有课程且活跃的课表
+          return item.scheduleCount > 0 && item.isActive === 1;
+        }
+      })
     : allTimetables;
 
   return (
@@ -502,15 +636,40 @@ const TimetableManagement = ({ user }) => {
                 已选择 {selectedTimetables.length} 个课表
               </span>
             </div>
-            <Button 
-              type="primary" 
-              icon={<MergeOutlined />}
-              onClick={handleMergeTimetables}
-              disabled={selectedTimetables.length < 2 || !checkCanMerge()}
-              size="small"
-            >
-              合并课表
-            </Button>
+            {showArchived ? (
+              // 归档模式：显示批量恢复和批量删除按钮
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button 
+                  type="primary" 
+                  icon={<RetweetOutlined />}
+                  onClick={handleBulkRestoreTimetables}
+                  disabled={selectedTimetables.length === 0}
+                  size="small"
+                >
+                  恢复
+                </Button>
+                <Button 
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleBulkDeleteTimetables}
+                  disabled={selectedTimetables.length === 0}
+                  size="small"
+                >
+                  删除
+                </Button>
+              </div>
+            ) : (
+              // 活跃模式：显示合并课表按钮
+              <Button 
+                type="primary" 
+                icon={<MergeOutlined />}
+                onClick={handleMergeTimetables}
+                disabled={selectedTimetables.length < 2 || !checkCanMerge()}
+                size="small"
+              >
+                合并课表
+              </Button>
+            )}
           </>
         ) : (
           <Button type="primary" size="small" icon={<MergeOutlined />} onClick={handleBatchMode} style={{ padding: '0 8px', height: 26, fontSize: 13 }}>
@@ -531,17 +690,17 @@ const TimetableManagement = ({ user }) => {
             return (
               <List.Item
                 style={{
-                  border: '1px solid #f0f0f0',
+                  border: item.isArchived === 1 ? '1px solid #ff8c00' : '1px solid #1890ff',
                   borderRadius: 10,
                   marginBottom: 16,
                   padding: 18,
                   display: 'flex',
                   alignItems: 'center',
-                  background: '#fff',
+                  background: item.isArchived === 1 ? '#fff7e6' : '#f0f8ff',
                   position: 'relative',
                 }}
               >
-                {item.isActive ? <ActiveBadge /> : null}
+                {item.isActive ? <ActiveBadge isArchived={item.isArchived === 1} /> : null}
                 {batchMode && (
                   <Checkbox
                     checked={checked}
@@ -649,7 +808,7 @@ const TimetableManagement = ({ user }) => {
                         <span>{item.scheduleCount || 0} 个课程</span>
                       </div>
                     </div>
-                    <Tag color={item.isWeekly ? "geekblue" : "purple"}>
+                    <Tag color={item.isArchived === 1 ? "orange" : "blue"}>
                       {item.isWeekly ? '周固定课表' : '日期范围课表'}
                     </Tag>
                   </div>

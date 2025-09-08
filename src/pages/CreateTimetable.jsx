@@ -45,6 +45,8 @@ const CreateTimetable = ({ user }) => {
     navigate('/dashboard?tab=timetables');
   };
 
+  console.log('CreateTimetable rendering, user:', user);
+  
   return (
     <div className="page-container">
       <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>创建新课表</h1>
