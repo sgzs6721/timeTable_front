@@ -2733,16 +2733,43 @@ const ViewTimetable = ({ user }) => {
     time: time,
   }));
 
-  if (!timetable || !viewMode) {
-    return (
-      <div className="page-container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
+  // 如果课表信息未加载，显示完整页面布局但数据为空
+  const isInitialLoading = !timetable || !viewMode;
+  
+  // 为初始加载状态准备空数据
+  const displayTimetable = timetable || { name: '课表加载中...', isWeekly: true };
+  const displayTableDataSource = isInitialLoading ? 
+    // 生成空的时间表格结构
+    Array.from({ length: 11 }, (_, i) => {
+      const hour = 9 + i;
+      return {
+        key: i,
+        time: `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00`
+      };
+    }) : tableDataSource;
+  
+  const displayColumns = isInitialLoading ? 
+    // 生成空的列结构
+    [
+      { title: '时间', dataIndex: 'time', key: 'time', width: 80, align: 'center' },
+      { title: '周一', dataIndex: 'monday', key: 'monday', align: 'center' },
+      { title: '周二', dataIndex: 'tuesday', key: 'tuesday', align: 'center' },
+      { title: '周三', dataIndex: 'wednesday', key: 'wednesday', align: 'center' },
+      { title: '周四', dataIndex: 'thursday', key: 'thursday', align: 'center' },
+      { title: '周五', dataIndex: 'friday', key: 'friday', align: 'center' },
+      { title: '周六', dataIndex: 'saturday', key: 'saturday', align: 'center' },
+      { title: '周日', dataIndex: 'sunday', key: 'sunday', align: 'center' }
+    ] : generateColumns();
+  
+  // 为初始加载提供默认值
+  const displayWeeklyInstances = isInitialLoading ? [] : weeklyInstances;
+  const displayViewMode = isInitialLoading ? 'template' : viewMode;
+  const displayWeeklyStats = isInitialLoading ? { count: 0, students: 0 } : weeklyStats;
+  const displayTotalWeeks = isInitialLoading ? 1 : totalWeeks;
+  const displayCurrentWeek = isInitialLoading ? 1 : currentWeek;
 
   return (
-    <div className="page-container" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className="page-container" onTouchStart={isInitialLoading ? undefined : handleTouchStart} onTouchEnd={isInitialLoading ? undefined : handleTouchEnd}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <Button
           type="text"
@@ -2773,7 +2800,7 @@ const ViewTimetable = ({ user }) => {
         }}>
           <Space align="center" size="large">
             <CalendarOutlined style={{ fontSize: '24px', color: '#8a2be2' }} />
-            <h1 style={{ margin: 0 }}>{timetable?.name}</h1>
+            <h1 style={{ margin: 0 }}>{displayTimetable?.name}</h1>
           </Space>
 
         </div>
@@ -2803,7 +2830,7 @@ const ViewTimetable = ({ user }) => {
 
 
       {/* 移动和复制模式的控制区域 */}
-      {!timetable?.isArchived && (moveMode || copyMode) && (
+      {(!timetable?.isArchived || isInitialLoading) && (moveMode || copyMode) && (
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -2873,7 +2900,7 @@ const ViewTimetable = ({ user }) => {
 
 
       {/* 图例说明和视图切换按钮 */}
-      {timetable && (
+      {(timetable || isInitialLoading) && (
         <div style={{ 
           marginBottom: '12px', 
           padding: '8px 12px', 
@@ -2889,7 +2916,7 @@ const ViewTimetable = ({ user }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {/* 在实例视图时显示图例 */}
-              {viewMode === 'instance' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate ? (
+              {((displayViewMode === 'instance' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) || (isInitialLoading && displayViewMode === 'instance')) ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ 
@@ -2914,7 +2941,7 @@ const ViewTimetable = ({ user }) => {
                 </>
               ) : null}
               {/* 在固定课表视图时显示提示信息 */}
-              {viewMode === 'template' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate ? (
+              {((displayViewMode === 'template' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) || (isInitialLoading && displayViewMode === 'template')) ? (
                 <span style={{ color: '#666', fontSize: '12px' }}>
                   固定课表模板视图
                 </span>
@@ -2924,7 +2951,7 @@ const ViewTimetable = ({ user }) => {
             {/* 视图切换按钮和多选删除按钮 */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {/* 视图切换按钮只在周固定课表中显示 */}
-              {Boolean(timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) ? (
+              {Boolean((timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) || (isInitialLoading && displayTimetable?.isWeekly)) ? (
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Button
@@ -3135,7 +3162,7 @@ const ViewTimetable = ({ user }) => {
           </div>
           
           {/* 分隔线 - 只在固定课表时显示 */}
-          {timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && (
+          {((timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) || (isInitialLoading && displayTimetable?.isWeekly)) && (
             <div style={{
               height: '1px',
               backgroundColor: '#e1e4e8',
@@ -3147,7 +3174,7 @@ const ViewTimetable = ({ user }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '32px' }}>
             {/* 左侧：多选排课按钮 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
-              {!timetable?.isArchived && !moveMode && !copyMode && !deleteMode ? (
+              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !deleteMode ? (
                 <Button
                   type={multiSelectMode ? 'default' : 'default'}
                   size="small"
@@ -3185,22 +3212,22 @@ const ViewTimetable = ({ user }) => {
                 </span>
               ) : null}
               {/* 非多选模式时显示课时信息 */}
-              {!multiSelectMode && !deleteMode && !moveMode && !copyMode && weeklyStats.count > 0 ? (
+              {!multiSelectMode && !deleteMode && !moveMode && !copyMode && (displayWeeklyStats.count > 0 || isInitialLoading) ? (
                 <span style={{ 
                   fontSize: '14px', 
                   color: '#666',
                   whiteSpace: 'nowrap'
                 }}>
-                  {viewMode === 'instance' && currentWeekInstance?.weekStartDate ? instanceWeekLabel : '本周'}
+                  {displayViewMode === 'instance' && currentWeekInstance?.weekStartDate ? instanceWeekLabel : '本周'}
                   <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
-                    {weeklyStats.count}
+                    {isInitialLoading ? '-' : displayWeeklyStats.count}
                   </span>
                   节课
-                  {weeklyStats.students > 0 && (
+                  {(displayWeeklyStats.students > 0 || isInitialLoading) && (
                     <>
                       <span style={{ margin: '0 4px' }}>学员</span>
                       <span style={{ color: '#52c41a', fontWeight: 'bold', margin: '0 2px' }}>
-                        {weeklyStats.students}
+                        {isInitialLoading ? '-' : displayWeeklyStats.students}
                       </span>
                       <span>个</span>
                     </>
@@ -3211,7 +3238,7 @@ const ViewTimetable = ({ user }) => {
             
             {/* 右侧：多选删除按钮、批量排课按钮和批量删除按钮 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              {!timetable?.isArchived && !moveMode && !copyMode && !multiSelectMode ? (
+              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !multiSelectMode ? (
                 <Button
                   type={deleteMode ? 'default' : 'default'}
                   size="small"
@@ -3251,37 +3278,41 @@ const ViewTimetable = ({ user }) => {
 
       <div className="compact-timetable-container" ref={tableRef} style={{ position: 'relative' }}>
         <Table
-          columns={generateColumns()}
-          dataSource={tableDataSource}
+          columns={displayColumns}
+          dataSource={displayTableDataSource}
           pagination={false}
-          loading={viewMode === 'instance' ? instanceDataLoading : loading}
+          loading={false}
           size="small"
           bordered
           className="compact-timetable"
           style={{ tableLayout: 'fixed' }}
         />
-        {/* 切换周实例时的蒙板和loading */}
-        {instancesLoading && (
+        {/* 统一的loading蒙板 */}
+        {(isInitialLoading || loading || instanceDataLoading || instancesLoading) && (
           <div style={{
             position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.6)',
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
             borderRadius: '6px'
           }}>
-            <Spin size="large" tip="切换周实例中..." />
+            <Spin size="large" tip={
+              isInitialLoading ? "正在加载课表..." :
+              instancesLoading ? "切换周实例中..." : 
+              "正在加载课表数据..."
+            } />
           </div>
         )}
       </div>
 
       {/* 每周实例分页控件 - 仅周固定课表且为实例视图时显示 */}
-      {timetable?.isWeekly && viewMode === 'instance' && weeklyInstances.length > 0 && (
+      {((timetable?.isWeekly && displayViewMode === 'instance' && displayWeeklyInstances.length > 0) || (isInitialLoading && displayTimetable?.isWeekly)) && (
         <div style={{ 
           display: 'flex', 
           justifyContent: 'center', 
@@ -3292,8 +3323,8 @@ const ViewTimetable = ({ user }) => {
         }}>
           <Button
             type="text"
-            onClick={() => switchToWeekInstanceByIndex(currentInstanceIndex - 1)}
-            disabled={currentInstanceIndex <= 0 || instancesLoading}
+            onClick={() => !isInitialLoading && switchToWeekInstanceByIndex(currentInstanceIndex - 1)}
+            disabled={isInitialLoading || currentInstanceIndex <= 0 || instancesLoading}
             icon={<LeftOutlined style={{ fontSize: 14 }} />}
             style={{
               width: 32,
@@ -3307,7 +3338,7 @@ const ViewTimetable = ({ user }) => {
           />
           
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {weeklyInstances.map((instance, index) => {
+            {(isInitialLoading ? [{ id: 'loading', weekStartDate: dayjs().format('YYYY-MM-DD') }] : displayWeeklyInstances).map((instance, index) => {
               console.log('Rendering button for instance:', instance, 'index:', index, 'currentIndex:', currentInstanceIndex);
               return (
                 <Button
@@ -3338,8 +3369,8 @@ const ViewTimetable = ({ user }) => {
           
           <Button
             type="text"
-            onClick={() => switchToWeekInstanceByIndex(currentInstanceIndex + 1)}
-            disabled={currentInstanceIndex >= weeklyInstances.length - 1 || instancesLoading}
+            onClick={() => !isInitialLoading && switchToWeekInstanceByIndex(currentInstanceIndex + 1)}
+            disabled={isInitialLoading || currentInstanceIndex >= displayWeeklyInstances.length - 1 || instancesLoading}
             icon={<RightOutlined style={{ fontSize: 14 }} />}
             style={{
               width: 32,
@@ -3354,12 +3385,12 @@ const ViewTimetable = ({ user }) => {
         </div>
       )}
 
-      {!timetable?.isWeekly && totalWeeks > 1 && (
+      {((!timetable?.isWeekly && totalWeeks > 1) || (isInitialLoading && !displayTimetable?.isWeekly)) && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.5rem', gap: '1rem' }}>
           <Button
             type="text"
-            onClick={() => currentWeek > 1 && handleWeekChange(currentWeek - 1)}
-            disabled={currentWeek <= 1}
+            onClick={() => !isInitialLoading && displayCurrentWeek > 1 && handleWeekChange(displayCurrentWeek - 1)}
+            disabled={isInitialLoading || displayCurrentWeek <= 1}
             icon={<LeftOutlined style={{ fontSize: 14 }} />}
             style={{
               width: 32,
@@ -3372,12 +3403,12 @@ const ViewTimetable = ({ user }) => {
             }}
           />
           <Tag color="purple" style={{ fontSize: '14px', padding: '4px 12px' }}>
-            第 {currentWeek} 周 / 共 {totalWeeks} 周
+            第 {displayCurrentWeek} 周 / 共 {displayTotalWeeks} 周
           </Tag>
           <Button
             type="text"
-            onClick={() => currentWeek < totalWeeks && handleWeekChange(currentWeek + 1)}
-            disabled={currentWeek >= totalWeeks}
+            onClick={() => !isInitialLoading && displayCurrentWeek < displayTotalWeeks && handleWeekChange(displayCurrentWeek + 1)}
+            disabled={isInitialLoading || displayCurrentWeek >= displayTotalWeeks}
             icon={<RightOutlined style={{ fontSize: 14 }} />}
             style={{
               width: 32,

@@ -2211,12 +2211,14 @@ const Dashboard = ({ user }) => {
                   <Button type={dayTab==='tomorrow' ? 'primary' : 'default'} size="small" onClick={()=>setDayTab('tomorrow')}>明日</Button>
                 </Button.Group>
               </div>
-              <span style={{ color: '#999', fontSize: 13 }}>
-                {dayTab==='today' ? '今日有课教练' : '明日有课教练'} {
+              <span style={{ color: '#999', fontSize: 13, textAlign: 'right', display: 'block', width: '100%' }}>
+                {dayTab==='today' ? '今日有课教练' : '明日有课教练'} 
+                <span style={{ color: '#1890ff', fontWeight: 500 }}>{
                   dayTab==='today'
                     ? Object.keys(todayCoachDetails).length
                     : Object.keys(tomorrowCoachDetails).length
-                }/{coaches?.length || 0}
+                }</span>
+                <span style={{ color: '#999' }}>/{coaches?.length || 0}</span>
               </span>
             </div>
           }
@@ -2481,7 +2483,7 @@ const Dashboard = ({ user }) => {
     ];
 
     return (
-      <div className="page-container">
+      <div className="page-container" style={{ paddingTop: '0.25rem' }}>
         <Tabs
           activeKey={activeTab}
           onChange={handleTabChange}
