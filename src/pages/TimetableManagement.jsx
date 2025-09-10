@@ -27,11 +27,13 @@ const ActiveBadge = ({ isArchived = false }) => (
     </div>
   );
 
-const TimetableManagement = ({ user, showArchived = false, onLoadingChange }) => {
+const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batchMode, onBatchModeChange }) => {
   const [allTimetables, setAllTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTimetables, setSelectedTimetables] = useState([]);
-  const [batchMode, setBatchMode] = useState(false);
+  // 使用外部传入的batchMode状态
+  const currentBatchMode = batchMode !== undefined ? batchMode : false;
+  const setBatchMode = onBatchModeChange || (() => {});
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [selectedTimetableForCopy, setSelectedTimetableForCopy] = useState(null);
   const [convertModal, setConvertModal] = useState({ visible: false, mode: null, timetable: null });
@@ -352,10 +354,18 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange }) =>
 
   // 进入/退出批量操作模式
   const handleBatchMode = () => {
-    setBatchMode(true);
+    if (onBatchModeChange) {
+      onBatchModeChange(true);
+    } else {
+      setBatchMode(true);
+    }
   };
   const handleCancelBatchMode = () => {
-    setBatchMode(false);
+    if (onBatchModeChange) {
+      onBatchModeChange(false);
+    } else {
+      setBatchMode(false);
+    }
     setSelectedTimetables([]);
   };
 
@@ -602,8 +612,8 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange }) =>
 
   return (
     <div>
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: batchMode ? 'space-between' : 'flex-start', alignItems: 'center' }}>
-        {batchMode ? (
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {currentBatchMode ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <Button 
@@ -671,11 +681,7 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange }) =>
               </Button>
             )}
           </>
-        ) : (
-          <Button type="primary" size="small" icon={<MergeOutlined />} onClick={handleBatchMode} style={{ padding: '0 8px', height: 26, fontSize: 13 }}>
-            批量操作
-          </Button>
-        )}
+        ) : null}
       </div>
 
       <List

@@ -41,11 +41,23 @@ export const getWeeksWithCountsApi = async (timetableId) => {
 };
 
 // 获取课表的课程数据
-export const getTimetableSchedules = async (timetableId, week = null) => {
+export const getTimetableSchedules = async (timetableId, week = null, templateOnly = false) => {
   try {
-    const url = week
-      ? `/timetables/${timetableId}/schedules?week=${week}`
-      : `/timetables/${timetableId}/schedules`;
+    let url = `/timetables/${timetableId}/schedules`;
+    const params = new URLSearchParams();
+    
+    if (week !== null) {
+      params.append('week', week);
+    }
+    
+    if (templateOnly) {
+      params.append('templateOnly', 'true');
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
     const response = await api.get(url);
     return response;
   } catch (error) {
@@ -290,6 +302,40 @@ export const getActiveSchedulesByDate = async (date) => {
   }
 };
 
+// 合并/缓存版：同一日期在短时间内只发起一次请求
+const activeSchedulesCache = new Map(); // date -> { time, promise, data }
+const MERGE_WINDOW_MS = 800; // 合并窗口
+
+export const getActiveSchedulesByDateMerged = async (date) => {
+  const now = Date.now();
+  const cached = activeSchedulesCache.get(date);
+
+  if (cached) {
+    // 已有数据且不过期，直接返回数据
+    if (cached.data && now - cached.time < 60_000) {
+      return cached.data;
+    }
+    // 合并在飞的请求
+    if (cached.promise && now - cached.time < MERGE_WINDOW_MS) {
+      return cached.promise;
+    }
+  }
+
+  const prom = api
+    .get(`/admin/active-timetables/schedules?date=${date}`)
+    .then((resp) => {
+      activeSchedulesCache.set(date, { time: Date.now(), data: resp, promise: null });
+      return resp;
+    })
+    .catch((err) => {
+      activeSchedulesCache.delete(date);
+      throw err;
+    });
+
+  activeSchedulesCache.set(date, { time: now, promise: prom, data: null });
+  return prom;
+};
+
 // 归档课表
 export const archiveTimetableApi = async (timetableId) => {
   try {
@@ -363,4 +409,91 @@ export const deleteSchedulesBatch = async (timetableId, scheduleIds) => {
   } catch (error) {
     throw error;
   }
+};
+
+// 获取今日课程
+export const getTodaySchedules = async (timetableId) => {
+  try {
+    const response = await api.get(`/timetables/${timetableId}/schedules/today`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取明日课程
+export const getTomorrowSchedules = async (timetableId) => {
+  try {
+    const response = await api.get(`/timetables/${timetableId}/schedules/tomorrow`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取本周课程
+export const getThisWeekSchedules = async (timetableId) => {
+  try {
+    const response = await api.get(`/timetables/${timetableId}/schedules/this-week`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取固定课表模板
+export const getTemplateSchedules = async (timetableId) => {
+  try {
+    const response = await api.get(`/timetables/${timetableId}/schedules/template`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// ====== 每个区块的合并/缓存版（同一课表ID短时间只请求一次） ======
+const cacheBox = {
+  today: new Map(), // id -> {time, promise, data}
+  tomorrow: new Map(),
+  week: new Map(),
+  template: new Map(),
+};
+const MERGE_MS = 800;       // 合并窗口
+const SOFT_TTL_MS = 60_000; // 软缓存1分钟
+
+function getMerged(map, key, doRequest) {
+  const now = Date.now();
+  const item = map.get(key);
+  if (item) {
+    if (item.data && now - item.time < SOFT_TTL_MS) return Promise.resolve(item.data);
+    if (item.promise && now - item.time < MERGE_MS) return item.promise;
+  }
+  const p = doRequest()
+    .then((resp) => {
+      map.set(key, { time: Date.now(), data: resp, promise: null });
+      return resp;
+    })
+    .catch((e) => { map.delete(key); throw e; });
+  map.set(key, { time: now, promise: p, data: null });
+  return p;
+}
+
+export const getTodaySchedulesOnce = (timetableId) =>
+  getMerged(cacheBox.today, String(timetableId), () => getTodaySchedules(timetableId));
+
+export const getTomorrowSchedulesOnce = (timetableId) =>
+  getMerged(cacheBox.tomorrow, String(timetableId), () => getTomorrowSchedules(timetableId));
+
+export const getThisWeekSchedulesOnce = (timetableId) =>
+  getMerged(cacheBox.week, String(timetableId), () => getThisWeekSchedules(timetableId));
+
+export const getTemplateSchedulesOnce = (timetableId) =>
+  getMerged(cacheBox.template, String(timetableId), () => getTemplateSchedules(timetableId));
+
+// 统一获取概览：今日/明日/本周/固定
+export const getSchedulesOverview = async (timetableId) => {
+  try {
+    const response = await api.get(`/timetables/${timetableId}/schedules/overview`);
+    return response;
+  } catch (error) { throw error; }
 };

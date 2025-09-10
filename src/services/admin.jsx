@@ -185,11 +185,293 @@ export const getCoachesStatistics = async () => {
 };
 
 // 获取基于实例逻辑的指定日期课程（今日/明日）
+// 加合并/短缓存，避免同日期多次请求
+const byDateCache = new Map(); // date -> {time, promise, data}
+const BYDATE_MERGE_MS = 800;
+const BYDATE_TTL_MS = 60_000;
+
 export const getInstanceSchedulesByDate = async (date) => {
+  const now = Date.now();
+  const hit = byDateCache.get(date);
+  if (hit) {
+    if (hit.data && now - hit.time < BYDATE_TTL_MS) return hit.data;
+    if (hit.promise && now - hit.time < BYDATE_MERGE_MS) return hit.promise;
+  }
+  const prom = api.get(`/weekly-instances/by-date?date=${date}`)
+    .then(resp => { 
+      const result = { success: true, data: resp.data }; 
+      byDateCache.set(date, { time: Date.now(), data: result, promise: null }); 
+      return result; 
+    })
+    .catch(e => { 
+      byDateCache.delete(date); 
+      return { success: false, data: { timetableSchedules: [] }, error: e.message }; 
+    });
+  byDateCache.set(date, { time: now, promise: prom, data: null });
+  return prom;
+};
+
+// 获取活动课表本周排课信息（周一到周日）- 优化版，一次性获取所有数据
+export const getActiveWeeklySchedules = async () => {
   try {
-    const response = await api.get(`/weekly-instances/by-date?date=${date}`);
+    // 使用新的优化接口，一次性获取所有活动课表的本周数据
+    const response = await api.get('/admin/active-timetables/this-week');
+    
+    if (!response.success) {
+      throw new Error('获取活动课表本周数据失败');
+    }
+    
+    console.log('本周课程数据响应:', response);
+    
+    return {
+      success: true,
+      data: response.data || []
+    };
+  } catch (error) {
+    console.error('getActiveWeeklySchedules 错误:', error);
+    return {
+      success: false,
+      data: [],
+      error: error.message
+    };
+  }
+};
+
+// 基于聚合接口：按课表ID过滤本周课程（单接口、前端过滤）
+export const getThisWeekSchedulesForTimetable = async (timetableId) => {
+  try {
+    const res = await getActiveWeeklySchedules();
+    if (!res || !res.success) return res;
+    const all = Array.isArray(res.data) ? res.data : [];
+    const filtered = all.filter(s => String(s.timetableId) === String(timetableId));
+    return { success: true, data: filtered };
+  } catch (error) {
+    return { success: false, data: [], error: error.message };
+  }
+};
+
+// 获取活动课表本周排课信息（周一到周日）- 原版本，保留作为备用
+export const getActiveWeeklySchedulesLegacy = async () => {
+  try {
+    // 获取所有活动课表
+    const activeTimetablesResponse = await api.get('/admin/active-timetables');
+    if (!activeTimetablesResponse.success) {
+      throw new Error('获取活动课表失败');
+    }
+    
+    const activeTimetables = activeTimetablesResponse.data || [];
+    console.log('活动课表列表:', activeTimetables);
+    
+    // 为每个活动课表获取本周数据
+    const weekResponses = await Promise.all(
+      activeTimetables.map(async (timetable) => {
+        try {
+          const weekResponse = await api.get(`/timetables/${timetable.id}/schedules/this-week`);
+          console.log(`课表 ${timetable.id} 的本周数据响应:`, weekResponse);
+          return {
+            timetableId: timetable.id,
+            timetableName: timetable.name,
+            ownerNickname: timetable.nickname,
+            ownerUsername: timetable.username,
+            isWeekly: timetable.isWeekly,
+            schedules: weekResponse.success ? weekResponse.data : []
+          };
+        } catch (error) {
+          console.warn(`获取课表 ${timetable.id} 本周数据失败:`, error);
+          return {
+            timetableId: timetable.id,
+            timetableName: timetable.name,
+            ownerNickname: timetable.nickname,
+            ownerUsername: timetable.username,
+            isWeekly: timetable.isWeekly,
+            schedules: []
+          };
+        }
+      })
+    );
+    
+    console.log('本周响应数据:', weekResponses);
+    
+    // 合并所有课表的课程数据
+    const allSchedules = [];
+    weekResponses.forEach(timetableData => {
+      if (timetableData.schedules && timetableData.schedules.length > 0) {
+        timetableData.schedules.forEach(schedule => {
+          allSchedules.push({
+            ...schedule,
+            timetableId: timetableData.timetableId,
+            timetableName: timetableData.timetableName,
+            ownerNickname: timetableData.ownerNickname,
+            ownerUsername: timetableData.ownerUsername,
+            isWeekly: timetableData.isWeekly
+          });
+        });
+      }
+    });
+    
+    console.log('合并后的所有课程数据:', allSchedules);
+    
+    return {
+      success: true,
+      data: allSchedules
+    };
+  } catch (error) {
+    console.error('getActiveWeeklySchedulesLegacy 错误:', error);
+    return {
+      success: false,
+      data: { dates: [], schedules: [] },
+      error: error.message
+    };
+  }
+};
+
+// 紧急修复：批量生成所有缺失的当前周实例
+export const emergencyFixWeeklyInstances = async () => {
+  try {
+    const response = await api.post('/admin/emergency-fix/weekly-instances');
     return response;
   } catch (error) {
     throw error;
+  }
+};
+
+// 自动检查并修复缺失的当前周实例
+export const autoFixWeeklyInstances = async () => {
+  try {
+    const response = await api.post('/admin/auto-fix/weekly-instances');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 清理所有周实例中的重复课程数据
+export const cleanDuplicateSchedules = async () => {
+  try {
+    const response = await api.post('/admin/clean-duplicate-schedules');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 获取活动课表固定模板信息（周一到周日）- 优化版，一次性获取所有数据
+export const getActiveWeeklyTemplates = async () => {
+  try {
+    // 使用新的优化接口，一次性获取所有活动课表的模板数据
+    const response = await api.get('/admin/active-timetables/templates');
+    
+    if (!response.success) {
+      throw new Error('获取活动课表模板数据失败');
+    }
+    
+    console.log('模板课程数据响应:', response);
+    
+    // 新接口返回的是扁平化的课程数组，直接返回给前端使用新的处理逻辑
+    const templateSchedules = response.data || [];
+    console.log('模板课程数据:', templateSchedules);
+    
+    return {
+      success: true,
+      data: templateSchedules // 直接返回扁平化数组，让前端统一处理
+    };
+  } catch (error) {
+    console.error('获取活动课表模板数据失败:', error);
+    return {
+      success: false,
+      data: { dates: [], schedules: [] },
+      error: error.message
+    };
+  }
+};
+
+// 基于聚合接口：按课表ID过滤模板课程（单接口、前端过滤）
+export const getTemplateSchedulesForTimetable = async (timetableId) => {
+  try {
+    const res = await getActiveWeeklyTemplates();
+    if (!res || !res.success) return res;
+    const all = Array.isArray(res.data) ? res.data : [];
+    const filtered = all.filter(s => String(s.timetableId) === String(timetableId));
+    return { success: true, data: filtered };
+  } catch (error) {
+    return { success: false, data: [], error: error.message };
+  }
+};
+
+// 获取活动课表固定模板信息（周一到周日）- 原版本，保留作为备用
+export const getActiveWeeklyTemplatesLegacy = async () => {
+  try {
+    // 获取所有活动课表
+    const activeTimetablesResponse = await api.get('/admin/active-timetables');
+    if (!activeTimetablesResponse.success) {
+      throw new Error('获取活动课表失败');
+    }
+    
+    const activeTimetables = activeTimetablesResponse.data || [];
+    console.log('活动课表列表:', activeTimetables);
+    
+    // 为每个活动课表获取模板数据
+    const templateResponses = await Promise.all(
+      activeTimetables.map(async (timetable) => {
+        try {
+          const templateResponse = await api.get(`/timetables/${timetable.id}/schedules/template`);
+          return {
+            timetableId: timetable.id,
+            timetableName: timetable.name,
+            ownerNickname: timetable.nickname,
+            ownerUsername: timetable.username,
+            isWeekly: timetable.isWeekly,
+            schedules: templateResponse.success ? templateResponse.data : []
+          };
+        } catch (error) {
+          console.warn(`获取课表 ${timetable.id} 模板数据失败:`, error);
+          return {
+            timetableId: timetable.id,
+            timetableName: timetable.name,
+            ownerNickname: timetable.nickname,
+            ownerUsername: timetable.username,
+            isWeekly: timetable.isWeekly,
+            schedules: []
+          };
+        }
+      })
+    );
+    
+    console.log('模板响应数据:', templateResponses);
+    
+    // 按星期几组织数据
+    const weekDays = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    const schedulesByDay = weekDays.map(dayOfWeek => {
+      const daySchedules = templateResponses.map(timetableData => ({
+        ...timetableData,
+        schedules: timetableData.schedules.filter(schedule => 
+          schedule.dayOfWeek === dayOfWeek
+        )
+      }));
+      
+      const filteredSchedules = daySchedules.filter(t => t.schedules.length > 0);
+      console.log(`${dayOfWeek} 的课程数据:`, filteredSchedules);
+      
+      return {
+        timetableSchedules: filteredSchedules
+      };
+    });
+    
+    console.log('最终组织的数据:', schedulesByDay);
+    
+    return {
+      success: true,
+      data: {
+        dates: [], // 模板数据不需要具体日期
+        schedules: schedulesByDay
+      }
+    };
+  } catch (error) {
+    console.error('获取活动课表模板数据失败:', error);
+    return {
+      success: false,
+      data: { dates: [], schedules: [] },
+      error: error.message
+    };
   }
 };

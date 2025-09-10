@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDate, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce } from '../services/timetable';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule } from '../services/weeklyInstance';
-import { getCoachesStatistics, getInstanceSchedulesByDate } from '../services/admin';
+import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates } from '../services/admin';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -964,13 +964,8 @@ const Dashboard = ({ user }) => {
 
       // 获取其他教练的今日课程数据
       setLoadingOtherCoachesToday(true);
-      const todayDateStr = dayjs().format('YYYY-MM-DD');
-      getActiveSchedulesByDate(todayDateStr)
-        .then(response => {
-          if (response.success) {
-            setOtherCoachesDataToday(response.data);
-          }
-        })
+      getTodaySchedulesOnce(activeTimetableId)
+        .then(response => { if (response && response.success) setOtherCoachesDataToday(response.data); })
         .catch(error => {
           console.error('获取其他教练今日课程失败:', error);
         })
@@ -980,13 +975,8 @@ const Dashboard = ({ user }) => {
 
       // 获取其他教练的明日课程数据
       setLoadingOtherCoachesTomorrow(true);
-      const tomorrowDateStr = dayjs().add(1, 'day').format('YYYY-MM-DD');
-      getActiveSchedulesByDate(tomorrowDateStr)
-        .then(response => {
-          if (response.success) {
-            setOtherCoachesDataTomorrow(response.data);
-          }
-        })
+      getTomorrowSchedulesOnce(activeTimetableId)
+        .then(response => { if (response && response.success) setOtherCoachesDataTomorrow(response.data); })
         .catch(error => {
           console.error('获取其他教练明日课程失败:', error);
         })
@@ -1510,7 +1500,7 @@ const Dashboard = ({ user }) => {
 
 
   // 图标主色循环
-  const iconColors = ['#722ED1','#1890ff','#52c41a','#faad14','#eb2f96','#fa541c','#13c2c2','#531dab'];
+  const iconColors = ['#dc2626','#1e40af','#059669','#7c3aed'];
   const getIconColor = (id) => iconColors[id % iconColors.length];
 
   // 渲染课表列表
@@ -2024,6 +2014,402 @@ const Dashboard = ({ user }) => {
     </>
   );
 
+  // 活动课表本周排课信息组件
+  const WeeklyScheduleBlock = ({ coachColorMap }) => {
+    const [weeklyScheduleData, setWeeklyScheduleData] = useState([]);
+    const [weeklyScheduleLoading, setWeeklyScheduleLoading] = useState(false);
+    const [viewMode, setViewMode] = useState('instance'); // 'instance' | 'template'
+    const [allCoaches, setAllCoaches] = useState(new Set());
+    
+    // 颜色调色板（与现有课表保持一致）
+    const colorPalette = [
+      '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF',
+      '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC',
+      '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
+    ];
+    
+    // 教练文字颜色调色板
+    const coachTextColorPalette = ['#1890ff', '#722ed1', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#d4380d'];
+    
+    // 学员背景色和教练文字色映射
+    const studentColorMap = new Map();
+    const coachTextColorMap = new Map();
+    
+    useEffect(() => {
+      fetchWeeklyScheduleData('instance'); // 明确指定初始加载为本周模式
+    }, []); // 移除viewMode依赖，改为手动调用
+    
+    const fetchWeeklyScheduleData = async (targetMode = viewMode) => {
+      setWeeklyScheduleLoading(true);
+      console.log('fetchWeeklyScheduleData called with targetMode:', targetMode);
+      try {
+        // 根据目标视图模式获取不同的数据
+        const response = targetMode === 'instance' 
+          ? await getActiveWeeklySchedules()
+          : await getActiveWeeklyTemplates();
+        console.log('API response:', response);
+        if (!response || !response.success) {
+          const errorMsg = targetMode === 'instance' ? '获取本周排课数据失败' : '获取固定课表模板失败';
+          console.error('API调用失败:', response);
+          message.error(errorMsg);
+          
+          // 即使API失败，也要更新viewMode并设置空数据，确保UI状态正确
+          setViewMode(targetMode);
+          setWeeklyScheduleData([]);
+          setAllCoaches(new Set());
+          return;
+        }
+        
+        const responseData = response.data;
+        console.log('响应数据类型:', typeof responseData, '内容:', responseData);
+        
+        // 根据目标视图模式处理不同的数据格式
+        let dates, schedules;
+        if (targetMode === 'instance') {
+          // 本周数据：直接是课程数组
+          dates = [];
+          schedules = Array.isArray(responseData) ? responseData : [];
+        } else {
+          // 固定模板数据：现在也是直接的课程数组
+          dates = [];
+          schedules = Array.isArray(responseData) ? responseData : [];
+        }
+        const weekDayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        
+        // 整理数据为表格格式
+        const timeSlotMap = new Map();
+        const allStudents = new Set();
+        const allCoaches = new Set();
+        
+        // 统一处理：现在本周数据和模板数据都是扁平化的课程数组
+        console.log(`处理${targetMode === 'instance' ? '本周' : '模板'}数据，课程数量:`, schedules.length);
+        
+        schedules.forEach((schedule, index) => {
+          console.log(`检查课程 ${index + 1}:`, {
+            dayOfWeek: schedule.dayOfWeek,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            studentName: schedule.studentName
+          });
+          
+          // 先跳过所有验证，看看数据本身有什么问题
+          const dayOfWeek = schedule.dayOfWeek?.toLowerCase();
+          
+          // 如果没有有效的 dayOfWeek，暂时使用 'monday' 作为默认值进行测试
+          const safeDayOfWeek = weekDayKeys.includes(dayOfWeek) ? dayOfWeek : 'monday';
+          
+          if (!schedule.startTime || !schedule.endTime) {
+            console.warn(`课程 ${index + 1} 缺少时间信息，跳过`);
+            return;
+          }
+          
+          const timeKey = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
+          console.log(`强制添加课程到 ${safeDayOfWeek} ${timeKey}: ${schedule.studentName}`);
+          
+          if (!timeSlotMap.has(timeKey)) {
+            timeSlotMap.set(timeKey, {
+              time: timeKey,
+              monday: [],
+              tuesday: [],
+              wednesday: [],
+              thursday: [],
+              friday: [],
+              saturday: [],
+              sunday: []
+            });
+          }
+          
+          const coachName = schedule.ownerNickname || schedule.ownerUsername;
+          const scheduleItem = {
+            coach: coachName,
+            student: schedule.studentName,
+            type: targetMode === 'instance' ? 'instance' : 'template',
+            timetableName: schedule.timetableName,
+            sourceIsWeekly: schedule.isWeekly === 1
+          };
+          
+          timeSlotMap.get(timeKey)[safeDayOfWeek].push(scheduleItem);
+          
+          // 收集所有学员和教练
+          allStudents.add(schedule.studentName);
+          allCoaches.add(coachName);
+        });
+        
+        // 转换为数组并按时间排序
+        const tableData = Array.from(timeSlotMap.values())
+          .sort((a, b) => a.time.localeCompare(b.time));
+        
+        // 如果没有数据，创建一个空的表格结构
+        if (tableData.length === 0) {
+          // 创建一个空的时间表作为占位
+          const emptyTimeSlots = [
+            '09:00-10:00', '10:00-11:00', '11:00-12:00',
+            '14:00-15:00', '15:00-16:00', '16:00-17:00',
+            '17:00-18:00', '18:00-19:00', '19:00-20:00'
+          ];
+          
+          emptyTimeSlots.forEach(timeSlot => {
+            tableData.push({
+              time: timeSlot,
+              monday: [],
+              tuesday: [],
+              wednesday: [],
+              thursday: [],
+              friday: [],
+              saturday: [],
+              sunday: []
+            });
+          });
+        }
+        
+        // 为学员分配背景色
+        Array.from(allStudents).forEach((student, index) => {
+          studentColorMap.set(student, colorPalette[index % colorPalette.length]);
+        });
+        
+        // 为教练分配文字色
+        Array.from(allCoaches).forEach((coach, index) => {
+          coachTextColorMap.set(coach, coachTextColorPalette[index % coachTextColorPalette.length]);
+        });
+        
+        setWeeklyScheduleData(tableData);
+        setAllCoaches(allCoaches);
+        
+        // 数据获取成功后更新viewMode
+        setViewMode(targetMode);
+        
+        console.log('获取到的数据:', { dates, schedules, tableData, allStudents: Array.from(allStudents), allCoaches: Array.from(allCoaches) });
+        console.log('最终tableData长度:', tableData.length);
+        console.log('最终viewMode将被设置为:', targetMode);
+      } catch (error) {
+        console.error('获取排课数据失败:', error);
+        console.error('错误详情:', error.stack);
+        message.error(targetMode === 'instance' ? '获取本周排课数据失败' : '获取固定课表模板失败');
+        
+        // 即使失败也设置空数据，避免界面卡住
+        setWeeklyScheduleData([]);
+        setAllCoaches(new Set());
+      } finally {
+        setWeeklyScheduleLoading(false);
+      }
+    };
+    
+    // 切换到本周视图
+    const switchToInstanceView = async () => {
+      console.log('switchToInstanceView called, current viewMode:', viewMode);
+      await fetchWeeklyScheduleData('instance');
+    };
+    
+    // 切换到固定课表视图
+    const switchToTemplateView = async () => {
+      console.log('switchToTemplateView called, current viewMode:', viewMode);
+      await fetchWeeklyScheduleData('template');
+    };
+    
+    const getCoachColor = (coachName) => {
+      // 高区分度配色（包含天蓝色）
+      const colors = ['#dc2626', '#38bdf8', '#059669', '#22c55e'];
+      const hash = coachName.split('').reduce((a, b) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+      }, 0);
+      return colors[Math.abs(hash) % colors.length];
+    };
+    
+    const renderScheduleCell = (schedules, day) => {
+      const filtered = (schedules || []).filter(s => {
+        if (viewMode === 'template') {
+          // 固定：包含周固定来源 + 日期范围
+          return (!!s.sourceIsWeekly) || s.type === 'dateRange' || s.type === 'template';
+        }
+        // 本周：包含实例 + 日期范围
+        return s.type === 'instance' || s.type === 'dateRange';
+      });
+      if (!filtered || filtered.length === 0) {
+        return <div style={{ height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />;
+      }
+      
+      return (
+        <div style={{
+          height: '100%',
+          minHeight: '48px',
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%'
+        }}>
+          {filtered.map((schedule, idx) => {
+            // 在"本周"模式下，实例与固定不一致高亮
+            let diffBorder = 'none';
+            if (viewMode === 'instance' && schedule.type === 'instance') {
+              const weeklySameStudent = (schedules || []).find(x => !!x.sourceIsWeekly && x.student === schedule.student);
+              if (!weeklySameStudent || weeklySameStudent.coach !== schedule.coach) {
+                diffBorder = '2px solid #fa8c16';
+              }
+            }
+            
+            return (
+              <div
+                key={`${schedule.coach}-${schedule.student}-${idx}`}
+                style={{
+                  backgroundColor: studentColorMap.get(schedule.student) || 'transparent',
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: (coachColorMap && coachColorMap[schedule.coach]) || getCoachColor(schedule.coach),
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  wordBreak: 'break-word',
+                  lineHeight: '1.2',
+                  borderTop: idx > 0 ? '1px solid #fff' : 'none',
+                  border: diffBorder,
+                  position: 'relative',
+                  padding: '2px'
+                }}
+                title={`教练: ${schedule.coach} | 学员: ${schedule.student}`}
+              >
+                {(() => {
+                  const isTruncated = schedule.student.length > 4;
+                  const content = isTruncated ? `${schedule.student.substring(0, 3)}…` : schedule.student;
+                  return (
+                    <span
+                      className={isTruncated ? 'student-name-truncated' : ''}
+                      title={isTruncated ? schedule.student : undefined}
+                    >
+                      {content}
+                    </span>
+                  );
+                })()
+                }
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+    
+    const weekDays = [
+      { key: 'monday', title: '周一' },
+      { key: 'tuesday', title: '周二' },
+      { key: 'wednesday', title: '周三' },
+      { key: 'thursday', title: '周四' },
+      { key: 'friday', title: '周五' },
+      { key: 'saturday', title: '周六' },
+      { key: 'sunday', title: '周日' }
+    ];
+    
+    // 生成表格列配置
+    const columns = [
+      {
+        title: '时间',
+        dataIndex: 'time',
+        key: 'time',
+        width: 60,
+        align: 'center',
+        render: (time) => {
+          const [startTime, endTime] = time.split('-');
+          return (
+            <div style={{ 
+              fontSize: '11px',
+              fontWeight: 500, 
+              color: '#333',
+              lineHeight: '1.2',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              height: '100%'
+            }}>
+              <div>{startTime}</div>
+              <div>{endTime}</div>
+            </div>
+          );
+        }
+      },
+      ...weekDays.map(day => ({
+        title: day.title,
+        dataIndex: day.key,
+        key: day.key,
+        align: 'center',
+        render: (schedules) => renderScheduleCell(schedules, day.key)
+      }))
+    ];
+    
+    // 转换数据为表格格式
+    const tableData = weeklyScheduleData.map((row, index) => ({
+      key: index,
+      time: row.time,
+      monday: row.monday,
+      tuesday: row.tuesday,
+      wednesday: row.wednesday,
+      thursday: row.thursday,
+      friday: row.friday,
+      saturday: row.saturday,
+      sunday: row.sunday
+    }));
+    
+    return (
+      <Card title={viewMode === 'instance' ? '本周排课信息' : '固定课表模板'} size="small" style={{ marginTop: '16px' }}
+        extra={
+          <div>
+            <Button.Group>
+              <Button 
+                size="small" 
+                type={viewMode==='instance' ? 'primary' : 'default'} 
+                loading={weeklyScheduleLoading && viewMode !== 'instance'}
+                disabled={weeklyScheduleLoading}
+                onClick={switchToInstanceView}
+              >
+                本周
+              </Button>
+              <Button 
+                size="small" 
+                type={viewMode==='template' ? 'primary' : 'default'} 
+                loading={weeklyScheduleLoading && viewMode !== 'template'}
+                disabled={weeklyScheduleLoading}
+                onClick={switchToTemplateView}
+              >
+                固定
+              </Button>
+            </Button.Group>
+          </div>
+        }
+      >
+        <Spin spinning={weeklyScheduleLoading}>
+          <div style={{ overflowX: 'auto' }}>
+            <Table
+              columns={columns}
+              dataSource={tableData}
+              pagination={false}
+              size="small"
+              bordered
+              rowClassName={() => 'weekly-schedule-row'}
+              style={{ fontSize: '12px' }}
+            />
+          </div>
+          
+          {/* 教练颜色图例说明 */}
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '12px' }}>
+              {(coachColorMap ? Object.keys(coachColorMap) : Array.from(allCoaches)).map((coach, index) => (
+                <div key={coach} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ 
+                    width: '12px', 
+                    height: '12px', 
+                    backgroundColor: (coachColorMap && coachColorMap[coach]) || getCoachColor(coach), 
+                    borderRadius: '2px' 
+                  }}></div>
+                  <span style={{ color: (coachColorMap && coachColorMap[coach]) || getCoachColor(coach), fontWeight: 500 }}>{coach}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Spin>
+      </Card>
+    );
+  };
+
   // 管理员概览组件
   const AdminOverview = () => {
     const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses, totalLastWeekCourses } = coachesStatistics || {};
@@ -2035,7 +2421,21 @@ const Dashboard = ({ user }) => {
 
     // 额外拉取今日活动课表的课程，用于显示学员+时间（后端统计缺少明细时兜底）
     const [todayCoachDetails, setTodayCoachDetails] = useState({});
-    
+
+    // 统一教练颜色（高区分度深色，按教练列表顺序分配，避免重复）
+    const coachPalette = ['#dc2626', '#38bdf8', '#059669', '#7c3aed'];
+    const coachColorMap = React.useMemo(() => {
+      const map = {};
+      (coaches || []).forEach((c, idx) => {
+        const name = c?.nickname || c?.username;
+        if (name && !map[name]) {
+          map[name] = coachPalette[idx % coachPalette.length];
+        }
+      });
+      return map;
+    }, [coaches]);
+    const colorForCoach = (name) => coachColorMap[name] || coachPalette[0];
+
     // 计算明日课时总数
     const totalTomorrowCourses = Object.values(tomorrowCoachDetails).reduce((total, details) => {
       return total + (details ? details.length : 0);
@@ -2051,13 +2451,34 @@ const Dashboard = ({ user }) => {
       const tomorrowStr = dayjs().add(1, 'day').format('YYYY-MM-DD');
       
       Promise.all([
-        // 获取今日数据
+        // 获取今日数据（一次性）
         getInstanceSchedulesByDate(todayStr).then(res => {
-          if (res && res.success && res.data && res.data.timetables) {
+          if (res && res.success && res.data) {
+            const list = res.data.timetables || res.data.timetableSchedules || [];
             const map = {};
-            res.data.timetables.forEach(t => {
+            list.forEach(t => {
               const owner = t.ownerName || t.username || t.nickname;
-              const items = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+              const schedules = t.schedules || [];
+              
+              // 去重：基于学生姓名、开始时间、结束时间的组合
+              const uniqueSchedules = [];
+              const seen = new Set();
+              
+              schedules.forEach(s => {
+                const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  uniqueSchedules.push(s);
+                }
+              });
+              
+              // 按开始时间排序后再生成显示文本
+              const sortedSchedules = uniqueSchedules.sort((a, b) => {
+                const timeA = String(a.startTime).slice(0, 5);
+                const timeB = String(b.startTime).slice(0, 5);
+                return timeA.localeCompare(timeB);
+              });
+              const items = sortedSchedules.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
               if (items.length > 0) {
                 map[owner] = items;
               }
@@ -2065,13 +2486,33 @@ const Dashboard = ({ user }) => {
             if (Object.keys(map).length > 0) {
               setTodayCoachDetails(map);
             } else {
-              // 回退到旧接口，防止实例未生成等情况
-              return getActiveSchedulesByDate(todayStr).then(res2 => {
+              // 使用合并版接口，避免重复请求
+              return getActiveSchedulesByDateMerged(todayStr).then(res2 => {
                 if (res2 && res2.success && res2.data && res2.data.timetables) {
                   const map2 = {};
                   res2.data.timetables.forEach(t => {
                     const owner2 = t.ownerName || t.username || t.nickname;
-                    const items2 = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+                    const schedules2 = t.schedules || [];
+                    
+                    // 去重：基于学生姓名、开始时间、结束时间的组合
+                    const uniqueSchedules2 = [];
+                    const seen2 = new Set();
+                    
+                    schedules2.forEach(s => {
+                      const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                      if (!seen2.has(key)) {
+                        seen2.add(key);
+                        uniqueSchedules2.push(s);
+                      }
+                    });
+                    
+                    // 按开始时间排序后再生成显示文本
+                    const sortedSchedules2 = uniqueSchedules2.sort((a, b) => {
+                      const timeA = String(a.startTime).slice(0, 5);
+                      const timeB = String(b.startTime).slice(0, 5);
+                      return timeA.localeCompare(timeB);
+                    });
+                    const items2 = sortedSchedules2.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
                     if (items2.length > 0) map2[owner2] = items2;
                   });
                   setTodayCoachDetails(map2);
@@ -2081,13 +2522,34 @@ const Dashboard = ({ user }) => {
           }
         }).catch(() => {}),
         
-        // 获取明日数据
+        // 获取明日数据（一次性）
         getInstanceSchedulesByDate(tomorrowStr).then(res => {
-          if (res && res.success && res.data && res.data.timetables) {
+          if (res && res.success && res.data) {
+            const list = res.data.timetables || res.data.timetableSchedules || [];
             const map = {};
-            res.data.timetables.forEach(t => {
+            list.forEach(t => {
               const owner = t.ownerName || t.username || t.nickname;
-              const items = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+              const schedules = t.schedules || [];
+              
+              // 去重：基于学生姓名、开始时间、结束时间的组合
+              const uniqueSchedules = [];
+              const seen = new Set();
+              
+              schedules.forEach(s => {
+                const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  uniqueSchedules.push(s);
+                }
+              });
+              
+              // 按开始时间排序后再生成显示文本
+              const sortedSchedules = uniqueSchedules.sort((a, b) => {
+                const timeA = String(a.startTime).slice(0, 5);
+                const timeB = String(b.startTime).slice(0, 5);
+                return timeA.localeCompare(timeB);
+              });
+              const items = sortedSchedules.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
               if (items.length > 0) {
                 map[owner] = items;
               }
@@ -2095,12 +2557,32 @@ const Dashboard = ({ user }) => {
             if (Object.keys(map).length > 0) {
               setTomorrowCoachDetails(map);
             } else {
-              return getActiveSchedulesByDate(tomorrowStr).then(res2 => {
+              return getActiveSchedulesByDateMerged(tomorrowStr).then(res2 => {
                 if (res2 && res2.success && res2.data && res2.data.timetables) {
                   const map2 = {};
                   res2.data.timetables.forEach(t => {
                     const owner2 = t.ownerName || t.username || t.nickname;
-                    const items2 = (t.schedules || []).map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+                    const schedules2 = t.schedules || [];
+                    
+                    // 去重：基于学生姓名、开始时间、结束时间的组合
+                    const uniqueSchedules2 = [];
+                    const seen2 = new Set();
+                    
+                    schedules2.forEach(s => {
+                      const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                      if (!seen2.has(key)) {
+                        seen2.add(key);
+                        uniqueSchedules2.push(s);
+                      }
+                    });
+                    
+                    // 按开始时间排序后再生成显示文本
+                    const sortedSchedules2 = uniqueSchedules2.sort((a, b) => {
+                      const timeA = String(a.startTime).slice(0, 5);
+                      const timeB = String(b.startTime).slice(0, 5);
+                      return timeA.localeCompare(timeB);
+                    });
+                    const items2 = sortedSchedules2.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
                     if (items2.length > 0) map2[owner2] = items2;
                   });
                   setTomorrowCoachDetails(map2);
@@ -2248,7 +2730,7 @@ const Dashboard = ({ user }) => {
                     width: '33.33%',
                     flex: '0 0 33.33%'
                   }}>
-                    <Avatar size="small" style={{ backgroundColor: getIconColor(coachId) }}>
+                    <Avatar size="small" style={{ backgroundColor: colorForCoach(coachName) }}>
                       {coachName?.[0]?.toUpperCase()}
                     </Avatar>
                     <div style={{ 
@@ -2398,7 +2880,7 @@ const Dashboard = ({ user }) => {
                   align: 'center',
                   render: (text, record) => (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-                      <Avatar size="small" style={{ backgroundColor: getIconColor(record.id) }}>
+                      <Avatar size="small" style={{ backgroundColor: colorForCoach(text || record.username) }}>
                         {(text || record.username)?.[0]?.toUpperCase()}
                       </Avatar>
                       <span style={{ marginLeft: '8px' }}>
@@ -2408,30 +2890,19 @@ const Dashboard = ({ user }) => {
                   )
                 },
                 {
-                  title: '课表数量',
-                  dataIndex: 'timetableCount',
-                  key: 'timetableCount',
-                  align: 'center',
-                  sorter: (a, b) => a.timetableCount - b.timetableCount,
-                },
-                {
-                  title: dayTab === 'today' ? '今日课程' : '明日课程',
-                  key: 'dynamicDayCourses',
+                  title: '今日课程',
+                  key: 'todayCourses',
                   align: 'center',
                   sorter: (a, b) => {
                     const nameA = a.nickname || a.username;
                     const nameB = b.nickname || b.username;
-                    const map = dayTab === 'today' ? todayCoachDetails : tomorrowCoachDetails;
-                    const valA = (map[nameA] || []).length;
-                    const valB = (map[nameB] || []).length;
+                    const valA = (todayCoachDetails[nameA] || []).length;
+                    const valB = (todayCoachDetails[nameB] || []).length;
                     return valA - valB;
                   },
-                  defaultSortOrder: 'descend',
-                  sortDirections: ['descend', 'ascend'],
                   render: (_, record) => {
                     const name = record.nickname || record.username;
-                    const map = dayTab === 'today' ? todayCoachDetails : tomorrowCoachDetails;
-                    const value = (map[name] || []).length;
+                    const value = (todayCoachDetails[name] || []).length;
                     return (
                       <span style={{ color: value > 0 ? '#52c41a' : '#999', fontWeight: 500 }}>
                         {value}
@@ -2445,11 +2916,31 @@ const Dashboard = ({ user }) => {
                   key: 'weeklyCourses',
                   align: 'center',
                   sorter: (a, b) => a.weeklyCourses - b.weeklyCourses,
+                  defaultSortOrder: 'descend',
+                  sortDirections: ['descend', 'ascend'],
                   render: (value) => (
                     <span style={{ color: '#1890ff', fontWeight: 500 }}>
                       {value}
                     </span>
                   )
+                },
+                {
+                  title: '本月课程',
+                  key: 'monthlyCourses',
+                  align: 'center',
+                  sorter: (a, b) => {
+                    // 这里需要后端提供本月课程数据，暂时使用本周数据作为占位
+                    return (a.weeklyCourses * 4) - (b.weeklyCourses * 4);
+                  },
+                  render: (_, record) => {
+                    // 暂时使用本周数据 * 4 作为估算值，后续需要后端提供真实数据
+                    const value = record.weeklyCourses * 4;
+                    return (
+                      <span style={{ color: '#722ed1', fontWeight: 500 }}>
+                        {value}
+                      </span>
+                    );
+                  }
                 }
               ]}
               pagination={false}
@@ -2458,6 +2949,9 @@ const Dashboard = ({ user }) => {
             />
           </Spin>
         </Card>
+
+        {/* 活动课表本周排课信息 */}
+        <WeeklyScheduleBlock coachColorMap={coachColorMap} />
       </div>
     );
   };
@@ -2795,7 +3289,7 @@ const Dashboard = ({ user }) => {
                 type="primary"
                 onClick={() => copyToClipboard(generateCopyText(todaysSchedulesForCopy, true, copyOtherCoachesToday, otherCoachesDataToday))}
               >
-                复制今日
+                复制今日课程
               </Button>
             </div>
           </>
@@ -2904,7 +3398,7 @@ const Dashboard = ({ user }) => {
                 type="primary"
                 onClick={() => copyToClipboard(generateCopyText(tomorrowsSchedulesForCopy, false, copyOtherCoachesTomorrow, otherCoachesDataTomorrow))}
               >
-                复制明日
+                复制明日课程
               </Button>
             </div>
           </>
