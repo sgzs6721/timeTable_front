@@ -213,9 +213,9 @@ export const updateSchedule = async (timetableId, scheduleId, scheduleData) => {
 };
 
 // 管理员功能：获取所有用户的课表
-export const getAllTimetables = async () => {
+export const getAllTimetables = async (activeOnly = false) => {
   try {
-    const response = await api.get('/admin/timetables');
+    const response = await api.get(`/admin/timetables?activeOnly=${activeOnly}`);
     return response;
   } catch (error) {
     throw error;
@@ -489,6 +489,19 @@ export const getThisWeekSchedulesOnce = (timetableId) =>
 
 export const getTemplateSchedulesOnce = (timetableId) =>
   getMerged(cacheBox.template, String(timetableId), () => getTemplateSchedules(timetableId));
+
+// 使某个课表的短缓存立即失效（用于新增/修改/删除后实时刷新）
+export const invalidateTimetableCache = (timetableId) => {
+  try {
+    const key = String(timetableId);
+    cacheBox.today.delete(key);
+    cacheBox.tomorrow.delete(key);
+    cacheBox.week.delete(key);
+    cacheBox.template.delete(key);
+  } catch (e) {
+    // 忽略缓存删除异常
+  }
+};
 
 // 统一获取概览：今日/明日/本周/固定
 export const getSchedulesOverview = async (timetableId) => {

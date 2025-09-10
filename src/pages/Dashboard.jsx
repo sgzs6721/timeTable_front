@@ -4,7 +4,7 @@ import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlin
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce } from '../services/timetable';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule } from '../services/weeklyInstance';
-import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates } from '../services/admin';
+import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables } from '../services/admin';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -162,6 +162,8 @@ const Dashboard = ({ user }) => {
   });
   const [coachesStatistics, setCoachesStatistics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
+  const [allTimetables, setAllTimetables] = useState([]);
+  const [coachTimetableMap, setCoachTimetableMap] = useState({});
   const [todaysCoursesData, setTodaysCoursesData] = useState([]);
   const [modalMainTitle, setModalMainTitle] = useState('');
   const [modalSubTitle, setModalSubTitle] = useState('');
@@ -221,6 +223,30 @@ const Dashboard = ({ user }) => {
     setActiveTab(key);
     setSearchParams({ tab: key });
   };
+
+  // 获取所有课表信息并建立教练课表映射
+  const fetchAllTimetablesInfo = useCallback(async () => {
+    if (user?.role?.toUpperCase() !== 'ADMIN') return;
+    
+    try {
+      const response = await getAllTimetables(true); // 只获取活动课表
+      if (response.success) {
+        setAllTimetables(response.data);
+        
+        // 建立教练和课表ID的映射关系（后端已过滤，只返回活动课表）
+        const coachMap = {};
+        response.data.forEach(timetable => {
+          const coachName = timetable.nickname || timetable.username;
+          if (coachName) {
+            coachMap[coachName] = timetable.id;
+          }
+        });
+        setCoachTimetableMap(coachMap);
+      }
+    } catch (error) {
+      console.error('获取课表信息失败:', error);
+    }
+  }, [user]);
 
   // 获取教练统计信息
   const fetchCoachesStatistics = useCallback(async () => {
@@ -403,9 +429,10 @@ const Dashboard = ({ user }) => {
     };
     fetchTimetables();
     
-    // 如果是管理员，获取教练统计信息
+    // 如果是管理员，获取教练统计信息和课表信息
     if (user?.role?.toUpperCase() === 'ADMIN') {
       fetchCoachesStatistics();
+      fetchAllTimetablesInfo();
     }
   }, [user]); // 移除fetchCoachesStatistics依赖，避免无限循环
 
@@ -1419,6 +1446,11 @@ const Dashboard = ({ user }) => {
         handleShowTodaysCourses(currentTimetable);
         // 更新课程数量
         updateTimetableScheduleCount(currentTimetable.id);
+        // 失效该课表的短缓存，避免其它区块读取旧数据
+        try {
+          const { invalidateTimetableCache } = await import('../services/timetable');
+          invalidateTimetableCache(currentTimetable.id);
+        } catch (_) {}
       } else {
         message.error(response.message || '添加失败');
       }
@@ -2450,6 +2482,9 @@ const Dashboard = ({ user }) => {
       const todayStr = dayjs().format('YYYY-MM-DD');
       const tomorrowStr = dayjs().add(1, 'day').format('YYYY-MM-DD');
       
+      const normalizeName = (name) => String(name || '').replace(/[\s\u3000]/g, '');
+      const hhmm = (t) => String(t).slice(0, 5);
+
       Promise.all([
         // 获取今日数据（一次性）
         getInstanceSchedulesByDate(todayStr).then(res => {
@@ -2465,7 +2500,7 @@ const Dashboard = ({ user }) => {
               const seen = new Set();
               
               schedules.forEach(s => {
-                const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                 if (!seen.has(key)) {
                   seen.add(key);
                   uniqueSchedules.push(s);
@@ -2474,11 +2509,11 @@ const Dashboard = ({ user }) => {
               
               // 按开始时间排序后再生成显示文本
               const sortedSchedules = uniqueSchedules.sort((a, b) => {
-                const timeA = String(a.startTime).slice(0, 5);
-                const timeB = String(b.startTime).slice(0, 5);
+                const timeA = hhmm(a.startTime);
+                const timeB = hhmm(b.startTime);
                 return timeA.localeCompare(timeB);
               });
-              const items = sortedSchedules.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+              const items = sortedSchedules.map(s => `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`);
               if (items.length > 0) {
                 map[owner] = items;
               }
@@ -2499,7 +2534,7 @@ const Dashboard = ({ user }) => {
                     const seen2 = new Set();
                     
                     schedules2.forEach(s => {
-                      const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                      const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                       if (!seen2.has(key)) {
                         seen2.add(key);
                         uniqueSchedules2.push(s);
@@ -2508,11 +2543,11 @@ const Dashboard = ({ user }) => {
                     
                     // 按开始时间排序后再生成显示文本
                     const sortedSchedules2 = uniqueSchedules2.sort((a, b) => {
-                      const timeA = String(a.startTime).slice(0, 5);
-                      const timeB = String(b.startTime).slice(0, 5);
+                      const timeA = hhmm(a.startTime);
+                      const timeB = hhmm(b.startTime);
                       return timeA.localeCompare(timeB);
                     });
-                    const items2 = sortedSchedules2.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+                    const items2 = sortedSchedules2.map(s => `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`);
                     if (items2.length > 0) map2[owner2] = items2;
                   });
                   setTodayCoachDetails(map2);
@@ -2536,7 +2571,7 @@ const Dashboard = ({ user }) => {
               const seen = new Set();
               
               schedules.forEach(s => {
-                const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                 if (!seen.has(key)) {
                   seen.add(key);
                   uniqueSchedules.push(s);
@@ -2545,11 +2580,11 @@ const Dashboard = ({ user }) => {
               
               // 按开始时间排序后再生成显示文本
               const sortedSchedules = uniqueSchedules.sort((a, b) => {
-                const timeA = String(a.startTime).slice(0, 5);
-                const timeB = String(b.startTime).slice(0, 5);
+                const timeA = hhmm(a.startTime);
+                const timeB = hhmm(b.startTime);
                 return timeA.localeCompare(timeB);
               });
-              const items = sortedSchedules.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+              const items = sortedSchedules.map(s => `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`);
               if (items.length > 0) {
                 map[owner] = items;
               }
@@ -2569,7 +2604,7 @@ const Dashboard = ({ user }) => {
                     const seen2 = new Set();
                     
                     schedules2.forEach(s => {
-                      const key = `${s.studentName}_${String(s.startTime).slice(0,5)}_${String(s.endTime).slice(0,5)}`;
+                      const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                       if (!seen2.has(key)) {
                         seen2.add(key);
                         uniqueSchedules2.push(s);
@@ -2578,11 +2613,11 @@ const Dashboard = ({ user }) => {
                     
                     // 按开始时间排序后再生成显示文本
                     const sortedSchedules2 = uniqueSchedules2.sort((a, b) => {
-                      const timeA = String(a.startTime).slice(0, 5);
-                      const timeB = String(b.startTime).slice(0, 5);
+                      const timeA = hhmm(a.startTime);
+                      const timeB = hhmm(b.startTime);
                       return timeA.localeCompare(timeB);
                     });
-                    const items2 = sortedSchedules2.map(s => `${String(s.startTime).slice(0,5)}-${String(s.endTime).slice(0,5)} ${s.studentName}`);
+                    const items2 = sortedSchedules2.map(s => `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`);
                     if (items2.length > 0) map2[owner2] = items2;
                   });
                   setTomorrowCoachDetails(map2);
@@ -2739,7 +2774,24 @@ const Dashboard = ({ user }) => {
                       flexDirection: 'column', 
                       justifyContent: 'center'
                     }}>
-                      <span style={{ fontWeight: 500, fontSize: 14, lineHeight: '1.2' }}>{coachName}</span>
+                      <span 
+                        style={{ 
+                          fontWeight: 500, 
+                          fontSize: 14, 
+                          lineHeight: '1.2',
+                          color: coachTimetableMap[coachName] ? '#1890ff' : 'inherit',
+                          cursor: coachTimetableMap[coachName] ? 'pointer' : 'default',
+                          textDecoration: coachTimetableMap[coachName] ? 'underline' : 'none'
+                        }}
+                        onClick={() => {
+                          const timetableId = coachTimetableMap[coachName];
+                          if (timetableId) {
+                            navigate(`/view-timetable/${timetableId}`);
+                          }
+                        }}
+                      >
+                        {coachName}
+                      </span>
                       <span style={{ color: '#52c41a', fontWeight: 500, fontSize: 12, marginTop: 4, lineHeight: '1.2' }}>{detailItems.length}课时</span>
                     </div>
                   </div>
@@ -2755,7 +2807,7 @@ const Dashboard = ({ user }) => {
                   }}>
                     {(() => {
                       const rawItems = detailItems;
-                      const items = rawItems.length > 0
+                      const parsed = rawItems.length > 0
                         ? rawItems.map((item) => {
                             if (typeof item === 'string') {
                               // 尝试格式1: 10:00-11:00 学员
@@ -2775,6 +2827,18 @@ const Dashboard = ({ user }) => {
                             return { time: `${startHour}-${endHour}`, name: item.studentName };
                           })
                         : [];
+
+                      // 二次去重（时间+学员名），同时规范化学员名去掉空格/全角空格
+                      const seen = new Set();
+                      const items = [];
+                      parsed.forEach(it => {
+                        const normName = String(it.name || '').replace(/[\s\u3000]/g, '');
+                        const key = `${it.time}|${normName}`;
+                        if (!seen.has(key)) {
+                          seen.add(key);
+                          items.push({ time: it.time, name: normName });
+                        }
+                      });
                       
                       if (items.length === 0) return '—';
                       
@@ -2878,16 +2942,32 @@ const Dashboard = ({ user }) => {
                   dataIndex: 'nickname',
                   key: 'nickname',
                   align: 'center',
-                  render: (text, record) => (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-                      <Avatar size="small" style={{ backgroundColor: colorForCoach(text || record.username) }}>
-                        {(text || record.username)?.[0]?.toUpperCase()}
-                      </Avatar>
-                      <span style={{ marginLeft: '8px' }}>
-                        {text || record.username}
-                      </span>
-                    </div>
-                  )
+                  render: (text, record) => {
+                    const coachName = text || record.username;
+                    const timetableId = coachTimetableMap[coachName];
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+                        <Avatar size="small" style={{ backgroundColor: colorForCoach(coachName) }}>
+                          {coachName?.[0]?.toUpperCase()}
+                        </Avatar>
+                        <span 
+                          style={{ 
+                            marginLeft: '8px',
+                            color: timetableId ? '#1890ff' : 'inherit',
+                            cursor: timetableId ? 'pointer' : 'default',
+                            textDecoration: timetableId ? 'underline' : 'none'
+                          }}
+                          onClick={() => {
+                            if (timetableId) {
+                              navigate(`/view-timetable/${timetableId}`);
+                            }
+                          }}
+                        >
+                          {coachName}
+                        </span>
+                      </div>
+                    );
+                  }
                 },
                 {
                   title: '今日课程',

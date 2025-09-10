@@ -1,9 +1,9 @@
 import api from './auth';
 
 // 获取所有课表
-export const getAllTimetables = async () => {
+export const getAllTimetables = async (activeOnly = false) => {
   try {
-    const response = await api.get('/admin/timetables');
+    const response = await api.get(`/admin/timetables?activeOnly=${activeOnly}`);
     return response;
   } catch (error) {
     throw error;
@@ -214,6 +214,14 @@ export const getInstanceSchedulesByDate = async (date) => {
 // 获取活动课表本周排课信息（周一到周日）- 优化版，一次性获取所有数据
 export const getActiveWeeklySchedules = async () => {
   try {
+    const now = Date.now();
+    // 检查缓存
+    if (weeklySchedulesCache && now - weeklySchedulesCacheTime < CACHE_TTL) {
+      console.log('使用缓存的本周课程数据');
+      return { success: true, data: weeklySchedulesCache };
+    }
+    
+    console.log('重新获取本周课程数据');
     // 使用新的优化接口，一次性获取所有活动课表的本周数据
     const response = await api.get('/admin/active-timetables/this-week');
     
@@ -223,9 +231,13 @@ export const getActiveWeeklySchedules = async () => {
     
     console.log('本周课程数据响应:', response);
     
+    // 更新缓存
+    weeklySchedulesCache = response.data || [];
+    weeklySchedulesCacheTime = now;
+    
     return {
       success: true,
-      data: response.data || []
+      data: weeklySchedulesCache
     };
   } catch (error) {
     console.error('getActiveWeeklySchedules 错误:', error);
@@ -237,12 +249,30 @@ export const getActiveWeeklySchedules = async () => {
   }
 };
 
+// 全局缓存，避免重复调用
+let weeklySchedulesCache = null;
+let weeklySchedulesCacheTime = 0;
+const CACHE_TTL = 30000; // 30秒缓存
+
 // 基于聚合接口：按课表ID过滤本周课程（单接口、前端过滤）
 export const getThisWeekSchedulesForTimetable = async (timetableId) => {
   try {
+    const now = Date.now();
+    // 检查缓存
+    if (weeklySchedulesCache && now - weeklySchedulesCacheTime < CACHE_TTL) {
+      const filtered = weeklySchedulesCache.filter(s => String(s.timetableId) === String(timetableId));
+      return { success: true, data: filtered };
+    }
+    
+    // 缓存过期，重新获取
     const res = await getActiveWeeklySchedules();
     if (!res || !res.success) return res;
     const all = Array.isArray(res.data) ? res.data : [];
+    
+    // 更新缓存
+    weeklySchedulesCache = all;
+    weeklySchedulesCacheTime = now;
+    
     const filtered = all.filter(s => String(s.timetableId) === String(timetableId));
     return { success: true, data: filtered };
   } catch (error) {
@@ -355,9 +385,26 @@ export const cleanDuplicateSchedules = async () => {
   }
 };
 
+// 全局缓存，避免重复调用
+let weeklyTemplatesCache = null;
+let weeklyTemplatesCacheTime = 0;
+export const invalidateWeeklyTemplatesCache = () => {
+  weeklyTemplatesCache = null;
+  weeklyTemplatesCacheTime = 0;
+};
+const TEMPLATE_CACHE_TTL = 30000; // 30秒缓存
+
 // 获取活动课表固定模板信息（周一到周日）- 优化版，一次性获取所有数据
 export const getActiveWeeklyTemplates = async () => {
   try {
+    const now = Date.now();
+    // 检查缓存
+    if (weeklyTemplatesCache && now - weeklyTemplatesCacheTime < TEMPLATE_CACHE_TTL) {
+      console.log('使用缓存的模板课程数据');
+      return { success: true, data: weeklyTemplatesCache };
+    }
+    
+    console.log('重新获取模板课程数据');
     // 使用新的优化接口，一次性获取所有活动课表的模板数据
     const response = await api.get('/admin/active-timetables/templates');
     
@@ -371,9 +418,13 @@ export const getActiveWeeklyTemplates = async () => {
     const templateSchedules = response.data || [];
     console.log('模板课程数据:', templateSchedules);
     
+    // 更新缓存
+    weeklyTemplatesCache = templateSchedules;
+    weeklyTemplatesCacheTime = now;
+    
     return {
       success: true,
-      data: templateSchedules // 直接返回扁平化数组，让前端统一处理
+      data: weeklyTemplatesCache // 直接返回扁平化数组，让前端统一处理
     };
   } catch (error) {
     console.error('获取活动课表模板数据失败:', error);

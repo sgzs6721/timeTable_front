@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce } from '../services/timetable';
-import { getThisWeekSchedulesForTimetable, getTemplateSchedulesForTimetable } from '../services/admin';
+import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged } from '../services/timetable';
+import { getTemplateSchedulesForTimetable, invalidateWeeklyTemplatesCache } from '../services/admin';
+import { getThisWeekSchedulesOnce } from '../services/timetable';
 import { 
   getCurrentWeekInstance, 
   generateCurrentWeekInstance, 
@@ -479,7 +480,14 @@ const ViewTimetable = ({ user }) => {
     const endTime = `${endTimeStr}:00`;
 
     let scheduleDate = null;
-    if (!timetable.isWeekly) {
+    // 统一规则：
+    // - 周固定课表且存在当前周实例 -> 使用实例周起始日计算具体日期
+    // - 日期范围课表 -> 使用当前周计算
+    if (timetable.isWeekly && currentWeekInstance) {
+      const dayIndex = weekDays.findIndex(day => day.key === dayKey);
+      const instanceStart = dayjs(currentWeekInstance.weekStartDate);
+      scheduleDate = instanceStart.add(dayIndex, 'day').format('YYYY-MM-DD');
+    } else if (!timetable.isWeekly) {
       const weekDates = getCurrentWeekDates();
       if (weekDates.start) {
         const dayIndex = weekDays.findIndex(day => day.key === dayKey);
@@ -503,7 +511,8 @@ const ViewTimetable = ({ user }) => {
     setAddLoading(true);
     try {
       let resp;
-      if (viewMode === 'instance' && currentWeekInstance) {
+      // 强制规则：周固定课表且存在当前周实例 -> 走实例API
+      if (timetable.isWeekly && currentWeekInstance) {
         resp = await createInstanceSchedule(currentWeekInstance.id, payload);
       } else {
         resp = await createSchedule(timetableId, payload);
@@ -511,6 +520,7 @@ const ViewTimetable = ({ user }) => {
       
       if (resp.success) {
         handlePopoverVisibleChange(`popover-${dayKey}-${timeIndex}`, false);
+        // 刷新数据
         await refreshSchedulesQuietly();
         message.success('添加成功');
       } else {
@@ -699,8 +709,8 @@ const ViewTimetable = ({ user }) => {
       const thisMonday = dayjs().startOf('week');
       if (start.isSame(thisMonday, 'day')) return '本周';
       if (start.isSame(thisMonday.add(1, 'week'), 'day')) return '下周';
-      // 如果是其他周，显示具体日期
-      return start.format('MM/DD');
+      // 其它周：按“MMDD”显示（例：0901）
+      return start.format('MMDD');
     }
     return '本周';
   }, [viewMode, currentWeekInstance]);
@@ -882,6 +892,25 @@ const ViewTimetable = ({ user }) => {
     }
   }, [currentWeek]); // 只在currentWeek变化时触发
 
+  // 当viewMode变化时，获取对应的数据
+  useEffect(() => {
+    if (!timetable) return;
+    
+    if (viewMode === 'instance' && timetable.isWeekly) {
+      // 获取本周实例数据
+      fetchWeekInstanceSchedules();
+    } else if (viewMode === 'template') {
+      // 使用已经获取的模板数据
+      if (templateSchedules.length > 0) {
+        setAllSchedules(templateSchedules);
+      }
+    } else if (viewMode === 'today') {
+      fetchTodaySchedules();
+    } else if (viewMode === 'tomorrow') {
+      fetchTomorrowSchedules();
+    }
+  }, [viewMode, timetable]);
+
   const fetchTimetable = async () => {
     setLoading(true);
     try {
@@ -895,10 +924,11 @@ const ViewTimetable = ({ user }) => {
         // 默认展示：周固定 -> 本周；日期范围 -> 固定
         if (timetableData.isWeekly && !timetableData.startDate && !timetableData.endDate) {
           setViewMode('instance');
-          const res = await getThisWeekSchedulesForTimetable(timetableId);
-          if (res && res.success) setAllSchedules(res.data || []);
+          // 获取模板数据和周实例列表
           const tpl = await getTemplateSchedulesForTimetable(timetableId);
           if (tpl && tpl.success) setTemplateSchedules(tpl.data || []);
+          // 获取周实例列表用于分页
+          await fetchWeeklyInstances();
         } else {
           setViewMode('template');
           const tpl = await getTemplateSchedulesForTimetable(timetableId);
@@ -1005,7 +1035,7 @@ const ViewTimetable = ({ user }) => {
   // 4. 获取本周数据（每区块一次）- 统一走聚合接口
   const fetchWeekInstanceSchedules = async () => {
     console.log('fetchWeekInstanceSchedules called for timetableId:', timetableId);
-    const response = await getThisWeekSchedulesForTimetable(timetableId);
+    const response = await getThisWeekSchedulesOnce(timetableId);
     console.log('fetchWeekInstanceSchedules response:', response);
     if (response && response.success) {
       console.log('Setting allSchedules to:', response.data || []);
@@ -1139,7 +1169,8 @@ const ViewTimetable = ({ user }) => {
 
   // 获取每周实例列表
   const fetchWeeklyInstances = async () => {
-    if (!timetableId || !timetable?.isWeekly) return;
+    // 仅依赖timetableId，避免因timetable状态尚未set而提前return
+    if (!timetableId) return;
     
     console.log('fetchWeeklyInstances called for timetableId:', timetableId);
     setInstancesLoading(true);
@@ -1314,19 +1345,40 @@ const ViewTimetable = ({ user }) => {
 
   // 局部刷新函数，不影响页面loading状态
   const refreshSchedulesQuietly = async () => {
-    // 走 Once 封装，命中缓存不再发起重复请求
-    if (viewMode === 'template') {
-      const r = await getTemplateSchedulesForTimetable(timetableId);
-      if (r && r.success) setAllSchedules(r.data || []);
-    } else if (viewMode === 'instance') {
-      const r = await getThisWeekSchedulesForTimetable(timetableId);
-      if (r && r.success) setAllSchedules(r.data || []);
-    } else if (viewMode === 'today') {
-      const r = await getTodaySchedulesOnce(timetableId);
-      if (r && r.success) setAllSchedules(r.data || []);
-    } else if (viewMode === 'tomorrow') {
-      const r = await getTomorrowSchedulesOnce(timetableId);
-      if (r && r.success) setAllSchedules(r.data || []);
+    try {
+      // 先清除缓存，确保获取最新数据
+      invalidateTimetableCache(timetableId);
+      
+      if (viewMode === 'template') {
+        // 强制刷新模板数据
+        const r = await getTimetableSchedules(timetableId, null, true);
+        if (r && r.success) {
+          setAllSchedules(r.data || []);
+          setTemplateSchedules(r.data || []);
+        }
+      } else if (viewMode === 'instance') {
+        // 实例视图：直接获取数据，不触发loading状态
+        try {
+          const response = await getCurrentWeekInstance(timetableId);
+          if (response && response.success && response.data.hasInstance) {
+            setCurrentWeekInstance(response.data.instance);
+            setAllSchedules(response.data.schedules || []);
+            console.log('实例数据静默刷新完成，课程数量:', response.data.schedules?.length || 0);
+          } else {
+            console.log('获取实例数据失败或没有实例');
+          }
+        } catch (error) {
+          console.error('实例数据刷新失败:', error);
+        }
+      } else if (viewMode === 'today') {
+        const r = await getTodaySchedulesOnce(timetableId);
+        if (r && r.success) setAllSchedules(r.data || []);
+      } else if (viewMode === 'tomorrow') {
+        const r = await getTomorrowSchedulesOnce(timetableId);
+        if (r && r.success) setAllSchedules(r.data || []);
+      }
+    } catch (error) {
+      console.error('刷新数据失败:', error);
     }
   };
 
@@ -1344,6 +1396,7 @@ const ViewTimetable = ({ user }) => {
       
       if (response.success) {
         setOpenPopoverKey(null);
+        // 删除后刷新数据
         await refreshSchedulesQuietly();
         message.success('删除成功');
       } else {
@@ -1405,6 +1458,7 @@ const ViewTimetable = ({ user }) => {
       if (response.success) {
         setEditModalVisible(false);
         setEditingSchedule(null);
+        // 修改后刷新数据
         await refreshSchedulesQuietly();
         message.success('修改成功');
       } else {
@@ -1510,6 +1564,7 @@ const ViewTimetable = ({ user }) => {
         setScheduleToMove(null);
         setSelectedMoveTarget(null);
         setMoveTargetText('请选择要移动到的时间段');
+        // 移动后刷新数据
         await refreshSchedulesQuietly();
         message.success('课程移动成功');
       } else {
@@ -2372,7 +2427,11 @@ const ViewTimetable = ({ user }) => {
               const endTime = `${endTimeStr}:00`;
 
               let scheduleDate = null;
-              if (!timetable.isWeekly && weekDates && weekDates.start) {
+              if (timetable.isWeekly && currentWeekInstance) {
+                const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
+                const targetDate = instanceStartDate.add(index, 'day');
+                scheduleDate = targetDate.format('YYYY-MM-DD');
+              } else if (!timetable.isWeekly && weekDates && weekDates.start) {
                 const currentDate = weekDates.start.add(index, 'day');
                 scheduleDate = currentDate.format('YYYY-MM-DD');
               }
@@ -2392,16 +2451,16 @@ const ViewTimetable = ({ user }) => {
               setAddLoading(true);
               try {
                 let resp;
-                if (viewMode === 'instance' && currentWeekInstance) {
-                  // 实例视图：使用实例API
+                // 强制：周固定课表且当前周实例存在 -> 一律写入实例
+                if (timetable.isWeekly && currentWeekInstance) {
                   resp = await createInstanceSchedule(currentWeekInstance.id, payload);
                 } else {
-                  // 模板视图：使用原有API
                   resp = await createSchedule(timetableId, payload);
                 }
                 
                 if (resp.success) {
                   setOpenPopoverKey(null);
+                  invalidateTimetableCache(timetableId);
                   await refreshSchedulesQuietly();
                   message.success('添加成功');
                 } else {
@@ -3324,7 +3383,7 @@ const ViewTimetable = ({ user }) => {
                   color: '#666',
                   whiteSpace: 'nowrap'
                 }}>
-                  {displayViewMode === 'instance' && currentWeekInstance?.weekStartDate ? instanceWeekLabel : '本周'}
+                  {displayViewMode === 'instance' && currentWeekInstance?.weekStartDate ? instanceWeekLabel : '每周'}
                   <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
                     {isInitialLoading ? '-' : displayWeeklyStats.count}
                   </span>
