@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged } from '../services/timetable';
-import { getTemplateSchedulesForTimetable, invalidateWeeklyTemplatesCache } from '../services/admin';
+import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules } from '../services/timetable';
+import { invalidateWeeklyTemplatesCache } from '../services/admin';
 import { getThisWeekSchedulesSessionOnce } from '../services/timetable';
 import { 
   getCurrentWeekInstance, 
@@ -928,7 +928,7 @@ const ViewTimetable = ({ user }) => {
         if (timetableData.isWeekly && !timetableData.startDate && !timetableData.endDate) {
           setViewMode('instance');
           // 获取模板数据和周实例列表
-          const tpl = await getTemplateSchedulesForTimetable(timetableId);
+          const tpl = await getTemplateSchedules(timetableId);
           if (tpl && tpl.success) setTemplateSchedules(tpl.data || []);
           // 获取周实例列表用于分页
           await fetchWeeklyInstances();
@@ -936,7 +936,7 @@ const ViewTimetable = ({ user }) => {
           await fetchWeekInstanceSchedules();
         } else {
           setViewMode('template');
-          const tpl = await getTemplateSchedulesForTimetable(timetableId);
+          const tpl = await getTemplateSchedules(timetableId);
           if (tpl && tpl.success) setAllSchedules(tpl.data || []);
         }
 
@@ -985,7 +985,8 @@ const ViewTimetable = ({ user }) => {
   // 1. 获取固定课表模板数据（每区块一次）
   const fetchTemplateSchedules = async (requestId) => {
     const currentId = requestId ?? latestRequestIdRef.current;
-    const response = await getTemplateSchedulesForTimetable(timetableId);
+    // 修复：使用正确的API直接获取指定课表的模板数据，而不是从admin接口获取所有数据再过滤
+    const response = await getTemplateSchedules(timetableId);
     if (response && response.success) {
       // 只有当本次请求仍是最新时才更新UI，避免切换过程中数据错乱
       if (latestRequestIdRef.current === currentId) {
