@@ -875,10 +875,15 @@ const ViewTimetable = ({ user }) => {
   useEffect(() => {
     if (weeklyInstances.length > 0 && viewMode === 'instance' && currentInstanceIndex === 0) {
       // 检查是否应该切换到本周实例
-      const thisWeekStart = dayjs().startOf('week').format('YYYY-MM-DD');
-      const thisWeekIndex = weeklyInstances.findIndex(inst => 
-        dayjs(inst.weekStartDate).isSame(thisWeekStart, 'day')
-      );
+      const today = dayjs();
+      const thisWeekStart = today.startOf('week').add(1, 'day'); // 周一
+      const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
+      
+      const thisWeekIndex = weeklyInstances.findIndex(inst => {
+        const start = dayjs(inst.weekStartDate);
+        const end = dayjs(inst.weekEndDate);
+        return start.isSame(thisWeekStart, 'day') && end.isSame(thisWeekEnd, 'day');
+      });
       
       // 如果找到本周实例且当前不是本周实例，则自动切换
       if (thisWeekIndex >= 0 && thisWeekIndex !== currentInstanceIndex) {
@@ -1208,18 +1213,21 @@ const ViewTimetable = ({ user }) => {
           } else {
             // 如果没有当前周实例，尝试找到本周的实例
             const today = dayjs();
-            const thisWeekStart = dayjs().startOf('week').add(1, 'day').format('YYYY-MM-DD');
+            // 与后端保持一致：周一为一周的开始
+            const thisWeekStart = today.startOf('week').add(1, 'day'); // 周一
+            const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
+            
             const thisWeekIndex = sortedInstances.findIndex(inst => {
               const start = dayjs(inst.weekStartDate);
               const end = dayjs(inst.weekEndDate);
-              // 精确匹配：今天在实例的日期范围内
-              return today.isSame(start, 'day') || (today.isAfter(start, 'day') && today.isBefore(end, 'day')) || today.isSame(end, 'day');
+              // 精确匹配：实例的周开始和结束日期与当前周一致
+              return start.isSame(thisWeekStart, 'day') && end.isSame(thisWeekEnd, 'day');
             });
             if (thisWeekIndex >= 0) {
               setCurrentInstanceIndex(thisWeekIndex);
             } else {
-              // 如果找不到本周实例，默认选择第一个
-              setCurrentInstanceIndex(0);
+              // 如果找不到本周实例，默认选择最后一个（最新的）实例
+              setCurrentInstanceIndex(sortedInstances.length - 1);
             }
           }
         }
