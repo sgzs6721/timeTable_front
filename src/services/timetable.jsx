@@ -487,6 +487,27 @@ export const getTomorrowSchedulesOnce = (timetableId) =>
 export const getThisWeekSchedulesOnce = (timetableId) =>
   getMerged(cacheBox.week, String(timetableId), () => getThisWeekSchedules(timetableId));
 
+// 全局单次请求缓存（会话级），用于首页合并各处对“本周数据”的调用
+const sessionOnceCache = new Map(); // key: `this-week-${timetableId}` -> Promise/data
+
+export const getThisWeekSchedulesSessionOnce = async (timetableId) => {
+  const key = `this-week-${timetableId}`;
+  const now = Date.now();
+  const cached = sessionOnceCache.get(key);
+  if (cached && cached.data && now - cached.time < 5 * 60 * 1000) { // 5分钟有效
+    return cached.data;
+  }
+  if (cached && cached.promise) return cached.promise;
+  const p = getThisWeekSchedulesOnce(timetableId)
+    .then((resp) => {
+      sessionOnceCache.set(key, { time: Date.now(), data: resp, promise: null });
+      return resp;
+    })
+    .catch((e) => { sessionOnceCache.delete(key); throw e; });
+  sessionOnceCache.set(key, { time: now, promise: p, data: null });
+  return p;
+};
+
 export const getTemplateSchedulesOnce = (timetableId) =>
   getMerged(cacheBox.template, String(timetableId), () => getTemplateSchedules(timetableId));
 

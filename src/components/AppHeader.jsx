@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Button, Dropdown, Avatar, Badge } from 'antd';
+import { Layout, Menu, Button, Dropdown, Avatar, Badge, message } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getAllRegistrationRequests } from '../services/admin';
 import logo from '../assets/logo.png';
 
@@ -50,6 +50,22 @@ const AppHeader = ({ user, onLogout }) => {
   ];
 
   const userMenuItems = [
+    {
+      key: 'refresh',
+      icon: <ReloadOutlined />,
+      label: '刷新',
+      onClick: () => {
+        // 轻提示+刷新当前页面数据
+        message.loading({ content: '正在刷新...', key: 'refreshing', duration: 0 });
+        // 优先尝试软刷新：重新加载当前路由
+        try {
+          navigate(0);
+        } catch (_) {
+          window.location.reload();
+        }
+      }
+    },
+    { type: 'divider' },
     {
       key: 'archived',
       icon: <InboxOutlined />,

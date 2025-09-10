@@ -2359,13 +2359,35 @@ const Dashboard = ({ user }) => {
           );
         }
       },
-      ...weekDays.map(day => ({
-        title: day.title,
-        dataIndex: day.key,
-        key: day.key,
-        align: 'center',
-        render: (schedules) => renderScheduleCell(schedules, day.key)
-      }))
+      ...weekDays.map((day, idx) => {
+        // 计算“今天”对应的列（将周日=0转换为周一=0的索引）
+        const todayIndex = (dayjs().day() + 6) % 7;
+        const isTodayCol = idx === todayIndex;
+        // 计算本周每一天的具体日期（以周一为一周开始）
+        const monday = dayjs().day(1).startOf('day');
+        const dateForCol = monday.add(idx, 'day').format('MM/DD');
+        return {
+          title: (
+            <div
+              style={{
+                textAlign: 'center',
+                fontWeight: isTodayCol ? 600 : 500,
+                color: isTodayCol ? '#1677ff' : undefined
+              }}
+            >
+              <div>{day.title}</div>
+              <div style={{ fontSize: '10px', lineHeight: '12px', whiteSpace: 'nowrap', color: isTodayCol ? '#1677ff' : '#888' }}>{dateForCol}</div>
+            </div>
+          ),
+          dataIndex: day.key,
+          key: day.key,
+          align: 'center',
+          onHeaderCell: () => ({
+            style: isTodayCol ? { backgroundColor: '#e6f4ff' } : undefined
+          }),
+          render: (schedules) => renderScheduleCell(schedules, day.key)
+        };
+      })
     ];
     
     // 转换数据为表格格式
