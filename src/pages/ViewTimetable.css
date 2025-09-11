@@ -78,29 +78,29 @@ div[data-reactroot] > div:first-child:not([class]):not([style]) {
 }
 */
 
-/* 强制保持选中实例按钮的颜色样式 */
+/* 强制保持选中实例按钮的颜色样式 - 与本周按钮保持一致 */
 .selected-instance-btn {
-  background-color: #1890ff !important;
-  border-color: #1890ff !important;
+  background-color: #fa8c16 !important;
+  border-color: #fa8c16 !important;
   color: #fff !important;
 }
 
 .selected-instance-btn:hover {
-  background-color: #40a9ff !important;
-  border-color: #40a9ff !important;
+  background-color: #ff9c2e !important;
+  border-color: #ff9c2e !important;
   color: #fff !important;
 }
 
 .selected-instance-btn:focus {
-  background-color: #1890ff !important;
-  border-color: #1890ff !important;
+  background-color: #fa8c16 !important;
+  border-color: #fa8c16 !important;
   color: #fff !important;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.2) !important;
 }
 
 .selected-instance-btn:active {
-  background-color: #096dd9 !important;
-  border-color: #096dd9 !important;
+  background-color: #e67e00 !important;
+  border-color: #e67e00 !important;
   color: #fff !important;
 }
 
