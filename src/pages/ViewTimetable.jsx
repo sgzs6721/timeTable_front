@@ -257,7 +257,7 @@ const ViewTimetable = ({ user }) => {
   const [loading, setLoading] = useState(true);
   
   // 周实例相关状态
-  const [viewMode, setViewMode] = useState(null); // 'template' | 'instance' | null (initially)
+  const [viewMode, setViewMode] = useState('instance'); // 'template' | 'instance' | 'today' | 'tomorrow'
   const [currentWeekInstance, setCurrentWeekInstance] = useState(null);
   const [hasCurrentWeekInstance, setHasCurrentWeekInstance] = useState(false);
   const [instanceLoading, setInstanceLoading] = useState(false);
@@ -892,9 +892,9 @@ const ViewTimetable = ({ user }) => {
   // 移除自动触发的useEffect，改为按钮点击时手动调用
   // 这样避免了无限循环调用API的问题
 
-  // 当获取到每周实例列表后，自动切换到本周实例
+  // 当获取到每周实例列表后，自动切换到本周实例（仅在用户操作后触发，不在初始加载时触发）
   useEffect(() => {
-    if (weeklyInstances.length > 0 && viewMode === 'instance' && currentInstanceIndex === 0) {
+    if (weeklyInstances.length > 0 && viewMode === 'instance' && currentInstanceIndex === 0 && !loading) {
       // 检查是否应该切换到本周实例
       const today = dayjs();
       const thisWeekStart = today.startOf('week').add(1, 'day'); // 周一
@@ -912,7 +912,7 @@ const ViewTimetable = ({ user }) => {
         switchToWeekInstanceByIndex(thisWeekIndex);
       }
     }
-  }, [weeklyInstances, viewMode]); // 移除currentInstanceIndex依赖，避免循环触发
+  }, [weeklyInstances, viewMode, loading]); // 添加loading依赖，避免初始加载时触发
 
   // 为日期范围课表添加单独的useEffect处理currentWeek变化
   useEffect(() => {
@@ -921,9 +921,9 @@ const ViewTimetable = ({ user }) => {
     }
   }, [currentWeek]); // 只在currentWeek变化时触发
 
-  // 当viewMode变化时，获取对应的数据
+  // 当viewMode变化时，获取对应的数据（仅在用户主动切换时触发，不在初始加载时触发）
   useEffect(() => {
-    if (!timetable) return;
+    if (!timetable || loading) return; // 初始加载时不触发
     
     if (viewMode === 'instance' && timetable.isWeekly) {
       // 获取本周实例数据
@@ -938,7 +938,7 @@ const ViewTimetable = ({ user }) => {
     } else if (viewMode === 'tomorrow') {
       fetchTomorrowSchedules();
     }
-  }, [viewMode, timetable]);
+  }, [viewMode, timetable, loading]);
 
   const fetchTimetable = async () => {
     setLoading(true);
@@ -952,14 +952,59 @@ const ViewTimetable = ({ user }) => {
         // For weekly timetables, initialize and determine view mode
         // 默认展示：周固定 -> 本周；日期范围 -> 固定
         if (timetableData.isWeekly && !timetableData.startDate && !timetableData.endDate) {
-          setViewMode('instance');
-          // 获取模板数据和周实例列表
-          const tpl = await getTemplateSchedules(timetableId);
-          if (tpl && tpl.success) setTemplateSchedules(tpl.data || []);
-          // 获取周实例列表用于分页
-          await fetchWeeklyInstances();
-          // 直接获取本周实例数据
-          await fetchWeekInstanceSchedules();
+          // 一次性获取所有需要的数据，避免多次状态更新导致闪烁
+          const [templateResponse, instancesResponse, currentWeekResponse] = await Promise.all([
+            getTemplateSchedules(timetableId),
+            getWeeklyInstances(timetableId),
+            getCurrentWeekInstance(timetableId)
+          ]);
+          
+          // 处理模板数据
+          if (templateResponse && templateResponse.success) {
+            setTemplateSchedules(templateResponse.data || []);
+          }
+          
+          // 处理周实例列表
+          if (instancesResponse && instancesResponse.success && Array.isArray(instancesResponse.data)) {
+            const sortedInstances = instancesResponse.data.sort((a, b) => 
+              dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))
+            );
+            setWeeklyInstances(sortedInstances);
+            
+            // 处理当前周实例
+            if (currentWeekResponse && currentWeekResponse.success && currentWeekResponse.data?.hasInstance) {
+              const instance = currentWeekResponse.data.instance;
+              const schedules = currentWeekResponse.data.schedules || [];
+              
+              // 找到当前实例在列表中的索引
+              const targetIndex = sortedInstances.findIndex(inst => inst.id === instance.id);
+              const finalIndex = targetIndex >= 0 ? targetIndex : sortedInstances.length - 1;
+              
+              // 一次性设置所有状态，避免闪烁
+              setViewMode('instance');
+              setCurrentWeekInstance(instance);
+              setAllSchedules(schedules);
+              setCurrentInstanceIndex(finalIndex);
+            } else {
+              // 没有当前周实例，生成一个
+              const generateResponse = await generateCurrentWeekInstance(timetableId);
+              if (generateResponse && generateResponse.success) {
+                const newCurrentWeekResponse = await getCurrentWeekInstance(timetableId);
+                if (newCurrentWeekResponse && newCurrentWeekResponse.success && newCurrentWeekResponse.data?.hasInstance) {
+                  const instance = newCurrentWeekResponse.data.instance;
+                  const schedules = newCurrentWeekResponse.data.schedules || [];
+                  
+                  const targetIndex = sortedInstances.findIndex(inst => inst.id === instance.id);
+                  const finalIndex = targetIndex >= 0 ? targetIndex : sortedInstances.length - 1;
+                  
+                  setViewMode('instance');
+                  setCurrentWeekInstance(instance);
+                  setAllSchedules(schedules);
+                  setCurrentInstanceIndex(finalIndex);
+                }
+              }
+            }
+          }
         } else {
           setViewMode('template');
           const tpl = await getTemplateSchedules(timetableId);
@@ -2406,18 +2451,16 @@ const ViewTimetable = ({ user }) => {
   const studentTextColorMap = new Map();
 
   // 如果课表信息未加载，显示完整页面布局但数据为空
-  const isInitialLoading = !timetable || !viewMode;
+  const isInitialLoading = !timetable;
   
   // 在切换过程中使用临时数据，否则使用当前数据
   const displaySchedules = (switchToInstanceLoading || switchToTemplateLoading) && tempSchedules.length > 0 
     ? tempSchedules 
     : allSchedules;
   
-  const displayViewMode = isInitialLoading 
-    ? 'template' 
-    : (switchToInstanceLoading || switchToTemplateLoading) && tempViewMode 
-      ? tempViewMode 
-      : viewMode;
+  const displayViewMode = (switchToInstanceLoading || switchToTemplateLoading) && tempViewMode 
+    ? tempViewMode 
+    : viewMode;
 
   const allStudentNames = [...new Set(displaySchedules.map(s => s.studentName).filter(Boolean))];
   allStudentNames.forEach((name, index) => {
@@ -3254,7 +3297,7 @@ const ViewTimetable = ({ user }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {/* 在实例视图时显示图例 */}
-              {((displayViewMode === 'instance' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) || (isInitialLoading && displayViewMode === 'instance')) ? (
+              {(displayViewMode === 'instance' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ 
@@ -3279,7 +3322,7 @@ const ViewTimetable = ({ user }) => {
                 </>
               ) : null}
               {/* 在固定课表视图时显示提示信息 */}
-              {((displayViewMode === 'template' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) || (isInitialLoading && displayViewMode === 'template')) ? (
+              {(displayViewMode === 'template' && timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) ? (
                 <span style={{ color: '#666', fontSize: '12px' }}>
                   固定课表模板视图
                 </span>
@@ -3641,7 +3684,7 @@ const ViewTimetable = ({ user }) => {
           style={{ tableLayout: 'fixed' }}
         />
         {/* 统一的loading蒙板 */}
-        {(isInitialLoading || instancesLoading || switchToInstanceLoading || switchToTemplateLoading) && (
+        {(loading || isInitialLoading || instancesLoading || switchToInstanceLoading || switchToTemplateLoading) && (
           <div style={{
             position: 'absolute',
             top: 0,
@@ -3656,7 +3699,8 @@ const ViewTimetable = ({ user }) => {
             borderRadius: '6px'
           }}>
             <Spin size="small" tip={
-              isInitialLoading ? "正在加载课表..." :
+              loading ? "正在加载课表..." :
+              isInitialLoading ? "正在初始化..." :
               instancesLoading ? "切换周实例中..." : 
               switchToInstanceLoading ? "切换到本周..." :
               switchToTemplateLoading ? "切换到固定课表..." :
