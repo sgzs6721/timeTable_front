@@ -1406,38 +1406,8 @@ const Dashboard = ({ user }) => {
     }
 
     try {
-      let response;
-      
-      // 检查是否有当前周实例
-      const instanceCheck = await checkCurrentWeekInstance(currentTimetable.id);
-      console.log('instanceCheck response:', instanceCheck);
-      
-      if (instanceCheck.success && instanceCheck.data.hasInstance) {
-        // 有实例，添加到实例中
-        const instanceId = instanceCheck.data.instanceId || instanceCheck.data.id;
-        console.log('Using existing instanceId:', instanceId);
-        if (!instanceId) {
-          message.error('无法获取实例ID');
-          return;
-        }
-        response = await createInstanceSchedule(instanceId, payload);
-      } else {
-        // 没有实例，先创建实例再添加
-        const createInstanceResponse = await generateCurrentWeekInstance(currentTimetable.id);
-        console.log('createInstanceResponse:', createInstanceResponse);
-        if (createInstanceResponse.success) {
-          const instanceId = createInstanceResponse.data.instanceId || createInstanceResponse.data.id;
-          console.log('Using new instanceId:', instanceId);
-          if (!instanceId) {
-            message.error('无法获取新创建的实例ID');
-            return;
-          }
-          response = await createInstanceSchedule(instanceId, payload);
-        } else {
-          message.error('创建周实例失败');
-          return;
-        }
-      }
+      // 修正：周固定课表新增应写入“固定课表模板”，由后端决定是否同步至本周实例
+      const response = await createSchedule(currentTimetable.id, payload);
       
       if (response.success) {
         message.success('添加成功');
