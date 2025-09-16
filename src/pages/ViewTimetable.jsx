@@ -2814,6 +2814,21 @@ const ViewTimetable = ({ user }) => {
               return <div style={{ height: '48px' }} />;
             }
 
+            const templateScheduleExists = displayViewMode === 'instance' &&
+              Array.isArray(templateSchedules) &&
+              templateSchedules.some(template => {
+                const timeKey = record.time;
+                const dayKey = day.key;
+                const templateTimeKey = `${template.startTime.substring(0, 5)}-${template.endTime.substring(0, 5)}`;
+                return template.dayOfWeek.toLowerCase() === dayKey && templateTimeKey === timeKey;
+              });
+
+            const emptyCellStyle = {
+              height: '48px',
+              cursor: 'pointer',
+              border: templateScheduleExists ? '1px dashed #ff4d4f' : undefined,
+            };
+
             const handleCellClick = (e) => {
               if (multiSelectMode) {
                 e.stopPropagation();
@@ -2915,10 +2930,9 @@ const ViewTimetable = ({ user }) => {
               return (
                 <div
                   style={{
-                    height: '48px',
-                    cursor: 'pointer',
+                    ...emptyCellStyle,
                     backgroundColor: isSelected ? '#e6f7ff' : 'transparent',
-                    border: isSelected ? '2px solid #1890ff' : '2px solid transparent',
+                    border: isSelected ? '2px solid #1890ff' : emptyCellStyle.border,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2938,10 +2952,9 @@ const ViewTimetable = ({ user }) => {
               return (
                                   <div
                     style={{
-                      height: '48px',
-                      cursor: 'pointer',
+                      ...emptyCellStyle,
                       backgroundColor: isSelected ? '#e6f4ff' : 'transparent',
-                      border: '1px solid #f0f0f0',
+                      border: isSelected ? '2px solid #1890ff' : emptyCellStyle.border || '1px solid #f0f0f0',
                       position: 'relative'
                     }}
                     onClick={handleCellClick}
@@ -2983,10 +2996,9 @@ const ViewTimetable = ({ user }) => {
               return (
                 <div
                   style={{
-                    height: '48px',
-                    cursor: 'pointer',
+                    ...emptyCellStyle,
                     backgroundColor: isSelected ? '#f0f9ff' : 'transparent',
-                    border: '1px solid #f0f0f0',
+                    border: isSelected ? '2px solid #1890ff' : emptyCellStyle.border || '1px solid #f0f0f0',
                     position: 'relative',
                     display: 'flex',
                     alignItems: 'flex-start', // Align to top to control position with padding
@@ -3045,7 +3057,7 @@ const ViewTimetable = ({ user }) => {
                 onOpenChange={handleOpenChange}
               >
                 <div style={{ 
-                  height: '48px', 
+                  ...emptyCellStyle,
                   cursor: deleteMode ? 'not-allowed' : 'pointer',
                   opacity: deleteMode ? 0.5 : 1
                 }} />
