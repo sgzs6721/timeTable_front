@@ -825,6 +825,13 @@ const ViewTimetable = ({ user }) => {
               date: targetDateStr,
               timetables: response.data.timetableSchedules || []
             };
+            if (convertedData.timetables) {
+              convertedData.timetables.forEach(timetable => {
+                if (timetable.schedules) {
+                  timetable.schedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                }
+              });
+            }
             setOtherCoachesDataInModal(convertedData);
           }
         })
@@ -834,6 +841,13 @@ const ViewTimetable = ({ user }) => {
           getActiveSchedulesByDateMerged(targetDateStr)
             .then(response => {
               if (response.success) {
+                if (response.data && response.data.timetables) {
+                  response.data.timetables.forEach(timetable => {
+                    if (timetable.schedules) {
+                      timetable.schedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    }
+                  });
+                }
                 setOtherCoachesDataInModal(response.data);
               }
             })
@@ -887,11 +901,13 @@ const ViewTimetable = ({ user }) => {
         }
 
         result += `\n${timetableInfo.ownerName}：`;
-        const otherCourseList = timetableInfo.schedules.map(schedule => {
-          const startHour = parseInt(schedule.startTime.substring(0, 2));
-          const endHour = startHour + 1;
-          return `${startHour}-${endHour} ${schedule.studentName}`;
-        }).join('\n');
+        const otherCourseList = [...timetableInfo.schedules]
+          .sort((a, b) => a.startTime.localeCompare(b.startTime))
+          .map(schedule => {
+            const startHour = parseInt(schedule.startTime.substring(0, 2));
+            const endHour = startHour + 1;
+            return `${startHour}-${endHour} ${schedule.studentName}`;
+          }).join('\n');
         result += `\n${otherCourseList}`;
       });
     }
