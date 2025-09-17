@@ -12,6 +12,16 @@ code {
     monospace;
 }
 
+:root {
+  /* Pastel (macaron) palette as RGB tuples for easy alpha control */
+  --pastel-1: 255, 183, 197; /* pink */
+  --pastel-2: 255, 223, 186; /* peach */
+  --pastel-3: 255, 255, 186; /* lemon */
+  --pastel-4: 186, 255, 201; /* mint */
+  --pastel-5: 186, 225, 255; /* sky */
+  --pastel-6: 218, 198, 255; /* lavender */
+}
+
 .app-container {
   min-height: 100vh;
   background-color: #f0f2f5;
@@ -495,8 +505,39 @@ code {
 }
 
 .time-slot.has-class {
-  background: #e6f7ff;
-  border-color: #91d5ff;
+  /* default fallback color (sky) with soft transparency */
+  background: rgba(var(--pastel-5), 0.35);
+  border-color: rgba(var(--pastel-5), 0.6);
+}
+
+/* Subtle macaron colors by day column (exclude first time column) */
+.ant-table-tbody > tr > td:nth-child(2) .time-slot.has-class { /* Monday */
+  background: rgba(var(--pastel-1), 0.35);
+  border-color: rgba(var(--pastel-1), 0.6);
+}
+.ant-table-tbody > tr > td:nth-child(3) .time-slot.has-class { /* Tuesday */
+  background: rgba(var(--pastel-2), 0.35);
+  border-color: rgba(var(--pastel-2), 0.6);
+}
+.ant-table-tbody > tr > td:nth-child(4) .time-slot.has-class { /* Wednesday */
+  background: rgba(var(--pastel-3), 0.35);
+  border-color: rgba(var(--pastel-3), 0.6);
+}
+.ant-table-tbody > tr > td:nth-child(5) .time-slot.has-class { /* Thursday */
+  background: rgba(var(--pastel-4), 0.35);
+  border-color: rgba(var(--pastel-4), 0.6);
+}
+.ant-table-tbody > tr > td:nth-child(6) .time-slot.has-class { /* Friday */
+  background: rgba(var(--pastel-5), 0.35);
+  border-color: rgba(var(--pastel-5), 0.6);
+}
+.ant-table-tbody > tr > td:nth-child(7) .time-slot.has-class { /* Saturday */
+  background: rgba(var(--pastel-6), 0.35);
+  border-color: rgba(var(--pastel-6), 0.6);
+}
+.ant-table-tbody > tr > td:nth-child(8) .time-slot.has-class { /* Sunday */
+  background: rgba(var(--pastel-1), 0.35);
+  border-color: rgba(var(--pastel-1), 0.6);
 }
 
 .student-name {

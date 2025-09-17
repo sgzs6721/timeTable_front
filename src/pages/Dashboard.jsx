@@ -2022,20 +2022,25 @@ const Dashboard = ({ user }) => {
     const [weeklyScheduleLoading, setWeeklyScheduleLoading] = useState(false);
     const [viewMode, setViewMode] = useState('instance'); // 'instance' | 'template'
     const [allCoaches, setAllCoaches] = useState(new Set());
+    const [selectedCoach, setSelectedCoach] = useState(null);
+    const [coachBgColorMap, setCoachBgColorMap] = useState(new Map());
+    const [studentBgColorMap, setStudentBgColorMap] = useState(new Map());
     
-    // 颜色调色板（与现有课表保持一致）
+    // 半透明马卡龙调色板（更柔和）
     const colorPalette = [
-      '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF',
-      '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC',
-      '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
+      'rgba(186,225,255,0.45)', // sky
+      'rgba(186,255,201,0.45)', // mint
+      'rgba(255,183,197,0.45)', // pink
+      'rgba(255,236,179,0.45)', // apricot
+      'rgba(218,198,255,0.45)', // lavender
+      'rgba(248,209,215,0.45)', // blush
+      'rgba(255,255,186,0.45)', // lemon
+      'rgba(210,245,228,0.45)', // aqua mint
+      'rgba(197,225,165,0.45)', // light green
+      'rgba(179,229,252,0.45)', // light blue
+      'rgba(255,214,214,0.45)', // light coral
+      'rgba(220,210,255,0.45)'  // pale violet
     ];
-    
-    // 教练文字颜色调色板
-    const coachTextColorPalette = ['#1890ff', '#722ed1', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#d4380d'];
-    
-    // 学员背景色和教练文字色映射
-    const studentColorMap = new Map();
-    const coachTextColorMap = new Map();
     
     useEffect(() => {
       fetchWeeklyScheduleData('instance'); // 明确指定初始加载为本周模式
@@ -2164,15 +2169,17 @@ const Dashboard = ({ user }) => {
           });
         }
         
-        // 为学员分配背景色
-        Array.from(allStudents).forEach((student, index) => {
-          studentColorMap.set(student, colorPalette[index % colorPalette.length]);
-        });
-        
-        // 为教练分配文字色
+        const newCoachBgColorMap = new Map();
         Array.from(allCoaches).forEach((coach, index) => {
-          coachTextColorMap.set(coach, coachTextColorPalette[index % coachTextColorPalette.length]);
+          newCoachBgColorMap.set(coach, colorPalette[index % colorPalette.length]);
         });
+        setCoachBgColorMap(newCoachBgColorMap);
+
+        const newStudentBgColorMap = new Map();
+        Array.from(allStudents).forEach((student, index) => {
+          newStudentBgColorMap.set(student, colorPalette[index % colorPalette.length]);
+        });
+        setStudentBgColorMap(newStudentBgColorMap);
         
         setWeeklyScheduleData(tableData);
         setAllCoaches(allCoaches);
@@ -2208,18 +2215,8 @@ const Dashboard = ({ user }) => {
       await fetchWeeklyScheduleData('template');
     };
     
-    const getCoachColor = (coachName) => {
-      // 高区分度配色（包含天蓝色）
-      const colors = ['#dc2626', '#38bdf8', '#059669', '#22c55e'];
-      const hash = coachName.split('').reduce((a, b) => {
-        a = ((a << 5) - a) + b.charCodeAt(0);
-        return a & a;
-      }, 0);
-      return colors[Math.abs(hash) % colors.length];
-    };
-    
     const renderScheduleCell = (schedules, day) => {
-      const filtered = (schedules || []).filter(s => {
+      const filteredByView = (schedules || []).filter(s => {
         if (viewMode === 'template') {
           // 固定：包含周固定来源 + 日期范围
           return (!!s.sourceIsWeekly) || s.type === 'dateRange' || s.type === 'template';
@@ -2227,6 +2224,11 @@ const Dashboard = ({ user }) => {
         // 本周：包含实例 + 日期范围
         return s.type === 'instance' || s.type === 'dateRange';
       });
+
+      const filtered = selectedCoach 
+        ? filteredByView.filter(schedule => schedule.coach === selectedCoach)
+        : filteredByView;
+
       if (!filtered || filtered.length === 0) {
         return <div style={{ height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />;
       }
@@ -2253,20 +2255,22 @@ const Dashboard = ({ user }) => {
               <div
                 key={`${schedule.coach}-${schedule.student}-${idx}`}
                 style={{
-                  backgroundColor: studentColorMap.get(schedule.student) || 'transparent',
+                  backgroundColor: studentBgColorMap.get(schedule.student) || coachBgColorMap.get(schedule.coach) || 'transparent',
                   flex: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: (coachColorMap && coachColorMap[schedule.coach]) || getCoachColor(schedule.coach),
+                  color: '#000',
                   fontSize: '12px',
                   fontWeight: 600,
                   wordBreak: 'break-word',
                   lineHeight: '1.2',
-                  borderTop: idx > 0 ? '1px solid #fff' : 'none',
+                  /* 让每个学员块铺满其等分区域，不留缝隙 */
+                  width: '100%',
+                  height: '100%',
                   border: diffBorder,
                   position: 'relative',
-                  padding: '2px'
+                  padding: 0,
                 }}
                 title={`教练: ${schedule.coach} | 学员: ${schedule.student}`}
               >
@@ -2401,6 +2405,33 @@ const Dashboard = ({ user }) => {
         }
       >
         <Spin spinning={weeklyScheduleLoading}>
+          {/* 教练颜色图例说明 */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '12px', justifyContent: 'center' }}>
+              {Array.from(allCoaches).map((coach, index) => (
+                <div 
+                  key={coach} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px',
+                    cursor: 'pointer',
+                    opacity: selectedCoach && selectedCoach !== coach ? 0.5 : 1,
+                    transition: 'opacity 0.3s'
+                  }}
+                  onClick={() => setSelectedCoach(selectedCoach === coach ? null : coach)}
+                >
+                  <div style={{ 
+                    width: '12px', 
+                    height: '12px', 
+                    backgroundColor: coachBgColorMap.get(coach) || 'transparent', 
+                    borderRadius: '2px' 
+                  }}></div>
+                  <span style={{ color: '#000', fontWeight: 500 }}>{coach}</span>
+                </div>
+              ))}
+            </div>
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <Table
               columns={columns}
@@ -2411,23 +2442,6 @@ const Dashboard = ({ user }) => {
               rowClassName={() => 'weekly-schedule-row'}
               style={{ fontSize: '12px' }}
             />
-          </div>
-          
-          {/* 教练颜色图例说明 */}
-          <div style={{ marginTop: '12px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '12px' }}>
-              {(coachColorMap ? Object.keys(coachColorMap) : Array.from(allCoaches)).map((coach, index) => (
-                <div key={coach} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <div style={{ 
-                    width: '12px', 
-                    height: '12px', 
-                    backgroundColor: (coachColorMap && coachColorMap[coach]) || getCoachColor(coach), 
-                    borderRadius: '2px' 
-                  }}></div>
-                  <span style={{ color: (coachColorMap && coachColorMap[coach]) || getCoachColor(coach), fontWeight: 500 }}>{coach}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </Spin>
       </Card>

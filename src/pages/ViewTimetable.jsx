@@ -2626,9 +2626,22 @@ const ViewTimetable = ({ user }) => {
   };
 
   const colorPalette = [
-    '#E6F7FF', '#F0F5FF', '#F6FFED', '#FFFBE6', '#FFF1F0', '#FCF4FF',
-    '#FFF0F6', '#F9F0FF', '#FFF7E6', '#FFFAE6', '#D9F7BE', '#B5F5EC',
-    '#ADC6FF', '#D3ADF7', '#FFADD2', '#FFD8BF'
+    'rgba(255,183,197,0.45)', // pink
+    'rgba(255,223,186,0.45)', // peach
+    'rgba(255,255,186,0.45)', // lemon
+    'rgba(186,255,201,0.45)', // mint
+    'rgba(186,225,255,0.45)', // sky
+    'rgba(218,198,255,0.45)', // lavender
+    'rgba(255,200,221,0.45)', // rose
+    'rgba(255,236,179,0.45)', // apricot
+    'rgba(197,225,165,0.45)', // light green
+    'rgba(179,229,252,0.45)', // light blue
+    'rgba(248,209,215,0.45)', // blush
+    'rgba(204,236,239,0.45)', // pale aqua
+    'rgba(220,210,255,0.45)', // pale violet
+    'rgba(255,214,214,0.45)', // light coral
+    'rgba(255,242,204,0.45)', // cream
+    'rgba(210,245,228,0.45)'  // aqua mint
   ];
 
   const textColorPalette = ['#1890ff', '#722ed1', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#d4380d'];
