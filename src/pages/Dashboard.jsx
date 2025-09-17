@@ -2346,7 +2346,7 @@ const Dashboard = ({ user }) => {
               }}
             >
               <div>{day.title}</div>
-              <div style={{ fontSize: '10px', lineHeight: '12px', whiteSpace: 'nowrap', color: isTodayCol ? '#1677ff' : '#888' }}>{dateForCol}</div>
+              {viewMode === 'instance' && <div style={{ fontSize: '10px', lineHeight: '12px', whiteSpace: 'nowrap', color: isTodayCol ? '#1677ff' : '#888' }}>{dateForCol}</div>}
             </div>
           ),
           dataIndex: day.key,
