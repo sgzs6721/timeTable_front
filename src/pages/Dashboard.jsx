@@ -2273,6 +2273,19 @@ const Dashboard = ({ user }) => {
         return <div style={{ height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />;
       }
       
+      let lastColorInCell = null;
+
+      const paletteSize = colorPalette.length;
+      const nameHash = (s) => {
+        s = String(s || '');
+        let h = 0;
+        for (let i = 0; i < s.length; i++) {
+          h = ((h << 5) - h) + s.charCodeAt(i);
+          h |= 0;
+        }
+        return Math.abs(h);
+      };
+
       return (
         <div style={{
           height: '100%',
@@ -2281,16 +2294,22 @@ const Dashboard = ({ user }) => {
           flexDirection: 'column',
           width: '100%'
         }}>
-          {filtered.map((schedule, idx) => {
-            // 计算相邻避免相近的背景色：与上一块不同且色距最大
-            const prevColor = idx > 0
-              ? (studentBgColorMap.get(filtered[idx - 1].student) || coachBgColorMap.get(filtered[idx - 1].coach))
-              : null;
-            const baseColor = studentBgColorMap.get(schedule.student) || coachBgColorMap.get(schedule.coach);
-            const bgColor = prevColor && baseColor && colorDistance(prevColor, baseColor) < 60
-              ? pickContrastingFromPalette(prevColor)
-              : (baseColor || pickContrastingFromPalette(prevColor));
-            // 在"本周"模式下，实例与固定不一致高亮
+           {filtered.map((schedule, idx) => {
+            // 1) 以学员名哈希为基准给定稳定索引
+            const baseIndex = nameHash(schedule.student) % paletteSize;
+            // 2) 如与上一块冲突，顺序探测寻找下一个不冲突颜色
+            let candidate = baseIndex;
+            let attempts = 0;
+            let candidateColor = colorPalette[candidate];
+            while (attempts < paletteSize && lastColorInCell && (candidateColor === lastColorInCell || colorDistance(candidateColor, lastColorInCell) < 80)) {
+              candidate = (candidate + 1) % paletteSize;
+              candidateColor = colorPalette[candidate];
+              attempts++;
+            }
+            const bgColor = candidateColor;
+            lastColorInCell = bgColor;
+            
+            // 在\"本周\"模式下，实例与固定不一致高亮
             let diffBorder = 'none';
             if (viewMode === 'instance' && schedule.type === 'instance') {
               const weeklySameStudent = (schedules || []).find(x => !!x.sourceIsWeekly && x.student === schedule.student);
@@ -2298,7 +2317,6 @@ const Dashboard = ({ user }) => {
                 diffBorder = '2px solid #fa8c16';
               }
             }
-            
             return (
               <div
                 key={`${schedule.coach}-${schedule.student}-${idx}`}
