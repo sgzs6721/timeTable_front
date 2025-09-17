@@ -2041,6 +2041,46 @@ const Dashboard = ({ user }) => {
       'rgba(255,214,214,0.45)', // light coral
       'rgba(220,210,255,0.45)'  // pale violet
     ];
+
+    // 解析 rgba(...) 或 rgb(...) 为数值数组
+    const parseRgb = (color) => {
+      if (!color) return [0, 0, 0];
+      const m = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+      if (m) {
+        return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+      }
+      // 简单处理 #rrggbb
+      if (color.startsWith('#') && color.length === 7) {
+        return [
+          parseInt(color.slice(1, 3), 16),
+          parseInt(color.slice(3, 5), 16),
+          parseInt(color.slice(5, 7), 16)
+        ];
+      }
+      return [0, 0, 0];
+    };
+
+    const colorDistance = (c1, c2) => {
+      const [r1, g1, b1] = parseRgb(c1);
+      const [r2, g2, b2] = parseRgb(c2);
+      const dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    };
+
+    // 挑选与 prevColor 差异最大的调色板颜色（用于避免相邻相近）
+    const pickContrastingFromPalette = (prevColor) => {
+      if (!prevColor) return colorPalette[0];
+      let best = colorPalette[0];
+      let bestDist = -1;
+      for (const c of colorPalette) {
+        const d = colorDistance(prevColor, c);
+        if (d > bestDist) {
+          bestDist = d;
+          best = c;
+        }
+      }
+      return best;
+    };
     
     useEffect(() => {
       fetchWeeklyScheduleData('instance'); // 明确指定初始加载为本周模式
@@ -2242,6 +2282,14 @@ const Dashboard = ({ user }) => {
           width: '100%'
         }}>
           {filtered.map((schedule, idx) => {
+            // 计算相邻避免相近的背景色：与上一块不同且色距最大
+            const prevColor = idx > 0
+              ? (studentBgColorMap.get(filtered[idx - 1].student) || coachBgColorMap.get(filtered[idx - 1].coach))
+              : null;
+            const baseColor = studentBgColorMap.get(schedule.student) || coachBgColorMap.get(schedule.coach);
+            const bgColor = prevColor && baseColor && colorDistance(prevColor, baseColor) < 60
+              ? pickContrastingFromPalette(prevColor)
+              : (baseColor || pickContrastingFromPalette(prevColor));
             // 在"本周"模式下，实例与固定不一致高亮
             let diffBorder = 'none';
             if (viewMode === 'instance' && schedule.type === 'instance') {
@@ -2255,14 +2303,14 @@ const Dashboard = ({ user }) => {
               <div
                 key={`${schedule.coach}-${schedule.student}-${idx}`}
                 style={{
-                  backgroundColor: studentBgColorMap.get(schedule.student) || coachBgColorMap.get(schedule.coach) || 'transparent',
+                  backgroundColor: bgColor || 'transparent',
                   flex: 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#000',
                   fontSize: '12px',
-                  fontWeight: 600,
+                   fontWeight: 400,
                   wordBreak: 'break-word',
                   lineHeight: '1.2',
                   /* 让每个学员块铺满其等分区域，不留缝隙 */
