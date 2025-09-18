@@ -2839,7 +2839,7 @@ const ViewTimetable = ({ user }) => {
             const emptyCellStyle = {
               height: '48px',
               cursor: 'pointer',
-              border: templateScheduleExists ? '1px dashed #ff4d4f' : undefined,
+              border: templateScheduleExists ? '2px dashed #ff4d4f' : undefined,
             };
 
             const handleCellClick = (e) => {
@@ -3597,24 +3597,34 @@ const ViewTimetable = ({ user }) => {
                 <>
                   {/* 图例说明 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <div style={{ 
-                      width: '12px', 
-                      height: '12px', 
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
                       border: '2px solid #52c41a',
                       borderRadius: '2px',
                       backgroundColor: 'transparent'
                     }}></div>
-                    <span>本周新增课程</span>
+                    <span>新增</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <div style={{ 
-                      width: '12px', 
-                      height: '12px', 
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
                       border: '2px solid #faad14',
                       borderRadius: '2px',
                       backgroundColor: 'transparent'
                     }}></div>
-                    <span>本周修改课程</span>
+                    <span>修改</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
+                      border: '2px dashed #ff4d4f',
+                      borderRadius: '2px',
+                      backgroundColor: 'transparent'
+                    }}></div>
+                    <span>取消</span>
                   </div>
                 </>
               ) : null}
