@@ -339,6 +339,8 @@ const ViewTimetable = ({ user }) => {
   const [tempViewMode, setTempViewMode] = useState(null);
   const [tempWeeklyStats, setTempWeeklyStats] = useState(null);
 
+  
+
   const availableSlotsTitle = useMemo(() => {
     if (viewMode === 'template') {
       return '固定可排课时段';
@@ -2581,6 +2583,47 @@ const ViewTimetable = ({ user }) => {
     return allSchedules || [];
   }, [allSchedules]);
 
+  const legendStats = useMemo(() => {
+    if (viewMode !== 'instance' || !timetable?.isWeekly) {
+      return null;
+    }
+
+    const stats = {
+      added: 0,
+      modified: 0,
+      cancelled: 0,
+    };
+
+    const toKey = (s) => `${s.dayOfWeek.toUpperCase()}|${s.startTime.slice(0, 5)}|${s.endTime.slice(0, 5)}`;
+    const templateMap = new Map(templateSchedules.map(s => [toKey(s), s]));
+    const instanceMap = new Map(allSchedules.map(s => [toKey(s), s]));
+
+    // 计算新增和已修改
+    for (const [key, instanceSchedule] of instanceMap.entries()) {
+      const templateSchedule = templateMap.get(key);
+      if (!templateSchedule) {
+        stats.added++;
+      } else {
+        const isContentSame =
+          (templateSchedule.studentName || '') === (instanceSchedule.studentName || '') &&
+          (templateSchedule.subject || '') === (instanceSchedule.subject || '') &&
+          (templateSchedule.note || '') === (instanceSchedule.note || '');
+        if (!isContentSame) {
+          stats.modified++;
+        }
+      }
+    }
+
+    // 计算已取消
+    for (const [key, templateSchedule] of templateMap.entries()) {
+      if (!instanceMap.has(key)) {
+        stats.cancelled++;
+      }
+    }
+
+    return stats;
+  }, [allSchedules, templateSchedules, viewMode, timetable?.isWeekly]);
+
   // 计算一周总课时数和节数
   const weeklyStats = useMemo(() => {
     // 根据当前视图模式选择数据源
@@ -3604,7 +3647,7 @@ const ViewTimetable = ({ user }) => {
                       borderRadius: '2px',
                       backgroundColor: 'transparent'
                     }}></div>
-                    <span>新增</span>
+                    <span>新增 {legendStats ? `(${legendStats.added})` : ''}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{
@@ -3614,7 +3657,7 @@ const ViewTimetable = ({ user }) => {
                       borderRadius: '2px',
                       backgroundColor: 'transparent'
                     }}></div>
-                    <span>修改</span>
+                    <span>修改 {legendStats ? `(${legendStats.modified})` : ''}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{
@@ -3624,7 +3667,7 @@ const ViewTimetable = ({ user }) => {
                       borderRadius: '2px',
                       backgroundColor: 'transparent'
                     }}></div>
-                    <span>取消</span>
+                    <span>取消 {legendStats ? `(${legendStats.cancelled})` : ''}</span>
                   </div>
                 </>
               ) : null}
