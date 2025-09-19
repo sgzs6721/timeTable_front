@@ -45,6 +45,11 @@ export const getCurrentWeekInstance = (timetableId) => {
   return api.get(`/weekly-instances/current/${timetableId}`);
 };
 
+// 获取指定课表的当前周实例（包含请假课程）
+export const getCurrentWeekInstanceIncludingLeaves = (timetableId) => {
+  return api.get(`/weekly-instances/current/${timetableId}/including-leaves`);
+};
+
 // 获取指定课表的所有周实例
 export const getWeeklyInstances = (timetableId) => {
   return api.get(`/weekly-instances/list/${timetableId}`);
@@ -107,4 +112,17 @@ export const generateNextWeekInstance = (timetableId) => {
 // 批量删除周实例中的课程
 export const deleteInstanceSchedulesBatch = (scheduleIds) => {
   return api.delete('/weekly-instances/schedules/batch', { data: scheduleIds });
+};
+
+// 学生请假
+export const requestLeave = (scheduleId, leaveReason) => {
+  return api.post('/weekly-instances/schedules/leave', {
+    scheduleId,
+    leaveReason
+  });
+};
+
+// 取消请假
+export const cancelLeave = (scheduleId) => {
+  return api.post(`/weekly-instances/schedules/cancel-leave/${scheduleId}`);
 };

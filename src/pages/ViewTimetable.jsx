@@ -7,6 +7,7 @@ import { invalidateWeeklyTemplatesCache, getInstanceSchedulesByDate } from '../s
 import { getThisWeekSchedulesSessionOnce } from '../services/timetable';
 import { 
   getCurrentWeekInstance, 
+  getCurrentWeekInstanceIncludingLeaves,
   generateCurrentWeekInstance, 
   checkCurrentWeekInstance,
   clearCurrentWeekInstanceSchedules,
@@ -20,7 +21,9 @@ import {
   generateNextWeekInstance,
   switchToWeekInstance,
   getInstanceSchedules,
-  getWeeklyInstances
+  getWeeklyInstances,
+  requestLeave,
+  cancelLeave
 } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -31,6 +34,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import html2canvas from 'html2canvas';
 import EditScheduleModal from '../components/EditScheduleModal';
+import LeaveRequestModal from '../components/LeaveRequestModal';
 import { isWeChatBrowser } from '../utils/browserDetect';
 import './ViewTimetable.css';
 
@@ -54,8 +58,12 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, onMove, onCopy, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCopy, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule }) => {
   const [name, setName] = React.useState(schedule.studentName);
+  const [showAllInfo, setShowAllInfo] = React.useState(false);
+  const [showLeaveForm, setShowLeaveForm] = React.useState(false);
+  const [leaveReason, setLeaveReason] = React.useState('');
+  const [leaveSubmitting, setLeaveSubmitting] = React.useState(false);
   const isNameChanged = name !== schedule.studentName;
 
   // 获取对应的固定课表模板内容
@@ -81,7 +89,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
 
 
   return (
-    <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '280px', display: 'flex', flexDirection: 'column' }}>
       {/* 时间信息和关闭图标在同一行 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <div style={{ fontSize: '12px', color: '#666' }}>
@@ -150,15 +158,31 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
         <Button
           type="primary"
           size="small"
-          onClick={() => onExport(schedule.studentName)}
+          onClick={() => { setShowAllInfo(!showAllInfo); setShowLeaveForm(false); }}
           style={{ 
             flex: 1,
             backgroundColor: '#52c41a',
             borderColor: '#52c41a'
           }}
         >
-          全部
+          {showAllInfo ? '收起' : '全部'}
         </Button>
+        {/* 实例课表模式下显示请假按钮 */}
+        {!isArchived && viewMode === 'instance' && (
+          <Button
+            type="default"
+            size="small"
+            onClick={() => { setShowLeaveForm(!showLeaveForm); setShowAllInfo(false); }}
+            style={{
+              flex: 1,
+              backgroundColor: '#fa8c16',
+              borderColor: '#fa8c16',
+              color: 'white'
+            }}
+          >
+            {showLeaveForm ? '收起' : '请假'}
+          </Button>
+        )}
         {!isArchived && (
           <>
             <Button
@@ -205,6 +229,142 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onExport, on
           </>
         )}
       </div>
+
+      {/* 全部信息显示区域 - 显示该学员本周所有课程 */}
+      {showAllInfo && (
+        <div style={{ 
+          marginTop: '12px', 
+          padding: '8px', 
+          backgroundColor: '#f5f5f5', 
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#666'
+        }}>
+          <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+            {schedule.studentName} 本周课程安排：
+          </div>
+          {(() => {
+            // 获取该学员本周的所有课程
+            const studentSchedules = allSchedules.filter(s => s.studentName === schedule.studentName);
+            
+            if (studentSchedules.length === 0) {
+              return <div style={{ color: '#999' }}>暂无其他课程</div>;
+            }
+            
+            return studentSchedules.map((studentSchedule, index) => (
+              <div key={studentSchedule.id || index} style={{ 
+                marginBottom: '4px', 
+                padding: '4px', 
+                backgroundColor: 'white', 
+                borderRadius: '2px',
+                border: studentSchedule.id === schedule.id ? '1px solid #1890ff' : '1px solid #e8e8e8'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <strong>星期{dayMap[studentSchedule.dayOfWeek?.toUpperCase()] || studentSchedule.dayOfWeek}</strong>
+                    <span style={{ marginLeft: '8px' }}>
+                      {studentSchedule.startTime?.substring(0, 5)}~{studentSchedule.endTime?.substring(0, 5)}
+                    </span>
+                  </div>
+                  {studentSchedule.id === schedule.id && (
+                    <span style={{ 
+                      fontSize: '10px', 
+                      color: '#1890ff', 
+                      backgroundColor: '#e6f7ff', 
+                      padding: '1px 4px', 
+                      borderRadius: '2px' 
+                    }}>
+                      当前
+                    </span>
+                  )}
+                </div>
+                {studentSchedule.subject && (
+                  <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                    科目：{studentSchedule.subject}
+                  </div>
+                )}
+                {studentSchedule.note && (
+                  <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                    备注：{studentSchedule.note}
+                  </div>
+                )}
+              </div>
+            ));
+          })()}
+        </div>
+      )}
+
+      {/* 请假内嵌表单 */}
+      {showLeaveForm && (
+        <div style={{
+          marginTop: '12px',
+          padding: '8px',
+          backgroundColor: '#fff7e6',
+          border: '1px solid #ffd591',
+          borderRadius: '4px'
+        }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <input
+              value={leaveReason}
+              onChange={(e) => setLeaveReason(e.target.value)}
+              placeholder="请输入请假原因（选填）"
+              style={{ flex: 1, height: 30, padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 4 }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+            <button
+              disabled={leaveSubmitting}
+              onClick={async () => {
+                try {
+                  setLeaveSubmitting(true);
+                  const resp = await requestLeave(schedule.id, leaveReason);
+                  if (resp && resp.success) {
+                    if (onRemoveSchedule) onRemoveSchedule(schedule.id);
+                    if (onClose) onClose();
+                    setShowLeaveForm(false);
+                    message.success('请假申请成功');
+                  } else {
+                    message.error(resp?.message || '请假申请失败');
+                  }
+                } catch (e) {
+                  message.error('请假申请失败');
+                } finally {
+                  setLeaveSubmitting(false);
+                }
+              }}
+              style={{
+                backgroundColor: '#fa8c16',
+                color: '#fff',
+                border: 'none',
+                padding: '0 12px',
+                borderRadius: 4,
+                height: 30,
+                cursor: 'pointer',
+                flex: 1
+              }}
+            >
+              {leaveSubmitting ? '提交中...' : '确认'}
+            </button>
+            <button
+              disabled={leaveSubmitting}
+              onClick={() => setShowLeaveForm(false)}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#595959',
+                border: '1px solid #d9d9d9',
+                padding: '0 12px',
+                borderRadius: 4,
+                height: 30,
+                cursor: 'pointer',
+                flex: 1
+              }}
+            >
+              取消
+            </button>
+          </div>
+          <div style={{ fontSize: '11px', color: '#8c8c8c' }}>请假后该课程将从课表中移除</div>
+        </div>
+      )}
     </div>
   );
 };
@@ -282,6 +442,11 @@ const ViewTimetable = ({ user }) => {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [exportContent, setExportContent] = useState('');
   const [exportingStudentName, setExportingStudentName] = useState('');
+
+  // 请假相关状态
+  const [leaveModalVisible, setLeaveModalVisible] = useState(false);
+  const [leaveSchedule, setLeaveSchedule] = useState(null);
+  const [leaveLoading, setLeaveLoading] = useState(false);
 
   // 防抖/竞态控制：视图切换时只接受最后一次请求结果
   const latestRequestIdRef = useRef(0);
@@ -740,7 +905,7 @@ const ViewTimetable = ({ user }) => {
     return '本周';
   }, [viewMode, currentWeekInstance]);
 
-  const handleShowDayCourses = (day, dayIndex) => {
+  const handleShowDayCourses = async (day, dayIndex) => {
     let schedulesForDay = [];
     let modalTitle = '';
     let targetDate = null;
@@ -752,7 +917,20 @@ const ViewTimetable = ({ user }) => {
         const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
         targetDate = instanceStartDate.add(dayIndex, 'day');
         const dateStr = targetDate.format('YYYY-MM-DD');
-        schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+        
+        // 获取包含请假课程的完整数据
+        try {
+          const response = await getCurrentWeekInstanceIncludingLeaves(timetable.id);
+          if (response && response.success && response.data && response.data.schedules) {
+            schedulesForDay = response.data.schedules.filter(s => s.scheduleDate === dateStr);
+          } else {
+            schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+          }
+        } catch (error) {
+          console.error('获取包含请假课程的数据失败:', error);
+          schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+        }
+        
         modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
       } else {
         // 模板视图或没有当前周实例：显示固定课表模板的课程
@@ -801,7 +979,7 @@ const ViewTimetable = ({ user }) => {
       return {
         key: index,
         time: slot.displayTime,
-        studentName: schedule ? schedule.studentName : '',
+        studentName: schedule ? (schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName) : '',
         schedule: schedule || null,
       };
     });
@@ -889,7 +1067,8 @@ const ViewTimetable = ({ user }) => {
     const courseList = schedules.map(schedule => {
         const startHour = parseInt(schedule.startTime.substring(0, 2));
         const endHour = startHour + 1;
-        return `${startHour}-${endHour} ${schedule.studentName}`;
+        const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
+        return `${startHour}-${endHour} ${studentName}`;
     }).join('\n');
 
     let result = `${title}\n${coachName}：\n${courseList}`;
@@ -908,7 +1087,8 @@ const ViewTimetable = ({ user }) => {
           .map(schedule => {
             const startHour = parseInt(schedule.startTime.substring(0, 2));
             const endHour = startHour + 1;
-            return `${startHour}-${endHour} ${schedule.studentName}`;
+            const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
+            return `${startHour}-${endHour} ${studentName}`;
           }).join('\n');
         result += `\n${otherCourseList}`;
       });
@@ -1697,6 +1877,44 @@ const ViewTimetable = ({ user }) => {
     } finally {
       setDeleteLoading(false);
     }
+  };
+
+  // 处理请假申请
+  const handleLeaveRequest = (schedule) => {
+    setLeaveSchedule(schedule);
+    setLeaveModalVisible(true);
+  };
+
+  // 确认请假申请
+  const handleConfirmLeave = async (leaveReason) => {
+    if (!leaveSchedule) return;
+    
+    setLeaveLoading(true);
+    try {
+      const response = await requestLeave(leaveSchedule.id, leaveReason);
+      if (response.success) {
+        setLeaveModalVisible(false);
+        setLeaveSchedule(null);
+        setOpenPopoverKey(null);
+        
+        // 从课表中移除该课程（类似删除效果）
+        setAllSchedules(prev => prev.filter(schedule => schedule.id !== leaveSchedule.id));
+        
+        message.success('请假申请成功');
+      } else {
+        message.error(response.message || '请假申请失败');
+      }
+    } catch (error) {
+      message.error('请假申请失败，请重试');
+    } finally {
+      setLeaveLoading(false);
+    }
+  };
+
+  // 取消请假申请
+  const handleCancelLeave = () => {
+    setLeaveModalVisible(false);
+    setLeaveSchedule(null);
   };
 
   // 更新学生姓名
@@ -2696,9 +2914,9 @@ const ViewTimetable = ({ user }) => {
   const isInitialLoading = !timetable;
   
   // 在切换过程中使用临时数据，否则使用当前数据
-  const displaySchedules = (switchToInstanceLoading || switchToTemplateLoading) && tempSchedules.length > 0 
+  const displaySchedules = ((switchToInstanceLoading || switchToTemplateLoading) && tempSchedules.length > 0 
     ? tempSchedules 
-    : allSchedules;
+    : allSchedules).filter(s => !s.isOnLeave);
   
   const displayViewMode = (switchToInstanceLoading || switchToTemplateLoading) && tempViewMode 
     ? tempViewMode 
@@ -3134,7 +3352,6 @@ const ViewTimetable = ({ user }) => {
                     schedule={student}
                     onDelete={() => handleDeleteSchedule(student.id)}
                     onUpdateName={(newName) => handleSaveStudentName(student, newName)}
-                    onExport={handleExportStudentSchedule}
                     onMove={handleStartMove}
                     onCopy={handleStartCopy}
                     timetable={timetable}
@@ -3144,6 +3361,11 @@ const ViewTimetable = ({ user }) => {
                     updateLoading={updateLoading}
                     templateSchedules={templateSchedules}
                     viewMode={viewMode}
+                    allSchedules={allSchedules}
+                    onRemoveSchedule={(id)=>{
+                      // 内嵌请假成功后，从当前列表移除
+                      setAllSchedules(prev=>prev.filter(s=>s.id!==id));
+                    }}
                   />
                   {idx < schedules.length - 1 && <hr style={{ margin: '8px 0' }} />}
                 </div>
@@ -4195,6 +4417,14 @@ const ViewTimetable = ({ user }) => {
         />
       )}
 
+      {/* 请假申请弹窗 */}
+      <LeaveRequestModal
+        visible={leaveModalVisible}
+        schedule={leaveSchedule}
+        onCancel={handleCancelLeave}
+        onOk={handleConfirmLeave}
+      />
+
       {/* 批量排课模态框 */}
       <Modal
         title="批量排课"
@@ -4366,10 +4596,10 @@ const ViewTimetable = ({ user }) => {
                               marginLeft: '8px'
                             }}>
                               <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
-                                {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
+                                {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].isOnLeave ? `${lineItems[0].studentName}（请假）` : lineItems[0].studentName}` : ''}
                               </span>
                               <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
-                                {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
+                                {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].isOnLeave ? `${lineItems[1].studentName}（请假）` : lineItems[1].studentName}` : ''}
                               </span>
                             </div>
                           ));

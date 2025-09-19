@@ -2525,6 +2525,7 @@ const Dashboard = ({ user }) => {
 
     // 额外拉取今日活动课表的课程，用于显示学员+时间（后端统计缺少明细时兜底）
     const [todayCoachDetails, setTodayCoachDetails] = useState({});
+    const [todayCoachLeaves, setTodayCoachLeaves] = useState({});
 
     // 统一教练颜色（高区分度深色，按教练列表顺序分配，避免重复）
     const coachPalette = ['#dc2626', '#38bdf8', '#059669', '#7c3aed'];
@@ -2585,7 +2586,10 @@ const Dashboard = ({ user }) => {
                 const timeB = hhmm(b.startTime);
                 return timeA.localeCompare(timeB);
               });
-              const items = sortedSchedules.map(s => `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`);
+                const items = sortedSchedules.map(s => {
+                  const base = `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`;
+                  return s.isOnLeave ? `${base}（请假）` : base;
+                });
               if (items.length > 0) {
                 map[owner] = items;
               }
@@ -2619,8 +2623,11 @@ const Dashboard = ({ user }) => {
                       const timeB = hhmm(b.startTime);
                       return timeA.localeCompare(timeB);
                     });
-                    const items2 = sortedSchedules2.map(s => `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`);
-                    if (items2.length > 0) map2[owner2] = items2;
+                  const items2 = sortedSchedules2.map(s => {
+                    const base2 = `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`;
+                    return s.isOnLeave ? `${base2}（请假）` : base2;
+                  });
+                  if (items2.length > 0) map2[owner2] = items2;
                   });
                   setTodayCoachDetails(map2);
                 }
@@ -2689,7 +2696,10 @@ const Dashboard = ({ user }) => {
                       const timeB = hhmm(b.startTime);
                       return timeA.localeCompare(timeB);
                     });
-                    const items2 = sortedSchedules2.map(s => `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`);
+                    const items2 = sortedSchedules2.map(s => {
+                      const base2 = `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`;
+                      return s.isOnLeave ? `${base2} 请假` : base2;
+                    });
                     if (items2.length > 0) map2[owner2] = items2;
                   });
                   setTomorrowCoachDetails(map2);
@@ -2804,8 +2814,8 @@ const Dashboard = ({ user }) => {
                 {dayTab==='today' ? '今日有课教练' : '明日有课教练'} 
                 <span style={{ color: '#1890ff', fontWeight: 500 }}>{
                   dayTab==='today'
-                    ? Object.keys(todayCoachDetails).length
-                    : Object.keys(tomorrowCoachDetails).length
+                    ? Object.entries(todayCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length
+                    : Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length
                 }</span>
                 <span style={{ color: '#999' }}>/{coaches?.length || 0}</span>
               </span>
@@ -2813,7 +2823,7 @@ const Dashboard = ({ user }) => {
           }
         >
           <Spin spinning={coachDetailsLoading || statisticsLoading}>
-          {(dayTab==='today' ? Object.keys(todayCoachDetails).length === 0 : Object.keys(tomorrowCoachDetails).length === 0) ? (
+          {(dayTab==='today' ? Object.entries(todayCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0 : Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0) ? (
             <div style={{ color: '#999' }}>{dayTab==='today' ? '今日' : '明日'}暂无课程</div>
           ) : (
             (dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails))
@@ -2864,7 +2874,9 @@ const Dashboard = ({ user }) => {
                       >
                         {coachName}
                       </span>
-                      <span style={{ color: '#52c41a', fontWeight: 500, fontSize: 12, marginTop: 4, lineHeight: '1.2' }}>{detailItems.length}课时</span>
+                      <span style={{ color: '#52c41a', fontWeight: 500, fontSize: 12, marginTop: 4, lineHeight: '1.2' }}>
+                        {detailItems.filter(item => !item.includes('（请假）')).length}课时
+                      </span>
                     </div>
                   </div>
                   {/* 第二列和第三列：学员数据 - 占2/3 */}
@@ -3063,6 +3075,20 @@ const Dashboard = ({ user }) => {
                   }
                 },
                 {
+                  title: '今日请假',
+                  key: 'todayLeaves',
+                  align: 'center',
+                  sorter: (a, b) => (a.todayLeaves || 0) - (b.todayLeaves || 0),
+                  render: (_, record) => {
+                    const value = record.todayLeaves ?? 0;
+                    return (
+                      <span style={{ color: value > 0 ? '#fa8c16' : '#999', fontWeight: 500 }}>
+                        {value}
+                      </span>
+                    );
+                  }
+                },
+                {
                   title: '本周课程',
                   dataIndex: 'weeklyCourses',
                   key: 'weeklyCourses',
@@ -3077,22 +3103,16 @@ const Dashboard = ({ user }) => {
                   )
                 },
                 {
-                  title: '本月课程',
-                  key: 'monthlyCourses',
+                  title: '上月课程',
+                  dataIndex: 'lastMonthCourses',
+                  key: 'lastMonthCourses',
                   align: 'center',
-                  sorter: (a, b) => {
-                    // 这里需要后端提供本月课程数据，暂时使用本周数据作为占位
-                    return (a.weeklyCourses * 4) - (b.weeklyCourses * 4);
-                  },
-                  render: (_, record) => {
-                    // 暂时使用本周数据 * 4 作为估算值，后续需要后端提供真实数据
-                    const value = record.weeklyCourses * 4;
-                    return (
-                      <span style={{ color: '#722ed1', fontWeight: 500 }}>
-                        {value}
-                      </span>
-                    );
-                  }
+                  sorter: (a, b) => (a.lastMonthCourses || 0) - (b.lastMonthCourses || 0),
+                  render: (value) => (
+                    <span style={{ color: '#722ed1', fontWeight: 500 }}>
+                      {value ?? 0}
+                    </span>
+                  )
                 }
               ]}
               pagination={false}
