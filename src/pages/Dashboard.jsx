@@ -5,10 +5,146 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce } from '../services/timetable';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule, getLeaveRecords, deleteLeaveRecordsBatch } from '../services/weeklyInstance';
 import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables } from '../services/admin';
+import { getAllStudents } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
+import StudentDetailModal from '../components/StudentDetailModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
+
+// 我的学员组件 - 提取到Dashboard组件外部
+const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showAllStudents, setShowAllStudents] = useState(false);
+
+  const fetchStudents = React.useCallback(async (showAll = false) => {
+    setLoading(true);
+    try {
+      const response = await getAllStudents(showAll);
+      if (response && response.success) {
+        setStudents(response.data || []);
+      } else {
+        message.error('获取学员列表失败');
+      }
+    } catch (error) {
+      console.error('获取学员列表失败:', error);
+      message.error('获取学员列表失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStudents(showAllStudents);
+  }, [showAllStudents, fetchStudents]);
+
+  const handleStudentClick = React.useCallback((studentName) => {
+    onStudentClick(studentName);
+  }, [onStudentClick]);
+
+  const handleCheckboxChange = React.useCallback((e) => {
+    setShowAllStudents(e.target.checked);
+  }, []);
+
+  // 生成学员头像颜色的函数
+  const getStudentAvatarColor = (studentName) => {
+    const colors = [
+      '#1890ff', '#52c41a', '#fa8c16', '#f5222d', '#722ed1',
+      '#13c2c2', '#eb2f96', '#faad14', '#a0d911', '#2f54eb',
+      '#f759ab', '#36cfc9', '#ff7875', '#ffa940', '#b37feb'
+    ];
+    // 使用学员名字的哈希值来确保相同名字总是得到相同颜色
+    let hash = 0;
+    for (let i = 0; i < studentName.length; i++) {
+      hash = ((hash << 5) - hash + studentName.charCodeAt(i)) & 0xffffffff;
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  return (
+    <Card 
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>我的学员</span>
+          {showAllCheckbox && (
+            <Checkbox 
+              checked={showAllStudents}
+              onChange={handleCheckboxChange}
+              style={{ marginLeft: '16px' }}
+            >
+              全部
+            </Checkbox>
+          )}
+        </div>
+      } 
+      size="small"
+    >
+      <Spin spinning={loading}>
+        {students.length === 0 ? (
+          <Empty description="暂无学员" />
+        ) : (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(4, 1fr)', 
+            gap: '16px',
+            padding: '16px 0'
+          }}>
+            {students.map((studentName, index) => (
+              <div
+                key={studentName}
+                style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  padding: '16px 12px',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  border: '1px solid #f0f0f0',
+                  backgroundColor: '#fafafa',
+                  transition: 'all 0.3s ease',
+                  ':hover': {
+                    backgroundColor: '#f5f5f5',
+                    borderColor: '#d9d9d9'
+                  }
+                }}
+                onClick={() => handleStudentClick(studentName)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  e.currentTarget.style.borderColor = '#d9d9d9';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#fafafa';
+                  e.currentTarget.style.borderColor = '#f0f0f0';
+                }}
+              >
+                <Avatar 
+                  size={48}
+                  style={{ 
+                    backgroundColor: getStudentAvatarColor(studentName),
+                    marginBottom: '8px',
+                    fontSize: '18px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {studentName.charAt(0)}
+                </Avatar>
+                <span style={{ 
+                  fontWeight: 500, 
+                  fontSize: '14px',
+                  textAlign: 'center',
+                  wordBreak: 'break-all'
+                }}>
+                  {studentName}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Spin>
+    </Card>
+  );
+};
 
 // 新增的组件，用于添加新课程
 const NewSchedulePopoverContent = ({ onAdd, onCancel, loading }) => {
@@ -170,6 +306,11 @@ const Dashboard = ({ user }) => {
   const [todaysSchedulesForCopy, setTodaysSchedulesForCopy] = useState([]);
   const [tomorrowsCoursesData, setTomorrowsCoursesData] = useState([]);
   const [tomorrowsSchedulesForCopy, setTomorrowsSchedulesForCopy] = useState([]);
+  
+  // 学员详情模态框相关状态
+  const [studentDetailVisible, setStudentDetailVisible] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedCoach, setSelectedCoach] = useState(null);
   const [modalSubTitleTomorrow, setModalSubTitleTomorrow] = useState('');
   const [studentColorMap, setStudentColorMap] = useState({});
 
@@ -991,25 +1132,47 @@ const Dashboard = ({ user }) => {
 
       // 获取其他教练的今日课程数据
       setLoadingOtherCoachesToday(true);
-      getTodaySchedulesOnce(activeTimetableId)
-        .then(response => { if (response && response.success) setOtherCoachesDataToday(response.data); })
-        .catch(error => {
-          console.error('获取其他教练今日课程失败:', error);
-        })
-        .finally(() => {
-          setLoadingOtherCoachesToday(false);
-        });
+      try {
+        const todayDate = dayjs().format('YYYY-MM-DD');
+        const todayResponse = await getInstanceSchedulesByDate(todayDate);
+        if (todayResponse && todayResponse.success) {
+          // 过滤掉当前课表的数据，只保留其他教练的数据
+          const otherCoachesData = todayResponse.data.timetableSchedules?.filter(
+            item => item.timetableId !== timetable.id
+          ) || [];
+          setOtherCoachesDataToday({ timetables: otherCoachesData });
+        } else {
+          console.warn('获取其他教练今日课程失败:', todayResponse?.error || '未知错误');
+          setOtherCoachesDataToday(null);
+        }
+      } catch (error) {
+        console.error('获取其他教练今日课程失败:', error);
+        setOtherCoachesDataToday(null);
+      } finally {
+        setLoadingOtherCoachesToday(false);
+      }
 
       // 获取其他教练的明日课程数据
       setLoadingOtherCoachesTomorrow(true);
-      getTomorrowSchedulesOnce(activeTimetableId)
-        .then(response => { if (response && response.success) setOtherCoachesDataTomorrow(response.data); })
-        .catch(error => {
-          console.error('获取其他教练明日课程失败:', error);
-        })
-        .finally(() => {
-          setLoadingOtherCoachesTomorrow(false);
-        });
+      try {
+        const tomorrowDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
+        const tomorrowResponse = await getInstanceSchedulesByDate(tomorrowDate);
+        if (tomorrowResponse && tomorrowResponse.success) {
+          // 过滤掉当前课表的数据，只保留其他教练的数据
+          const otherCoachesData = tomorrowResponse.data.timetableSchedules?.filter(
+            item => item.timetableId !== timetable.id
+          ) || [];
+          setOtherCoachesDataTomorrow({ timetables: otherCoachesData });
+        } else {
+          console.warn('获取其他教练明日课程失败:', tomorrowResponse?.error || '未知错误');
+          setOtherCoachesDataTomorrow(null);
+        }
+      } catch (error) {
+        console.error('获取其他教练明日课程失败:', error);
+        setOtherCoachesDataTomorrow(null);
+      } finally {
+        setLoadingOtherCoachesTomorrow(false);
+      }
 
     } catch (error) {
       message.error('查询失败，请检查网络连接');
@@ -2599,6 +2762,13 @@ const Dashboard = ({ user }) => {
       });
     };
 
+    // 点击学员名字显示详情
+    const handleStudentClick = (studentName, coachName) => {
+      setSelectedStudent(studentName);
+      setSelectedCoach(coachName);
+      setStudentDetailVisible(true);
+    };
+
     // 额外拉取今日活动课表的课程，用于显示学员+时间（后端统计缺少明细时兜底）
     const [todayCoachDetails, setTodayCoachDetails] = useState({});
     const [todayCoachLeaves, setTodayCoachLeaves] = useState({});
@@ -2649,6 +2819,10 @@ const Dashboard = ({ user }) => {
               const seen = new Set();
               
               schedules.forEach(s => {
+                // 过滤掉请假学员，不显示在今日课程中
+                if (s.isOnLeave) {
+                  return;
+                }
                 const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                 if (!seen.has(key)) {
                   seen.add(key);
@@ -2664,7 +2838,7 @@ const Dashboard = ({ user }) => {
               });
                 const items = sortedSchedules.map(s => {
                   const base = `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`;
-                  return s.isOnLeave ? `${base}（请假）` : base;
+                  return base;
                 });
               if (items.length > 0) {
                 map[owner] = items;
@@ -2686,6 +2860,10 @@ const Dashboard = ({ user }) => {
                     const seen2 = new Set();
                     
                     schedules2.forEach(s => {
+                      // 过滤掉请假学员，不显示在今日课程中
+                      if (s.isOnLeave) {
+                        return;
+                      }
                       const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                       if (!seen2.has(key)) {
                         seen2.add(key);
@@ -2701,7 +2879,7 @@ const Dashboard = ({ user }) => {
                     });
                   const items2 = sortedSchedules2.map(s => {
                     const base2 = `${hhmm(s.startTime)}-${hhmm(s.endTime)} ${normalizeName(s.studentName)}`;
-                    return s.isOnLeave ? `${base2}（请假）` : base2;
+                    return base2;
                   });
                   if (items2.length > 0) map2[owner2] = items2;
                   });
@@ -2908,7 +3086,7 @@ const Dashboard = ({ user }) => {
           {dayTab === 'leave' ? (
             // 请假记录显示
             leaveRecords.length === 0 ? (
-              <div style={{ color: '#999' }}>暂无请假记录</div>
+              <div style={{ color: '#999', paddingTop: '16px' }}>暂无请假记录</div>
             ) : (
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                 {(() => {
@@ -3046,7 +3224,15 @@ const Dashboard = ({ user }) => {
                                           }}>
                                             {studentLeaveCount[record.studentName]}次
                                           </div>
-                                          <span style={{ fontWeight: 'bold', color: '#333' }}>
+                                          <span 
+                                            style={{ 
+                                              fontWeight: 'bold', 
+                                              color: '#1890ff',
+                                              cursor: 'pointer',
+                                              textDecoration: 'underline'
+                                            }}
+                                            onClick={() => handleStudentClick(record.studentName, selectedCoachTab)}
+                                          >
                                             {record.studentName}
                                           </span>
                                           {record.leaveReason && (
@@ -3252,20 +3438,25 @@ const Dashboard = ({ user }) => {
                             }}>
                               {lineItems[0]?.time || ''}
                             </span>
-                            <span style={{ 
-                              minWidth: '36px',
-                              textAlign: 'left',
-                              fontFamily: 'monospace',
-                              color: lineItems[0] ? (() => {
-                                // 根据学员名字生成不同颜色
-                                const colors = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#722ed1', '#f5222d'];
-                                const hash = lineItems[0].name.split('').reduce((a, b) => {
-                                  a = ((a << 5) - a) + b.charCodeAt(0);
-                                  return a & a;
-                                }, 0);
-                                return colors[Math.abs(hash) % colors.length];
-                              })() : 'transparent'
-                            }}>
+                            <span 
+                              style={{ 
+                                minWidth: '36px',
+                                textAlign: 'left',
+                                fontFamily: 'monospace',
+                                color: lineItems[0] ? (() => {
+                                  // 根据学员名字生成不同颜色
+                                  const colors = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#722ed1', '#f5222d'];
+                                  const hash = lineItems[0].name.split('').reduce((a, b) => {
+                                    a = ((a << 5) - a) + b.charCodeAt(0);
+                                    return a & a;
+                                  }, 0);
+                                  return colors[Math.abs(hash) % colors.length];
+                                })() : 'transparent',
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                              onClick={() => handleStudentClick(lineItems[0].name, coachName)}
+                            >
                               {lineItems[0] ? (lineItems[0].name.length === 2 ? lineItems[0].name.split('').join('　') : lineItems[0].name) : ''}
                             </span>
                           </div>
@@ -3283,20 +3474,25 @@ const Dashboard = ({ user }) => {
                             }}>
                               {lineItems[1]?.time || ''}
                             </span>
-                            <span style={{ 
-                              minWidth: '36px',
-                              textAlign: 'left',
-                              fontFamily: 'monospace',
-                              color: lineItems[1] ? (() => {
-                                // 根据学员名字生成不同颜色
-                                const colors = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#722ed1', '#f5222d'];
-                                const hash = lineItems[1].name.split('').reduce((a, b) => {
-                                  a = ((a << 5) - a) + b.charCodeAt(0);
-                                  return a & a;
-                                }, 0);
-                                return colors[Math.abs(hash) % colors.length];
-                              })() : 'transparent'
-                            }}>
+                            <span 
+                              style={{ 
+                                minWidth: '36px',
+                                textAlign: 'left',
+                                fontFamily: 'monospace',
+                                color: lineItems[1] ? (() => {
+                                  // 根据学员名字生成不同颜色
+                                  const colors = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#fa541c', '#13c2c2', '#722ed1', '#f5222d'];
+                                  const hash = lineItems[1].name.split('').reduce((a, b) => {
+                                    a = ((a << 5) - a) + b.charCodeAt(0);
+                                    return a & a;
+                                  }, 0);
+                                  return colors[Math.abs(hash) % colors.length];
+                                })() : 'transparent',
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                              onClick={() => handleStudentClick(lineItems[1].name, coachName)}
+                            >
                               {lineItems[1] ? (lineItems[1].name.length === 2 ? lineItems[1].name.split('').join('　') : lineItems[1].name) : ''}
                             </span>
                           </div>
@@ -3317,7 +3513,13 @@ const Dashboard = ({ user }) => {
         <Card title="教练详情" size="small">
           <Spin spinning={statisticsLoading}>
             <Table
-              dataSource={coaches}
+              dataSource={coaches ? coaches.sort((a, b) => {
+                const nameA = a.nickname || a.username;
+                const nameB = b.nickname || b.username;
+                const valA = (todayCoachDetails[nameA] || []).length;
+                const valB = (todayCoachDetails[nameB] || []).length;
+                return valB - valA; // 降序排列
+              }) : []}
               columns={[
                 {
                   title: '教练',
@@ -3355,13 +3557,6 @@ const Dashboard = ({ user }) => {
                   title: '今日课程',
                   key: 'todayCourses',
                   align: 'center',
-                  sorter: (a, b) => {
-                    const nameA = a.nickname || a.username;
-                    const nameB = b.nickname || b.username;
-                    const valA = (todayCoachDetails[nameA] || []).length;
-                    const valB = (todayCoachDetails[nameB] || []).length;
-                    return valA - valB;
-                  },
                   render: (_, record) => {
                     const name = record.nickname || record.username;
                     const value = (todayCoachDetails[name] || []).length;
@@ -3376,7 +3571,6 @@ const Dashboard = ({ user }) => {
                   title: '今日请假',
                   key: 'todayLeaves',
                   align: 'center',
-                  sorter: (a, b) => (a.todayLeaves || 0) - (b.todayLeaves || 0),
                   render: (_, record) => {
                     const value = record.todayLeaves ?? 0;
                     return (
@@ -3391,9 +3585,6 @@ const Dashboard = ({ user }) => {
                   dataIndex: 'weeklyCourses',
                   key: 'weeklyCourses',
                   align: 'center',
-                  sorter: (a, b) => a.weeklyCourses - b.weeklyCourses,
-                  defaultSortOrder: 'descend',
-                  sortDirections: ['descend', 'ascend'],
                   render: (value) => (
                     <span style={{ color: '#1890ff', fontWeight: 500 }}>
                       {value}
@@ -3405,7 +3596,6 @@ const Dashboard = ({ user }) => {
                   dataIndex: 'lastMonthCourses',
                   key: 'lastMonthCourses',
                   align: 'center',
-                  sorter: (a, b) => (a.lastMonthCourses || 0) - (b.lastMonthCourses || 0),
                   render: (value) => (
                     <span style={{ color: '#722ed1', fontWeight: 500 }}>
                       {value ?? 0}
@@ -3422,646 +3612,108 @@ const Dashboard = ({ user }) => {
 
         {/* 活动课表本周排课信息 */}
         <WeeklyScheduleBlock coachColorMap={coachColorMap} />
+
+        {/* 学员详情模态框 */}
+        <StudentDetailModal
+          visible={studentDetailVisible}
+          onClose={() => setStudentDetailVisible(false)}
+          studentName={selectedStudent}
+          coachName={selectedCoach}
+        />
       </div>
     );
   };
 
-  // 如果是管理员，显示Tab界面
-  if (user?.role?.toUpperCase() === 'ADMIN') {
-    const tabItems = [
-      {
+  // 生成学员头像颜色的函数
+  const getStudentAvatarColor = (studentName, index) => {
+    const colors = [
+      '#1890ff', '#52c41a', '#fa8c16', '#f5222d', '#722ed1',
+      '#13c2c2', '#eb2f96', '#faad14', '#a0d911', '#2f54eb',
+      '#f759ab', '#36cfc9', '#ff7875', '#ffa940', '#b37feb'
+    ];
+    // 使用学员名字的哈希值来确保相同名字总是得到相同颜色
+    let hash = 0;
+    for (let i = 0; i < studentName.length; i++) {
+      hash = ((hash << 5) - hash + studentName.charCodeAt(i)) & 0xffffffff;
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+
+  // 构建tab项目
+  const buildTabItems = () => {
+    const tabItems = [];
+    
+    // 管理员显示教练概览
+    if (user?.role?.toUpperCase() === 'ADMIN') {
+      tabItems.push({
         key: 'overview',
         label: '教练概览',
         children: <AdminOverview />
-      },
+      });
+    }
+    
+    // 所有用户都显示我的课表和我的学员
+    tabItems.push(
       {
         key: 'timetables',
         label: '我的课表',
         children: (
           <div>
-            {/* 管理员视图下，顶部标题去掉，创建按钮已移到 Tabs 右上角 */}
             {renderTimetableList()}
           </div>
         )
+      },
+      {
+        key: 'students',
+        label: '我的学员',
+        children: <MyStudents 
+          onStudentClick={(studentName) => {
+            setSelectedStudent(studentName);
+            setSelectedCoach(user?.role?.toUpperCase() === 'ADMIN' ? null : user?.nickname || user?.username); // 普通用户传递自己的名称
+            setStudentDetailVisible(true);
+          }}
+          showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
+        />
       }
-    ];
-
-    return (
-      <div className="page-container" style={{ paddingTop: '0.25rem' }}>
-        <Tabs
-          activeKey={activeTab}
-          onChange={handleTabChange}
-          items={tabItems}
-          size="large"
-          tabBarExtraContent={{
-            right: (
-              <Button
-                type="link"
-                icon={<PlusOutlined />}
-                onClick={handleCreateTimetable}
-                disabled={timetables.length >= 5}
-              >
-                创建课表
-              </Button>
-            )
-          }}
-        />
-        {/* 模态框等保持不变 */}
-        {renderModals()}
-      </div>
     );
-  }
+    
+    return tabItems;
+  };
 
-  // 非管理员用户显示原有界面
+  // 显示Tab界面（管理员和普通用户都显示）
+  const tabItems = buildTabItems();
+  
   return (
-    <div className="page-container">
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '24px', position: 'relative' }}>
-        <h1 style={{ margin: 0, fontWeight: '700' }}>我的课表</h1>
-        {loadingScheduleCounts && (
-          <div style={{ 
-            position: 'absolute', 
-            left: '50%', 
-            transform: 'translateX(-50%)',
-            top: '40px',
-            fontSize: '12px',
-            color: '#999',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <Spin size="small" style={{ marginRight: '6px' }} />
-            正在统计课程数量...
-          </div>
-        )}
-        <Button
-          type="link"
-          icon={<PlusOutlined />}
-          onClick={handleCreateTimetable}
-          style={{ position: 'absolute', right: 0 }}
-          disabled={timetables.length >= 5}
-        >
-          创建课表
-        </Button>
-      </div>
-
-      {loading ? (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '80px 20px',
-          minHeight: '400px'
-        }}>
-          <Spin size="large" />
-          <div style={{ marginTop: '16px', color: '#666', fontSize: '14px' }}>
-            正在加载课表数据...
-          </div>
-        </div>
-      ) : timetables.length === 0 ? (
-        <Empty description="暂无课表，快去创建一个吧" />
-      ) : (
-        <List
-          className="timetable-list"
-          itemLayout="horizontal"
-          dataSource={timetables}
-          renderItem={(item) => (
-            <List.Item
-              style={{ position: 'relative' }}
-              actions={[
-                <Button type="link" onClick={() => handleShowTodaysCourses(item)}>今明课程</Button>,
-                <Button type="link" onClick={() => handleInputTimetable(item)}>录入</Button>,
-                <Button type="link" onClick={() => handleViewTimetable(item.id)}>查看</Button>,
-                <Dropdown menu={getActionMenu(item)} trigger={["click"]} placement="bottomRight">
-                  <Button type="link">操作</Button>
-                </Dropdown>
-              ]}
+    <div className="page-container" style={{ paddingTop: '0.25rem' }}>
+      <Tabs
+        activeKey={activeTab}
+        onChange={handleTabChange}
+        items={tabItems}
+        size="large"
+        tabBarExtraContent={{
+          right: (
+            <Button
+              type="link"
+              icon={<PlusOutlined />}
+              onClick={handleCreateTimetable}
+              disabled={timetables.length >= 5}
             >
-              {item.isActive ? <ActiveBadge /> : null}
-              <List.Item.Meta
-                className="timetable-item-meta"
-                avatar={
-                  <div style={{ margin: 12 }}>
-                  <Avatar
-                    shape="square"
-                    size={48}
-                    icon={<CalendarOutlined />}
-                    style={{
-                      backgroundColor: '#f9f0ff',
-                      color: getIconColor(item.id),
-                      border: '1px solid #e0d7f7',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  </div>
-                }
-                title={
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {editingTimetableId === item.id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Input
-                            size="small"
-                            value={editingTimetableName}
-                            onChange={(e) => setEditingTimetableName(e.target.value)}
-                            onPressEnter={() => handleSaveTimetableName(item.id)}
-                            style={{ width: '200px' }}
-                            autoFocus
-                          />
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<CheckOutlined />}
-                            onClick={() => handleSaveTimetableName(item.id)}
-                            style={{ color: '#52c41a' }}
-                          />
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<CloseOutlined />}
-                            onClick={handleCancelEditTimetableName}
-                            style={{ color: '#ff4d4f' }}
-                          />
-                        </div>
-                      ) : (
-                        <a onClick={() => handleViewTimetable(item.id)} style={{ fontWeight: 600, fontSize: 17 }}>{item.name}</a>
-                      )}
-                    </div>
-                    {!editingTimetableId && (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<EditOutlined />}
-                          onClick={() => handleStartEditTimetableName(item.id, item.name)}
-                          style={{ color: '#1890ff', padding: '0 4px' }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                }
-                description={
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#888', fontSize: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div>
-                        {item.isWeekly ? (
-                          <div>星期一至星期日</div>
-                        ) : (
-                          <div>{`${item.startDate} 至 ${item.endDate}`}</div>
-                        )}
-                      </div>
-                      <div>
-                        <span>创建于: {dayjs(item.createdAt).format('YYYY-MM-DD')}</span>
-                        <span style={{ marginLeft: '16px' }}>共</span>
-                        <span style={{ color: '#1890ff' }}>{timetableScheduleCounts[item.id] || 0}</span>
-                        <span>课程</span>
-                      </div>
-                    </div>
-                    <Tag
-                      style={item.isWeekly
-                        ? { backgroundColor: '#e6f7ff', borderColor: 'transparent', color: '#1890ff' }
-                        : { backgroundColor: '#f9f0ff', borderColor: 'transparent', color: '#722ED1' }
-                      }
-                    >
-                      {item.isWeekly ? '周固定课表' : '日期范围课表'}
-                    </Tag>
-                  </div>
-                }
-              />
-            </List.Item>
-          )}
-        />
-      )}
-      <Modal
-        title={
-          <div style={{ paddingBottom: '8px' }}>
-            <div style={{ textAlign: 'center', fontSize: '20px', fontWeight: '500', color: '#262626' }}>{modalMainTitle}</div>
-          </div>
-        }
-        open={todaysCoursesModalVisible}
-        onCancel={() => {
-          setTodaysCoursesModalVisible(false);
-          setCurrentTimetable(null);
-          setAllSchedulesData([]);
-          setOpenPopoverKey(null);
-                        // 重置复制其他教练课程相关状态
-              setCopyOtherCoachesToday(true);
-              setCopyOtherCoachesTomorrow(true);
-              setOtherCoachesDataToday([]);
-              setOtherCoachesDataTomorrow([]);
-              setLoadingOtherCoachesToday(false);
-              setLoadingOtherCoachesTomorrow(false);
-              setOtherCoachesExpandedToday(false);
-              setOtherCoachesExpandedTomorrow(false);
-          setOtherCoachesExpandedToday(false);
-          setOtherCoachesExpandedTomorrow(false);
+              创建课表
+            </Button>
+          )
         }}
-        width={600}
-        footer={null}
-      >
-        {todaysCoursesData.length > 0 && (
-          <>
-            {/* 显示其他教练今日课程信息 */}
-            {(loadingOtherCoachesToday || (otherCoachesDataToday && otherCoachesDataToday.timetables && otherCoachesDataToday.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).length > 0)) && (
-              <div style={{ marginBottom: '16px', border: '1px solid #f0f0f0', borderRadius: '4px' }}>
-                {/* 折叠标题栏 */}
-                <div
-                  style={{
-                    padding: '12px',
-                    backgroundColor: '#fafafa',
-                    borderRadius: '4px 4px 0 0',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: otherCoachesExpandedToday ? '1px solid #f0f0f0' : 'none'
-                  }}
-                  onClick={() => setOtherCoachesExpandedToday(!otherCoachesExpandedToday)}
-                >
-                  <div style={{ fontSize: '14px', color: '#666', fontWeight: 'bold' }}>
-                    其他教练课程 ({dayjs().format('YYYY-MM-DD')})
-                  </div>
-                  <div style={{ color: '#1890ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {loadingOtherCoachesToday && (
-                      <Spin size="small" />
-                    )}
-                    {otherCoachesExpandedToday ? <UpOutlined /> : <DownOutlined />}
-                  </div>
-                </div>
-
-                {/* 可折叠的内容区域 */}
-                {!loadingOtherCoachesToday && otherCoachesDataToday && otherCoachesDataToday.timetables && (
-                  <div
-                    style={{
-                      maxHeight: otherCoachesExpandedToday ? '200px' : '0px',
-                      overflow: 'hidden',
-                      transition: 'max-height 0.3s ease-in-out'
-                    }}
-                  >
-                    <div style={{ padding: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                      {otherCoachesDataToday.timetables
-                        .filter(timetableInfo => currentTimetable && timetableInfo.timetableId.toString() !== currentTimetable.id.toString())
-                        .map((timetableInfo, index) => (
-                          <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>
-                              {timetableInfo.ownerName} - {timetableInfo.timetableName}
-                            </div>
-                            {(() => {
-                              // 每行显示两个课程
-                              const lines = [];
-                              for (let i = 0; i < timetableInfo.schedules.length; i += 2) {
-                                const lineItems = timetableInfo.schedules.slice(i, i + 2);
-                                lines.push(lineItems);
-                              }
-                              return lines.map((lineItems, lineIndex) => (
-                                <div key={lineIndex} style={{ 
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  marginBottom: lineIndex < lines.length - 1 ? '2px' : '0',
-                                  marginLeft: '8px'
-                                }}>
-                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
-                                    {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
-                                  </span>
-                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
-                                    {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
-                                  </span>
-                                </div>
-                              ));
-                            })()}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div style={{ textAlign: 'left', fontSize: '14px', color: '#8c8c8c', marginBottom: '8px' }}>{modalSubTitle}</div>
-            <Table
-              dataSource={todaysCoursesData}
-              pagination={false}
-              bordered
-              size="small"
-              columns={getColumns(studentColorMap)}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Checkbox
-                  checked={copyOtherCoachesToday}
-                  onChange={(e) => setCopyOtherCoachesToday(e.target.checked)}
-                  disabled={loadingOtherCoachesToday}
-                >
-                  复制其他教练课程
-                </Checkbox>
-              </div>
-              <Button
-                icon={<CopyOutlined />}
-                type="primary"
-                onClick={() => copyToClipboard(generateCopyText(todaysSchedulesForCopy, true, copyOtherCoachesToday, otherCoachesDataToday))}
-              >
-                复制今日课程
-              </Button>
-            </div>
-          </>
-        )}
-
-        {tomorrowsCoursesData.length > 0 && (
-          <>
-            <Divider />
-            
-            {/* 显示其他教练明日课程信息 */}
-            {(loadingOtherCoachesTomorrow || (otherCoachesDataTomorrow && otherCoachesDataTomorrow.timetables && otherCoachesDataTomorrow.timetables.filter(t => currentTimetable && t.timetableId.toString() !== currentTimetable.id.toString()).length > 0)) && (
-              <div style={{ marginBottom: '16px', border: '1px solid #f0f0f0', borderRadius: '4px' }}>
-                {/* 折叠标题栏 */}
-                <div
-                  style={{
-                    padding: '12px',
-                    backgroundColor: '#fafafa',
-                    borderRadius: '4px 4px 0 0',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: otherCoachesExpandedTomorrow ? '1px solid #f0f0f0' : 'none'
-                  }}
-                  onClick={() => setOtherCoachesExpandedTomorrow(!otherCoachesExpandedTomorrow)}
-                >
-                  <div style={{ fontSize: '14px', color: '#666', fontWeight: 'bold' }}>
-                    其他教练课程 ({dayjs().add(1, 'day').format('YYYY-MM-DD')})
-                  </div>
-                  <div style={{ color: '#1890ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {loadingOtherCoachesTomorrow && (
-                      <Spin size="small" />
-                    )}
-                    {otherCoachesExpandedTomorrow ? <UpOutlined /> : <DownOutlined />}
-                  </div>
-                </div>
-
-                {/* 可折叠的内容区域 */}
-                {!loadingOtherCoachesTomorrow && otherCoachesDataTomorrow && otherCoachesDataTomorrow.timetables && (
-                  <div
-                    style={{
-                      maxHeight: otherCoachesExpandedTomorrow ? '200px' : '0px',
-                      overflow: 'hidden',
-                      transition: 'max-height 0.3s ease-in-out'
-                    }}
-                  >
-                    <div style={{ padding: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                      {otherCoachesDataTomorrow.timetables
-                        .filter(timetableInfo => currentTimetable && timetableInfo.timetableId.toString() !== currentTimetable.id.toString())
-                        .map((timetableInfo, index) => (
-                          <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>
-                              {timetableInfo.ownerName} - {timetableInfo.timetableName}
-                            </div>
-                            {(() => {
-                              // 每行显示两个课程
-                              const lines = [];
-                              for (let i = 0; i < timetableInfo.schedules.length; i += 2) {
-                                const lineItems = timetableInfo.schedules.slice(i, i + 2);
-                                lines.push(lineItems);
-                              }
-                              return lines.map((lineItems, lineIndex) => (
-                                <div key={lineIndex} style={{ 
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  marginBottom: lineIndex < lines.length - 1 ? '2px' : '0',
-                                  marginLeft: '8px'
-                                }}>
-                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
-                                    {lineItems[0] ? `${lineItems[0].startTime.substring(0,5)}-${lineItems[0].endTime.substring(0,5)} ${lineItems[0].studentName}` : ''}
-                                  </span>
-                                  <span style={{ width: '48%', fontSize: '12px', color: '#666' }}>
-                                    {lineItems[1] ? `${lineItems[1].startTime.substring(0,5)}-${lineItems[1].endTime.substring(0,5)} ${lineItems[1].studentName}` : ''}
-                                  </span>
-                                </div>
-                              ));
-                            })()}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div style={{ textAlign: 'left', fontSize: '14px', color: '#8c8c8c', marginBottom: '8px' }}>{modalSubTitleTomorrow}</div>
-            <Table
-              dataSource={tomorrowsCoursesData}
-              pagination={false}
-              bordered
-              size="small"
-              columns={getColumnsForTomorrow(studentColorMap)}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Checkbox
-                  checked={copyOtherCoachesTomorrow}
-                  onChange={(e) => setCopyOtherCoachesTomorrow(e.target.checked)}
-                  disabled={loadingOtherCoachesTomorrow}
-                >
-                  复制其他教练课程
-                </Checkbox>
-              </div>
-              <Button
-                icon={<CopyOutlined />}
-                type="primary"
-                onClick={() => copyToClipboard(generateCopyText(tomorrowsSchedulesForCopy, false, copyOtherCoachesTomorrow, otherCoachesDataTomorrow))}
-              >
-                复制明日课程
-              </Button>
-            </div>
-          </>
-        )}
-
-        {(todaysCoursesData.length > 0 || tomorrowsCoursesData.length > 0) && <Divider />}
-
-        <div style={{ textAlign: 'center', marginTop: '16px' }}>
-          <Button
-            danger
-            type="primary"
-            onClick={() => {
-              setTodaysCoursesModalVisible(false);
-              setCurrentTimetable(null);
-              setAllSchedulesData([]);
-              setOpenPopoverKey(null);
-              // 重置复制其他教练课程相关状态
-              setCopyOtherCoachesToday(true);
-              setCopyOtherCoachesTomorrow(true);
-              setOtherCoachesDataToday([]);
-              setOtherCoachesDataTomorrow([]);
-              setLoadingOtherCoachesToday(false);
-              setLoadingOtherCoachesTomorrow(false);
-              setOtherCoachesExpandedToday(false);
-              setOtherCoachesExpandedTomorrow(false);
-            }}
-            style={{ minWidth: '100px' }}
-          >
-            关闭
-          </Button>
-        </div>
-      </Modal>
-
-      {/* 编辑课程模态框 */}
-      {editingSchedule && (
-        <EditScheduleModal
-          visible={editModalVisible}
-          schedule={editingSchedule}
-          timetable={currentTimetable}
-          onCancel={() => {
-            setEditModalVisible(false);
-            setEditingSchedule(null);
-          }}
-          onOk={(data) => {
-            if (editingSchedule) {
-              handleUpdateSchedule(editingSchedule, data.studentName);
-              setEditModalVisible(false);
-              setEditingSchedule(null);
-            }
-          }}
-        />
-      )}
-
-      {/* 复制课表模态框 */}
-      <Modal
-        title="复制课表"
-        open={copyTimetableModalVisible}
-        onCancel={() => {
-          setCopyTimetableModalVisible(false);
-          setSelectedTimetableForCopy(null);
-        }}
-        onOk={handleConfirmCopyTimetable}
-        okText="确认复制"
-        cancelText="取消"
-        width={500}
-      >
-        <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f6f8fa', borderRadius: '6px' }}>
-          <div style={{ fontWeight: 500, marginBottom: '4px' }}>源课表信息：</div>
-          <div style={{ color: '#666' }}>
-            {selectedTimetableForCopy?.name} ({selectedTimetableForCopy?.isWeekly ? '周固定课表' : '日期范围课表'})
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontWeight: 500, marginBottom: '8px' }}>新课表名称：</div>
-          <Input
-            placeholder={`${selectedTimetableForCopy?.name || ''} (复制)`}
-            maxLength={100}
-            showCount
-            value={editingTimetableName}
-            onChange={(e) => setEditingTimetableName(e.target.value)}
-          />
-        </div>
-
-        <div style={{ padding: '12px', backgroundColor: '#fff7e6', borderRadius: '6px', border: '1px solid #ffd666' }}>
-          <div style={{ fontSize: '12px', color: '#d46b08' }}>
-            <div>• 复制后的课表将包含原课表的所有课程信息</div>
-            <div>• 如果当前没有活动课表，复制的课表将自动设为活动状态</div>
-            <div>• 每个用户最多只能有5个非归档课表</div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* 转换弹窗 */}
-      <Modal
-        open={convertModal.visible}
-        title={convertModal.mode === 'dateToWeekly' ? '转为周固定课表' : '转为日期范围课表'}
-        onCancel={() => { setConvertModal({ visible: false, mode: null, timetable: null }); setSelectedWeekStart(null); setDateRange([]); }}
-        onOk={async () => {
-          if (!convertModal.timetable) return;
-          
-          // 显示loading消息
-          message.loading({ content: '正在准备转换预览...', key: 'convert', duration: 0 });
-          
-          try {
-            if (convertModal.mode === 'dateToWeekly') {
-              if (!selectedWeekStart) { 
-                message.warning('请选择一周'); 
-                message.destroy('convert');
-                return; 
-              }
-              
-              // 延迟跳转，让用户看到loading效果
-              setTimeout(() => {
-                // 清除loading消息
-                // message.destroy('convert'); // 移除此行
-                
-                const ws = dayjs(selectedWeekStart);
-                const we = ws.add(6, 'day');
-                navigate('/convert-preview', {
-                  state: {
-                    type: 'date-to-weekly',
-                    sourceTimetable: convertModal.timetable,
-                    weekStart: selectedWeekStart,
-                    weekEnd: we.format('YYYY-MM-DD'),
-                    newTimetableName: `${convertModal.timetable.name}-周固定`,
-                    currentUserId: user?.id
-                  }
-                });
-              }, 800);
-              
-            } else {
-              if (!dateRange || dateRange.length !== 2) { 
-                message.warning('请选择日期范围'); 
-                message.destroy('convert');
-                return; 
-              }
-              
-              // 延迟跳转，让用户看到loading效果
-              setTimeout(() => {
-                // 清除loading消息
-                
-                const startDate = dayjs(dateRange[0]).format('YYYY-MM-DD');
-                const endDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
-                navigate('/convert-preview', {
-                  state: {
-                    type: 'weekly-to-date',
-                    sourceTimetable: convertModal.timetable,
-                    startDate: startDate,
-                    endDate: endDate,
-                    newTimetableName: `${convertModal.timetable.name}-日期`,
-                    currentUserId: user?.id
-                  }
-                });
-              }, 800);
-            }
-          } catch (error) { 
-            message.error('操作失败'); 
-            message.destroy('convert');
-          }
-        }}
-        okText="确认"
-        cancelText="取消"
-      >
-        {convertModal.mode === 'dateToWeekly' ? (
-          <div>
-            <div style={{ marginBottom: 8 }}>选择包含课程的一周：</div>
-            <Select
-              options={weekOptions}
-              onChange={setSelectedWeekStart}
-              style={{ width: '100%' }}
-              placeholder="周一日期 ~ 周日日期 (课程数)"
-            />
-          </div>
-        ) : convertModal.mode === 'weeklyToDate' ? (
-          <div>
-            <div style={{ marginBottom: 8 }}>开始日期：</div>
-            <DatePicker
-              style={{ width: '100%', marginBottom: 12 }}
-              value={dateRange?.[0] || null}
-              onChange={(v) => setDateRange([v, dateRange?.[1] || null])}
-            />
-            <div style={{ marginBottom: 8 }}>结束日期：</div>
-            <DatePicker
-              style={{ width: '100%' }}
-              value={dateRange?.[1] || null}
-              onChange={(v) => setDateRange([dateRange?.[0] || null, v])}
-            />
-          </div>
-        ) : null}
-      </Modal>
-
-
+      />
+      {/* 模态框等保持不变 */}
+      {renderModals()}
+      
+      {/* 学员详情模态框 */}
+      <StudentDetailModal
+        visible={studentDetailVisible}
+        onClose={() => setStudentDetailVisible(false)}
+        studentName={selectedStudent}
+        coachName={selectedCoach}
+      />
     </div>
   );
 };

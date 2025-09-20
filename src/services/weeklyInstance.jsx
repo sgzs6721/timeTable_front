@@ -141,3 +141,16 @@ export const deleteLeaveRecord = (recordId) => {
 export const deleteLeaveRecordsBatch = (recordIds) => {
   return api.delete('/weekly-instances/leave-records/batch', { data: recordIds });
 };
+
+// 获取学员记录
+export const getStudentRecords = (studentName, coachName) => {
+  return api.get('/weekly-instances/student-records', {
+    params: { studentName, coachName }
+  });
+};
+
+export const getAllStudents = (showAll = false) => {
+  return api.get('/weekly-instances/students', {
+    params: { showAll }
+  });
+};
