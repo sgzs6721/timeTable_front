@@ -126,3 +126,18 @@ export const requestLeave = (scheduleId, leaveReason) => {
 export const cancelLeave = (scheduleId) => {
   return api.post(`/weekly-instances/schedules/cancel-leave/${scheduleId}`);
 };
+
+// 获取所有请假记录
+export const getLeaveRecords = () => {
+  return api.get('/weekly-instances/leave-records');
+};
+
+// 删除请假记录
+export const deleteLeaveRecord = (recordId) => {
+  return api.delete(`/weekly-instances/leave-records/${recordId}`);
+};
+
+// 批量删除请假记录
+export const deleteLeaveRecordsBatch = (recordIds) => {
+  return api.delete('/weekly-instances/leave-records/batch', { data: recordIds });
+};

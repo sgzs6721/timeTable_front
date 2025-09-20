@@ -3,7 +3,7 @@ import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag,
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce } from '../services/timetable';
-import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule } from '../services/weeklyInstance';
+import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule, getLeaveRecords, deleteLeaveRecordsBatch } from '../services/weeklyInstance';
 import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables } from '../services/admin';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -2518,10 +2518,86 @@ const Dashboard = ({ user }) => {
   const AdminOverview = () => {
     const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses, totalLastWeekCourses } = coachesStatistics || {};
     
-    // 今日/明日切换
-    const [dayTab, setDayTab] = useState('today'); // 'today' | 'tomorrow'
+    // 今日/明日/请假切换
+    const [dayTab, setDayTab] = useState('today'); // 'today' | 'tomorrow' | 'leave'
     const [tomorrowCoachDetails, setTomorrowCoachDetails] = useState({});
     const [coachDetailsLoading, setCoachDetailsLoading] = useState(false);
+    
+    // 请假记录相关状态
+    const [leaveRecords, setLeaveRecords] = useState([]);
+    const [leaveRecordsLoading, setLeaveRecordsLoading] = useState(false);
+    const [selectedCoachTab, setSelectedCoachTab] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10; // 每页显示10个记录
+    const [selectedRecords, setSelectedRecords] = useState(new Set());
+
+    // 获取请假记录
+    const fetchLeaveRecords = async () => {
+      setLeaveRecordsLoading(true);
+      try {
+        const response = await getLeaveRecords();
+        if (response && response.success) {
+          setLeaveRecords(response.data || []);
+        } else {
+          message.error('获取请假记录失败');
+        }
+      } catch (error) {
+        console.error('获取请假记录失败:', error);
+        message.error('获取请假记录失败');
+      } finally {
+        setLeaveRecordsLoading(false);
+      }
+    };
+
+    // 删除选中的请假记录
+    const deleteSelectedRecords = async () => {
+      if (selectedRecords.size === 0) {
+        message.warning('请先选择要删除的记录');
+        return;
+      }
+      
+      // 显示确认对话框
+      Modal.confirm({
+        title: '确认删除',
+        content: `确定要删除选中的 ${selectedRecords.size} 条请假记录吗？删除后无法恢复。`,
+        okText: '确认删除',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk: async () => {
+          try {
+            const recordsToDelete = Array.from(selectedRecords);
+            
+            // 调用后端API删除记录
+            const response = await deleteLeaveRecordsBatch(recordsToDelete);
+            
+            if (response && response.success) {
+              // 更新本地状态
+              setLeaveRecords(prev => prev.filter(record => !selectedRecords.has(record.id)));
+              setSelectedRecords(new Set());
+              message.success(`成功删除 ${recordsToDelete.length} 条记录`);
+            } else {
+              message.error(response?.message || '删除记录失败');
+            }
+          } catch (error) {
+            console.error('删除记录失败:', error);
+            message.error('删除记录失败，请重试');
+          }
+        }
+      });
+    };
+
+    // 切换记录选中状态
+    const toggleRecordSelection = (recordId) => {
+      setSelectedRecords(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(recordId)) {
+          newSet.delete(recordId);
+        } else {
+          newSet.add(recordId);
+        }
+        return newSet;
+      });
+    };
 
     // 额外拉取今日活动课表的课程，用于显示学员+时间（后端统计缺少明细时兜底）
     const [todayCoachDetails, setTodayCoachDetails] = useState({});
@@ -2808,22 +2884,244 @@ const Dashboard = ({ user }) => {
                 <Button.Group>
                   <Button type={dayTab==='today' ? 'primary' : 'default'} size="small" onClick={()=>setDayTab('today')}>今日</Button>
                   <Button type={dayTab==='tomorrow' ? 'primary' : 'default'} size="small" onClick={()=>setDayTab('tomorrow')}>明日</Button>
+                  <Button type={dayTab==='leave' ? 'primary' : 'default'} size="small" onClick={()=>{
+                    setDayTab('leave');
+                    fetchLeaveRecords();
+                  }}>请假</Button>
                 </Button.Group>
               </div>
               <span style={{ color: '#999', fontSize: 13, textAlign: 'right', display: 'block', width: '100%' }}>
-                {dayTab==='today' ? '今日有课教练' : '明日有课教练'} 
+                {dayTab==='today' ? '今日有课教练' : dayTab==='tomorrow' ? '明日有课教练' : '请假记录'} 
                 <span style={{ color: '#1890ff', fontWeight: 500 }}>{
                   dayTab==='today'
                     ? Object.entries(todayCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length
-                    : Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length
+                    : dayTab==='tomorrow'
+                    ? Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length
+                    : leaveRecords.length
                 }</span>
-                <span style={{ color: '#999' }}>/{coaches?.length || 0}</span>
+                {dayTab !== 'leave' && <span style={{ color: '#999' }}>/{coaches?.length || 0}</span>}
               </span>
             </div>
           }
         >
-          <Spin spinning={coachDetailsLoading || statisticsLoading}>
-          {(dayTab==='today' ? Object.entries(todayCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0 : Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0) ? (
+          <Spin spinning={coachDetailsLoading || statisticsLoading || leaveRecordsLoading}>
+          {dayTab === 'leave' ? (
+            // 请假记录显示
+            leaveRecords.length === 0 ? (
+              <div style={{ color: '#999' }}>暂无请假记录</div>
+            ) : (
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {(() => {
+                  // 按教练分组
+                  const groupedByCoach = leaveRecords.reduce((acc, record) => {
+                    const coachName = record.coachName;
+                    if (!acc[coachName]) {
+                      acc[coachName] = [];
+                    }
+                    acc[coachName].push(record);
+                    return acc;
+                  }, {});
+
+                  const coachNames = Object.keys(groupedByCoach);
+                  
+                  // 如果没有选中教练，默认选中第一个
+                  if (!selectedCoachTab && coachNames.length > 0) {
+                    setSelectedCoachTab(coachNames[0]);
+                  }
+
+                  return (
+                    <div>
+                      {/* 教练tab切换 */}
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                          {coachNames.map((coachName) => (
+                            <span
+                              key={coachName}
+                              onClick={() => {
+                                setSelectedCoachTab(coachName);
+                                setCurrentPage(1); // 切换教练时重置到第一页
+                              }}
+                              style={{
+                                cursor: 'pointer',
+                                color: selectedCoachTab === coachName ? '#1890ff' : '#666',
+                                fontSize: '14px',
+                                fontWeight: selectedCoachTab === coachName ? 'bold' : 'normal',
+                                borderBottom: selectedCoachTab === coachName ? '2px solid #1890ff' : '2px solid transparent',
+                                paddingBottom: '4px',
+                                transition: 'all 0.3s'
+                              }}
+                            >
+                              {coachName}（{groupedByCoach[coachName].length}）
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 显示选中教练的请假记录 */}
+                      {selectedCoachTab && groupedByCoach[selectedCoachTab] && (
+                        <div>
+                          {/* 删除按钮 */}
+                          {selectedRecords.size > 0 && (
+                            <div style={{ 
+                              marginBottom: '12px', 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center' 
+                            }}>
+                              <span style={{ color: '#666', fontSize: '12px' }}>
+                                已选择 {selectedRecords.size} 条记录
+                              </span>
+                              <button
+                                onClick={deleteSelectedRecords}
+                                style={{
+                                  padding: '4px 12px',
+                                  backgroundColor: '#ff4d4f',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                删除选中
+                              </button>
+                            </div>
+                          )}
+
+                          {/* 该教练的请假记录，单列显示 */}
+                          {(() => {
+                            const records = groupedByCoach[selectedCoachTab];
+                            const totalPages = Math.ceil(records.length / pageSize);
+                            const startIndex = (currentPage - 1) * pageSize;
+                            const endIndex = startIndex + pageSize;
+                            const currentRecords = records.slice(startIndex, endIndex);
+                            
+                            // 按学员分组，计算每个学员的请假次数
+                            const studentLeaveCount = records.reduce((acc, record) => {
+                              const studentName = record.studentName;
+                              if (!acc[studentName]) {
+                                acc[studentName] = 0;
+                              }
+                              acc[studentName]++;
+                              return acc;
+                            }, {});
+
+                            return (
+                              <div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {currentRecords.map((record, index) => (
+                                    <div key={startIndex + index} style={{ 
+                                      width: '100%',
+                                      padding: '6px 12px', 
+                                      backgroundColor: selectedRecords.has(record.id) ? '#e6f7ff' : '#f9f9f9', 
+                                      borderRadius: '4px',
+                                      border: selectedRecords.has(record.id) ? '1px solid #91d5ff' : '1px solid #e8e8e8',
+                                      fontSize: '12px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '12px'
+                                    }}>
+                                      {/* 复选框 */}
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedRecords.has(record.id)}
+                                        onChange={() => toggleRecordSelection(record.id)}
+                                        style={{ 
+                                          width: '16px', 
+                                          height: '16px',
+                                          cursor: 'pointer'
+                                        }}
+                                      />
+                                      
+                                      {/* 记录内容 */}
+                                      <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <div style={{ 
+                                            fontSize: '10px', 
+                                            color: '#ff4d4f', 
+                                            backgroundColor: '#fff2f0', 
+                                            padding: '1px 4px', 
+                                            borderRadius: '2px',
+                                            border: '1px solid #ffccc7'
+                                          }}>
+                                            {studentLeaveCount[record.studentName]}次
+                                          </div>
+                                          <span style={{ fontWeight: 'bold', color: '#333' }}>
+                                            {record.studentName}
+                                          </span>
+                                          {record.leaveReason && (
+                                            <span style={{ color: '#fa8c16' }}>
+                                              {record.leaveReason}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#999', fontSize: '11px' }}>
+                                          <span>{record.scheduleDate}</span>
+                                          <span>{record.startTime?.substring(0,5)}-{record.endTime?.substring(0,5)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                
+                                {/* 分页控件 */}
+                                {totalPages > 1 && (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'center', 
+                                    alignItems: 'center', 
+                                    gap: '8px', 
+                                    marginTop: '16px',
+                                    padding: '8px 0'
+                                  }}>
+                                    <button
+                                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                      disabled={currentPage === 1}
+                                      style={{
+                                        padding: '4px 8px',
+                                        border: '1px solid #d9d9d9',
+                                        borderRadius: '4px',
+                                        backgroundColor: currentPage === 1 ? '#f5f5f5' : 'white',
+                                        color: currentPage === 1 ? '#999' : '#333',
+                                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                        fontSize: '12px'
+                                      }}
+                                    >
+                                      上一页
+                                    </button>
+                                    
+                                    <span style={{ fontSize: '12px', color: '#666' }}>
+                                      第 {currentPage} 页，共 {totalPages} 页
+                                    </span>
+                                    
+                                    <button
+                                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                      disabled={currentPage === totalPages}
+                                      style={{
+                                        padding: '4px 8px',
+                                        border: '1px solid #d9d9d9',
+                                        borderRadius: '4px',
+                                        backgroundColor: currentPage === totalPages ? '#f5f5f5' : 'white',
+                                        color: currentPage === totalPages ? '#999' : '#333',
+                                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                        fontSize: '12px'
+                                      }}
+                                    >
+                                      下一页
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )
+          ) : (dayTab==='today' ? Object.entries(todayCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0 : Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0) ? (
             <div style={{ color: '#999' }}>{dayTab==='today' ? '今日' : '明日'}暂无课程</div>
           ) : (
             (dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails))
