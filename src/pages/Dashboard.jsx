@@ -3110,7 +3110,7 @@ const Dashboard = ({ user }) => {
                   return (
                     <div>
                       {/* 教练tab切换 */}
-                      <div style={{ marginBottom: '16px' }}>
+                      <div style={{ marginTop: '12px', marginBottom: '16px' }}>
                         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                           {coachNames.map((coachName) => (
                             <span
