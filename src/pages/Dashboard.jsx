@@ -66,7 +66,9 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     <Card 
       title={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>我的学员</span>
+          <span>
+            我的学员{students && students.length > 0 ? `（${students.length}）` : '（0）'}
+          </span>
           {showAllCheckbox && (
             <Checkbox 
               checked={showAllStudents}
@@ -2187,6 +2189,7 @@ const Dashboard = ({ user }) => {
     const [allCoaches, setAllCoaches] = useState(new Set());
     const [selectedCoach, setSelectedCoach] = useState(null);
     const [coachBgColorMap, setCoachBgColorMap] = useState(new Map());
+    const [coachCourseCount, setCoachCourseCount] = useState(new Map());
     const [studentBgColorMap, setStudentBgColorMap] = useState(new Map());
     
     // 半透明马卡龙调色板（更柔和）
@@ -2285,6 +2288,15 @@ const Dashboard = ({ user }) => {
           schedules = Array.isArray(responseData) ? responseData : [];
         }
         const weekDayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+        // 统计每位教练的课程数量（兼容不同返回字段）
+        const countMap = new Map();
+        (schedules || []).forEach(s => {
+          const name = s.ownerNickname || s.ownerUsername || s.ownerName || s.username || s.nickname;
+          if (!name) return;
+          countMap.set(name, (countMap.get(name) || 0) + 1);
+        });
+        setCoachCourseCount(countMap);
         
         // 整理数据为表格格式
         const timeSlotMap = new Map();
@@ -2606,6 +2618,12 @@ const Dashboard = ({ user }) => {
       sunday: row.sunday
     }));
     
+    // 图例按照数量从多到少排序
+    const coachesOrdered = React.useMemo(() => {
+      const list = Array.from(allCoaches);
+      return list.sort((a, b) => (coachCourseCount.get(b) || 0) - (coachCourseCount.get(a) || 0));
+    }, [allCoaches, coachCourseCount]);
+
     return (
       <Card title={viewMode === 'instance' ? '本周排课信息' : '固定课表模板'} size="small" style={{ marginTop: '16px' }}
         extra={
@@ -2637,7 +2655,7 @@ const Dashboard = ({ user }) => {
           {/* 教练颜色图例说明 */}
           <div style={{ marginBottom: '12px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '12px', justifyContent: 'center' }}>
-              {Array.from(allCoaches).map((coach, index) => (
+              {coachesOrdered.map((coach, index) => (
                 <div 
                   key={coach} 
                   style={{ 
@@ -2656,7 +2674,31 @@ const Dashboard = ({ user }) => {
                     backgroundColor: coachBgColorMap.get(coach) || 'transparent', 
                     borderRadius: '2px' 
                   }}></div>
-                  <span style={{ color: '#000', fontWeight: 500 }}>{coach}</span>
+                  <span style={{ color: '#000', fontWeight: 500 }}>
+                    {coach}
+                    <span
+                      style={{
+                        marginLeft: 6,
+                        fontWeight: 700,
+                        color: (() => {
+                          const c = coachBgColorMap.get(coach);
+                          if (typeof c === 'string' && c.startsWith('rgba(')) {
+                            const m = c.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+                            if (m) {
+                              // 加深色彩
+                              const r = Math.round(parseInt(m[1],10)*0.72);
+                              const g = Math.round(parseInt(m[2],10)*0.72);
+                              const b = Math.round(parseInt(m[3],10)*0.72);
+                              return `rgb(${r}, ${g}, ${b})`;
+                            }
+                          }
+                          return c || '#1677ff';
+                        })()
+                      }}
+                    >
+                      {coachCourseCount.get(coach) || 0}
+                    </span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -3310,8 +3352,11 @@ const Dashboard = ({ user }) => {
           ) : (dayTab==='today' ? Object.entries(todayCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0 : Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length === 0) ? (
             <div style={{ color: '#999' }}>{dayTab==='today' ? '今日' : '明日'}暂无课程</div>
           ) : (
-            (dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails))
-              .map(([coachName, detailItems], idx) => {
+            (() => {
+              const entries = dayTab==='today' ? Object.entries(todayCoachDetails) : Object.entries(tomorrowCoachDetails);
+              // 按课程数量从多到少排序（不区分请假与否，已在显示处标注）
+              const sorted = entries.sort((a, b) => (b[1]?.length || 0) - (a[1]?.length || 0));
+              return sorted.map(([coachName, detailItems], idx) => {
                 // 根据教练姓名找到对应的教练ID，用于保持颜色一致
                 const coach = (coaches || []).find(c => (c.nickname || c.username) === coachName);
                 const coachId = coach?.id || idx;
@@ -3502,7 +3547,8 @@ const Dashboard = ({ user }) => {
                   </div>
                 </div>
                 );
-              })
+              });
+            })()
           )}
           </Spin>
         </Card>

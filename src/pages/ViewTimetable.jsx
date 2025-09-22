@@ -2939,6 +2939,29 @@ const ViewTimetable = ({ user }) => {
     };
   }, [currentWeekSchedules, currentWeekInstance?.schedules, viewMode]);
 
+  // 本周请假课时数
+  const weeklyLeaveCount = useMemo(() => {
+    // 避免提前引用：本地计算显示视图
+    const dv = ((switchToInstanceLoading || switchToTemplateLoading) && tempViewMode 
+      ? tempViewMode 
+      : viewMode);
+    // 优先：对于周固定课表的实例视图，用模板与实例差集作为请假数（更准确）
+    if (dv === 'instance' && timetable?.isWeekly && legendStats) {
+      return legendStats.cancelled || 0;
+    }
+    // 兜底：统计标记为 isOnLeave 的课程（若后端有返回）
+    let schedules = [];
+    if (viewMode === 'instance' && currentWeekInstance?.schedules) {
+      schedules = currentWeekInstance.schedules;
+    } else if (viewMode === 'instance') {
+      schedules = allSchedules || [];
+    } else {
+      schedules = currentWeekSchedules;
+    }
+    if (!schedules || schedules.length === 0) return 0;
+    return schedules.filter((s) => s.isOnLeave).length;
+  }, [switchToInstanceLoading, switchToTemplateLoading, tempViewMode, viewMode, timetable?.isWeekly, legendStats, currentWeekSchedules, currentWeekInstance?.schedules, allSchedules]);
+
   const handleWeekChange = (week) => {
     setCurrentWeek(week);
   };
@@ -4236,6 +4259,15 @@ const ViewTimetable = ({ user }) => {
                     {isInitialLoading ? '0' : displayWeeklyStats.students}
                   </span>
                   <span>个</span>
+                  {displayViewMode === 'instance' && !isInitialLoading && weeklyLeaveCount > 0 && (
+                    <>
+                      <span style={{ marginLeft: 12 }}>请假</span>
+                      <span style={{ color: '#fa8c16', fontWeight: 'bold', margin: '0 4px' }}>
+                        {weeklyLeaveCount}
+                      </span>
+                      <span>课时</span>
+                    </>
+                  )}
                 </span>
               ) : null}
             </div>
