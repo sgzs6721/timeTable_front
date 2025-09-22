@@ -1111,7 +1111,8 @@ const ViewTimetable = ({ user }) => {
     if (weeklyInstances.length > 0 && viewMode === 'instance' && currentInstanceIndex === 0 && !loading) {
       // 检查是否应该切换到本周实例
       const today = dayjs();
-      const thisWeekStart = today.startOf('week').add(1, 'day'); // 周一
+      // 如果今天是周日，仍然属于当前周，不是下一周
+      const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
       const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
       
       const thisWeekIndex = weeklyInstances.findIndex(inst => {
@@ -1471,8 +1472,8 @@ const ViewTimetable = ({ user }) => {
         
         // 如果没有当前周实例，尝试找到本周的实例
         const today = dayjs();
-        // 与后端保持一致：周一为一周的开始
-        const thisWeekStart = today.startOf('week').add(1, 'day'); // 周一
+        // 与后端保持一致：周一为一周的开始，但周日仍属于当前周
+        const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
         const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
         
         const thisWeekIndex = sortedInstances.findIndex(inst => {
@@ -1576,7 +1577,8 @@ const ViewTimetable = ({ user }) => {
     
     // 计算本周的开始和结束日期
     const today = dayjs();
-    const thisWeekStart = today.startOf('week').add(1, 'day'); // 周一
+    // 如果今天是周日，仍然属于当前周，不是下一周
+    const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
     const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
     
     // 查找本周实例
@@ -1625,7 +1627,8 @@ const ViewTimetable = ({ user }) => {
     // 检查当前是否已经是本周实例
     if (viewMode === 'instance' && currentWeekInstance?.weekStartDate) {
       const today = dayjs();
-      const thisWeekStart = today.startOf('week').add(1, 'day'); // 周一
+      // 如果今天是周日，仍然属于当前周，不是下一周
+      const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
       const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
       
       const currentStart = dayjs(currentWeekInstance.weekStartDate);
@@ -3930,7 +3933,9 @@ const ViewTimetable = ({ user }) => {
                         // 第一项：在本周和下周之间切换
                         (() => {
                           // 判断当前是否在下周实例
-                          const isOnNextWeek = viewMode === 'instance' && currentWeekInstance?.weekStartDate && dayjs(currentWeekInstance.weekStartDate).isSame(dayjs().startOf('week').add(1, 'week'), 'day');
+                          const today = dayjs();
+                          const nextWeekStart = today.day() === 0 ? today.add(1, 'day') : today.startOf('week').add(8, 'day'); // 下周一开始
+                          const isOnNextWeek = viewMode === 'instance' && currentWeekInstance?.weekStartDate && dayjs(currentWeekInstance.weekStartDate).isSame(nextWeekStart, 'day');
                           // 处于下周实例：始终提供"本周课表"切回
                           if (isOnNextWeek) {
                             return {
