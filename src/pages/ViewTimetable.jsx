@@ -695,17 +695,26 @@ const ViewTimetable = ({ user }) => {
     const endTime = `${endTimeStr}:00`;
 
     let scheduleDate = null;
-    // 统一规则（修正）：
-    // - 周固定课表：新增应写入“固定课表模板”，不带具体日期（scheduleDate=null）
-    // - 日期范围课表：使用当前周计算具体日期
-    if (!timetable.isWeekly) {
-      const weekDates = getCurrentWeekDates();
-      if (weekDates.start) {
-        const dayIndex = weekDays.findIndex(day => day.key === dayKey);
-        const currentDate = weekDates.start.add(dayIndex, 'day');
-        scheduleDate = currentDate.format('YYYY-MM-DD');
-      }
+  // 统一规则（修正）：
+  // - 周固定课表（isWeekly=true）：
+  //   - 实例视图：仅写入“当前周实例”，需要具体日期 scheduleDate
+  //   - 模板视图：写入“固定课表模板”，不带具体日期（不设置 scheduleDate）
+  // - 日期范围课表（isWeekly=false）：始终使用当前周计算具体日期
+  if (timetable.isWeekly) {
+    if (viewMode === 'instance' && currentWeekInstance) {
+      const dayIndex = weekDays.findIndex(day => day.key === dayKey);
+      const base = dayjs(currentWeekInstance.weekStartDate);
+      const currentDate = base.add(dayIndex, 'day');
+      scheduleDate = currentDate.format('YYYY-MM-DD');
     }
+  } else {
+    const weekDates = getCurrentWeekDates();
+    if (weekDates.start) {
+      const dayIndex = weekDays.findIndex(day => day.key === dayKey);
+      const currentDate = weekDates.start.add(dayIndex, 'day');
+      scheduleDate = currentDate.format('YYYY-MM-DD');
+    }
+  }
 
     const payload = {
       studentName: trimmedName,
@@ -715,14 +724,15 @@ const ViewTimetable = ({ user }) => {
       note: '手动添加',
     };
 
-    if (scheduleDate) {
-      payload.scheduleDate = scheduleDate;
-    }
+  // 仅当需要按日期写入（实例或日期范围课表）时，才设置 scheduleDate
+  if (scheduleDate) {
+    payload.scheduleDate = scheduleDate;
+  }
 
     setAddLoading(true);
     try {
       let resp;
-      if (viewMode === 'instance' && currentWeekInstance) {
+  if (viewMode === 'instance' && currentWeekInstance) {
         // 实例视图：直接在实例中创建课程
         resp = await createInstanceSchedule(currentWeekInstance.id, payload);
       } else {
