@@ -437,6 +437,42 @@ const ViewTimetable = ({ user }) => {
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [availableTimeModalVisible, setAvailableTimeModalVisible] = useState(false);
+  
+  // 周实例显示范围状态
+  const [displayStartIndex, setDisplayStartIndex] = useState(0);
+  const maxDisplayCount = 3; // 最多显示3个实例
+  
+  // 计算当前显示的实例范围
+  const getDisplayInstances = (instances) => {
+    if (instances.length <= maxDisplayCount) {
+      return instances;
+    }
+    const endIndex = Math.min(displayStartIndex + maxDisplayCount, instances.length);
+    return instances.slice(displayStartIndex, endIndex);
+  };
+  
+  // 更新显示范围，确保当前选中的实例在显示范围内
+  const updateDisplayRange = (newCurrentIndex, instances) => {
+    if (instances.length <= maxDisplayCount) {
+      return;
+    }
+    
+    let newStartIndex = displayStartIndex;
+    
+    // 如果当前实例不在显示范围内，调整显示范围
+    if (newCurrentIndex < displayStartIndex) {
+      newStartIndex = newCurrentIndex;
+    } else if (newCurrentIndex >= displayStartIndex + maxDisplayCount) {
+      newStartIndex = newCurrentIndex - maxDisplayCount + 1;
+    }
+    
+    // 确保不超出边界
+    newStartIndex = Math.max(0, Math.min(newStartIndex, instances.length - maxDisplayCount));
+    
+    if (newStartIndex !== displayStartIndex) {
+      setDisplayStartIndex(newStartIndex);
+    }
+  };
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [exportModalVisible, setExportModalVisible] = useState(false);
@@ -1128,6 +1164,13 @@ const ViewTimetable = ({ user }) => {
       }
     }
   }, [weeklyInstances, viewMode, loading]); // 添加loading依赖，避免初始加载时触发
+  
+  // 当实例列表变化时，更新显示范围
+  useEffect(() => {
+    if (weeklyInstances.length > 0) {
+      updateDisplayRange(currentInstanceIndex, weeklyInstances);
+    }
+  }, [weeklyInstances, currentInstanceIndex]);
 
   // 注释掉旧的fetchTemplateSchedules调用，避免重复请求
   // useEffect(() => {
@@ -1519,6 +1562,7 @@ const ViewTimetable = ({ user }) => {
     setSwitchToInstanceLoading(true);
     
     setCurrentInstanceIndex(instanceIndex);
+    updateDisplayRange(instanceIndex, weeklyInstances);
     setInstancesLoading(true);
     
     try {
@@ -4290,8 +4334,9 @@ const ViewTimetable = ({ user }) => {
           />
           
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {(isInitialLoading ? [{ id: 'loading', weekStartDate: dayjs().format('YYYY-MM-DD') }] : displayWeeklyInstances).map((instance, index) => {
-              console.log('Rendering button for instance:', instance, 'index:', index, 'currentIndex:', currentInstanceIndex);
+            {(isInitialLoading ? [{ id: 'loading', weekStartDate: dayjs().format('YYYY-MM-DD') }] : getDisplayInstances(displayWeeklyInstances)).map((instance, displayIndex) => {
+              const actualIndex = displayStartIndex + displayIndex;
+              console.log('Rendering button for instance:', instance, 'displayIndex:', displayIndex, 'actualIndex:', actualIndex, 'currentIndex:', currentInstanceIndex);
               return (
                 <Button
                   key={instance.id}
@@ -4299,24 +4344,24 @@ const ViewTimetable = ({ user }) => {
                   size="small"
                   onClick={() => {
                     // 如果点击的是当前选中的实例，不做任何操作
-                    if (index === currentInstanceIndex) {
+                    if (actualIndex === currentInstanceIndex) {
                       console.log('Clicked current instance, no action needed');
                       return;
                     }
-                    console.log('Button clicked for index:', index);
-                    switchToWeekInstanceByIndex(index);
+                    console.log('Button clicked for actualIndex:', actualIndex);
+                    switchToWeekInstanceByIndex(actualIndex);
                   }}
                   disabled={instancesLoading}
                   style={{
                     minWidth: '80px',
                     fontSize: '12px',
-                    ...(index === currentInstanceIndex && {
+                    ...(actualIndex === currentInstanceIndex && {
                       backgroundColor: '#fa8c16 !important',
                       borderColor: '#fa8c16 !important',
                       color: '#fff !important'
                     })
                   }}
-                  className={index === currentInstanceIndex ? 'selected-instance-btn' : ''}
+                  className={actualIndex === currentInstanceIndex ? 'selected-instance-btn' : ''}
                 >
                   {dayjs(instance.weekStartDate).format('MM/DD')}
                 </Button>
