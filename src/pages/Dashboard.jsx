@@ -2627,7 +2627,7 @@ const Dashboard = ({ user }) => {
     }, [allCoaches, coachCourseCount]);
 
     return (
-      <Card title={viewMode === 'instance' ? '本周排课信息' : '固定课表模板'} size="small" style={{ marginTop: '16px' }}
+      <Card title={viewMode === 'instance' ? '本周排课信息' : '固定课表模板'} size="small" style={{ marginTop: '24px' }}
         extra={
           <div>
             <Button.Group>
