@@ -184,6 +184,16 @@ export const getCoachesStatistics = async () => {
   }
 };
 
+// 获取指定教练的上月课程明细
+export const getCoachLastMonthRecords = async (coachId) => {
+  try {
+    const response = await api.get(`/admin/coaches/${coachId}/last-month-records`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 获取基于实例逻辑的指定日期课程（今日/明日）
 // 加合并/短缓存，避免同日期多次请求
 const byDateCache = new Map(); // date -> {time, promise, data}

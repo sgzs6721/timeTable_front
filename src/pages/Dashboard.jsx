@@ -4,7 +4,7 @@ import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlin
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce } from '../services/timetable';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule, getLeaveRecords, deleteLeaveRecordsBatch } from '../services/weeklyInstance';
-import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables } from '../services/admin';
+import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables, getCoachLastMonthRecords } from '../services/admin';
 import { getAllStudents } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -314,6 +314,8 @@ const Dashboard = ({ user }) => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedCoach, setSelectedCoach] = useState(null);
   const [modalSubTitleTomorrow, setModalSubTitleTomorrow] = useState('');
+  // 管理员概览内 今日/明日/请假 tab 状态上移，避免子组件因重挂而重置
+  const [adminDayTab, setAdminDayTab] = useState('today');
   const [studentColorMap, setStudentColorMap] = useState({});
 
   // 新增状态用于管理弹窗功能
@@ -2720,11 +2722,10 @@ const Dashboard = ({ user }) => {
   };
 
   // 管理员概览组件
-  const AdminOverview = () => {
+  const AdminOverview = ({ dayTab, setDayTab }) => {
     const { coaches, totalCoaches, totalTodayCourses, totalWeeklyCourses, totalLastWeekCourses } = coachesStatistics || {};
     
-    // 今日/明日/请假切换
-    const [dayTab, setDayTab] = useState('today'); // 'today' | 'tomorrow' | 'leave'
+    // dayTab 由父组件托管（'today' | 'tomorrow' | 'leave'）
     const [tomorrowCoachDetails, setTomorrowCoachDetails] = useState({});
     const [coachDetailsLoading, setCoachDetailsLoading] = useState(false);
     
@@ -2735,6 +2736,43 @@ const Dashboard = ({ user }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10; // 每页显示10个记录
     const [selectedRecords, setSelectedRecords] = useState(new Set());
+
+    // 上月课程弹窗状态
+    const [lastMonthModalVisible, setLastMonthModalVisible] = useState(false);
+    const [lastMonthCoachName, setLastMonthCoachName] = useState('');
+    const [lastMonthLoading, setLastMonthLoading] = useState(false);
+    const [lastMonthRecords, setLastMonthRecords] = useState([]);
+
+    const openLastMonthModal = async (coachName) => {
+      setLastMonthCoachName(coachName);
+      setLastMonthModalVisible(true);
+      setLastMonthLoading(true);
+      try {
+        // 根据教练名找到其ID
+        const coach = (coaches || []).find(c => (c.nickname || c.username) === coachName);
+        if (!coach) {
+          setLastMonthRecords([]);
+          setLastMonthLoading(false);
+          return;
+        }
+        const resp = await getCoachLastMonthRecords(coach.id);
+        if (resp && resp.success) {
+          const list = (resp.data || []).map(x => ({
+            scheduleDate: x.date,
+            timeRange: `${String(x.startTime||'').slice(0,5)}-${String(x.endTime||'').slice(0,5)}`,
+            studentName: x.studentName || '',
+            status: x.isOnLeave ? '请假' : '正常'
+          }));
+          setLastMonthRecords(list);
+        } else {
+          setLastMonthRecords([]);
+        }
+      } catch (error) {
+        message.error('获取上月课程记录失败');
+      } finally {
+        setLastMonthLoading(false);
+      }
+    };
 
     // 获取请假记录
     const fetchLeaveRecords = async () => {
@@ -2790,6 +2828,13 @@ const Dashboard = ({ user }) => {
         }
       });
     };
+
+    // 当切到“请假”页时自动拉取数据，避免空白
+    useEffect(() => {
+      if (dayTab === 'leave') {
+        fetchLeaveRecords();
+      }
+    }, [dayTab]);
 
     // 切换记录选中状态
     const toggleRecordSelection = (recordId) => {
@@ -3642,11 +3687,18 @@ const Dashboard = ({ user }) => {
                   dataIndex: 'lastMonthCourses',
                   key: 'lastMonthCourses',
                   align: 'center',
-                  render: (value) => (
-                    <span style={{ color: '#722ed1', fontWeight: 500 }}>
-                      {value ?? 0}
-                    </span>
-                  )
+                  render: (value, record) => {
+                    const coachName = record.nickname || record.username;
+                    return (
+                      <span
+                        style={{ color: '#722ed1', fontWeight: 500, cursor: 'pointer' }}
+                        onClick={() => openLastMonthModal(coachName)}
+                        title="点击查看上月所有上课记录"
+                      >
+                        {value ?? 0}
+                      </span>
+                    );
+                  }
                 }
               ]}
               pagination={false}
@@ -3666,6 +3718,51 @@ const Dashboard = ({ user }) => {
           studentName={selectedStudent}
           coachName={selectedCoach}
         />
+
+        {/* 上月课程记录弹窗 */}
+        <Modal
+          title={`上月课程记录 - ${lastMonthCoachName}`}
+          open={lastMonthModalVisible}
+          onCancel={() => setLastMonthModalVisible(false)}
+          footer={null}
+          width={700}
+          style={{ top: 24 }}
+        >
+          <Spin spinning={lastMonthLoading}>
+            <div style={{ marginBottom: 12, fontSize: '13px', color: '#666' }}>
+              共 {lastMonthRecords.length} 条
+            </div>
+            <List
+              dataSource={lastMonthRecords}
+              renderItem={(item, index) => (
+                <List.Item style={{ padding: '8px 0', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
+                    <div style={{ minWidth: '40px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ color: '#999', fontSize: '11px' }}>#{index + 1}</span>
+                    </div>
+                    <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ color: '#722ed1', fontWeight: 500 }}>{item.scheduleDate}</span>
+                    </div>
+                    <div style={{ minWidth: '100px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ color: '#666' }}>{item.timeRange}</span>
+                    </div>
+                    <div style={{ minWidth: '100px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ color: '#333', fontWeight: 500 }}>{item.studentName || '-'}</span>
+                    </div>
+                    <div style={{ minWidth: '60px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                      {item.status === '请假' ? (
+                        <Tag color="orange" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>请假</Tag>
+                      ) : (
+                        <Tag color="green" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>正常</Tag>
+                      )}
+                    </div>
+                  </div>
+                </List.Item>
+              )}
+              pagination={{ pageSize: 10, size: 'small', showSizeChanger: false }}
+            />
+          </Spin>
+        </Modal>
       </div>
     );
   };
@@ -3695,7 +3792,7 @@ const Dashboard = ({ user }) => {
       tabItems.push({
         key: 'overview',
         label: '教练概览',
-        children: <AdminOverview />
+        children: <AdminOverview dayTab={adminDayTab} setDayTab={setAdminDayTab} />
       });
     }
     
