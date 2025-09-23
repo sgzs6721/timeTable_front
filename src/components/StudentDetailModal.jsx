@@ -50,8 +50,8 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       children: (
         <List
           dataSource={scheduleRecords}
-          renderItem={(item) => (
-            <List.Item style={{ padding: '8px 0', fontSize: '12px' }}>
+          renderItem={(item, index) => (
+            <List.Item key={`${item.scheduleDate}-${item.timeRange}-${item.status}-${index}`} style={{ padding: '8px 0', fontSize: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
                 <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                   <span style={{ color: '#1890ff', fontWeight: 500 }}>
@@ -111,8 +111,8 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       children: (
         <List
           dataSource={leaveRecords}
-          renderItem={(item) => (
-            <List.Item style={{ padding: '8px 0', fontSize: '12px' }}>
+          renderItem={(item, index) => (
+            <List.Item key={`${item.leaveDate}-${item.timeRange}-${item.leaveReason || ''}-${index}`} style={{ padding: '8px 0', fontSize: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
                 <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                   <span style={{ color: '#fa8c16', fontWeight: 500 }}>
@@ -164,6 +164,7 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
           defaultActiveKey="schedules"
           items={tabItems}
           size="small"
+          destroyInactiveTabPane
         />
       </Spin>
     </Modal>

@@ -3711,13 +3711,7 @@ const Dashboard = ({ user }) => {
         {/* 活动课表本周排课信息 */}
         <WeeklyScheduleBlock coachColorMap={coachColorMap} />
 
-        {/* 学员详情模态框 */}
-        <StudentDetailModal
-          visible={studentDetailVisible}
-          onClose={() => setStudentDetailVisible(false)}
-          studentName={selectedStudent}
-          coachName={selectedCoach}
-        />
+        {/* 学员详情模态框在页面底部统一渲染，避免重复 */}
 
         {/* 上月课程记录弹窗 */}
         <Modal
