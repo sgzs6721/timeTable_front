@@ -2940,27 +2940,32 @@ const ViewTimetable = ({ user }) => {
   }, [currentWeekSchedules, currentWeekInstance?.schedules, viewMode]);
 
   // 本周请假课时数
-  const weeklyLeaveCount = useMemo(() => {
-    // 避免提前引用：本地计算显示视图
-    const dv = ((switchToInstanceLoading || switchToTemplateLoading) && tempViewMode 
-      ? tempViewMode 
-      : viewMode);
-    // 优先：对于周固定课表的实例视图，用模板与实例差集作为请假数（更准确）
-    if (dv === 'instance' && timetable?.isWeekly && legendStats) {
-      return legendStats.cancelled || 0;
-    }
-    // 兜底：统计标记为 isOnLeave 的课程（若后端有返回）
-    let schedules = [];
-    if (viewMode === 'instance' && currentWeekInstance?.schedules) {
-      schedules = currentWeekInstance.schedules;
-    } else if (viewMode === 'instance') {
-      schedules = allSchedules || [];
+  const [weeklyLeaveCount, setWeeklyLeaveCount] = useState(0);
+  
+  // 获取请假课时数
+  const fetchLeaveCount = useCallback(async () => {
+    if (viewMode === 'instance' && timetable?.isWeekly && currentWeekInstance?.id) {
+      try {
+        const response = await getCurrentWeekInstanceIncludingLeaves(timetable.id);
+        if (response && response.success && response.data && response.data.schedules) {
+          const leaveCount = response.data.schedules.filter(s => s.isOnLeave === true).length;
+          setWeeklyLeaveCount(leaveCount);
+        } else {
+          setWeeklyLeaveCount(0);
+        }
+      } catch (error) {
+        console.error('获取请假课时数失败:', error);
+        setWeeklyLeaveCount(0);
+      }
     } else {
-      schedules = currentWeekSchedules;
+      setWeeklyLeaveCount(0);
     }
-    if (!schedules || schedules.length === 0) return 0;
-    return schedules.filter((s) => s.isOnLeave).length;
-  }, [switchToInstanceLoading, switchToTemplateLoading, tempViewMode, viewMode, timetable?.isWeekly, legendStats, currentWeekSchedules, currentWeekInstance?.schedules, allSchedules]);
+  }, [viewMode, timetable?.isWeekly, timetable?.id, currentWeekInstance?.id]);
+
+  // 当相关状态变化时重新获取请假课时数
+  useEffect(() => {
+    fetchLeaveCount();
+  }, [fetchLeaveCount]);
 
   const handleWeekChange = (week) => {
     setCurrentWeek(week);
@@ -4007,84 +4012,69 @@ const ViewTimetable = ({ user }) => {
                     disabled={switchToInstanceLoading || switchToTemplateLoading}
                     menu={{
                       items: [
-                        // 第一项：在本周和下周之间切换
-                        (() => {
-                          // 判断当前是否在下周实例
-                          const today = dayjs();
-                          const nextWeekStart = today.day() === 0 ? today.add(1, 'day') : today.startOf('week').add(8, 'day'); // 下周一开始
-                          const isOnNextWeek = viewMode === 'instance' && currentWeekInstance?.weekStartDate && dayjs(currentWeekInstance.weekStartDate).isSame(nextWeekStart, 'day');
-                          // 处于下周实例：始终提供"本周课表"切回
-                          if (isOnNextWeek) {
-                            return {
-                              key: 'thisWeek',
-                              label: '本周课表',
-                              icon: <UndoOutlined />,
-                              onClick: async () => {
-                                // 确保切换到真正的本周实例
-                                await switchToCurrentWeekInstance();
-                                message.success('已切换到本周课表');
-                              }
-                            };
+                        // 第一项：本周课表
+                        {
+                          key: 'thisWeek',
+                          label: '本周课表',
+                          icon: <UndoOutlined />,
+                          onClick: async () => {
+                            await switchToCurrentWeekInstance();
+                            message.success('已切换到本周课表');
                           }
-                          // 默认：下周课表（仅在周日19:00之后显示）
-                          const now = dayjs();
-                          const isSundayAfter7pm = now.day() === 0 ? now.hour() >= 19 : false; // day() 周日为0
-                          if (!isSundayAfter7pm) {
-                            return null;
-                          }
-                          return {
-                            key: 'nextWeek',
-                            label: '下周课表',
-                            icon: <UndoOutlined />,
-                            onClick: async () => {
-                              try {
-                                // 先查是否已有下周实例
-                                const listResp = await getWeeklyInstances(timetableId);
-                                if (listResp.success && Array.isArray(listResp.data)) {
-                                  const nextMonday = dayjs().startOf('week').add(7, 'day');
-                                  const existing = listResp.data.find(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
-                                  if (existing) {
-                                    setInstanceLoading(true);
-                                    const sw = await switchToWeekInstance(existing.id);
-                                    if (sw.success) {
-                                      const list = await getInstanceSchedules(existing.id);
-                                      if (list.success) {
-                                        setCurrentWeekInstance(existing);
-                                        setAllSchedules(list.data || []);
-                                        setViewMode('instance');
-                                        message.success('已切换到下周课表');
-                                      }
+                        },
+                        // 第二项：下周课表
+                        {
+                          key: 'nextWeek',
+                          label: '下周课表',
+                          icon: <UndoOutlined />,
+                          onClick: async () => {
+                            try {
+                              // 先查是否已有下周实例
+                              const listResp = await getWeeklyInstances(timetableId);
+                              if (listResp.success && Array.isArray(listResp.data)) {
+                                const nextMonday = dayjs().startOf('week').add(7, 'day');
+                                const existing = listResp.data.find(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
+                                if (existing) {
+                                  setInstanceLoading(true);
+                                  const sw = await switchToWeekInstance(existing.id);
+                                  if (sw.success) {
+                                    const list = await getInstanceSchedules(existing.id);
+                                    if (list.success) {
+                                      setCurrentWeekInstance(existing);
+                                      setAllSchedules(list.data || []);
+                                      setViewMode('instance');
+                                      message.success('已切换到下周课表');
                                     }
-                                    setInstanceLoading(false);
-                                    return;
                                   }
-                                }
-
-                                // 没有则生成再切换
-                                const resp = await generateNextWeekInstance(timetableId);
-                                if (!resp.success) {
-                                  message.error(resp.message || '生成失败');
+                                  setInstanceLoading(false);
                                   return;
                                 }
-                                const instanceId = resp.data?.id || resp.data?.instanceId;
-                                if (instanceId) {
-                                  setInstanceLoading(true);
-                                  await switchToWeekInstance(instanceId);
-                                  const list = await getInstanceSchedules(instanceId);
-                                  if (list.success) {
-                                    setCurrentWeekInstance({ id: instanceId, weekStartDate: resp.data.weekStartDate, weekEndDate: resp.data.weekEndDate });
-                                    setAllSchedules(list.data || []);
-                                    setViewMode('instance');
-                                  }
-                                  message.success('已生成并切换至下周课表');
-                                  setInstanceLoading(false);
-                                }
-                              } catch {
-                                message.error('生成失败');
                               }
+
+                              // 没有则生成再切换
+                              const resp = await generateNextWeekInstance(timetableId);
+                              if (!resp.success) {
+                                message.error(resp.message || '生成失败');
+                                return;
+                              }
+                              const instanceId = resp.data?.id || resp.data?.instanceId;
+                              if (instanceId) {
+                                setInstanceLoading(true);
+                                await switchToWeekInstance(instanceId);
+                                const list = await getInstanceSchedules(instanceId);
+                                if (list.success) {
+                                  setCurrentWeekInstance({ id: instanceId, weekStartDate: resp.data.weekStartDate, weekEndDate: resp.data.weekEndDate });
+                                  setAllSchedules(list.data || []);
+                                  setViewMode('instance');
+                                }
+                                message.success('已生成并切换至下周课表');
+                                setInstanceLoading(false);
+                              }
+                            } catch {
+                              message.error('生成失败');
                             }
-                          };
-                        })(),
+                          }
+                        },
                         // 第二项：清空本周
                         {
                           key: 'clear',
@@ -4250,7 +4240,7 @@ const ViewTimetable = ({ user }) => {
                   whiteSpace: 'nowrap'
                 }}>
                   {displayViewMode === 'instance' ? '本周' : '每周'}
-                  <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 4px' }}>
+                  <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 2px' }}>
                     {isInitialLoading ? '0' : displayWeeklyStats.count}
                   </span>
                   节课
@@ -4261,8 +4251,8 @@ const ViewTimetable = ({ user }) => {
                   <span>个</span>
                   {displayViewMode === 'instance' && !isInitialLoading && weeklyLeaveCount > 0 && (
                     <>
-                      <span style={{ marginLeft: 12 }}>请假</span>
-                      <span style={{ color: '#fa8c16', fontWeight: 'bold', margin: '0 4px' }}>
+                      <span style={{ margin: '0 4px' }}>请假</span>
+                      <span style={{ color: '#fa8c16', fontWeight: 'bold', margin: '0 2px' }}>
                         {weeklyLeaveCount}
                       </span>
                       <span>课时</span>
