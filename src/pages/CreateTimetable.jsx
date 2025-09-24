@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Switch, DatePicker, Button, message, Row, Col } from 'antd';
+import { Form, Input, DatePicker, Button, message, Row, Col, Radio } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { createTimetable } from '../services/timetable';
 import dayjs from 'dayjs';
@@ -71,13 +71,16 @@ const CreateTimetable = ({ user }) => {
         <Form.Item
           name="isWeekly"
           label="课表类型"
-          valuePropName="checked"
+          initialValue={false}
         >
-          <Switch
-            checkedChildren="周固定课表"
-            unCheckedChildren="日期范围课表"
-            onChange={handleWeeklyChange}
-          />
+          <Radio.Group 
+            onChange={(e) => handleWeeklyChange(e.target.value)}
+            optionType="button"
+            buttonStyle="solid"
+          >
+            <Radio.Button value={false}>日期范围课表</Radio.Button>
+            <Radio.Button value={true}>周固定课表</Radio.Button>
+          </Radio.Group>
         </Form.Item>
 
         {!isWeekly && (
