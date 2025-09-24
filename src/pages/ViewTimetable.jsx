@@ -2945,22 +2945,33 @@ const ViewTimetable = ({ user }) => {
   // 获取请假课时数
   const fetchLeaveCount = useCallback(async () => {
     if (viewMode === 'instance' && timetable?.isWeekly && currentWeekInstance?.id) {
-      try {
-        const response = await getCurrentWeekInstanceIncludingLeaves(timetable.id);
-        if (response && response.success && response.data && response.data.schedules) {
-          const leaveCount = response.data.schedules.filter(s => s.isOnLeave === true).length;
-          setWeeklyLeaveCount(leaveCount);
-        } else {
+      // 检查当前查看的实例是否是真实的“本周”
+      const isViewingActualCurrentWeek = currentWeekInstance.weekStartDate && 
+        dayjs(currentWeekInstance.weekStartDate).isSame(dayjs().startOf('week'), 'day');
+
+      if (isViewingActualCurrentWeek) {
+        try {
+          // 只在查看真实本周时调用此API
+          const response = await getCurrentWeekInstanceIncludingLeaves(timetable.id);
+          if (response && response.success && response.data && response.data.schedules) {
+            const leaveCount = response.data.schedules.filter(s => s.isOnLeave === true).length;
+            setWeeklyLeaveCount(leaveCount);
+          } else {
+            setWeeklyLeaveCount(0);
+          }
+        } catch (error) {
+          console.error('获取请假课时数失败:', error);
           setWeeklyLeaveCount(0);
         }
-      } catch (error) {
-        console.error('获取请假课时数失败:', error);
+      } else {
+        // 查看其它周时，请假计数为0（因为没有API获取其它周的请假数据）
         setWeeklyLeaveCount(0);
       }
     } else {
+      // 非实例视图模式，请假计数为0
       setWeeklyLeaveCount(0);
     }
-  }, [viewMode, timetable?.isWeekly, timetable?.id, currentWeekInstance?.id]);
+  }, [viewMode, timetable?.isWeekly, timetable?.id, currentWeekInstance?.id, currentWeekInstance?.weekStartDate]);
 
   // 当相关状态变化时重新获取请假课时数
   useEffect(() => {
