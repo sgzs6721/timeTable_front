@@ -4028,50 +4028,56 @@ const ViewTimetable = ({ user }) => {
                           label: '下周课表',
                           icon: <UndoOutlined />,
                           onClick: async () => {
+                            setInstanceLoading(true);
                             try {
-                              // 先查是否已有下周实例
-                              const listResp = await getWeeklyInstances(timetableId);
+                              // 统一逻辑：先获取最新实例列表
+                              let listResp = await getWeeklyInstances(timetableId);
+                              let instances = [];
                               if (listResp.success && Array.isArray(listResp.data)) {
-                                const nextMonday = dayjs().startOf('week').add(7, 'day');
-                                const existing = listResp.data.find(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
-                                if (existing) {
-                                  setInstanceLoading(true);
-                                  const sw = await switchToWeekInstance(existing.id);
-                                  if (sw.success) {
-                                    const list = await getInstanceSchedules(existing.id);
-                                    if (list.success) {
-                                      setCurrentWeekInstance(existing);
-                                      setAllSchedules(list.data || []);
-                                      setViewMode('instance');
-                                      message.success('已切换到下周课表');
-                                    }
-                                  }
+                                instances = listResp.data.sort((a, b) => 
+                                  dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))
+                                );
+                                // 在这里更新 weeklyInstances 状态，确保UI同步
+                                setWeeklyInstances(instances);
+                              }
+
+                              const nextMonday = dayjs().startOf('week').add(7, 'day');
+                              let nextWeekIndex = instances.findIndex(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
+
+                              // 如果没有找到下周实例，则生成一个
+                              if (nextWeekIndex === -1) {
+                                message.info('正在生成下周课表...');
+                                const genResp = await generateNextWeekInstance(timetableId);
+                                if (!genResp.success) {
+                                  message.error(genResp.message || '生成下周课表失败');
                                   setInstanceLoading(false);
                                   return;
                                 }
+                                
+                                // 生成后，重新获取实例列表并更新状态
+                                listResp = await getWeeklyInstances(timetableId);
+                                if (listResp.success && Array.isArray(listResp.data)) {
+                                  instances = listResp.data.sort((a, b) => 
+                                    dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))
+                                  );
+                                  setWeeklyInstances(instances);
+                                  nextWeekIndex = instances.findIndex(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
+                                }
                               }
 
-                              // 没有则生成再切换
-                              const resp = await generateNextWeekInstance(timetableId);
-                              if (!resp.success) {
-                                message.error(resp.message || '生成失败');
-                                return;
+                              // 切换到下周实例
+                              if (nextWeekIndex !== -1) {
+                                // 调用统一的切换函数，它会处理所有相关的状态更新
+                                await switchToWeekInstanceByIndex(nextWeekIndex);
+                                message.success('已切换到下周课表');
+                              } else {
+                                message.error('无法找到或生成下周课表，请刷新重试');
                               }
-                              const instanceId = resp.data?.id || resp.data?.instanceId;
-                              if (instanceId) {
-                                setInstanceLoading(true);
-                                await switchToWeekInstance(instanceId);
-                                const list = await getInstanceSchedules(instanceId);
-                                if (list.success) {
-                                  setCurrentWeekInstance({ id: instanceId, weekStartDate: resp.data.weekStartDate, weekEndDate: resp.data.weekEndDate });
-                                  setAllSchedules(list.data || []);
-                                  setViewMode('instance');
-                                }
-                                message.success('已生成并切换至下周课表');
-                                setInstanceLoading(false);
-                              }
-                            } catch {
-                              message.error('生成失败');
+                            } catch (e) {
+                              message.error('操作失败，请稍后重试');
+                              console.error('Switch to next week failed:', e);
+                            } finally {
+                              setInstanceLoading(false);
                             }
                           }
                         },
