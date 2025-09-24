@@ -1158,7 +1158,7 @@ const ViewTimetable = ({ user }) => {
       // 检查是否应该切换到本周实例
       const today = dayjs();
       // 如果今天是周日，仍然属于当前周，不是下一周
-      const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
+      const thisWeekStart = today.startOf('week'); // 周一
       const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
       
       const thisWeekIndex = weeklyInstances.findIndex(inst => {
@@ -1526,7 +1526,7 @@ const ViewTimetable = ({ user }) => {
         // 如果没有当前周实例，尝试找到本周的实例
         const today = dayjs();
         // 与后端保持一致：周一为一周的开始，但周日仍属于当前周
-        const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
+        const thisWeekStart = today.startOf('week'); // 周一
         const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
         
         const thisWeekIndex = sortedInstances.findIndex(inst => {
@@ -1632,7 +1632,7 @@ const ViewTimetable = ({ user }) => {
     // 计算本周的开始和结束日期
     const today = dayjs();
     // 如果今天是周日，仍然属于当前周，不是下一周
-    const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
+    const thisWeekStart = today.startOf('week'); // 周一
     const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
     
     // 查找本周实例
@@ -1682,7 +1682,7 @@ const ViewTimetable = ({ user }) => {
     if (viewMode === 'instance' && currentWeekInstance?.weekStartDate) {
       const today = dayjs();
       // 如果今天是周日，仍然属于当前周，不是下一周
-      const thisWeekStart = today.day() === 0 ? today.subtract(6, 'day') : today.startOf('week').add(1, 'day'); // 周一
+      const thisWeekStart = today.startOf('week'); // 周一
       const thisWeekEnd = thisWeekStart.add(6, 'day'); // 周日
       
       const currentStart = dayjs(currentWeekInstance.weekStartDate);
