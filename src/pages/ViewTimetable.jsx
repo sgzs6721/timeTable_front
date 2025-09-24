@@ -4024,7 +4024,7 @@ const ViewTimetable = ({ user }) => {
                     menu={{
                       items: [
                         // 第一项：本周课表
-                        {
+                        instanceWeekLabel !== '本周' && {
                           key: 'thisWeek',
                           label: '本周课表',
                           icon: <UndoOutlined />,
@@ -4034,7 +4034,7 @@ const ViewTimetable = ({ user }) => {
                           }
                         },
                         // 第二项：下周课表
-                        {
+                        instanceWeekLabel !== '下周' && {
                           key: 'nextWeek',
                           label: '下周课表',
                           icon: <UndoOutlined />,
