@@ -1,5 +1,160 @@
 /* Dashboard.css */
 
+.student-detail-modal .ant-modal-body {
+  /* 整体不出现内部滚动条，由外层容器滚动 */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 让模态内容区域上下结构稳定，分页始终在下方 */
+.student-detail-modal .student-detail-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; /* 允许内部可滚动区域收缩 */
+}
+
+.student-detail-modal .student-detail-tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.student-detail-modal .student-detail-tabs .ant-tabs-content-holder {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.student-detail-modal .student-detail-tabs .ant-tabs-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.student-detail-modal .student-detail-tabs .ant-tabs-tabpane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.student-detail-modal .student-detail-tabs .ant-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.student-detail-modal .student-detail-tabs .ant-list .ant-spin-nested-loading,
+.student-detail-modal .student-detail-tabs .ant-list .ant-spin-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.student-detail-modal .student-detail-tabs .ant-list .ant-list-items {
+  flex: 1; /* 列表占满剩余空间 */
+  min-height: 0;
+  overflow: hidden; /* 由容器控制，避免内部滚动条 */
+}
+
+.student-detail-modal .student-detail-tabs .ant-list .ant-list-pagination {
+  margin-top: auto; /* 分页始终吸底 */
+  background: #fff;
+  padding-top: 8px;
+}
+
+.student-detail-modal .ant-tabs-nav .ant-tabs-tab .ant-tabs-tab-btn > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px; /* 图标与文字间距（兜底，JSX已加margin）*/
+}
+
+.student-detail-modal .ant-list-pagination {
+  display: flex;
+  justify-content: center; /* 分页整体居中 */
+  margin-top: 6px; /* 往上移，减小与列表的间距 */
+  margin-bottom: 0; /* 靠近底部也更紧凑 */
+}
+
+/* 让“第 X-Y 条，共 Z 条”在上一行 */
+.student-detail-modal .ant-list-pagination .ant-pagination .ant-pagination-total-text {
+  width: 100%;
+  display: block;
+  text-align: center;
+  margin-top: 6px;
+  font-size: 12px; /* 字体小一点 */
+  color: #666;
+  order: 1; /* 放到最后一行显示在下方 */
+}
+
+/* 控件在一行显示并居中 */
+.student-detail-modal .ant-list-pagination .ant-pagination {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap; /* 允许换行，使总计文字单独一行 */
+  align-items: center;
+  justify-content: center;
+  gap: 8px; /* 控件水平间距 */
+}
+
+.student-detail-modal .ant-pagination .ant-pagination-item {
+  margin: 0 4px; /* 数字间距更近些 */
+  border: none; /* 数字不加边框 */
+  background: transparent; /* 去除背景 */
+}
+
+.student-detail-modal .ant-pagination .ant-pagination-prev,
+.student-detail-modal .ant-pagination .ant-pagination-next {
+  margin: 0 4px; /* 箭头与数字的间距更紧凑 */
+}
+
+/* 只有一页时隐藏箭头 */
+.student-detail-modal .ant-pagination .ant-pagination-prev.ant-pagination-disabled,
+.student-detail-modal .ant-pagination .ant-pagination-next.ant-pagination-disabled {
+  display: none;
+}
+
+.student-detail-modal .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.student-detail-modal .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  border-radius: 50%; /* 仅为左右箭头设置圆形 */
+  border: 1px solid #1677ff;
+}
+
+.student-detail-modal .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.student-detail-modal .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1677ff;
+  background-color: #fff;
+}
+
+/* 选中页码样式：仅文字高亮，无边框背景 */
+.student-detail-modal .ant-pagination .ant-pagination-item-active {
+  border: none;
+  background: transparent;
+}
+.student-detail-modal .ant-pagination .ant-pagination-item a {
+  color: #1677ff;
+}
+.student-detail-modal .ant-pagination .ant-pagination-item-active a {
+  color: #1677ff;
+  font-weight: 700;             /* 当前页更醒目 */
+  text-decoration: underline;   /* 当前页增加下划线标识 */
+}
+
+.student-detail-modal .ant-pagination {
+  margin-top: 8px;
+}
+
 .timetable-list .ant-list-items {
   padding-inline-start: 0 !important; /* Reset default list padding */
 }

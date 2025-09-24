@@ -9,6 +9,9 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
   const [leaveRecords, setLeaveRecords] = useState([]);
   const [actualCoachName, setActualCoachName] = useState(coachName);
 
+  const PAGE_SIZE = 10;
+  const ITEM_ROW_HEIGHT = 44; // 单行高度，确保分页固定位置
+
   useEffect(() => {
     if (visible && studentName) {
       fetchStudentRecords();
@@ -43,15 +46,17 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       key: 'schedules',
       label: (
         <span>
-          <CalendarOutlined />
+          <CalendarOutlined style={{ marginRight: 6 }} />
           上课记录 ({scheduleRecords.length})
         </span>
       ),
       children: (
+        <div style={{ minHeight: PAGE_SIZE * ITEM_ROW_HEIGHT, display: 'flex', flexDirection: 'column' }}>
         <List
+          className="fixed-height-list"
           dataSource={scheduleRecords}
           renderItem={(item, index) => (
-            <List.Item key={`${item.scheduleDate}-${item.timeRange}-${item.status}-${index}`} style={{ padding: '8px 0', fontSize: '12px' }}>
+            <List.Item key={`${item.scheduleDate}-${item.timeRange}-${item.status}-${index}`} style={{ padding: '8px 0', fontSize: '12px', minHeight: ITEM_ROW_HEIGHT - 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
                 <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                   <span style={{ color: '#1890ff', fontWeight: 500 }}>
@@ -91,28 +96,32 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
             </List.Item>
           )}
           pagination={{ 
-            pageSize: 10, 
+            pageSize: PAGE_SIZE, 
             size: 'small',
             showSizeChanger: false,
             showQuickJumper: false,
+            hideOnSinglePage: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
           }}
         />
+        </div>
       )
     },
     {
       key: 'leaves',
       label: (
         <span>
-          <ClockCircleOutlined />
+          <ClockCircleOutlined style={{ marginRight: 6 }} />
           请假记录 ({leaveRecords.length})
         </span>
       ),
       children: (
+        <div style={{ minHeight: PAGE_SIZE * ITEM_ROW_HEIGHT }}>
         <List
+          className="fixed-height-list"
           dataSource={leaveRecords}
           renderItem={(item, index) => (
-            <List.Item key={`${item.leaveDate}-${item.timeRange}-${item.leaveReason || ''}-${index}`} style={{ padding: '8px 0', fontSize: '12px' }}>
+            <List.Item key={`${item.leaveDate}-${item.timeRange}-${item.leaveReason || ''}-${index}`} style={{ padding: '8px 0', fontSize: '12px', minHeight: ITEM_ROW_HEIGHT - 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
                 <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                   <span style={{ color: '#fa8c16', fontWeight: 500 }}>
@@ -134,13 +143,15 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
             </List.Item>
           )}
           pagination={{ 
-            pageSize: 10, 
+            pageSize: PAGE_SIZE, 
             size: 'small',
             showSizeChanger: false,
             showQuickJumper: false,
+            hideOnSinglePage: true,
             showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
           }}
         />
+        </div>
       )
     }
   ];
@@ -153,8 +164,11 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       footer={null}
       width={600}
       style={{ top: 20 }}
+      rootClassName="student-detail-modal"
+      bodyStyle={{ height: '60vh', overflowY: 'auto' }}
     >
       <Spin spinning={loading}>
+        <div className="student-detail-body">
         <div style={{ marginBottom: 12, fontSize: '13px' }}>
           <span style={{ color: '#666' }}>教练：</span>
           <span style={{ fontWeight: 500 }}>{actualCoachName}</span>
@@ -165,7 +179,9 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
           items={tabItems}
           size="small"
           destroyInactiveTabPane
+          className="student-detail-tabs"
         />
+        </div>
       </Spin>
     </Modal>
   );

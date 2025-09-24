@@ -1091,6 +1091,25 @@ code {
   box-shadow: 0 0 0 2px #1890ff40 !important;
 }
 
+/* 学员详情模态框：隐藏垂直滚动条但保留滚动能力 */
+.student-detail-modal .ant-modal-body {
+  /* 已在组件中设置了高度与 overflow-y:auto，这里仅负责隐藏滚动条外观 */
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.student-detail-modal .ant-modal-body::-webkit-scrollbar {
+  width: 0 !important; /* Chrome/Safari */
+  height: 0 !important;
+}
+
+/* 固定模态内列表分页在底部 */
+.student-detail-modal .fixed-height-list .ant-list-pagination {
+  margin-top: auto !important; /* 将分页推到容器底部 */
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
 /* DatePicker移动端触摸优化 */
 @media (max-width: 768px) {
   .mobile-friendly-datepicker .ant-picker-cell {
