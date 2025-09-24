@@ -1110,6 +1110,13 @@ code {
   padding-top: 8px;
 }
 
+/* 上月课程记录弹窗：分页居中 */
+.last-month-modal .ant-list-pagination,
+.last-month-modal .centered-pagination {
+  display: flex !important;
+  justify-content: center !important;
+}
+
 /* DatePicker移动端触摸优化 */
 @media (max-width: 768px) {
   .mobile-friendly-datepicker .ant-picker-cell {

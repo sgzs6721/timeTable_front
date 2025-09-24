@@ -3721,6 +3721,7 @@ const Dashboard = ({ user }) => {
           footer={null}
           width={700}
           style={{ top: 24 }}
+          rootClassName="last-month-modal"
         >
           <Spin spinning={lastMonthLoading}>
             <div style={{ marginBottom: 12, fontSize: '13px', color: '#666' }}>
@@ -3753,7 +3754,7 @@ const Dashboard = ({ user }) => {
                   </div>
                 </List.Item>
               )}
-              pagination={{ pageSize: 10, size: 'small', showSizeChanger: false }}
+              pagination={{ pageSize: 10, size: 'small', showSizeChanger: false, className: 'centered-pagination' }}
             />
           </Spin>
         </Modal>
