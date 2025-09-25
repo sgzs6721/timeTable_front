@@ -26,7 +26,7 @@ jobs:
           VITE_API_URL: ${{ secrets.PROD_API_URL }}
       
       - name: clean Server Old Files
-        uses: fifsky/ssh-action@master
+        uses: fifsky/ssh-action@v1.0.0
         with:
           command: rm -rf ${{ secrets.TARGET_PATH }}/*
           host: ${{ secrets.HW_TEST_SERVER }}
