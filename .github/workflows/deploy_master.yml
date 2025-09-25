@@ -26,13 +26,12 @@ jobs:
           VITE_API_URL: ${{ secrets.PROD_API_URL }}
       
       - name: clean Server Old Files
-        uses: fifsky/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.1.0
         with:
-          command: rm -rf ${{ secrets.TARGET_PATH }}/*
           host: ${{ secrets.HW_TEST_SERVER }}
-          user: ${{ secrets.HW_SERVER_USERNAME }}
-          pass: ${{ secrets.HW_SERVER_PWD }}
-          args: "-tt"
+          username: ${{ secrets.HW_SERVER_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: rm -rf ${{ secrets.TARGET_PATH }}/*
 
       - name: Scp dist To HW Server
         uses: appleboy/scp-action@master
