@@ -3884,6 +3884,7 @@ const MyHours = ({ user }) => {
   const [timetables, setTimetables] = React.useState([]);
   const [coachId, setCoachId] = React.useState(null);
   const [coachOptions, setCoachOptions] = React.useState([]);
+  const isInitialized = React.useRef(false);
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -3927,7 +3928,7 @@ const MyHours = ({ user }) => {
         startTime: s.startTime,
         endTime: s.endTime,
         studentName: s.studentName,
-        timetableOwner: s.timetableOwner || s.coachName || selectedCoachName
+        timetableOwner: s.coachName || selectedCoachName
       }));
       setTotalCount(total);
       setRecords(mapped);
@@ -3937,14 +3938,15 @@ const MyHours = ({ user }) => {
     }
   }, [startDate, endDate, coachId, page]);
 
-  // 只在组件初始化时加载一次数据
+  // 初始化时加载数据
   React.useEffect(() => { 
     fetchData(); 
+    isInitialized.current = true;
   }, []); // 空依赖数组，只在组件挂载时执行一次
   
   // 分页时自动查询
   React.useEffect(() => { 
-    if (page > 1) { // 避免初始化时重复查询
+    if (isInitialized.current) { // 只有在初始化完成后才响应分页变化
       fetchData(); 
     }
   }, [page]);
@@ -4013,7 +4015,7 @@ const MyHours = ({ user }) => {
   }, [user]);
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 200px)' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'center', marginBottom: 12, width: '100%' }}>
         <DatePicker placeholder="开始日期" value={startDate} onChange={setStartDate} style={{ width: '100%' }} />
         <DatePicker placeholder="结束日期" value={endDate} onChange={setEndDate} style={{ width: '100%' }} />
@@ -4029,24 +4031,36 @@ const MyHours = ({ user }) => {
           />
         )}
       </div>
-      <Table
-        size="small"
-        rowKey={(r)=>`${r.scheduleDate}-${r.startTime}-${r.id || Math.random()}`}
-        columns={columns}
-        dataSource={records}
-        loading={loading}
-        className="myhours-table"
-        pagination={false}
-      />
-      <div className="myhours-summary">共计 {stats.count} 课时</div>
-      <Pagination
-        className="myhours-pagination"
-        current={page}
-        pageSize={pageSize}
-        total={totalCount}
-        onChange={(p)=>{ setPage(p); }}
-        showSizeChanger={false}
-      />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Table
+          size="small"
+          rowKey={(r)=>`${r.scheduleDate}-${r.startTime}-${r.id || Math.random()}`}
+          columns={columns}
+          dataSource={records}
+          loading={loading}
+          className="myhours-table"
+          pagination={false}
+        />
+        <div style={{ flex: 1 }}></div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 16, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
+              第 {((page - 1) * pageSize) + 1}~{Math.min(page * pageSize, totalCount)} 条记录
+            </span>
+            <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
+              共计 {stats.count} 课时
+            </span>
+          </div>
+        </div>
+        <Pagination
+          className="myhours-pagination"
+          current={page}
+          pageSize={pageSize}
+          total={totalCount}
+          onChange={(p)=>{ setPage(p); }}
+          showSizeChanger={false}
+        />
+      </div>
     </div>
   );
 };
