@@ -52,58 +52,69 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       ),
       children: (
         <div style={{ minHeight: PAGE_SIZE * ITEM_ROW_HEIGHT, display: 'flex', flexDirection: 'column' }}>
-        <List
-          className="fixed-height-list"
-          dataSource={scheduleRecords}
-          renderItem={(item, index) => (
-            <List.Item key={`${item.scheduleDate}-${item.timeRange}-${item.status}-${index}`} style={{ padding: '8px 0', fontSize: '12px', minHeight: ITEM_ROW_HEIGHT - 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
-                <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: '#1890ff', fontWeight: 500 }}>
-                    {item.scheduleDate}
-                  </span>
-                </div>
-                <div style={{ minWidth: '100px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: '#666' }}>
-                    <ClockCircleOutlined style={{ marginRight: 4 }} />
-                    {item.timeRange}
-                  </span>
-                </div>
-                <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                  <Tag 
-                    color={item.timetableType === '实例课表' ? undefined : undefined} 
-                    style={{ 
-                      fontSize: '10px',
-                      backgroundColor: item.timetableType === '实例课表' ? 'rgba(114, 46, 209, 0.2)' : 'rgba(24, 144, 255, 0.2)',
-                      color: item.timetableType === '实例课表' ? '#722ed1' : '#1890ff',
-                      border: item.timetableType === '实例课表' ? '1px solid rgba(114, 46, 209, 0.3)' : '1px solid rgba(24, 144, 255, 0.3)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      height: '20px'
-                    }}
-                  >
-                    {item.timetableType}
-                  </Tag>
-                </div>
-                <div style={{ minWidth: '60px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                  {item.status === '请假' ? (
-                    <Tag color="orange" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>请假</Tag>
-                  ) : (
-                    <Tag color="green" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>正常</Tag>
-                  )}
-                </div>
-              </div>
-            </List.Item>
-          )}
-          pagination={{ 
-            pageSize: PAGE_SIZE, 
-            size: 'small',
-            showSizeChanger: false,
-            showQuickJumper: false,
-            hideOnSinglePage: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+        <div 
+          style={{ 
+            overflowX: 'auto', 
+            overflowY: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-x'
           }}
-        />
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
+          <List
+            className="fixed-height-list"
+            dataSource={scheduleRecords}
+            renderItem={(item, index) => (
+              <List.Item key={`${item.scheduleDate}-${item.timeRange}-${item.status}-${index}`} style={{ padding: '8px 0', fontSize: '12px', minHeight: ITEM_ROW_HEIGHT - 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', minWidth: '400px', gap: '20px' }}>
+                  <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <span style={{ color: '#1890ff', fontWeight: 500 }}>
+                      {item.scheduleDate}
+                    </span>
+                  </div>
+                  <div style={{ minWidth: '100px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <span style={{ color: '#666' }}>
+                      <ClockCircleOutlined style={{ marginRight: 4 }} />
+                      {item.timeRange}
+                    </span>
+                  </div>
+                  <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <Tag 
+                      color={item.timetableType === '实例课表' ? undefined : undefined} 
+                      style={{ 
+                        fontSize: '10px',
+                        backgroundColor: item.timetableType === '实例课表' ? 'rgba(114, 46, 209, 0.2)' : 'rgba(24, 144, 255, 0.2)',
+                        color: item.timetableType === '实例课表' ? '#722ed1' : '#1890ff',
+                        border: item.timetableType === '实例课表' ? '1px solid rgba(114, 46, 209, 0.3)' : '1px solid rgba(24, 144, 255, 0.3)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        height: '20px'
+                      }}
+                    >
+                      {item.timetableType}
+                    </Tag>
+                  </div>
+                  <div style={{ minWidth: '60px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    {item.status === '请假' ? (
+                      <Tag color="orange" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>请假</Tag>
+                    ) : (
+                      <Tag color="green" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>正常</Tag>
+                    )}
+                  </div>
+                </div>
+              </List.Item>
+            )}
+            pagination={{ 
+              pageSize: PAGE_SIZE, 
+              size: 'small',
+              showSizeChanger: false,
+              showQuickJumper: false,
+              hideOnSinglePage: true,
+              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+            }}
+          />
+        </div>
         </div>
       )
     },
@@ -117,40 +128,51 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       ),
       children: (
         <div style={{ minHeight: PAGE_SIZE * ITEM_ROW_HEIGHT }}>
-        <List
-          className="fixed-height-list"
-          dataSource={leaveRecords}
-          renderItem={(item, index) => (
-            <List.Item key={`${item.leaveDate}-${item.timeRange}-${item.leaveReason || ''}-${index}`} style={{ padding: '8px 0', fontSize: '12px', minHeight: ITEM_ROW_HEIGHT - 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
-                <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: '#fa8c16', fontWeight: 500 }}>
-                    {item.leaveDate}
-                  </span>
-                </div>
-                <div style={{ minWidth: '100px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: '#666' }}>
-                    <ClockCircleOutlined style={{ marginRight: 4 }} />
-                    {item.timeRange}
-                  </span>
-                </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: '#fa8c16' }}>
-                    {item.leaveReason || '未填写'}
-                  </span>
-                </div>
-              </div>
-            </List.Item>
-          )}
-          pagination={{ 
-            pageSize: PAGE_SIZE, 
-            size: 'small',
-            showSizeChanger: false,
-            showQuickJumper: false,
-            hideOnSinglePage: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+        <div 
+          style={{ 
+            overflowX: 'auto', 
+            overflowY: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-x'
           }}
-        />
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
+          <List
+            className="fixed-height-list"
+            dataSource={leaveRecords}
+            renderItem={(item, index) => (
+              <List.Item key={`${item.leaveDate}-${item.timeRange}-${item.leaveReason || ''}-${index}`} style={{ padding: '8px 0', fontSize: '12px', minHeight: ITEM_ROW_HEIGHT - 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', minWidth: '300px', gap: '20px' }}>
+                  <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <span style={{ color: '#fa8c16', fontWeight: 500 }}>
+                      {item.leaveDate}
+                    </span>
+                  </div>
+                  <div style={{ minWidth: '100px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <span style={{ color: '#666' }}>
+                      <ClockCircleOutlined style={{ marginRight: 4 }} />
+                      {item.timeRange}
+                    </span>
+                  </div>
+                  <div style={{ minWidth: '120px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <span style={{ color: '#fa8c16' }}>
+                      {item.leaveReason || '未填写'}
+                    </span>
+                  </div>
+                </div>
+              </List.Item>
+            )}
+            pagination={{ 
+              pageSize: PAGE_SIZE, 
+              size: 'small',
+              showSizeChanger: false,
+              showQuickJumper: false,
+              hideOnSinglePage: true,
+              showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+            }}
+          />
+        </div>
         </div>
       )
     }
@@ -165,7 +187,13 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       width={600}
       style={{ top: 20 }}
       rootClassName="student-detail-modal"
-      styles={{ body: { height: '60vh', overflowY: 'auto' } }}
+      styles={{ 
+        body: { 
+          height: '60vh', 
+          overflowY: 'auto',
+          touchAction: 'pan-y'
+        } 
+      }}
     >
       <Spin spinning={loading}>
         <div className="student-detail-body">

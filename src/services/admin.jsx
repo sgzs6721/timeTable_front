@@ -194,10 +194,13 @@ export const getCoachesStatistics = async () => {
   }
 };
 
-// 获取指定教练的上月课程明细
-export const getCoachLastMonthRecords = async (coachId) => {
+// 获取指定教练的上月课程明细（分页）
+export const getCoachLastMonthRecords = async (coachId, page = 1, size = 10) => {
   try {
-    const response = await api.get(`/admin/coaches/${coachId}/last-month-records`);
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('size', size);
+    const response = await api.get(`/admin/coaches/${coachId}/last-month-records?${params.toString()}`);
     return response;
   } catch (error) {
     throw error;

@@ -2743,33 +2743,48 @@ const Dashboard = ({ user }) => {
     const [lastMonthCoachName, setLastMonthCoachName] = useState('');
     const [lastMonthLoading, setLastMonthLoading] = useState(false);
     const [lastMonthRecords, setLastMonthRecords] = useState([]);
+    const [lastMonthPage, setLastMonthPage] = useState(1);
+    const [lastMonthTotal, setLastMonthTotal] = useState(0);
+    const [lastMonthPageSize] = useState(10);
 
     const openLastMonthModal = async (coachName) => {
       setLastMonthCoachName(coachName);
       setLastMonthModalVisible(true);
+      setLastMonthPage(1); // 重置到第一页
+      await fetchLastMonthRecords(coachName, 1);
+    };
+
+    const fetchLastMonthRecords = async (coachName, page) => {
       setLastMonthLoading(true);
       try {
         // 根据教练名找到其ID
         const coach = (coaches || []).find(c => (c.nickname || c.username) === coachName);
         if (!coach) {
           setLastMonthRecords([]);
+          setLastMonthTotal(0);
           setLastMonthLoading(false);
           return;
         }
-        const resp = await getCoachLastMonthRecords(coach.id);
+        const resp = await getCoachLastMonthRecords(coach.id, page, lastMonthPageSize);
         if (resp && resp.success) {
-          const list = (resp.data || []).map(x => ({
+          const data = resp.data || {};
+          const list = (data.list || []).map(x => ({
             scheduleDate: x.date,
             timeRange: `${String(x.startTime||'').slice(0,5)}-${String(x.endTime||'').slice(0,5)}`,
             studentName: x.studentName || '',
             status: x.isOnLeave ? '请假' : '正常'
           }));
           setLastMonthRecords(list);
+          setLastMonthTotal(data.total || 0);
+          setLastMonthPage(page);
         } else {
           setLastMonthRecords([]);
+          setLastMonthTotal(0);
         }
       } catch (error) {
         message.error('获取上月课程记录失败');
+        setLastMonthRecords([]);
+        setLastMonthTotal(0);
       } finally {
         setLastMonthLoading(false);
       }
@@ -3752,14 +3767,26 @@ const Dashboard = ({ user }) => {
                   </div>
                 </List.Item>
               )}
-              pagination={{ 
-                pageSize: 10, 
-                size: 'small', 
-                showSizeChanger: false, 
-                className: 'centered-pagination',
-                showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条记录 共计 ${total} 课时`
-              }}
+              pagination={false}
             />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
+                  第 {((lastMonthPage - 1) * lastMonthPageSize) + 1}~{Math.min(lastMonthPage * lastMonthPageSize, lastMonthTotal)} 条记录
+                </span>
+                <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
+                  共计 {lastMonthTotal} 课时
+                </span>
+              </div>
+              <Pagination
+                className="myhours-pagination"
+                current={lastMonthPage}
+                pageSize={lastMonthPageSize}
+                total={lastMonthTotal}
+                onChange={(p)=>{ fetchLastMonthRecords(lastMonthCoachName, p); }}
+                showSizeChanger={false}
+              />
+            </div>
           </Spin>
         </Modal>
       </div>
@@ -4045,8 +4072,8 @@ const MyHours = ({ user }) => {
           pagination={false}
         />
         <div style={{ flex: 1 }}></div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 16, marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
               第 {((page - 1) * pageSize) + 1}~{Math.min(page * pageSize, totalCount)} 条记录
             </span>
@@ -4054,15 +4081,15 @@ const MyHours = ({ user }) => {
               共计 {stats.count} 课时
             </span>
           </div>
+          <Pagination
+            className="myhours-pagination"
+            current={page}
+            pageSize={pageSize}
+            total={totalCount}
+            onChange={(p)=>{ setPage(p); }}
+            showSizeChanger={false}
+          />
         </div>
-        <Pagination
-          className="myhours-pagination"
-          current={page}
-          pageSize={pageSize}
-          total={totalCount}
-          onChange={(p)=>{ setPage(p); }}
-          showSizeChanger={false}
-        />
       </div>
     </div>
   );
