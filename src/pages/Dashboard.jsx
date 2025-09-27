@@ -3716,7 +3716,7 @@ const Dashboard = ({ user }) => {
 
         {/* 上月课程记录弹窗 */}
         <Modal
-          title={`上月课程记录 - ${lastMonthCoachName}`}
+          title={`课程记录 - ${lastMonthCoachName}`}
           open={lastMonthModalVisible}
           onCancel={() => setLastMonthModalVisible(false)}
           footer={null}
@@ -3725,9 +3725,6 @@ const Dashboard = ({ user }) => {
           rootClassName="last-month-modal"
         >
           <Spin spinning={lastMonthLoading}>
-            <div style={{ marginBottom: 12, fontSize: '13px', color: '#666' }}>
-              共 {lastMonthRecords.length} 条
-            </div>
             <List
               dataSource={lastMonthRecords}
               renderItem={(item, index) => (
@@ -3755,7 +3752,13 @@ const Dashboard = ({ user }) => {
                   </div>
                 </List.Item>
               )}
-              pagination={{ pageSize: 10, size: 'small', showSizeChanger: false, className: 'centered-pagination' }}
+              pagination={{ 
+                pageSize: 10, 
+                size: 'small', 
+                showSizeChanger: false, 
+                className: 'centered-pagination',
+                showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条记录 共计 ${total} 课时`
+              }}
             />
           </Spin>
         </Modal>
