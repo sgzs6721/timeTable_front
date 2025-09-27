@@ -3746,7 +3746,7 @@ const Dashboard = ({ user }) => {
                 <List.Item style={{ padding: '8px 0', fontSize: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '20px' }}>
                     <div style={{ minWidth: '40px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                      <span style={{ color: '#999', fontSize: '11px' }}>#{index + 1}</span>
+                      <span style={{ color: '#999', fontSize: '11px' }}>#{((lastMonthPage - 1) * lastMonthPageSize) + index + 1}</span>
                     </div>
                     <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                       <span style={{ color: '#722ed1', fontWeight: 500 }}>{item.scheduleDate}</span>
@@ -3756,13 +3756,6 @@ const Dashboard = ({ user }) => {
                     </div>
                     <div style={{ minWidth: '100px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                       <span style={{ color: '#333', fontWeight: 500 }}>{item.studentName || '-'}</span>
-                    </div>
-                    <div style={{ minWidth: '60px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                      {item.status === '请假' ? (
-                        <Tag color="orange" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>请假</Tag>
-                      ) : (
-                        <Tag color="green" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', height: '20px' }}>正常</Tag>
-                      )}
                     </div>
                   </div>
                 </List.Item>
