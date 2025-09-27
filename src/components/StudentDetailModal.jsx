@@ -165,7 +165,7 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
       width={600}
       style={{ top: 20 }}
       rootClassName="student-detail-modal"
-      bodyStyle={{ height: '60vh', overflowY: 'auto' }}
+      styles={{ body: { height: '60vh', overflowY: 'auto' } }}
     >
       <Spin spinning={loading}>
         <div className="student-detail-body">

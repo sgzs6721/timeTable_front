@@ -58,6 +58,31 @@ const dayMap = {
   SUNDAY: '日',
 };
 
+// 仅展示信息的弹层：显示原学员与“取消/请假”状态
+const CancelledOrLeavePopoverContent = ({ info, onClose }) => {
+  if (!info) return null;
+  return (
+    <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ fontSize: '12px', color: '#666' }}>{info.timeInfo}</div>
+        <Button type="text" size="small" icon={<CloseOutlined />} onClick={onClose} style={{ padding: 0, minWidth: 'auto', height: 'auto' }} />
+      </div>
+      <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 4, padding: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '12px', color: '#595959' }}>
+            原学员：<strong>{info.studentName || '—'}</strong>
+          </div>
+          {info.type === '请假' ? (
+            <Tag color="orange" style={{ fontSize: 12, height: 22, display: 'inline-flex', alignItems: 'center' }}>请假</Tag>
+          ) : (
+            <Tag color="red" style={{ fontSize: 12, height: 22, display: 'inline-flex', alignItems: 'center' }}>取消</Tag>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCopy, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const [showAllInfo, setShowAllInfo] = React.useState(false);
@@ -373,7 +398,7 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) =>
   const [name, setName] = React.useState('');
 
   return (
-    <div style={{ width: '180px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 时间信息显示 */}
       {timeInfo && (
         <div style={{ 
@@ -391,6 +416,7 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) =>
         value={name}
         onChange={(e) => setName(e.target.value)}
         disabled={addLoading}
+        style={{ width: '100%' }}
       />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
         <Button size="small" onClick={onCancel} style={{ marginRight: 8 }} disabled={addLoading}>
@@ -2941,6 +2967,8 @@ const ViewTimetable = ({ user }) => {
 
   // 本周请假课时数
   const [weeklyLeaveCount, setWeeklyLeaveCount] = useState(0);
+  // 记录请假时段，用于网格点击时区分“取消/请假”
+  const [leaveSlotMap, setLeaveSlotMap] = useState(new Map());
   
   // 获取请假课时数
   const fetchLeaveCount = useCallback(async () => {
@@ -2976,6 +3004,29 @@ const ViewTimetable = ({ user }) => {
   // 当相关状态变化时重新获取请假课时数
   useEffect(() => {
     fetchLeaveCount();
+    // 同步刷新请假时段映射
+    (async () => {
+      try {
+        if (viewMode === 'instance' && timetable?.isWeekly && currentWeekInstance?.id) {
+          const response = await getCurrentWeekInstanceIncludingLeaves(timetable.id);
+          if (response && response.success && response.data && Array.isArray(response.data.schedules)) {
+            const map = new Map();
+            response.data.schedules.filter(s => s.isOnLeave).forEach(s => {
+              const dayKey = (s.dayOfWeek || '').toLowerCase();
+              const timeKey = `${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`;
+              map.set(`${dayKey}|${timeKey}`, s.studentName || '');
+            });
+            setLeaveSlotMap(map);
+          } else {
+            setLeaveSlotMap(new Map());
+          }
+        } else {
+          setLeaveSlotMap(new Map());
+        }
+      } catch (e) {
+        setLeaveSlotMap(new Map());
+      }
+    })();
   }, [fetchLeaveCount]);
 
   const handleWeekChange = (week) => {
@@ -3192,6 +3243,13 @@ const ViewTimetable = ({ user }) => {
                 const templateTimeKey = `${template.startTime.substring(0, 5)}-${template.endTime.substring(0, 5)}`;
                 return template.dayOfWeek.toLowerCase() === dayKey && templateTimeKey === timeKey;
               });
+
+            const templateScheduleForCell = displayViewMode === 'instance' && Array.isArray(templateSchedules)
+              ? templateSchedules.find(template => {
+                  const templateTimeKey = `${template.startTime.substring(0, 5)}-${template.endTime.substring(0, 5)}`;
+                  return template.dayOfWeek.toLowerCase() === day.key && templateTimeKey === record.time;
+                })
+              : null;
 
             const emptyCellStyle = {
               height: '48px',
@@ -3417,11 +3475,30 @@ const ViewTimetable = ({ user }) => {
                 ? `${weekDates.start.add(index, 'day').format('MM/DD')}, ${record.time}`
                 : `${record.time}`;
 
+            const slotKey = `${day.key}|${record.time}`;
+            const leaveStudent = leaveSlotMap.get(slotKey);
+            const cancelInfo = templateScheduleExists && templateScheduleForCell ? {
+              studentName: templateScheduleForCell.studentName,
+              type: leaveStudent ? '请假' : '取消',
+              timeInfo
+            } : null;
+
             return (
               <Popover
                 placement={getSmartPlacement(index, record.key)}
                 title={null}
-                content={ <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} /> }
+                content={
+                  cancelInfo ? (
+                    <div style={{ width: 220 }}>
+                      <CancelledOrLeavePopoverContent info={cancelInfo} onClose={() => handleOpenChange(false)} />
+                      <div style={{ padding: '0 8px' }}>
+                        <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={null} />
+                      </div>
+                    </div>
+                  ) : (
+                    <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} />
+                  )
+                }
                 trigger={multiSelectMode ? "contextMenu" : (deleteMode ? "none" : "click")}
                 open={!timetable?.isArchived && !deleteMode && openPopoverKey === cellKey}
                 onOpenChange={handleOpenChange}

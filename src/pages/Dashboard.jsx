@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col } from 'antd';
+import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce } from '../services/timetable';
+import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce, getAllTimetables as getAllTimetablesSvc, getMyHoursPaged } from '../services/timetable';
+import { getCoachesWithTimetables } from '../services/admin';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule, getLeaveRecords, deleteLeaveRecordsBatch } from '../services/weeklyInstance';
-import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables, getCoachLastMonthRecords } from '../services/admin';
+import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables as getAllTimetablesAdmin, getCoachLastMonthRecords } from '../services/admin';
 import { getAllStudents } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
@@ -374,7 +375,7 @@ const Dashboard = ({ user }) => {
     if (user?.role?.toUpperCase() !== 'ADMIN') return;
     
     try {
-      const response = await getAllTimetables(true); // 只获取活动课表
+      const response = await getAllTimetablesAdmin(true); // 只获取活动课表
       if (response.success) {
         setAllTimetables(response.data);
         
@@ -3813,6 +3814,15 @@ const Dashboard = ({ user }) => {
           }}
           showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
         />
+      },
+      {
+        key: 'hours',
+        label: '我的课时',
+        children: (
+          <div style={{ padding: '8px 0' }}>
+            <MyHours user={user} />
+          </div>
+        )
       }
     );
     
@@ -3829,6 +3839,7 @@ const Dashboard = ({ user }) => {
         onChange={handleTabChange}
         items={tabItems}
         size="large"
+        tabBarGutter={12}
         tabBarExtraContent={{
           right: (
             <Button
@@ -3845,6 +3856,9 @@ const Dashboard = ({ user }) => {
       {/* 模态框等保持不变 */}
       {renderModals()}
       
+      {/* 内联定义：我的课时 */}
+      {/* 为避免拆文件，这里定义轻量 MyHours 组件 */}
+      
       {/* 学员详情模态框 */}
       <StudentDetailModal
         visible={studentDetailVisible}
@@ -3857,3 +3871,182 @@ const Dashboard = ({ user }) => {
 };
 
 export default Dashboard;
+ 
+// 轻量实现：我的课时
+const MyHours = ({ user }) => {
+  const [loading, setLoading] = React.useState(false);
+  const [startDate, setStartDate] = React.useState(null);
+  const [endDate, setEndDate] = React.useState(null);
+  const [stats, setStats] = React.useState({ count: 0, hours: 0 });
+  const [records, setRecords] = React.useState([]);
+  const [page, setPage] = React.useState(1);
+  const [totalCount, setTotalCount] = React.useState(0);
+  const [timetables, setTimetables] = React.useState([]);
+  const [coachId, setCoachId] = React.useState(null);
+  const [coachOptions, setCoachOptions] = React.useState([]);
+
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      // 管理员：加载教练下拉（后端已去重并按注册时间倒序）
+      if (user?.role?.toUpperCase() === 'ADMIN') {
+        const resp = await getCoachesWithTimetables();
+        const options = (resp?.data?.list || []).map(x => ({ value: String(x.id), label: x.name, createdAt: x.createdAt }));
+        setCoachOptions(options);
+        if (!coachId && options.length > 0) {
+          const meId = user?.id ? String(user.id) : null;
+          const byId = meId ? options.find(o => String(o.value) === meId) : null;
+          setCoachId((byId || options[0]).value);
+        }
+      }
+
+      // 后端分页查询
+      const params = {
+        startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : undefined,
+        endDate: endDate ? dayjs(endDate).format('YYYY-MM-DD') : undefined,
+        coachId: user?.role?.toUpperCase() === 'ADMIN' ? (coachId ? String(coachId) : undefined) : undefined,
+        page,
+        size: pageSize
+      };
+      const resp = await getMyHoursPaged(params);
+      const list = resp?.data?.list || [];
+      const total = resp?.data?.total || 0;
+      // 统计总课时
+      const totalHours = list.reduce((sum, s) => {
+        const st = dayjs(s.startTime, 'HH:mm:ss');
+        const et = dayjs(s.endTime, 'HH:mm:ss');
+        return sum + et.diff(st, 'hour', true);
+      }, 0);
+      // 规范字段（兼容现有列定义）
+      const selectedCoachName = user?.role?.toUpperCase() === 'ADMIN'
+        ? (coachOptions.find(o => String(o.value) === String(coachId))?.label || '')
+        : (user?.nickname || user?.username || '');
+      const mapped = list.map(s => ({
+        ...s,
+        scheduleDate: s.scheduleDate,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        studentName: s.studentName,
+        timetableOwner: s.timetableOwner || s.coachName || selectedCoachName
+      }));
+      setTotalCount(total);
+      setRecords(mapped);
+      setStats({ count: total, hours: totalHours });
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate, coachId, page]);
+
+  // 只在组件初始化时加载一次数据
+  React.useEffect(() => { 
+    fetchData(); 
+  }, []); // 空依赖数组，只在组件挂载时执行一次
+  
+  // 分页时自动查询
+  React.useEffect(() => { 
+    if (page > 1) { // 避免初始化时重复查询
+      fetchData(); 
+    }
+  }, [page]);
+
+  // 每页数量
+  const pageSize = 10;
+
+  const baseColumns = [
+    { 
+      title: '日期时间', 
+      key: 'datetime',
+      width: 180,
+      align: 'center',
+      render: (_, record) => {
+        let dateStr = '';
+        if (record.scheduleDate) {
+          dateStr = dayjs(record.scheduleDate).format('YYYY-MM-DD');
+        } else if (record.dayOfWeek) {
+          // 如果没有具体日期但有星期几，根据当前周推算具体日期
+          const dayMap = {
+            'MONDAY': 1,
+            'TUESDAY': 2, 
+            'WEDNESDAY': 3,
+            'THURSDAY': 4,
+            'FRIDAY': 5,
+            'SATURDAY': 6,
+            'SUNDAY': 0
+          };
+          const targetDay = dayMap[record.dayOfWeek];
+          if (targetDay !== undefined) {
+            // 获取当前周的周一
+            const today = dayjs();
+            const currentWeekMonday = today.startOf('week').add(1, 'day'); // 周一是第一天
+            // 计算目标日期
+            const targetDate = currentWeekMonday.add(targetDay - 1, 'day');
+            
+            // 后端已经过滤了未来记录，所以这里直接显示推算的日期
+            dateStr = targetDate.format('YYYY-MM-DD');
+          } else {
+            dateStr = record.dayOfWeek;
+          }
+        } else {
+          dateStr = '-';
+        }
+        
+        const timeStr = `${record.startTime?.slice(0,5)}~${record.endTime?.slice(0,5)}`;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <span style={{ fontWeight: 500, color: '#722ed1', fontSize: '12px' }}>{dateStr}</span>
+            <span style={{ fontSize: '11px', color: '#666' }}>{timeStr}</span>
+          </div>
+        );
+      }
+    },
+    { title: '学员', dataIndex: 'studentName', key: 'student', width: 100, align: 'center' },
+  ];
+
+  const columns = React.useMemo(() => {
+    if (user?.role?.toUpperCase() === 'ADMIN') {
+      return [
+        ...baseColumns,
+        { title: '教练', dataIndex: 'timetableOwner', key: 'coach', width: 100, align: 'center', render: v => v || '-' }
+      ];
+    }
+    return baseColumns;
+  }, [user]);
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'center', marginBottom: 12, width: '100%' }}>
+        <DatePicker placeholder="开始日期" value={startDate} onChange={setStartDate} style={{ width: '100%' }} />
+        <DatePicker placeholder="结束日期" value={endDate} onChange={setEndDate} style={{ width: '100%' }} />
+        <Button type="primary" onClick={() => { setPage(1); fetchData(); }} loading={loading} style={{ minWidth: 72 }}>查询</Button>
+        {user?.role?.toUpperCase() === 'ADMIN' && (
+          <Select
+            placeholder="选择教练"
+            allowClear
+            style={{ gridColumn: '1 / span 1', width: '100%' }}
+            value={coachId}
+            onChange={setCoachId}
+            options={coachOptions}
+          />
+        )}
+      </div>
+      <Table
+        size="small"
+        rowKey={(r)=>`${r.scheduleDate}-${r.startTime}-${r.id || Math.random()}`}
+        columns={columns}
+        dataSource={records}
+        loading={loading}
+        className="myhours-table"
+        pagination={false}
+      />
+      <div className="myhours-summary">共计 {stats.count} 课时</div>
+      <Pagination
+        className="myhours-pagination"
+        current={page}
+        pageSize={pageSize}
+        total={totalCount}
+        onChange={(p)=>{ setPage(p); }}
+        showSizeChanger={false}
+      />
+    </div>
+  );
+};

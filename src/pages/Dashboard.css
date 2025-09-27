@@ -1,3 +1,28 @@
+.myhours-pagination .ant-pagination-item {
+  margin-inline-end: 14px;
+}
+
+.myhours-table .ant-table-thead > tr > th {
+  text-align: center;
+}
+.myhours-table .ant-table-tbody > tr > td {
+  text-align: center;
+}
+
+.myhours-summary {
+  text-align: center;
+  margin: 12px 0;
+}
+
+.myhours-pagination {
+  display: flex !important;
+  justify-content: center;
+  margin: 8px 0 16px;
+}
+
+.myhours-pagination .ant-pagination-item {
+  margin: 0 8px;
+}
 /* Dashboard.css */
 
 .student-detail-modal .ant-modal-body {

@@ -531,3 +531,18 @@ export const getSchedulesOverview = async (timetableId) => {
     return response;
   } catch (error) { throw error; }
 };
+
+// 报表：分页查询课时
+export const getMyHoursPaged = async ({ startDate, endDate, coachId, page, size }) => {
+  try {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (coachId) params.append('coachId', coachId);
+    params.append('page', page);
+    params.append('size', size);
+    const url = `/reports/my-hours?${params.toString()}`;
+    const response = await api.get(url);
+    return response;
+  } catch (error) { throw error; }
+};

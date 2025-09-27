@@ -10,6 +10,16 @@ export const getAllTimetables = async (activeOnly = false) => {
   }
 };
 
+// 有课表（活动或归档）的教练列表，按注册时间倒序
+export const getCoachesWithTimetables = async () => {
+  try {
+    const response = await api.get('/admin/coaches/with-timetables');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const updateTimetableStatus = async (id, data) => {
   try {
     const response = await api.put(`/admin/timetables/${id}`, data);
