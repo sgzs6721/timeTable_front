@@ -407,6 +407,41 @@ code {
   }
 }
 
+/* iPhone 12 Pro 特殊适配 (390px) */
+@media (max-width: 390px) {
+  .compact-timetable-container {
+    /* iPhone 12 Pro 特殊优化 */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    box-sizing: border-box;
+    /* 确保表格边框完整显示，不被截断 */
+    padding: 0;
+    margin: 0;
+    /* 防止表格内容溢出 */
+    max-width: 100%;
+  }
+
+  .compact-timetable {
+    min-width: 350px;
+    /* 确保表格有足够的宽度显示所有列 */
+    width: max-content;
+  }
+
+  .compact-timetable .ant-table-thead > tr > th {
+    padding: 3px 1px;
+    font-size: 10px;
+    /* 确保表头边框完整 */
+    border: 1px solid #e8e8e8;
+  }
+
+  .compact-timetable .ant-table-tbody > tr > td {
+    padding: 1px;
+    /* 确保表格单元格边框完整 */
+    border: 1px solid #e8e8e8;
+  }
+}
+
 /* 超小屏幕设备适配 (360px 以下) */
 @media (max-width: 360px) {
   .layout-header {
@@ -641,6 +676,7 @@ code {
 
 .compact-timetable-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
 }
 
 .compact-timetable {
@@ -845,6 +881,15 @@ code {
     min-width: 380px;
   }
 
+  .compact-timetable-container {
+    /* 确保在移动端表格能够水平滚动 */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* 防止表格被截断 */
+    width: 100%;
+    box-sizing: border-box;
+  }
+
   .compact-timetable .ant-table-thead > tr > th {
     padding: 4px 2px;
     font-size: 11px;
@@ -997,6 +1042,17 @@ code {
 
   .compact-timetable {
     min-width: 360px;
+  }
+
+  .compact-timetable-container {
+    /* 小屏幕设备优化 */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    box-sizing: border-box;
+    /* 确保表格边框完整显示 */
+    padding: 0;
+    margin: 0;
   }
 
   .compact-timetable .ant-table-thead > tr > th {

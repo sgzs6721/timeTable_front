@@ -4405,6 +4405,7 @@ const ViewTimetable = ({ user }) => {
           bordered
           className="compact-timetable"
           style={{ tableLayout: 'fixed' }}
+          scroll={{ x: 'max-content' }}
         />
         {/* 统一的loading蒙板 */}
         {(loading || isInitialLoading || instancesLoading || switchToInstanceLoading || switchToTemplateLoading) && (
