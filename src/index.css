@@ -1444,3 +1444,29 @@ code {
     padding: 4px 8px !important;
   }
 }
+
+/* 微信登录按钮专用样式 */
+.wechat-login-btn {
+  background-color: #07c160 !important;
+  border-color: #07c160 !important;
+  color: #ffffff !important;
+}
+
+.wechat-login-btn:hover {
+  background-color: #06ad56 !important;
+  border-color: #06ad56 !important;
+  color: #ffffff !important;
+}
+
+.wechat-login-btn:focus {
+  background-color: #07c160 !important;
+  border-color: #07c160 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(7, 193, 96, 0.2) !important;
+}
+
+.wechat-login-btn:active {
+  background-color: #05a050 !important;
+  border-color: #05a050 !important;
+  color: #ffffff !important;
+}

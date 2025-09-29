@@ -90,17 +90,19 @@ const WechatLogin = ({ onLogin }) => {
   return (
     <div style={{ textAlign: 'center' }}>
       <Button
-        type="primary"
+        type="default"
         icon={<WechatOutlined />}
         onClick={handleWechatAuth}
         loading={loading}
         size="large"
+        className="wechat-login-btn"
         style={{
           height: '45px',
           width: '100%',
           backgroundColor: '#07c160',
           borderColor: '#07c160',
-          fontSize: '16px'
+          fontSize: '16px',
+          color: '#ffffff'
         }}
       >
         {loading ? <Spin size="small" /> : '微信登录'}

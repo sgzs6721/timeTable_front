@@ -8,6 +8,7 @@ import logo from '../assets/logo.png';
 
 const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
+  const currentYear = new Date().getFullYear();
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -98,18 +99,24 @@ const Login = ({ onLogin }) => {
             </Button>
           </Form.Item>
 
+          <Divider style={{ margin: '12px 0' }}>
+            <span style={{ marginRight: 8 }}>还没有账号？</span>
+            <Link to="/register">
+              <Button type="link" size="large" style={{ padding: 0, height: 'auto' }}>立即注册</Button>
+            </Link>
+          </Divider>
+
           <Divider style={{ margin: '12px 0' }}>其他登录方式</Divider>
           
           <WechatLogin onLogin={onLogin} />
-          
-          <Divider style={{ margin: '12px 0' }}>还没有账号？</Divider>
-          
-          <div style={{ textAlign: 'center' }}>
-            <Link to="/register">
-              <Button type="link" size="large">
-                立即注册
-              </Button>
-            </Link>
+
+          <div style={{ height: '16px' }} />
+
+          <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '4px' }}>
+            © 2023-{currentYear} 飓风乒乓部训中关村校区
+          </div>
+          <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '2px' }}>
+            雷网科技（北京）有限公司
           </div>
         </Form>
       </Card>

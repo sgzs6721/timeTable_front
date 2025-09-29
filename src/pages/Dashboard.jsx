@@ -10,7 +10,6 @@ import { getAllStudents } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
-import WechatLoginButton from '../components/WechatLoginButton';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
 
@@ -854,13 +853,6 @@ const Dashboard = ({ user }) => {
     navigate('/create-timetable');
   };
 
-  // 处理微信登录成功
-  const handleWechatLogin = (user) => {
-    // 更新用户信息
-    setUser(user);
-    // 刷新页面数据
-    window.location.reload();
-  };
 
   const handleViewTimetable = (id) => {
     navigate(`/view-timetable/${id}`);
@@ -3874,17 +3866,14 @@ const Dashboard = ({ user }) => {
         tabBarGutter={12}
         tabBarExtraContent={{
           right: (
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <WechatLoginButton onLogin={handleWechatLogin} size="middle" />
-              <Button
-                type="link"
-                icon={<PlusOutlined />}
-                onClick={handleCreateTimetable}
-                disabled={timetables.length >= 5}
-              >
-                创建课表
-              </Button>
-            </div>
+            <Button
+              type="link"
+              icon={<PlusOutlined />}
+              onClick={handleCreateTimetable}
+              disabled={timetables.length >= 5}
+            >
+              创建课表
+            </Button>
           )
         }}
       />
