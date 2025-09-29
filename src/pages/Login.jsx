@@ -3,6 +3,7 @@ import { Form, Input, Button, Card, message, Divider } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { login } from '../services/auth';
+import WechatLogin from '../components/WechatLogin';
 import logo from '../assets/logo.png';
 
 const Login = ({ onLogin }) => {
@@ -97,6 +98,10 @@ const Login = ({ onLogin }) => {
             </Button>
           </Form.Item>
 
+          <Divider style={{ margin: '12px 0' }}>其他登录方式</Divider>
+          
+          <WechatLogin onLogin={onLogin} />
+          
           <Divider style={{ margin: '12px 0' }}>还没有账号？</Divider>
           
           <div style={{ textAlign: 'center' }}>

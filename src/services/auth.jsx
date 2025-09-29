@@ -79,6 +79,18 @@ export const validateToken = async () => {
   }
 };
 
+// 微信登录
+export const wechatLogin = async (code) => {
+  const response = await api.post('/auth/wechat/login', { code });
+  return response;
+};
+
+// 获取微信登录授权URL
+export const getWechatAuthUrl = async () => {
+  const response = await api.get('/auth/wechat/auth-url');
+  return response;
+};
+
 // 更新用户资料
 export const updateProfile = async (profileData) => {
   try {

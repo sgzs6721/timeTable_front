@@ -4,21 +4,21 @@
 const ENVIRONMENTS = {
   // 开发环境
   development: {
-    REMOTE_HOST: 'http://timetable.devtesting.top',
+    REMOTE_HOST: 'http://121.36.91.199:8088',
     API_BASE_PATH: '/timetable/api',
-    USE_PROXY: true
+    USE_PROXY: false
   },
   
   // 测试环境
   testing: {
-    REMOTE_HOST: 'http://timetable.test.com',
+    REMOTE_HOST: 'http://121.36.91.199:8088',
     API_BASE_PATH: '/timetable/api',
-    USE_PROXY: true
+    USE_PROXY: false
   },
   
   // 生产环境
   production: {
-    REMOTE_HOST: 'http://timetable.devtesting.top',
+    REMOTE_HOST: 'http://121.36.91.199:8088',
     API_BASE_PATH: '/timetable/api',
     USE_PROXY: false
   }

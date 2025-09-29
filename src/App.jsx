@@ -14,6 +14,7 @@ import MergePreview from './pages/MergePreview';
 import UserProfile from './pages/UserProfile';
 import ArchivedTimetables from './pages/ArchivedTimetables';
 import ConvertPreview from './pages/ConvertPreview';
+import WechatTest from './pages/WechatTest';
 import './App.css';
 
 const { Content } = Layout;
@@ -147,6 +148,10 @@ function App() {
             <Route
               path="/convert-preview"
               element={user ? <ConvertPreview /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/wechat-test"
+              element={<WechatTest />}
             />
             <Route
               path="/"
