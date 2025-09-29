@@ -10,6 +10,7 @@ import ViewTimetable from './pages/ViewTimetable';
 import AdminPanel from './pages/AdminPanel';
 import ConfirmSchedulePage from './pages/ConfirmSchedulePage';
 import AppHeader from './components/AppHeader';
+import UserGuide from './pages/UserGuide';
 import MergePreview from './pages/MergePreview';
 import UserProfile from './pages/UserProfile';
 import ArchivedTimetables from './pages/ArchivedTimetables';
@@ -141,6 +142,10 @@ function App() {
               path="/profile"
               element={user ? <UserProfile user={user} /> : <Navigate to="/login" />}
             />
+          <Route
+            path="/guide"
+            element={user ? <UserGuide user={user} /> : <Navigate to="/login" />}
+          />
             <Route
               path="/archived-timetables"
               element={user ? <ArchivedTimetables /> : <Navigate to="/login" />}

@@ -53,7 +53,7 @@ const AppHeader = ({ user, onLogout }) => {
     {
       key: 'refresh',
       icon: <ReloadOutlined />,
-      label: '刷新',
+      label: '刷新\u3000',
       onClick: () => {
         // 轻提示+刷新当前页面数据
         message.loading({ content: '正在刷新...', key: 'refreshing', duration: 0 });
@@ -87,6 +87,12 @@ const AppHeader = ({ user, onLogout }) => {
       onClick: () => navigate('/profile'),
     },
     {
+      key: 'guide',
+      icon: <InboxOutlined />,
+      label: '使用说明',
+      onClick: () => navigate('/guide'),
+    },
+    {
       type: 'divider',
     },
     {
@@ -98,7 +104,7 @@ const AppHeader = ({ user, onLogout }) => {
   ];
 
   if (user?.role?.toUpperCase() === 'ADMIN') {
-    userMenuItems.unshift({
+    const adminItem = {
       key: 'admin',
       icon: <SettingOutlined />,
       label: (
@@ -121,7 +127,15 @@ const AppHeader = ({ user, onLogout }) => {
         </div>
       ),
       onClick: () => navigate('/admin'),
-    }, { type: 'divider' });
+    };
+    // 目标顺序：刷新 -> 分隔线 -> 管理员 -> 归档课表 ...
+    if (userMenuItems[1]?.type === 'divider') {
+      // 分隔线已存在在刷新后，将管理员插入到分隔线之后，并在其后再加一条分隔线
+      userMenuItems.splice(2, 0, adminItem, { type: 'divider' });
+    } else {
+      // 没有分隔线，则先插入分隔线，再插入管理员和分隔线
+      userMenuItems.splice(1, 0, { type: 'divider' }, adminItem, { type: 'divider' });
+    }
   }
 
   return (
