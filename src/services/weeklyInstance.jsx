@@ -109,6 +109,11 @@ export const generateNextWeekInstance = (timetableId) => {
   return api.post(`/weekly-instances/next-week/generate/${timetableId}`, {});
 };
 
+// 删除下周实例
+export const deleteNextWeekInstance = (timetableId) => {
+  return api.delete(`/weekly-instances/next-week/${timetableId}`);
+};
+
 // 批量删除周实例中的课程
 export const deleteInstanceSchedulesBatch = (scheduleIds) => {
   return api.delete('/weekly-instances/schedules/batch', { data: scheduleIds });

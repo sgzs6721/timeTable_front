@@ -2555,22 +2555,29 @@ const Dashboard = ({ user }) => {
         title: '时间',
         dataIndex: 'time',
         key: 'time',
-        width: 60,
+        width: 40,
         align: 'center',
+          onHeaderCell: () => ({
+            style: { padding: '0 4px', minWidth: 40, maxWidth: 40 }
+          }),
+          onCell: () => ({
+            style: { padding: 0, minWidth: 40, maxWidth: 40 }
+          }),
         render: (time) => {
           const [startTime, endTime] = time.split('-');
           return (
             <div style={{ 
-              fontSize: '11px',
+              fontSize: '10px',
               fontWeight: 500, 
               color: '#333',
-              lineHeight: '1.2',
+              lineHeight: '1.0',
               textAlign: 'center',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              height: '100%'
+                height: '100%',
+                padding: '0'
             }}>
               <div>{startTime}</div>
               <div>{endTime}</div>
@@ -2716,6 +2723,7 @@ const Dashboard = ({ user }) => {
               bordered
               rowClassName={() => 'weekly-schedule-row'}
               style={{ fontSize: '12px' }}
+              tableLayout="fixed"
             />
           </div>
         </Spin>

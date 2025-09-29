@@ -50,14 +50,18 @@ export const getAllUsers = async () => {
 };
 
 // 更新用户权限
-export const updateUserRole = async (userId, role) => {
+// 统一接口：更新用户信息（角色、用户名等）
+export const updateUserInfo = async (userId, data) => {
   try {
-    const response = await api.put(`/admin/users/${userId}/role`, { role });
+    const response = await api.put(`/admin/users/${userId}`, data);
     return response;
   } catch (error) {
     throw error;
   }
 };
+
+// 兼容旧用法：仅更新角色
+export const updateUserRole = async (userId, role) => updateUserInfo(userId, { role });
 
 // 重置用户密码
 export const resetUserPassword = async (userId, password) => {
@@ -78,6 +82,10 @@ export const updateUserNickname = async (userId, nickname) => {
     throw error;
   }
 };
+
+// 更新用户名（用户名用于登录）
+// 已合并到 updateUserInfo：保留占位以兼容导入，但调用统一接口
+export const updateUserUsername = async (userId, username) => updateUserInfo(userId, { username });
 
 // 软删除用户
 export const deleteUser = async (userId) => {

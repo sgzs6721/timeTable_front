@@ -96,16 +96,19 @@ const WechatLogin = ({ onLogin }) => {
         loading={loading}
         size="large"
         className="wechat-login-btn"
+        disabled
         style={{
           height: '45px',
           width: '100%',
-          backgroundColor: '#07c160',
-          borderColor: '#07c160',
+          backgroundColor: '#c8c8c8',
+          borderColor: '#c8c8c8',
           fontSize: '16px',
-          color: '#ffffff'
+          color: '#ffffff',
+          cursor: 'not-allowed',
+          opacity: 0.7
         }}
       >
-        {loading ? <Spin size="small" /> : '微信登录'}
+        即将开放
       </Button>
     </div>
   );

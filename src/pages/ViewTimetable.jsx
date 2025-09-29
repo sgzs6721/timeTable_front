@@ -25,6 +25,7 @@ import {
   requestLeave,
   cancelLeave
 } from '../services/weeklyInstance';
+import { deleteNextWeekInstance } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import weekday from 'dayjs/plugin/weekday';
@@ -1575,15 +1576,16 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
-  // 切换到指定的周实例
-  const switchToWeekInstanceByIndex = async (instanceIndex) => {
-    console.log('switchToWeekInstance called with index:', instanceIndex, 'weeklyInstances:', weeklyInstances);
-    if (instanceIndex < 0 || instanceIndex >= weeklyInstances.length) {
+  // 切换到指定的周实例（允许传入最新的实例列表，避免异步状态滞后）
+  const switchToWeekInstanceByIndex = async (instanceIndex, instancesOverride) => {
+    const list = Array.isArray(instancesOverride) ? instancesOverride : weeklyInstances;
+    console.log('switchToWeekInstance called with index:', instanceIndex, 'list length:', list?.length);
+    if (!Array.isArray(list) || instanceIndex < 0 || instanceIndex >= list.length) {
       console.log('Invalid instance index:', instanceIndex);
       return;
     }
     
-    const targetInstance = weeklyInstances[instanceIndex];
+    const targetInstance = list[instanceIndex];
     console.log('Target instance:', targetInstance);
     
     // 如果点击的是当前选中的实例，不做任何操作
@@ -1598,7 +1600,7 @@ const ViewTimetable = ({ user }) => {
     setSwitchToInstanceLoading(true);
     
     setCurrentInstanceIndex(instanceIndex);
-    updateDisplayRange(instanceIndex, weeklyInstances);
+    updateDisplayRange(instanceIndex, list);
     setInstancesLoading(true);
     
     try {
@@ -3883,6 +3885,19 @@ const ViewTimetable = ({ user }) => {
   const displayTotalWeeks = isInitialLoading ? 1 : totalWeeks;
   const displayCurrentWeek = isInitialLoading ? 1 : currentWeek;
 
+  // 是否已存在“下周”实例（用于控制“删除下周课表”菜单项显示）
+  const hasNextWeekInstance = useMemo(() => {
+    try {
+      if (!timetable?.isWeekly || !Array.isArray(weeklyInstances) || weeklyInstances.length === 0) {
+        return false;
+      }
+      const nextMonday = dayjs().startOf('week').add(7, 'day');
+      return weeklyInstances.some(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
+    } catch (_) {
+      return false;
+    }
+  }, [timetable, weeklyInstances]);
+
   return (
     <div className="page-container" onTouchStart={isInitialLoading ? undefined : handleTouchStart} onTouchEnd={isInitialLoading ? undefined : handleTouchEnd}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
@@ -4132,16 +4147,16 @@ const ViewTimetable = ({ user }) => {
                               const nextMonday = dayjs().startOf('week').add(7, 'day');
                               let nextWeekIndex = instances.findIndex(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
 
+                              let generated = false;
                               // 如果没有找到下周实例，则生成一个
                               if (nextWeekIndex === -1) {
-                                message.info('正在生成下周课表...');
                                 const genResp = await generateNextWeekInstance(timetableId);
                                 if (!genResp.success) {
                                   message.error(genResp.message || '生成下周课表失败');
                                   setInstanceLoading(false);
                                   return;
                                 }
-                                
+                                generated = true;
                                 // 生成后，重新获取实例列表并更新状态
                                 listResp = await getWeeklyInstances(timetableId);
                                 if (listResp.success && Array.isArray(listResp.data)) {
@@ -4153,11 +4168,10 @@ const ViewTimetable = ({ user }) => {
                                 }
                               }
 
-                              // 切换到下周实例
+                              // 切换到下周实例（传入最新的实例数组，避免状态未及时更新）
                               if (nextWeekIndex !== -1) {
-                                // 调用统一的切换函数，它会处理所有相关的状态更新
-                                await switchToWeekInstanceByIndex(nextWeekIndex);
-                                message.success('已切换到下周课表');
+                                await switchToWeekInstanceByIndex(nextWeekIndex, instances);
+                                message.success(generated ? '已生成并切换到下周课表' : '已切换到下周课表');
                               } else {
                                 message.error('无法找到或生成下周课表，请刷新重试');
                               }
@@ -4166,6 +4180,48 @@ const ViewTimetable = ({ user }) => {
                               console.error('Switch to next week failed:', e);
                             } finally {
                               setInstanceLoading(false);
+                            }
+                          }
+                        },
+                        // 删除下周课表（仅当真的存在下周实例时显示）
+                        instanceWeekLabel !== '下周' && hasNextWeekInstance && {
+                          key: 'deleteNextWeek',
+                          label: '删除下周课表',
+                          icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
+                          onClick: async () => {
+                            try {
+                              // 检查是否存在下周实例
+                              const listResp = await getWeeklyInstances(timetableId);
+                              if (!listResp.success) {
+                                message.error('获取实例列表失败');
+                                return;
+                              }
+                              const instances = (listResp.data || []).sort((a, b) => dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate)));
+                              const nextMonday = dayjs().startOf('week').add(7, 'day');
+                              const nextWeekIndex = instances.findIndex(inst => dayjs(inst.weekStartDate).isSame(nextMonday, 'day'));
+                              if (nextWeekIndex === -1) {
+                                message.warning('未找到下周课表，无需删除');
+                                return;
+                              }
+                              Modal.confirm({
+                                title: '删除下周课表',
+                                content: '确定删除下周课表实例及其所有课程吗？此操作不可恢复。',
+                                okText: '删除',
+                                okType: 'danger',
+                                cancelText: '取消',
+                                onOk: async () => {
+                                  const resp = await deleteNextWeekInstance(timetableId);
+                                  if (resp.success) {
+                                    const refreshed = await getWeeklyInstances(timetableId);
+                                    if (refreshed.success) setWeeklyInstances(refreshed.data || []);
+                                    message.success('已删除下周课表');
+                                  } else {
+                                    message.error(resp.message || '删除下周课表失败');
+                                  }
+                                }
+                              });
+                            } catch (e) {
+                              message.error('删除失败，请稍后重试');
                             }
                           }
                         },
@@ -4461,7 +4517,13 @@ const ViewTimetable = ({ user }) => {
           />
           
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {(isInitialLoading ? [{ id: 'loading', weekStartDate: dayjs().format('YYYY-MM-DD') }] : getDisplayInstances(displayWeeklyInstances)).map((instance, displayIndex) => {
+            {(
+              isInitialLoading
+                ? [{ id: 'loading', weekStartDate: dayjs().format('YYYY-MM-DD') }]
+                : getDisplayInstances(displayWeeklyInstances)
+                    .slice()
+                    .sort((a, b) => dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))) // 确保左到右日期递增
+            ).map((instance, displayIndex) => {
               const actualIndex = displayStartIndex + displayIndex;
               console.log('Rendering button for instance:', instance, 'displayIndex:', displayIndex, 'actualIndex:', actualIndex, 'currentIndex:', currentInstanceIndex);
               return (

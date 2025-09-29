@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip, Spin, Badge, Tabs } from 'antd';
 import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
-import { getAllUsers, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
+import { getAllUsers, updateUserInfo, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, updateUserUsername, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
 import './UserManagement.css';
 
 const { Option } = Select;
@@ -20,6 +20,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
   const [selectedRole, setSelectedRole] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newNickname, setNewNickname] = useState('');
+  const [newUsername, setNewUsername] = useState('');
   const [roleLoading, setRoleLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [nicknameLoading, setNicknameLoading] = useState(false);
@@ -112,6 +113,8 @@ const UserManagement = ({ activeTab = 'users' }) => {
   const handleEditRole = (user) => {
     setEditingUser(user);
     setSelectedRole(user.role);
+    setNewUsername(user.username || '');
+    setNewNickname(user.nickname || '');
     setRoleModalVisible(true);
   };
 
@@ -126,6 +129,8 @@ const UserManagement = ({ activeTab = 'users' }) => {
     setNewNickname(user.nickname || '');
     setNicknameModalVisible(true);
   };
+
+  // 已合并到角色编辑弹窗中，单独的“编辑用户名”入口不再使用
 
   const handleDeleteUser = (user) => {
     Modal.confirm({
@@ -150,30 +155,54 @@ const UserManagement = ({ activeTab = 'users' }) => {
     });
   };
 
-  const handleUpdateRole = async () => {
-    if (!editingUser || !selectedRole) {
-      message.error('请选择角色');
+  const handleConfirmRoleAndUsername = async () => {
+    if (!editingUser) return;
+    const payload = {};
+    // 用户名变化
+    const trimmed = (newUsername || '').trim();
+    if (!trimmed) {
+      message.error('用户名不能为空');
       return;
     }
+    if (trimmed !== editingUser.username) {
+      if (trimmed.length < 2 || trimmed.length > 32) {
+        message.error('用户名长度需在 2-32 个字符之间');
+        return;
+      }
+      payload.username = trimmed;
+    }
 
-    if (selectedRole === editingUser.role) {
-      message.warning('用户角色未发生变化');
+    // 昵称变化（可为空，为空表示清除昵称）
+    if ((newNickname || '') !== (editingUser.nickname || '')) {
+      if (newNickname && newNickname.length > 50) {
+        message.error('昵称长度不能超过50个字符');
+        return;
+      }
+      payload.nickname = newNickname || '';
+    }
+
+    // 角色：后端要求必须传 USER/ADMIN。若未变更，也要传当前角色。
+    payload.role = selectedRole || editingUser.role;
+
+    if (Object.keys(payload).length === 0) {
+      message.warning('未检测到变更');
       setRoleModalVisible(false);
       return;
     }
 
     setRoleLoading(true);
     try {
-      const response = await updateUserRole(editingUser.id, selectedRole);
-      if (response.success) {
-        message.success('用户权限更新成功');
+      const res = await updateUserInfo(editingUser.id, payload);
+      if (res && res.success) {
+        message.success('更新成功');
         setRoleModalVisible(false);
-        fetchUsers(); // 重新获取用户列表
+        // 更新本地列表
+        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...payload } : u));
       } else {
-        message.error(response.message || '更新用户权限失败');
+        message.error(res?.message || '更新失败');
       }
-    } catch (error) {
-      message.error('更新用户权限失败，请检查网络连接');
+    } catch (e) {
+      message.error('更新失败，请检查网络连接');
     } finally {
       setRoleLoading(false);
     }
@@ -242,6 +271,36 @@ const UserManagement = ({ activeTab = 'users' }) => {
     }
   };
 
+  const handleUpdateUsername = async () => {
+    if (!editingUser) return;
+    const trimmed = (newUsername || '').trim();
+    if (!trimmed) {
+      message.error('用户名不能为空');
+      return;
+    }
+    if (trimmed.length < 2 || trimmed.length > 32) {
+      message.error('用户名长度需在 2-32 个字符之间');
+      return;
+    }
+    setUsernameLoading(true);
+    try {
+      const response = await updateUserUsername(editingUser.id, trimmed);
+      if (response.success) {
+        message.success('用户名更新成功');
+        setUsernameModalVisible(false);
+        setNewUsername('');
+        // 更新用户列表
+        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, username: trimmed } : u));
+      } else {
+        message.error(response.message || '用户名更新失败');
+      }
+    } catch (e) {
+      message.error('用户名更新失败，请检查网络连接');
+    } finally {
+      setUsernameLoading(false);
+    }
+  };
+
   const columns = [
     {
       title: '用户名',
@@ -260,16 +319,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
               ? <CrownOutlined style={{ color: '#f5222d' }} /> 
               : <UserOutlined style={{ color: '#1890ff' }} />}
             <Tooltip title={`用户名: ${text}${record.nickname ? ` | 昵称: ${record.nickname}` : ''}`} placement="topLeft" mouseEnterDelay={0.2}>
-              <span 
-                style={{ fontWeight: 'bold', cursor: 'pointer', color: '#1890ff' }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleEditNickname(record);
-                }}
-              >
-                {showText}
-              </span>
+              <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{showText}</span>
             </Tooltip>
           </Space>
         );
@@ -308,6 +358,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
               title="变更权限"
               style={{ fontSize: '16px', color: '#722ed1', padding: '0 6px' }}
             />
+            
             <Button 
               type="text" 
               className="action-button"
@@ -599,9 +650,9 @@ const UserManagement = ({ activeTab = 'users' }) => {
       
       {/* 角色编辑模态框 */}
       <Modal
-        title="编辑用户角色"
+        title="编辑用户信息"
         open={roleModalVisible}
-        onOk={handleUpdateRole}
+        onOk={handleConfirmRoleAndUsername}
         onCancel={() => setRoleModalVisible(false)}
         confirmLoading={roleLoading}
         okText="确认"
@@ -610,6 +661,24 @@ const UserManagement = ({ activeTab = 'users' }) => {
         <div style={{ marginBottom: 16 }}>
           <p>用户：{editingUser?.username}</p>
           <p>当前角色：{editingUser?.role === 'ADMIN' ? '管理员' : '普通用户'}</p>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label>新用户名：</label>
+          <Input
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            placeholder="请输入新用户名（2-32 个字符）"
+            style={{ width: '100%', marginTop: 8 }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label>新昵称：</label>
+          <Input
+            value={newNickname}
+            onChange={(e) => setNewNickname(e.target.value)}
+            placeholder="请输入新昵称（可留空）"
+            style={{ width: '100%', marginTop: 8 }}
+          />
         </div>
         <div>
           <label>新角色：</label>
@@ -672,6 +741,8 @@ const UserManagement = ({ activeTab = 'users' }) => {
           />
         </div>
       </Modal>
+
+      {/* 移除单独的用户名编辑弹窗，功能已合并到角色编辑弹窗 */}
     </>
   );
 };
