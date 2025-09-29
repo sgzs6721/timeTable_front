@@ -440,6 +440,30 @@ code {
     /* 确保表格单元格边框完整 */
     border: 1px solid #e8e8e8;
   }
+
+  /* 教练详情表格和固定课表模板表格的移动端优化 */
+  .ant-table {
+    /* 防止表格文字换行 */
+    white-space: nowrap;
+  }
+
+  .ant-table-thead > tr > th {
+    /* 表头文字不换行，保持完整显示 */
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  .ant-table-tbody > tr > td {
+    /* 表格内容不换行，保持完整显示 */
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  /* 确保表格容器支持水平滚动 */
+  .ant-card-body > div[style*="overflowX"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
 }
 
 /* 超小屏幕设备适配 (360px 以下) */
@@ -793,6 +817,27 @@ code {
 
 /* 移动端表格样式 */
 @media (max-width: 768px) {
+  /* 通用表格移动端优化 - 防止文字换行，支持水平滚动 */
+  .ant-table {
+    white-space: nowrap;
+  }
+
+  .ant-table-thead > tr > th {
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  .ant-table-tbody > tr > td {
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  /* 确保所有表格容器支持水平滚动 */
+  .ant-card-body,
+  .ant-card-body > div {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
   .voice-button {
     width: 80px;
     height: 80px;
@@ -888,6 +933,30 @@ code {
     /* 防止表格被截断 */
     width: 100%;
     box-sizing: border-box;
+  }
+
+  /* 教练详情表格和固定课表模板表格的移动端优化 */
+  .ant-table {
+    /* 防止表格文字换行 */
+    white-space: nowrap;
+  }
+
+  .ant-table-thead > tr > th {
+    /* 表头文字不换行，保持完整显示 */
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  .ant-table-tbody > tr > td {
+    /* 表格内容不换行，保持完整显示 */
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  /* 确保表格容器支持水平滚动 */
+  .ant-card-body > div[style*="overflowX"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   .compact-timetable .ant-table-thead > tr > th {
@@ -1053,6 +1122,30 @@ code {
     /* 确保表格边框完整显示 */
     padding: 0;
     margin: 0;
+  }
+
+  /* 教练详情表格和固定课表模板表格的小屏幕优化 */
+  .ant-table {
+    /* 防止表格文字换行 */
+    white-space: nowrap;
+  }
+
+  .ant-table-thead > tr > th {
+    /* 表头文字不换行，保持完整显示 */
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  .ant-table-tbody > tr > td {
+    /* 表格内容不换行，保持完整显示 */
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  /* 确保表格容器支持水平滚动 */
+  .ant-card-body > div[style*="overflowX"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   .compact-timetable .ant-table-thead > tr > th {
