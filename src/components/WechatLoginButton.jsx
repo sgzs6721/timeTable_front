@@ -57,14 +57,13 @@ const WechatLoginButton = ({ onLogin, size = 'middle' }) => {
 
   return (
     <Button
-      type="primary"
+      type="default"
       icon={<WechatOutlined />}
       onClick={handleWechatAuth}
       loading={loading}
       size={size}
+      className="wechat-login-btn"
       style={{
-        backgroundColor: '#07c160',
-        borderColor: '#07c160',
         marginRight: '8px'
       }}
     >

@@ -109,7 +109,7 @@ const Login = ({ onLogin }) => {
           }}>
             <span style={{ color: '#595959' }}>还没有账号？</span>
             <Link to="/register">
-              <Button type="link" size="large" style={{ padding: 0, height: 'auto' }}>立即注册</Button>
+              <Button type="link" style={{ padding: 0, height: 'auto', fontSize: 'inherit' }}>立即注册</Button>
             </Link>
           </div>
 

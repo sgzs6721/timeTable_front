@@ -3,6 +3,7 @@ import { Form, Input, Button, Card, message, Divider, Result } from 'antd';
 import { UserOutlined, LockOutlined, SmileOutlined, CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../services/auth';
+import WechatLogin from '../components/WechatLogin';
 import logo from '../assets/logo.png';
 
 const Register = ({ onLogin }) => {
@@ -238,6 +239,10 @@ const Register = ({ onLogin }) => {
           }}>
             注册申请提交后需要管理员确认才能登录
           </div>
+
+          <Divider>其他登录方式</Divider>
+          
+          <WechatLogin onLogin={onLogin} />
 
           <Divider>已有账号？</Divider>
           
