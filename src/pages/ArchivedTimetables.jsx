@@ -10,6 +10,7 @@ import {
   bulkDeleteTimetables,
   getTimetableSchedules
 } from '../services/timetable';
+import Footer from '../components/Footer';
 
 const ArchivedTimetables = () => {
   const navigate = useNavigate();
@@ -288,6 +289,9 @@ const ArchivedTimetables = () => {
           }}
         />
       )}
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };

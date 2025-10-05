@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, Card, message, Input, Space, Typography } from 'antd';
 import { WechatOutlined } from '@ant-design/icons';
 import { wechatLogin, getWechatAuthUrl } from '../services/auth';
+import Footer from '../components/Footer';
 
 const { Title, Text } = Typography;
 
@@ -113,6 +114,8 @@ const WechatTest = () => {
           )}
         </Space>
       </Card>
+      
+      <Footer />
     </div>
   );
 };

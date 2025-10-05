@@ -1,6 +1,7 @@
 import React from 'react';
 import { Typography, Card, Divider, List, Table, Modal, Tag, Button, Space } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import Footer from '../components/Footer';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -263,6 +264,8 @@ const UserGuide = ({ user }) => {
           </div>
         </div>
       </Card>
+      
+      <Footer />
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip, Spin, Badge, Tabs } from 'antd';
 import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
 import { getAllUsers, updateUserInfo, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, updateUserUsername, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
+import Footer from '../components/Footer';
 import './UserManagement.css';
 
 const { Option } = Select;

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createSchedulesBatch, createSchedulesBatchForce, checkScheduleConflicts } from '../services/timetable';
 import { Button, message, Modal, List, Typography, Alert, Space, Tag, Checkbox } from 'antd';
 import { DeleteOutlined, ExclamationCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import Footer from '../components/Footer';
 import './ConfirmSchedulePage.css';
 
 const { Text, Title } = Typography;
@@ -493,6 +494,9 @@ const ConfirmSchedulePage = ({ setTextInputValue }) => {
           </div>
         )}
       </Modal>
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };

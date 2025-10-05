@@ -3,6 +3,7 @@ import { Button, Input, message, Space, Typography, Alert, Spin, Radio, Table, T
 import { LeftOutlined, SendOutlined, EditOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, addScheduleByText, addScheduleByFormat } from '../services/timetable';
+import Footer from '../components/Footer';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -353,6 +354,9 @@ const InputTimetable = ({ user, textInputValue, setTextInputValue }) => {
       </div>
 
       {textTabContent}
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };

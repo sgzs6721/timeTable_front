@@ -5,10 +5,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules } from '../services/timetable';
 import { invalidateWeeklyTemplatesCache, getInstanceSchedulesByDate } from '../services/admin';
 import { getThisWeekSchedulesSessionOnce } from '../services/timetable';
-import { 
-  getCurrentWeekInstance, 
+import {
+  getCurrentWeekInstance,
   getCurrentWeekInstanceIncludingLeaves,
-  generateCurrentWeekInstance, 
+  generateCurrentWeekInstance,
   checkCurrentWeekInstance,
   clearCurrentWeekInstanceSchedules,
   syncTemplateToInstances,
@@ -36,6 +36,7 @@ import weekOfYear from 'dayjs/plugin/weekOfYear';
 import html2canvas from 'html2canvas';
 import EditScheduleModal from '../components/EditScheduleModal';
 import LeaveRequestModal from '../components/LeaveRequestModal';
+import Footer from '../components/Footer';
 import { isWeChatBrowser } from '../utils/browserDetect';
 import './ViewTimetable.css';
 
@@ -5009,7 +5010,9 @@ const ViewTimetable = ({ user }) => {
           )}
         </div>
       </Modal>
-
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };

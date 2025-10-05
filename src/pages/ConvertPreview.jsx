@@ -4,6 +4,7 @@ import { LeftOutlined, RightOutlined, CalendarOutlined, CheckOutlined } from '@a
 import { useNavigate, useLocation } from 'react-router-dom';
 import { copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules } from '../services/timetable';
 import dayjs from 'dayjs';
+import Footer from '../components/Footer';
 import './ViewTimetable.css';
 
 const ConvertPreview = () => {
@@ -931,6 +932,8 @@ const ConvertPreview = () => {
           />
         </div>
       )}
+      
+      <Footer />
     </div>
   );
 };

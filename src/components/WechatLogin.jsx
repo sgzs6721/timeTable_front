@@ -3,7 +3,7 @@ import { Button, message, Spin } from 'antd';
 import { WechatOutlined } from '@ant-design/icons';
 import { wechatLogin, getWechatAuthUrl } from '../services/auth';
 
-const WechatLogin = ({ onLogin }) => {
+const WechatLogin = ({ onLogin, disabled = false }) => {
   const [loading, setLoading] = useState(false);
   const [authUrl, setAuthUrl] = useState('');
 
@@ -94,15 +94,16 @@ const WechatLogin = ({ onLogin }) => {
         icon={<WechatOutlined />}
         onClick={handleWechatAuth}
         loading={loading}
+        disabled={disabled}
         size="large"
         className="wechat-login-btn"
         style={{
           height: '45px',
           width: '100%',
-          backgroundColor: '#07c160',
-          borderColor: '#07c160',
+          backgroundColor: disabled ? '#f5f5f5' : '#07c160',
+          borderColor: disabled ? '#d9d9d9' : '#07c160',
           fontSize: '16px',
-          color: '#ffffff'
+          color: disabled ? 'rgba(0, 0, 0, 0.25)' : '#ffffff'
         }}
       >
         微信登录

@@ -10,6 +10,7 @@ import weekOfYear from 'dayjs/plugin/weekOfYear';
 import localeData from 'dayjs/plugin/localeData';
 import html2canvas from 'html2canvas';
 import { isWeChatBrowser } from '../utils/browserDetect';
+import Footer from '../components/Footer';
 import './ViewTimetable.css';
 
 // 扩展 dayjs 插件
@@ -817,8 +818,8 @@ const MergePreview = ({ user }) => {
           />
         </div>
       )}
-
-
+      
+      <Footer />
     </div>
   );
 };

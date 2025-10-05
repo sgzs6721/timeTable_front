@@ -219,10 +219,19 @@ const Register = ({ onLogin }) => {
             />
           </Form.Item>
 
+          <div style={{
+            textAlign: 'center',
+            color: '#666',
+            fontSize: '14px',
+            marginBottom: '16px'
+          }}>
+            注册申请提交后需要管理员确认才能登录
+          </div>
+
           <Form.Item>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
+            <Button
+              type="primary"
+              htmlType="submit"
               loading={loading}
               block
               style={{ height: '45px' }}
@@ -231,27 +240,29 @@ const Register = ({ onLogin }) => {
             </Button>
           </Form.Item>
 
-          <div style={{ 
-            textAlign: 'center', 
-            color: '#666', 
-            fontSize: '14px',
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
             marginBottom: '16px'
           }}>
-            注册申请提交后需要管理员确认才能登录
+            <span style={{ marginRight: '8px', color: '#666', fontSize: '14px' }}>已有账号？</span>
+            <Link to="/login" style={{ fontSize: '14px', color: '#1890ff' }}>
+              立即登录
+            </Link>
           </div>
 
           <Divider>其他登录方式</Divider>
           
-          <WechatLogin onLogin={onLogin} />
+          <WechatLogin onLogin={onLogin} disabled={true} />
 
-          <Divider>已有账号？</Divider>
-          
-          <div style={{ textAlign: 'center' }}>
-            <Link to="/login">
-              <Button type="link" size="large">
-                立即登录
-              </Button>
-            </Link>
+          {/* 底部版权信息 */}
+          <div style={{ height: '16px' }} />
+          <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '4px' }}>
+            © 2023-{new Date().getFullYear()} 飓风乒乓部训中关村校区
+          </div>
+          <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '2px' }}>
+            雷网科技（北京）有限公司
           </div>
         </Form>
       </Card>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, DatePicker, Button, message, Row, Col, Radio } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { createTimetable } from '../services/timetable';
+import Footer from '../components/Footer';
 import dayjs from 'dayjs';
 
 const CreateTimetable = ({ user }) => {
@@ -152,6 +153,9 @@ const CreateTimetable = ({ user }) => {
           <div><strong>日期课表：</strong>适用于有明确开始和结束日期的课程，如假期班。</div>
         </div>
       </Form>
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };

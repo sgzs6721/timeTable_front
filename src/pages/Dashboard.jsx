@@ -10,6 +10,7 @@ import { getAllStudents } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
+import Footer from '../components/Footer';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
 
@@ -3898,6 +3899,9 @@ const Dashboard = ({ user }) => {
         studentName={selectedStudent}
         coachName={selectedCoach}
       />
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };

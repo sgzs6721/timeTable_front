@@ -4,6 +4,7 @@ import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutline
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables, updateTimetableStatus, updateTimetableDetails, deleteTimetableByAdmin, clearTimetableSchedulesByAdmin } from '../services/admin';
 import CopyTimetableModal from '../components/CopyTimetableModal';
+import Footer from '../components/Footer';
 import dayjs from 'dayjs';
 import { getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules, updateTimetable, clearTimetableSchedules, bulkRestoreTimetables, bulkDeleteTimetables } from '../services/timetable';
 
@@ -946,6 +947,8 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
               onChange={(v) => setDateRange([dateRange?.[0] || null, v])}
               disabled={converting}
             />
+            {/* 版权信息 */}
+            <Footer />
           </div>
         ) : null}
         

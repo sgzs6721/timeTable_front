@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
 import TimetableManagement from './TimetableManagement';
+import Footer from '../components/Footer';
 import './AdminPanel.css';
 import { getAllRegistrationRequests, emergencyFixWeeklyInstances, autoFixWeeklyInstances, cleanDuplicateSchedules } from '../services/admin';
 
@@ -278,7 +279,9 @@ const AdminPanel = ({ user }) => {
           onChange={(key) => setActiveTab(key)}
         />
       </div>
-
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };

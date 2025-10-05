@@ -3,6 +3,7 @@ import { Card, Form, Input, Button, message, Modal } from 'antd';
 import { UserOutlined, LockOutlined, SaveOutlined, ArrowLeftOutlined, LogoutOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { updateProfile, updatePassword, deactivateAccount } from '../services/auth';
+import Footer from '../components/Footer';
 import './UserProfile.css';
 
 const { confirm } = Modal;
@@ -317,6 +318,9 @@ const UserProfile = ({ user }) => {
           </Button>
         </div>
       </div>
+      
+      {/* 版权信息 */}
+      <Footer />
     </div>
   );
 };
