@@ -3715,13 +3715,25 @@ const Dashboard = ({ user }) => {
                   align: 'center',
                   render: (value, record) => {
                     const coachName = record.nickname || record.username;
+                    const courseCount = value ?? 0;
+                    
+                    // 如果课程数量为0，显示为普通文本，不可点击
+                    if (courseCount === 0) {
+                      return (
+                        <span style={{ color: '#999', fontWeight: 400 }}>
+                          0
+                        </span>
+                      );
+                    }
+                    
+                    // 课程数量大于0时，显示为可点击的链接
                     return (
                       <span
                         style={{ color: '#722ed1', fontWeight: 500, cursor: 'pointer' }}
                         onClick={() => openLastMonthModal(coachName)}
                         title="点击查看上月所有上课记录"
                       >
-                        {value ?? 0}
+                        {courseCount}
                       </span>
                     );
                   }

@@ -4,6 +4,7 @@ import { UserOutlined, LockOutlined, SmileOutlined, CheckCircleOutlined, ArrowLe
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../services/auth';
 import WechatLogin from '../components/WechatLogin';
+import Footer from '../components/Footer';
 import logo from '../assets/logo.png';
 
 const Register = ({ onLogin }) => {
@@ -258,12 +259,7 @@ const Register = ({ onLogin }) => {
 
           {/* 底部版权信息 */}
           <div style={{ height: '16px' }} />
-          <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '4px' }}>
-            © 2023-{new Date().getFullYear()} 飓风乒乓部训中关村校区
-          </div>
-          <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '2px' }}>
-            雷网科技（北京）有限公司
-          </div>
+          <Footer />
         </Form>
       </Card>
     </div>
