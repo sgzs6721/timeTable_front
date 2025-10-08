@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown } from 'antd';
-import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons';
+import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules } from '../services/timetable';
 import { invalidateWeeklyTemplatesCache, getInstanceSchedulesByDate } from '../services/admin';
@@ -60,8 +60,8 @@ const dayMap = {
   SUNDAY: '日',
 };
 
-// 仅展示信息的弹层：显示原学员与“取消/请假”状态
-const CancelledOrLeavePopoverContent = ({ info, onClose }) => {
+// 仅展示信息的弹层：显示原学员与"取消/请假"状态
+const CancelledOrLeavePopoverContent = ({ info, onClose, onRestore, restoreLoading }) => {
   if (!info) return null;
   return (
     <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
@@ -74,11 +74,35 @@ const CancelledOrLeavePopoverContent = ({ info, onClose }) => {
           <div style={{ fontSize: '12px', color: '#595959' }}>
             原学员：<strong>{info.studentName || '—'}</strong>
           </div>
-          {info.type === '请假' ? (
-            <Tag color="orange" style={{ fontSize: 12, height: 22, display: 'inline-flex', alignItems: 'center' }}>请假</Tag>
-          ) : (
-            <Tag color="red" style={{ fontSize: 12, height: 22, display: 'inline-flex', alignItems: 'center' }}>取消</Tag>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {info.type === '请假' ? (
+              <Tag color="orange" style={{ fontSize: 12, height: 22, display: 'inline-flex', alignItems: 'center' }}>请假</Tag>
+            ) : (
+              <Tag color="red" style={{ fontSize: 12, height: 22, display: 'inline-flex', alignItems: 'center' }}>取消</Tag>
+            )}
+            <span
+              onClick={restoreLoading ? undefined : onRestore}
+              style={{
+                fontSize: '12px',
+                color: restoreLoading ? '#999' : '#389e0d',
+                cursor: restoreLoading ? 'not-allowed' : 'pointer',
+                textDecoration: restoreLoading ? 'none' : 'underline',
+                userSelect: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              {restoreLoading ? (
+                <>
+                  <LoadingOutlined style={{ fontSize: '12px' }} />
+                  恢复
+                </>
+              ) : (
+                '恢复'
+              )}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -136,7 +160,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
       </div>
 
       {/* 如果是已修改的课程，显示固定课表原始内容 */}
-      {isModified && templateSchedule && (
+      {isModified && templateSchedule && schedule.note !== '恢复的课程' && (
         <div style={{ 
           backgroundColor: '#f6f6f6', 
           padding: '6px 8px', 
@@ -511,6 +535,7 @@ const ViewTimetable = ({ user }) => {
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
   const [leaveSchedule, setLeaveSchedule] = useState(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
 
   // 防抖/竞态控制：视图切换时只接受最后一次请求结果
   const latestRequestIdRef = useRef(0);
@@ -725,8 +750,8 @@ const ViewTimetable = ({ user }) => {
     let scheduleDate = null;
   // 统一规则（修正）：
   // - 周固定课表（isWeekly=true）：
-  //   - 实例视图：仅写入“当前周实例”，需要具体日期 scheduleDate
-  //   - 模板视图：写入“固定课表模板”，不带具体日期（不设置 scheduleDate）
+  //   - 实例视图：仅写入"当前周实例"，需要具体日期 scheduleDate
+  //   - 模板视图：写入"固定课表模板"，不带具体日期（不设置 scheduleDate）
   // - 日期范围课表（isWeekly=false）：始终使用当前周计算具体日期
   if (timetable.isWeekly) {
     if (viewMode === 'instance' && currentWeekInstance) {
@@ -973,7 +998,7 @@ const ViewTimetable = ({ user }) => {
       const thisMonday = dayjs().startOf('week');
       if (start.isSame(thisMonday, 'day')) return '本周';
       if (start.isSame(thisMonday.add(1, 'week'), 'day')) return '下周';
-      // 其它周：按“MMDD”显示（例：0901）
+      // 其它周：按"MMDD"显示（例：0901）
       return start.format('MMDD');
     }
     return '本周';
@@ -1409,16 +1434,34 @@ const ViewTimetable = ({ user }) => {
   // 4. 获取本周数据（每区块一次）- 统一走聚合接口
   const fetchWeekInstanceSchedules = async (requestId) => {
     console.log('fetchWeekInstanceSchedules called for timetableId:', timetableId);
-    const response = await getThisWeekSchedulesSessionOnce(timetableId);
-    console.log('fetchWeekInstanceSchedules response:', response);
-    if (response && response.success) {
-      console.log('Setting allSchedules to:', response.data || []);
+    
+    // 同时获取本周实例数据和模板数据
+    const [instanceResponse, templateResponse] = await Promise.all([
+      getThisWeekSchedulesSessionOnce(timetableId),
+      getTemplateSchedules(timetableId)
+    ]);
+    
+    console.log('fetchWeekInstanceSchedules instanceResponse:', instanceResponse);
+    console.log('fetchWeekInstanceSchedules templateResponse:', templateResponse);
+    
+    if (instanceResponse && instanceResponse.success) {
+      console.log('Setting allSchedules to:', instanceResponse.data || []);
       if (latestRequestIdRef.current === (requestId ?? latestRequestIdRef.current)) {
-        setAllSchedules(response.data || []);
+        setAllSchedules(instanceResponse.data || []);
+        
+        // 同时更新模板数据
+        if (templateResponse && templateResponse.success) {
+          setTemplateSchedules(templateResponse.data || []);
+        }
       }
     } else {
       console.log('Failed to fetch week instance schedules');
       setAllSchedules([]);
+      
+      // 即使实例数据获取失败，也要尝试设置模板数据
+      if (templateResponse && templateResponse.success) {
+        setTemplateSchedules(templateResponse.data || []);
+      }
     }
   };
 
@@ -1786,45 +1829,78 @@ const ViewTimetable = ({ user }) => {
     if (!timetable || !timetable.isWeekly) {
       return ''; // 非周固定课表，不显示特殊边框
     }
-    
-    // 在实例视图或loading状态下从实例切换到模板时，都显示边框
     if (viewMode !== 'instance' && !loading) {
-      return ''; // 非实例视图且非loading状态，不显示特殊边框
+      return '';
     }
-
-    // 统一比较口径：星期大小写无关；时间以 HH:mm 比较
-    const toDay = (v) => (v ? String(v).toUpperCase() : '');
-    const toHm = (v) => (v ? String(v).slice(0, 5) : '');
-
-    const iDay = toDay(instanceSchedule.dayOfWeek);
-    const iStart = toHm(instanceSchedule.startTime);
-    const iEnd = toHm(instanceSchedule.endTime);
-
-    // 查找对应的固定课表模板课程（忽略秒）
-    const templateSchedule = templateSchedules.find(template => {
-      const tDay = toDay(template.dayOfWeek);
-      const tStart = toHm(template.startTime);
-      const tEnd = toHm(template.endTime);
+    
+    // 确保模板数据已加载
+    if (!templateSchedules || templateSchedules.length === 0) {
+      return ''; // 模板数据未加载，不显示边框
+    }
+    
+    // 标准化处理函数，确保格式一致
+    const normalizeDay = (v) => {
+      if (!v) return '';
+      const dayStr = String(v).toLowerCase().trim();
+      // 处理可能的中文星期格式
+      const dayMap = {
+        '星期一': 'monday', '周一': 'monday', '一': 'monday',
+        '星期二': 'tuesday', '周二': 'tuesday', '二': 'tuesday',
+        '星期三': 'wednesday', '周三': 'wednesday', '三': 'wednesday',
+        '星期四': 'thursday', '周四': 'thursday', '四': 'thursday',
+        '星期五': 'friday', '周五': 'friday', '五': 'friday',
+        '星期六': 'saturday', '周六': 'saturday', '六': 'saturday',
+        '星期日': 'sunday', '周日': 'sunday', '日': 'sunday',
+        'monday': 'monday', 'tuesday': 'tuesday', 'wednesday': 'wednesday',
+        'thursday': 'thursday', 'friday': 'friday', 'saturday': 'saturday', 'sunday': 'sunday'
+      };
+      return dayMap[dayStr] || dayStr;
+    };
+    
+    const normalizeTime = (v) => {
+      if (!v) return '';
+      let timeStr = String(v).trim();
+      // 处理可能的秒数，如 "09:00:00"
+      if (timeStr.length > 5) {
+        timeStr = timeStr.substring(0, 5);
+      }
+      // 确保时间是 HH:MM 格式
+      return timeStr;
+    };
+    
+    const iDay = normalizeDay(instanceSchedule.dayOfWeek);
+    const iStart = normalizeTime(instanceSchedule.startTime);
+    const iEnd = normalizeTime(instanceSchedule.endTime);
+    
+    // 使用更宽松的匹配逻辑，先尝试精确匹配
+    let templateSchedule = templateSchedules.find(template => {
+      const tDay = normalizeDay(template.dayOfWeek);
+      const tStart = normalizeTime(template.startTime);
+      const tEnd = normalizeTime(template.endTime);
       return tDay === iDay && tStart === iStart && tEnd === iEnd;
     });
-
+    
+    // 如果精确匹配失败，尝试只匹配时间段（忽略星期）
+    if (!templateSchedule) {
+      templateSchedule = templateSchedules.find(template => {
+        const tStart = normalizeTime(template.startTime);
+        const tEnd = normalizeTime(template.endTime);
+        return tStart === iStart && tEnd === iEnd;
+      });
+    }
+    
+    
     if (!templateSchedule) {
       // 固定课表中没有，但实例中有 - 绿色边框（手动添加）
       return '#52c41a';
     } else {
-      // 固定课表中有，检查内容是否一致
-      const isContentSame = 
-        (templateSchedule.studentName || '') === (instanceSchedule.studentName || '') &&
-        (templateSchedule.subject || '') === (instanceSchedule.subject || '') &&
-        (templateSchedule.note || '') === (instanceSchedule.note || '');
-      
-      if (!isContentSame) {
-        // 内容不一致 - 橙色边框（已修改）
-        return '#faad14';
+      // 固定课表中有，检查学生名是否一致
+      if ((templateSchedule.studentName || '') !== (instanceSchedule.studentName || '')) {
+        return '#faad14'; // 橙色边框
       }
+      // 完全一致，不显示任何边框
+      return '';
     }
-
-    return ''; // 内容一致，不显示特殊边框
   };
 
   // 简化的刷新函数，直接按当前视图类型刷新
@@ -1934,6 +2010,9 @@ const ViewTimetable = ({ user }) => {
   const handleDeleteSchedule = async (scheduleId) => {
     setDeleteLoading(true);
     try {
+      // 找到要删除的课程信息
+      const scheduleToDelete = allSchedules.find(s => s.id === scheduleId);
+      
       let response;
       if (viewMode === 'instance') {
         // 实例视图：直接删除实例中的课程
@@ -1942,6 +2021,18 @@ const ViewTimetable = ({ user }) => {
           setOpenPopoverKey(null);
           // 直接从当前显示的数据中移除，避免重新请求
           setAllSchedules(prev => prev.filter(schedule => schedule.id !== scheduleId));
+          
+          // 如果是取消操作（不是删除），更新leaveSlotMap
+          if (scheduleToDelete) {
+            const dayKey = (scheduleToDelete.dayOfWeek || '').toLowerCase();
+            const timeKey = `${scheduleToDelete.startTime.substring(0,5)}-${scheduleToDelete.endTime.substring(0,5)}`;
+            setLeaveSlotMap(prev => {
+              const newMap = new Map(prev);
+              newMap.set(`${dayKey}|${timeKey}`, scheduleToDelete.studentName || '');
+              return newMap;
+            });
+          }
+          
           message.success('删除成功');
         } else {
           message.error(response.message || '删除失败');
@@ -1986,6 +2077,15 @@ const ViewTimetable = ({ user }) => {
         // 从课表中移除该课程（类似删除效果）
         setAllSchedules(prev => prev.filter(schedule => schedule.id !== leaveSchedule.id));
         
+        // 更新leaveSlotMap，添加请假记录
+        const dayKey = (leaveSchedule.dayOfWeek || '').toLowerCase();
+        const timeKey = `${leaveSchedule.startTime.substring(0,5)}-${leaveSchedule.endTime.substring(0,5)}`;
+        setLeaveSlotMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(`${dayKey}|${timeKey}`, leaveSchedule.studentName || '');
+          return newMap;
+        });
+        
         message.success('请假申请成功');
       } else {
         message.error(response.message || '请假申请失败');
@@ -2001,6 +2101,260 @@ const ViewTimetable = ({ user }) => {
   const handleCancelLeave = () => {
     setLeaveModalVisible(false);
     setLeaveSchedule(null);
+  };
+
+  // 恢复请假/取消的学员
+  const handleRestoreSchedule = async (cancelInfo) => {
+    console.log('handleRestoreSchedule 被调用:', cancelInfo);
+    if (restoreLoading) return; // 防止重复点击
+    try {
+      setRestoreLoading(true);
+      console.log('restoreLoading 已设置为 true');
+      
+      if (cancelInfo.type === '请假') {
+        // 请假恢复：使用cancelLeave API
+        try {
+          console.log('尝试取消请假，scheduleId:', cancelInfo.scheduleId);
+          const response = await cancelLeave(cancelInfo.scheduleId);
+          console.log('取消请假响应:', response);
+          if (response.success) {
+            message.success('恢复成功');
+            // 清除缓存，确保获取最新数据
+            invalidateTimetableCache(timetableId);
+            await fetchWeekInstanceSchedules();
+            setOpenPopoverKey(null);
+            
+            // 恢复成功后，从leaveSlotMap中移除该记录
+            const timeInfoParts = cancelInfo.timeInfo.split(', ');
+            // 将中文星期转换为英文小写
+            const chineseToEnglishDay = {
+              '星期一': 'monday',
+              '星期二': 'tuesday',
+              '星期三': 'wednesday',
+              '星期四': 'thursday',
+              '星期五': 'friday',
+              '星期六': 'saturday',
+              '星期日': 'sunday'
+            };
+            const dayKey = chineseToEnglishDay[timeInfoParts[0]] || timeInfoParts[0].toLowerCase();
+            const timeKey = timeInfoParts[1];
+            setLeaveSlotMap(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(`${dayKey}|${timeKey}`);
+              return newMap;
+            });
+          } else {
+            message.error(response.message || '恢复失败');
+          }
+        } catch (error) {
+          console.error('取消请假失败:', error);
+          // 如果课程不存在（可能被物理删除），则重新创建
+          if (error.response?.status === 404 ||
+              error.message?.includes('课程不存在') ||
+              error.response?.data?.message?.includes('不存在') ||
+              error.response?.data?.message?.includes('已取消')) {
+            console.log('请假课程不存在或已取消，重新创建');
+            await recreateSchedule(cancelInfo);
+          } else {
+            // 其他错误，也尝试重新创建作为备选方案
+            console.log('尝试重新创建课程作为备选方案');
+            try {
+              await recreateSchedule(cancelInfo);
+            } catch (recreateError) {
+              console.error('重新创建课程也失败:', recreateError);
+              message.error(error.response?.data?.message || '恢复失败，请重试');
+            }
+          }
+        }
+      } else {
+        // 取消恢复：重新创建课程
+        await recreateSchedule(cancelInfo);
+      }
+      
+    } catch (error) {
+      message.error('恢复失败，请重试');
+      console.error('恢复失败:', error);
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  // 重新创建课程（用于恢复被删除的课程）
+  const recreateSchedule = async (cancelInfo) => {
+    try {
+      console.log('recreateSchedule 被调用，恢复课程信息:', cancelInfo);
+      
+      // 检查 cancelInfo 结构
+      if (!cancelInfo || !cancelInfo.timeInfo) {
+        console.error('cancelInfo 结构不正确:', cancelInfo);
+        message.error('恢复信息不完整，请重试');
+        return;
+      }
+      
+      const timeInfoParts = cancelInfo.timeInfo.split(', ');
+      if (timeInfoParts.length < 2) {
+        console.error('timeInfo 格式不正确:', cancelInfo.timeInfo);
+        message.error('时间信息格式错误，请重试');
+        return;
+      }
+      
+      const [startTimeStr, endTimeStr] = timeInfoParts[1].split('-');
+      if (!startTimeStr || !endTimeStr) {
+        console.error('时间解析失败:', timeInfoParts[1]);
+        message.error('时间解析失败，请重试');
+        return;
+      }
+      
+      const startTime = `${startTimeStr}:00`;
+      const endTime = `${endTimeStr}:00`;
+      
+      // 获取星期几
+      const dayMap = {
+        '星期一': 'MONDAY',
+        '星期二': 'TUESDAY',
+        '星期三': 'WEDNESDAY',
+        '星期四': 'THURSDAY',
+        '星期五': 'FRIDAY',
+        '星期六': 'SATURDAY',
+        '星期日': 'SUNDAY'
+      };
+      const dayOfWeek = dayMap[timeInfoParts[0]];
+      
+      if (!dayOfWeek) {
+        console.error('星期几解析失败:', timeInfoParts[0]);
+        message.error('星期几解析失败，请重试');
+        return;
+      }
+      
+      const payload = {
+        studentName: cancelInfo.studentName,
+        dayOfWeek: dayOfWeek,
+        startTime: startTime,
+        endTime: endTime,
+        note: '恢复的课程',
+        isManualAdded: false,  // 标记为非手动添加，因为是从固定课表恢复的
+        isModified: false      // 标记为未修改，因为内容与固定课表一致
+      };
+      
+      console.log('创建课程 payload:', payload);
+      
+      if (currentWeekInstance) {
+        console.log('准备创建实例课程，currentWeekInstance.id:', currentWeekInstance.id);
+        console.log('创建课程的 payload:', payload);
+        
+        // 先检查课程是否已经存在
+        const existingSchedules = allSchedules || [];
+        const alreadyExists = existingSchedules.some(schedule =>
+          schedule.dayOfWeek === payload.dayOfWeek &&
+          schedule.startTime === payload.startTime &&
+          schedule.endTime === payload.endTime &&
+          schedule.studentName === payload.studentName
+        );
+        
+        if (alreadyExists) {
+          console.log('课程已存在，无需重复创建');
+          message.success('恢复成功');
+          // 清除缓存，确保获取最新数据
+          invalidateTimetableCache(timetableId);
+          await fetchWeekInstanceSchedules();
+          setOpenPopoverKey(null);
+          
+          // 从leaveSlotMap中移除该记录
+          const timeInfoParts = cancelInfo.timeInfo.split(', ');
+          const chineseToEnglishDay = {
+            '星期一': 'monday',
+            '星期二': 'tuesday',
+            '星期三': 'wednesday',
+            '星期四': 'thursday',
+            '星期五': 'friday',
+            '星期六': 'saturday',
+            '星期日': 'sunday'
+          };
+          const dayKey = chineseToEnglishDay[timeInfoParts[0]] || timeInfoParts[0].toLowerCase();
+          const timeKey = timeInfoParts[1];
+          setLeaveSlotMap(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(`${dayKey}|${timeKey}`);
+            return newMap;
+          });
+          return;
+        }
+        
+        try {
+          const response = await createInstanceSchedule(currentWeekInstance.id, payload);
+          console.log('创建实例课程的响应:', response);
+          if (response.success) {
+            message.success('恢复成功');
+            // 清除缓存，确保获取最新数据
+            invalidateTimetableCache(timetableId);
+            await fetchWeekInstanceSchedules();
+            setOpenPopoverKey(null);
+            
+            // 恢复成功后，从leaveSlotMap中移除该记录
+            const timeInfoParts = cancelInfo.timeInfo.split(', ');
+            // 将中文星期转换为英文小写
+            const chineseToEnglishDay = {
+              '星期一': 'monday',
+              '星期二': 'tuesday',
+              '星期三': 'wednesday',
+              '星期四': 'thursday',
+              '星期五': 'friday',
+              '星期六': 'saturday',
+              '星期日': 'sunday'
+            };
+            const dayKey = chineseToEnglishDay[timeInfoParts[0]] || timeInfoParts[0].toLowerCase();
+            const timeKey = timeInfoParts[1];
+            setLeaveSlotMap(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(`${dayKey}|${timeKey}`);
+              return newMap;
+            });
+          } else {
+            message.error(response.message || '恢复失败');
+          }
+        } catch (createError) {
+          console.error('创建实例课程失败:', createError);
+          // 检查是否是重复创建的错误
+          if (createError.response?.status === 409 ||
+              (createError.response?.data?.message &&
+               createError.response.data.message.includes('已存在'))) {
+            console.log('课程已存在，刷新数据');
+            message.success('恢复成功');
+            // 清除缓存，确保获取最新数据
+            invalidateTimetableCache(timetableId);
+            await fetchWeekInstanceSchedules();
+            setOpenPopoverKey(null);
+            
+            // 从leaveSlotMap中移除该记录
+            const timeInfoParts = cancelInfo.timeInfo.split(', ');
+            const chineseToEnglishDay = {
+              '星期一': 'monday',
+              '星期二': 'tuesday',
+              '星期三': 'wednesday',
+              '星期四': 'thursday',
+              '星期五': 'friday',
+              '星期六': 'saturday',
+              '星期日': 'sunday'
+            };
+            const dayKey = chineseToEnglishDay[timeInfoParts[0]] || timeInfoParts[0].toLowerCase();
+            const timeKey = timeInfoParts[1];
+            setLeaveSlotMap(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(`${dayKey}|${timeKey}`);
+              return newMap;
+            });
+          } else {
+            message.error(createError.response?.data?.message || '创建课程失败');
+          }
+        }
+      } else {
+        console.error('当前没有周实例，无法恢复课程');
+        message.error('当前没有周实例，无法恢复课程');
+      }
+    } catch (error) {
+      console.error('重新创建课程失败:', error);
+      message.error('恢复失败：' + (error.message || '未知错误'));
+    }
   };
 
   // 更新学生姓名
@@ -2970,13 +3324,13 @@ const ViewTimetable = ({ user }) => {
 
   // 本周请假课时数
   const [weeklyLeaveCount, setWeeklyLeaveCount] = useState(0);
-  // 记录请假时段，用于网格点击时区分“取消/请假”
+  // 记录请假时段，用于网格点击时区分"取消/请假"
   const [leaveSlotMap, setLeaveSlotMap] = useState(new Map());
   
   // 获取请假课时数
   const fetchLeaveCount = useCallback(async () => {
     if (viewMode === 'instance' && timetable?.isWeekly && currentWeekInstance?.id) {
-      // 检查当前查看的实例是否是真实的“本周”
+      // 检查当前查看的实例是否是真实的"本周"
       const isViewingActualCurrentWeek = currentWeekInstance.weekStartDate && 
         dayjs(currentWeekInstance.weekStartDate).isSame(dayjs().startOf('week'), 'day');
 
@@ -3238,6 +3592,7 @@ const ViewTimetable = ({ user }) => {
               return <div style={{ height: '48px' }} />;
             }
 
+            // 检查模板中是否存在该时间段，且实例中该时间段没有课程（或课程是请假状态）
             const templateScheduleExists = displayViewMode === 'instance' &&
               Array.isArray(templateSchedules) &&
               templateSchedules.some(template => {
@@ -3245,7 +3600,9 @@ const ViewTimetable = ({ user }) => {
                 const dayKey = day.key;
                 const templateTimeKey = `${template.startTime.substring(0, 5)}-${template.endTime.substring(0, 5)}`;
                 return template.dayOfWeek.toLowerCase() === dayKey && templateTimeKey === timeKey;
-              });
+              }) &&
+              (!schedules || schedules.length === 0 || schedules.every(schedule => schedule.isOnLeave));
+            
 
             const templateScheduleForCell = displayViewMode === 'instance' && Array.isArray(templateSchedules)
               ? templateSchedules.find(template => {
@@ -3257,7 +3614,7 @@ const ViewTimetable = ({ user }) => {
             const emptyCellStyle = {
               height: '48px',
               cursor: 'pointer',
-              border: templateScheduleExists ? '2px dashed #ff4d4f' : undefined,
+              border: templateScheduleExists ? '1px dashed #ff4d4f' : undefined,
             };
 
             const handleCellClick = (e) => {
@@ -3483,7 +3840,8 @@ const ViewTimetable = ({ user }) => {
             const cancelInfo = templateScheduleExists && templateScheduleForCell ? {
               studentName: templateScheduleForCell.studentName,
               type: leaveStudent ? '请假' : '取消',
-              timeInfo
+              timeInfo,
+              scheduleId: templateScheduleForCell.id
             } : null;
 
             return (
@@ -3493,7 +3851,12 @@ const ViewTimetable = ({ user }) => {
                 content={
                   cancelInfo ? (
                     <div style={{ width: 220 }}>
-                      <CancelledOrLeavePopoverContent info={cancelInfo} onClose={() => handleOpenChange(false)} />
+                      <CancelledOrLeavePopoverContent 
+                        info={cancelInfo} 
+                        onClose={() => handleOpenChange(false)}
+                        onRestore={() => handleRestoreSchedule(cancelInfo)}
+                        restoreLoading={restoreLoading}
+                      />
                       <div style={{ padding: '0 8px' }}>
                         <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={null} />
                       </div>
@@ -3592,6 +3955,8 @@ const ViewTimetable = ({ user }) => {
                   
                   // 优先使用比较逻辑确定的边框颜色
                   const comparisonBorderColor = getScheduleBorderColor(student);
+                  
+                  
                   if (comparisonBorderColor) {
                     borderColor = comparisonBorderColor;
                     if (comparisonBorderColor === '#52c41a') {
@@ -3599,12 +3964,15 @@ const ViewTimetable = ({ user }) => {
                     } else if (comparisonBorderColor === '#faad14') {
                       titleText = isSourceCell ? sourceCellTitle : `已修改的课程 - ${modeText}`;
                     }
-                  } else if (isManualAdded) {
-                    borderColor = '#52c41a';
-                    titleText = isSourceCell ? sourceCellTitle : `手动添加的课程 - ${modeText}`;
                   } else if (isModified) {
                     borderColor = '#faad14';
                     titleText = isSourceCell ? sourceCellTitle : `已修改的课程 - ${modeText}`;
+                  }
+                  // 只有在比较逻辑返回绿色边框时，才使用isManualAdded标志
+                  // 这样可以避免与固定课表完全匹配的课程被错误标记为手动添加
+                  else if (isManualAdded && comparisonBorderColor === '#52c41a') {
+                    borderColor = '#52c41a';
+                    titleText = isSourceCell ? sourceCellTitle : `手动添加的课程 - ${modeText}`;
                   }
                   
                   return (
@@ -3734,6 +4102,8 @@ const ViewTimetable = ({ user }) => {
                   
                   // 优先使用比较逻辑确定的边框颜色
                   const comparisonBorderColor = getScheduleBorderColor(student);
+                  
+                  
                   if (comparisonBorderColor) {
                     borderColor = comparisonBorderColor;
                     if (comparisonBorderColor === '#52c41a') {
@@ -3741,12 +4111,15 @@ const ViewTimetable = ({ user }) => {
                     } else if (comparisonBorderColor === '#faad14') {
                       titleText = '已修改的课程 - 点击查看详情或删除';
                     }
-                  } else if (isManualAdded) {
-                    borderColor = '#52c41a';
-                    titleText = '手动添加的课程 - 点击查看详情或删除';
                   } else if (isModified) {
                     borderColor = '#faad14';
                     titleText = '已修改的课程 - 点击查看详情或删除';
+                  }
+                  // 只有在比较逻辑返回绿色边框时，才使用isManualAdded标志
+                  // 这样可以避免与固定课表完全匹配的课程被错误标记为手动添加
+                  else if (isManualAdded && comparisonBorderColor === '#52c41a') {
+                    borderColor = '#52c41a';
+                    titleText = '手动添加的课程 - 点击查看详情或删除';
                   }
                   
                   return (
@@ -3886,7 +4259,7 @@ const ViewTimetable = ({ user }) => {
   const displayTotalWeeks = isInitialLoading ? 1 : totalWeeks;
   const displayCurrentWeek = isInitialLoading ? 1 : currentWeek;
 
-  // 是否已存在“下周”实例（用于控制“删除下周课表”菜单项显示）
+  // 是否已存在"下周"实例（用于控制"删除下周课表"菜单项显示）
   const hasNextWeekInstance = useMemo(() => {
     try {
       if (!timetable?.isWeekly || !Array.isArray(weeklyInstances) || weeklyInstances.length === 0) {
@@ -4074,7 +4447,7 @@ const ViewTimetable = ({ user }) => {
                     <div style={{
                       width: '12px',
                       height: '12px',
-                      border: '2px dashed #ff4d4f',
+                      border: '1px dashed #ff4d4f',
                       borderRadius: '2px',
                       backgroundColor: 'transparent'
                     }}></div>
