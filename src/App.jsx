@@ -15,6 +15,7 @@ import UserProfile from './pages/UserProfile';
 import ArchivedTimetables from './pages/ArchivedTimetables';
 import ConvertPreview from './pages/ConvertPreview';
 import WechatTest from './pages/WechatTest';
+import UserGuide from './pages/UserGuide';
 import './App.css';
 
 const { Content } = Layout;
@@ -144,6 +145,10 @@ function App() {
             <Route
               path="/archived-timetables"
               element={user ? <ArchivedTimetables /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/guide"
+              element={user ? <UserGuide /> : <Navigate to="/login" />}
             />
             <Route
               path="/convert-preview"

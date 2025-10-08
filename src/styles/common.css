@@ -1,5 +1,6 @@
 .page-container {
   position: relative;
+  box-sizing: border-box;
   max-width: 900px; /* 稍微增大宽度以适应不同页面的内容 */
   margin: 0 auto;
   padding: 1.5rem 2rem; /* 调整内边距 */

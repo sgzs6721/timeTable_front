@@ -175,17 +175,25 @@ const UserGuide = ({ user }) => {
   }, [demo]);
   return (
     <div style={{ maxWidth: 960, margin: '24px auto', padding: '0 16px' }}>
-      <Card bodyStyle={{ position: 'relative' }}>
-        <Button
-          type="link"
-          onClick={() => navigate(-1)}
-          style={{ position: 'absolute', right: 8, top: 8 }}
+      <Card bodyStyle={{ position: 'relative', padding: 0 }}>
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 2,
+            background: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 24px',
+            borderBottom: '1px solid #f0f0f0'
+          }}
         >
-          返回
-        </Button>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          <Title level={3} style={{ margin: 0 }}>使用说明（普通用户）</Title>
+          <Button type="link" onClick={() => navigate(-1)}>返回</Button>
+        </div>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', padding: '16px 24px' }}>
           <div style={{ flex: '1 1 260px', minWidth: 240 }}>
-            <Title level={3} style={{ marginTop: 0 }}>使用说明（普通用户）</Title>
             <Paragraph>
               本说明仅面向普通用户（非管理员），涵盖登录后常用页面与操作，帮助你快速完成日常排课、查看与分享。
             </Paragraph>

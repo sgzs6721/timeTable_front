@@ -2748,6 +2748,14 @@ const Dashboard = ({ user }) => {
     const pageSize = 10; // 每页显示10个记录
     const [selectedRecords, setSelectedRecords] = useState(new Set());
 
+    // 仅保留仍在职教练的请假记录（已删除/停用的教练不显示）
+    const activeCoachNames = React.useMemo(() => {
+      return new Set((coaches || []).map(c => c?.nickname || c?.username).filter(Boolean));
+    }, [coaches]);
+    const filteredLeaveRecords = React.useMemo(() => {
+      return (leaveRecords || []).filter(r => activeCoachNames.has(r?.coachName));
+    }, [leaveRecords, activeCoachNames]);
+
     // 上月课程弹窗状态
     const [lastMonthModalVisible, setLastMonthModalVisible] = useState(false);
     const [lastMonthCoachName, setLastMonthCoachName] = useState('');
@@ -3188,7 +3196,7 @@ const Dashboard = ({ user }) => {
                     ? Object.entries(todayCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length
                     : dayTab==='tomorrow'
                     ? Object.entries(tomorrowCoachDetails).filter(([_, items]) => items.some(item => !item.includes('（请假）'))).length
-                    : leaveRecords.length
+                    : filteredLeaveRecords.length
                 }</span>
                 {dayTab !== 'leave' && <span style={{ color: '#999' }}>/{coaches?.length || 0}</span>}
               </span>
@@ -3198,13 +3206,13 @@ const Dashboard = ({ user }) => {
           <Spin spinning={coachDetailsLoading || statisticsLoading || leaveRecordsLoading}>
           {dayTab === 'leave' ? (
             // 请假记录显示
-            leaveRecords.length === 0 ? (
+            filteredLeaveRecords.length === 0 ? (
               <div style={{ color: '#999', paddingTop: '16px' }}>暂无请假记录</div>
             ) : (
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                 {(() => {
                   // 按教练分组
-                  const groupedByCoach = leaveRecords.reduce((acc, record) => {
+                  const groupedByCoach = filteredLeaveRecords.reduce((acc, record) => {
                     const coachName = record.coachName;
                     if (!acc[coachName]) {
                       acc[coachName] = [];
@@ -3878,7 +3886,8 @@ const Dashboard = ({ user }) => {
   const tabItems = buildTabItems();
   
   return (
-    <div className="page-container" style={{ paddingTop: '0.25rem' }}>
+    <div className="page-container" style={{ paddingTop: '0.25rem', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 45px)' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <Tabs
         activeKey={activeTab}
         onChange={handleTabChange}
@@ -3900,6 +3909,7 @@ const Dashboard = ({ user }) => {
       />
       {/* 模态框等保持不变 */}
       {renderModals()}
+      </div>
       
       {/* 内联定义：我的课时 */}
       {/* 为避免拆文件，这里定义轻量 MyHours 组件 */}
@@ -4063,7 +4073,7 @@ const MyHours = ({ user }) => {
   }, [user]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 200px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'center', marginBottom: 12, width: '100%' }}>
         <DatePicker placeholder="开始日期" value={startDate} onChange={setStartDate} style={{ width: '100%' }} />
         <DatePicker placeholder="结束日期" value={endDate} onChange={setEndDate} style={{ width: '100%' }} />
@@ -4089,8 +4099,7 @@ const MyHours = ({ user }) => {
           className="myhours-table"
           pagination={false}
         />
-        <div style={{ flex: 1 }}></div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
               第 {((page - 1) * pageSize) + 1}~{Math.min(page * pageSize, totalCount)} 条记录

@@ -4870,7 +4870,7 @@ const ViewTimetable = ({ user }) => {
           display: 'flex', 
           justifyContent: 'center', 
           alignItems: 'center', 
-          marginTop: '0.5rem', 
+          marginTop: '1.5rem', 
           gap: '1rem',
           padding: '8px 0'
         }}>
