@@ -13,7 +13,7 @@ const ENVIRONMENTS = {
   
   // 测试环境
   testing: {
-    REMOTE_HOST: 'https://121.36.91.199:8088',
+    REMOTE_HOST: 'https://timetable.devtesting.top',
     API_BASE_PATH: '/timetable/api',
     USE_PROXY: false,
     PROTO: 'https',
@@ -30,8 +30,14 @@ const ENVIRONMENTS = {
   }
 };
 
-// 当前环境 - 可以轻松切换
-const CURRENT_ENV = 'development';
+// 当前环境 - 自动判断
+let CURRENT_ENV = 'production';
+if (
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+) {
+  CURRENT_ENV = 'development';
+}
 
 // 获取当前环境配置
 const getCurrentConfig = () => ENVIRONMENTS[CURRENT_ENV];
