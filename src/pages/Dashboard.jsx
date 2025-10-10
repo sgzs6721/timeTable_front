@@ -25,7 +25,18 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     try {
       const response = await getAllStudents(showAll);
       if (response && response.success) {
-        setStudents(response.data || []);
+        const raw = response.data || [];
+        const normalized = Array.isArray(raw)
+          ? raw.map((item) =>
+              typeof item === 'string'
+                ? { studentName: item, attendedCount: 0 }
+                : {
+                    studentName: item?.studentName ?? '',
+                    attendedCount: Number(item?.attendedCount ?? 0),
+                  }
+            )
+          : [];
+        setStudents(normalized);
       } else {
         message.error('获取学员列表失败');
       }
@@ -56,6 +67,9 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
       '#13c2c2', '#eb2f96', '#faad14', '#a0d911', '#2f54eb',
       '#f759ab', '#36cfc9', '#ff7875', '#ffa940', '#b37feb'
     ];
+    if (!studentName || typeof studentName !== 'string') {
+      return colors[0];
+    }
     // 使用学员名字的哈希值来确保相同名字总是得到相同颜色
     let hash = 0;
     for (let i = 0; i < studentName.length; i++) {
@@ -94,9 +108,9 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
             gap: '16px',
             padding: '16px 0'
           }}>
-            {students.map((studentName, index) => (
+            {([...students].sort((a, b) => (b?.attendedCount || 0) - (a?.attendedCount || 0))).map((student, index) => (
               <div
-                key={studentName}
+                key={student.studentName}
                 style={{ 
                   display: 'flex', 
                   flexDirection: 'column',
@@ -112,7 +126,7 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
                     borderColor: '#d9d9d9'
                   }
                 }}
-                onClick={() => handleStudentClick(studentName)}
+                onClick={() => handleStudentClick(student.studentName)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f5f5f5';
                   e.currentTarget.style.borderColor = '#d9d9d9';
@@ -125,13 +139,13 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
                 <Avatar 
                   size={48}
                   style={{ 
-                    backgroundColor: getStudentAvatarColor(studentName),
+                    backgroundColor: getStudentAvatarColor(student.studentName),
                     marginBottom: '8px',
                     fontSize: '18px',
                     fontWeight: 'bold'
                   }}
                 >
-                  {studentName.charAt(0)}
+                  {student.studentName?.charAt(0)}
                 </Avatar>
                 <span style={{ 
                   fontWeight: 500, 
@@ -139,7 +153,10 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
                   textAlign: 'center',
                   wordBreak: 'break-all'
                 }}>
-                  {studentName}
+                  {student.studentName}
+                </span>
+                <span style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '4px' }}>
+                  共 {student.attendedCount || 0} 课时
                 </span>
               </div>
             ))}

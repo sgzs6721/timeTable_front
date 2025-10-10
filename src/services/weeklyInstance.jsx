@@ -154,6 +154,7 @@ export const getStudentRecords = (studentName, coachName) => {
   });
 };
 
+// 获取学员汇总（返回 [{ studentName, attendedCount }]，已按 attendedCount 倒序）
 export const getAllStudents = (showAll = false) => {
   return api.get('/weekly-instances/students', {
     params: { showAll }
