@@ -26,17 +26,7 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
       const response = await getAllStudents(showAll);
       if (response && response.success) {
         const raw = response.data || [];
-        const normalized = Array.isArray(raw)
-          ? raw.map((item) =>
-              typeof item === 'string'
-                ? { studentName: item, attendedCount: 0 }
-                : {
-                    studentName: item?.studentName ?? '',
-                    attendedCount: Number(item?.attendedCount ?? 0),
-                  }
-            )
-          : [];
-        setStudents(normalized);
+        setStudents(raw);
       } else {
         message.error('获取学员列表失败');
       }
@@ -60,7 +50,6 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     setShowAllStudents(e.target.checked);
   }, []);
 
-  // 生成学员头像颜色的函数
   const getStudentAvatarColor = (studentName) => {
     const colors = [
       '#1890ff', '#52c41a', '#fa8c16', '#f5222d', '#722ed1',
@@ -70,7 +59,6 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     if (!studentName || typeof studentName !== 'string') {
       return colors[0];
     }
-    // 使用学员名字的哈希值来确保相同名字总是得到相同颜色
     let hash = 0;
     for (let i = 0; i < studentName.length; i++) {
       hash = ((hash << 5) - hash + studentName.charCodeAt(i)) & 0xffffffff;
@@ -78,12 +66,52 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // 分组|平铺学员卡片渲染函数
+  const renderStudentCards = (stuList = []) => (
+    <div style={{ 
+      display: 'grid', 
+      gridTemplateColumns: 'repeat(4, 1fr)', 
+      gap: '16px',
+      padding: '16px 0'
+    }}>
+      {[...stuList].sort((a, b) => (b?.attendedCount || 0) - (a?.attendedCount || 0)).map((student, index) => (
+        <div
+          key={student.studentName}
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '16px 12px',
+            cursor: 'pointer',
+            borderRadius: '8px',
+            border: '1px solid #f0f0f0',
+            backgroundColor: '#fafafa',
+            transition: 'all 0.3s ease',
+          }}
+          onClick={() => handleStudentClick(student.studentName)}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f5f5f5'; e.currentTarget.style.borderColor = '#d9d9d9'; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fafafa'; e.currentTarget.style.borderColor = '#f0f0f0'; }}
+        >
+          <Avatar 
+            size={48}
+            style={{ backgroundColor: getStudentAvatarColor(student.studentName), marginBottom: '8px', fontSize: '18px', fontWeight: 'bold' }}
+          >{student.studentName?.charAt(0)}</Avatar>
+          <span style={{ fontWeight: 500, fontSize: '14px', textAlign: 'center', wordBreak: 'break-all' }}>{student.studentName}</span>
+          <span style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '4px' }}>{student.attendedCount || 0} 课时</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  // 判断是分组结构（showAll+分组数组含coachId/coachName）
+  const isGrouped = showAllStudents && Array.isArray(students) && students[0] && typeof students[0] === 'object' && students[0].coachId;
+
   return (
     <Card 
       title={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>
-            我的学员{students && students.length > 0 ? `（${students.length}）` : '（0）'}
+            {showAllStudents ? '所有学员' : '我的学员'}{isGrouped ? `（${students.reduce((sum, grp) => sum + (grp.students?.length||0), 0)}）` : (students && students.length > 0 ? `（${students.length}）` : '（0）')}
           </span>
           {showAllCheckbox && (
             <Checkbox 
@@ -95,72 +123,25 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
             </Checkbox>
           )}
         </div>
-      } 
+      }
       size="small"
     >
       <Spin spinning={loading}>
-        {students.length === 0 ? (
-          <Empty description="暂无学员" />
-        ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(4, 1fr)', 
-            gap: '16px',
-            padding: '16px 0'
-          }}>
-            {([...students].sort((a, b) => (b?.attendedCount || 0) - (a?.attendedCount || 0))).map((student, index) => (
-              <div
-                key={student.studentName}
-                style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  padding: '16px 12px',
-                  cursor: 'pointer',
-                  borderRadius: '8px',
-                  border: '1px solid #f0f0f0',
-                  backgroundColor: '#fafafa',
-                  transition: 'all 0.3s ease',
-                  ':hover': {
-                    backgroundColor: '#f5f5f5',
-                    borderColor: '#d9d9d9'
-                  }
-                }}
-                onClick={() => handleStudentClick(student.studentName)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  e.currentTarget.style.borderColor = '#d9d9d9';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#fafafa';
-                  e.currentTarget.style.borderColor = '#f0f0f0';
-                }}
-              >
-                <Avatar 
-                  size={48}
-                  style={{ 
-                    backgroundColor: getStudentAvatarColor(student.studentName),
-                    marginBottom: '8px',
-                    fontSize: '18px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  {student.studentName?.charAt(0)}
-                </Avatar>
-                <span style={{ 
-                  fontWeight: 500, 
-                  fontSize: '14px',
-                  textAlign: 'center',
-                  wordBreak: 'break-all'
-                }}>
-                  {student.studentName}
-                </span>
-                <span style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '4px' }}>
-                  共 {student.attendedCount || 0} 课时
-                </span>
+        {/* 分组模式 */}
+        {isGrouped ? (
+          students.length === 0 ? <Empty description="暂无学员" /> :
+          <div style={{display:'flex',flexDirection:'column',gap:'24px'}}>
+            {students.map((group)=>(
+              <div key={group.coachId} style={{background:'#f9f9fc',borderRadius:'6px',padding:'12px',boxShadow:'0 1px 2px #00000008'}}>
+                <div style={{fontWeight:'bold',fontSize:'16px',marginBottom:'8px',color:'#1d39c4'}}>
+                  {group.coachName}（{group.totalCount}课时｜{(group.students||[]).length}学员）
+                </div>
+                {renderStudentCards(group.students||[])}
               </div>
             ))}
           </div>
+        ) : (
+          students.length === 0 ? <Empty description="暂无学员" /> : renderStudentCards(students)
         )}
       </Spin>
     </Card>
@@ -1593,7 +1574,7 @@ const Dashboard = ({ user }) => {
     }
 
     try {
-      // 修正：周固定课表新增应写入“固定课表模板”，由后端决定是否同步至本周实例
+      // 修正：周固定课表新增应写入"固定课表模板"，由后端决定是否同步至本周实例
       const response = await createSchedule(currentTimetable.id, payload);
       
       if (response.success) {
@@ -2604,7 +2585,7 @@ const Dashboard = ({ user }) => {
         }
       },
       ...weekDays.map((day, idx) => {
-        // 计算“今天”对应的列（将周日=0转换为周一=0的索引）
+        // 计算"今天"对应的列（将周日=0转换为周一=0的索引）
         const todayIndex = (dayjs().day() + 6) % 7;
         const isTodayCol = idx === todayIndex;
         // 计算本周每一天的具体日期（以周一为一周开始）
@@ -2880,7 +2861,7 @@ const Dashboard = ({ user }) => {
       });
     };
 
-    // 当切到“请假”页时自动拉取数据，避免空白
+    // 当切到"请假"页时自动拉取数据，避免空白
     useEffect(() => {
       if (dayTab === 'leave') {
         fetchLeaveRecords();
