@@ -21,8 +21,8 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    // 强制设置为HTTP请求，防止重定向
-    config.headers['X-Forwarded-Proto'] = 'http';
+    // 强制设置为HTTPS请求，防止重定向
+    config.headers['X-Forwarded-Proto'] = 'https';
     config.headers['X-Requested-With'] = 'XMLHttpRequest';
     return config;
   },

@@ -4,21 +4,21 @@
 const ENVIRONMENTS = {
   // 开发环境
   development: {
-    REMOTE_HOST: 'http://121.36.91.199:8088',
+    REMOTE_HOST: 'https://timetable.devtesting.top',
     API_BASE_PATH: '/timetable/api',
     USE_PROXY: false
   },
   
   // 测试环境
   testing: {
-    REMOTE_HOST: 'http://121.36.91.199:8088',
+    REMOTE_HOST: 'https://121.36.91.199:8088',
     API_BASE_PATH: '/timetable/api',
     USE_PROXY: false
   },
   
   // 生产环境
   production: {
-    REMOTE_HOST: 'http://121.36.91.199:8088',
+    REMOTE_HOST: 'https://timetable.devtesting.top',
     API_BASE_PATH: '/timetable/api',
     USE_PROXY: false
   }
@@ -41,7 +41,7 @@ export const API_CONFIG = {
   // 请求头配置
   HEADERS: {
     'Content-Type': 'application/json',
-    'X-Forwarded-Proto': 'http',
+    'X-Forwarded-Proto': 'https',
     'Cache-Control': 'no-cache',
     'X-Requested-With': 'XMLHttpRequest'
   },
@@ -51,8 +51,8 @@ export const API_CONFIG = {
     TIMEOUT: 30000,
     FOLLOW_REDIRECTS: false,
     HEADERS: {
-      'X-Forwarded-Proto': 'http',
-      'X-Forwarded-Port': '80',
+      'X-Forwarded-Proto': 'https',
+      'X-Forwarded-Port': '443',
       'X-Real-IP': '127.0.0.1',
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
     }
