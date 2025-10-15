@@ -3640,18 +3640,35 @@ const Dashboard = ({ user }) => {
       let totalHours = 0;
       coachDetails.forEach(item => {
         console.log('处理课程项:', item);
-        // 解析时间段，如 "10:00-12:00 学员名" 或 "17:00-18:00 学员名"
-        const timeMatch = item.match(/^(\d+):?\d*-(\d+):?\d*/);
+        // 解析时间段，支持分钟，如 "10:00-12:00 学员名" 或 "10:00-10:30 学员名"
+        const timeMatch = item.match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})/);
         if (timeMatch) {
           const startHour = parseInt(timeMatch[1]);
-          const endHour = parseInt(timeMatch[2]);
-          const hours = endHour - startHour;
-          console.log(`时间段 ${startHour}-${endHour} = ${hours} 课时`);
+          const startMinute = parseInt(timeMatch[2]);
+          const endHour = parseInt(timeMatch[3]);
+          const endMinute = parseInt(timeMatch[4]);
+          
+          const startTotalMinutes = startHour * 60 + startMinute;
+          const endTotalMinutes = endHour * 60 + endMinute;
+          const durationMinutes = endTotalMinutes - startTotalMinutes;
+          const hours = durationMinutes / 60;
+          
+          console.log(`时间段 ${startHour}:${startMinute.toString().padStart(2, '0')}-${endHour}:${endMinute.toString().padStart(2, '0')} = ${hours} 课时`);
           totalHours += hours;
         } else {
-          // 如果没有匹配到时间段，默认为1课时
-          console.log('未匹配到时间段，默认1课时');
-          totalHours += 1;
+          // 尝试简化格式（只有小时）
+          const simpleMatch = item.match(/^(\d+)-(\d+)/);
+          if (simpleMatch) {
+            const startHour = parseInt(simpleMatch[1]);
+            const endHour = parseInt(simpleMatch[2]);
+            const hours = endHour - startHour;
+            console.log(`时间段 ${startHour}-${endHour} = ${hours} 课时`);
+            totalHours += hours;
+          } else {
+            // 如果没有匹配到时间段，默认为1课时
+            console.log('未匹配到时间段，默认1课时');
+            totalHours += 1;
+          }
         }
       });
       
@@ -3681,7 +3698,8 @@ const Dashboard = ({ user }) => {
     const [lastMonthLoading, setLastMonthLoading] = useState(false);
     const [lastMonthRecords, setLastMonthRecords] = useState([]);
     const [lastMonthPage, setLastMonthPage] = useState(1);
-    const [lastMonthTotal, setLastMonthTotal] = useState(0);
+    const [lastMonthTotal, setLastMonthTotal] = useState(0); // 课时总数
+    const [lastMonthRecordCount, setLastMonthRecordCount] = useState(0); // 记录总数，用于分页
     const [lastMonthPageSize] = useState(10);
 
     const openLastMonthModal = async (coachName) => {
@@ -3699,6 +3717,7 @@ const Dashboard = ({ user }) => {
         if (!coach) {
           setLastMonthRecords([]);
           setLastMonthTotal(0);
+          setLastMonthRecordCount(0);
           setLastMonthLoading(false);
           return;
         }
@@ -3711,17 +3730,31 @@ const Dashboard = ({ user }) => {
             studentName: x.studentName || '',
             status: x.isOnLeave ? '请假' : '正常'
           }));
+          
+          // 计算总课时数（包括半小时课程按0.5计算）
+          const totalHours = (data.list || []).reduce((sum, x) => {
+            if (x.startTime && x.endTime) {
+              const st = dayjs(x.startTime, 'HH:mm:ss');
+              const et = dayjs(x.endTime, 'HH:mm:ss');
+              return sum + et.diff(st, 'hour', true); // true 表示返回精确的浮点数
+            }
+            return sum + 1; // 如果没有时间信息，默认1课时
+          }, 0);
+          
           setLastMonthRecords(list);
-          setLastMonthTotal(data.total || 0);
+          setLastMonthTotal(totalHours); // 使用计算出的课时数
+          setLastMonthRecordCount(data.total || 0); // 记录总数，用于分页
           setLastMonthPage(page);
         } else {
           setLastMonthRecords([]);
           setLastMonthTotal(0);
+          setLastMonthRecordCount(0);
         }
       } catch (error) {
         message.error('获取上月课程记录失败');
         setLastMonthRecords([]);
         setLastMonthTotal(0);
+        setLastMonthRecordCount(0);
       } finally {
         setLastMonthLoading(false);
       }
@@ -4678,7 +4711,7 @@ const Dashboard = ({ user }) => {
                     const value = calculateActualHours(todayCoachDetails[name] || []);
                     return (
                       <span style={{ color: value > 0 ? '#52c41a' : '#999', fontWeight: 500 }}>
-                        {value}
+                        {Number.isInteger(value) ? value : value.toFixed(1)}
                       </span>
                     );
                   }
@@ -4786,17 +4819,17 @@ const Dashboard = ({ user }) => {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
-                  第 {((lastMonthPage - 1) * lastMonthPageSize) + 1}~{Math.min(lastMonthPage * lastMonthPageSize, lastMonthTotal)} 条记录
+                  第 {((lastMonthPage - 1) * lastMonthPageSize) + 1}~{Math.min(lastMonthPage * lastMonthPageSize, lastMonthRecordCount)} 条记录
                 </span>
                 <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
-                  共计 {lastMonthTotal} 课时
+                  共计 {Number.isInteger(lastMonthTotal) ? lastMonthTotal : lastMonthTotal.toFixed(1)} 课时
                 </span>
               </div>
               <Pagination
                 className="myhours-pagination"
                 current={lastMonthPage}
                 pageSize={lastMonthPageSize}
-                total={lastMonthTotal}
+                total={lastMonthRecordCount}
                 onChange={(p)=>{ fetchLastMonthRecords(lastMonthCoachName, p); }}
                 showSizeChanger={false}
               />
@@ -5178,7 +5211,7 @@ const MyHours = ({ user }) => {
   const [loading, setLoading] = React.useState(false);
   const [startDate, setStartDate] = React.useState(null);
   const [endDate, setEndDate] = React.useState(null);
-  const [stats, setStats] = React.useState({ count: 0, hours: 0 });
+  const [stats, setStats] = React.useState({ count: 0, hours: 0, grandTotalHours: 0 });
   const [records, setRecords] = React.useState([]);
   const [page, setPage] = React.useState(1);
   const [totalCount, setTotalCount] = React.useState(0);
@@ -5214,11 +5247,10 @@ const MyHours = ({ user }) => {
       const list = resp?.data?.list || [];
       const total = resp?.data?.total || 0;
       // 统计总课时
-      const totalHours = list.reduce((sum, s) => {
-        const st = dayjs(s.startTime, 'HH:mm:ss');
-        const et = dayjs(s.endTime, 'HH:mm:ss');
-        return sum + et.diff(st, 'hour', true);
-      }, 0);
+      // 使用后端返回的课时数据
+      const currentPageHours = resp?.data?.totalHours || 0;
+      const grandTotalHours = resp?.data?.grandTotalHours || 0;
+      
       // 规范字段（兼容现有列定义）
       const selectedCoachName = user?.role?.toUpperCase() === 'ADMIN'
         ? (coachOptions.find(o => String(o.value) === String(coachId))?.label || '')
@@ -5233,7 +5265,11 @@ const MyHours = ({ user }) => {
       }));
       setTotalCount(total);
       setRecords(mapped);
-      setStats({ count: total, hours: totalHours });
+      setStats({ 
+        count: total, 
+        hours: currentPageHours,
+        grandTotalHours: grandTotalHours 
+      });
     } finally {
       setLoading(false);
     }
@@ -5345,10 +5381,7 @@ const MyHours = ({ user }) => {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
-              第 {((page - 1) * pageSize) + 1}~{Math.min(page * pageSize, totalCount)} 条记录
-            </span>
-            <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
-              共计 {stats.count} 课时
+              第 {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, totalCount)} 条记录，{Number.isInteger(stats.hours) ? stats.hours : stats.hours.toFixed(1)} 课时，总计 {Number.isInteger(stats.grandTotalHours) ? stats.grandTotalHours : stats.grandTotalHours.toFixed(1)} 课时
             </span>
           </div>
           <Pagination

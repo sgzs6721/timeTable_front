@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown } from 'antd';
+import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown, Switch } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules } from '../services/timetable';
@@ -422,18 +422,23 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
 
 const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) => {
   const [name, setName] = React.useState('');
+  const [isHalfHour, setIsHalfHour] = React.useState(false);
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 时间信息显示 */}
+    <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
+      {/* 时间信息显示和半小时开关 */}
       {timeInfo && (
-        <div style={{ 
-          fontSize: '12px', 
-          color: '#666', 
-          marginBottom: '8px',
-          textAlign: 'center'
-        }}>
-          {timeInfo}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
+          <span>{timeInfo}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>半小时</span>
+            <Switch
+              size="small"
+              checked={isHalfHour}
+              onChange={setIsHalfHour}
+              disabled={addLoading}
+            />
+          </div>
         </div>
       )}
       <Input
@@ -442,7 +447,7 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) =>
         value={name}
         onChange={(e) => setName(e.target.value)}
         disabled={addLoading}
-        style={{ width: '100%' }}
+        style={{ width: '100%', marginBottom: '8px' }}
       />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
         <Button size="small" onClick={onCancel} style={{ marginRight: 8 }} disabled={addLoading}>
@@ -451,7 +456,7 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) =>
         <Button
           type="primary"
           size="small"
-          onClick={() => onAdd(name)}
+          onClick={() => onAdd({ studentName: name, isHalfHour })}
           loading={addLoading}
           disabled={addLoading}
         >
@@ -658,14 +663,52 @@ const ViewTimetable = ({ user }) => {
   const navigate = useNavigate();
   const { timetableId } = useParams();
   const addScheduleInputRef = useRef(null);
-  const [newScheduleInfo, setNewScheduleInfo] = useState({ studentName: '' });
+  const [newScheduleInfo, setNewScheduleInfo] = useState({ 
+    studentName: '', 
+    isHalfHour: false // 默认1小时，false表示1小时，true表示半小时
+  });
   const [popoverVisible, setPopoverVisible] = useState({});
 
   const handlePopoverVisibleChange = (key, visible) => {
     setPopoverVisible(prev => ({ ...prev, [key]: visible }));
     if (!visible) {
-      setNewScheduleInfo({ studentName: '' }); // 关闭时清空输入
+      setNewScheduleInfo({ studentName: '', isHalfHour: false }); // 关闭时清空输入
     }
+  };
+
+  // 判断课程是否为半小时课程
+  const isHalfHourSchedule = (schedule) => {
+    // 方法1: 检查note字段
+    if (schedule.note && schedule.note.includes('30分钟')) {
+      return true;
+    }
+    
+    // 方法2: 计算时间差
+    if (schedule.startTime && schedule.endTime) {
+      const start = dayjs(schedule.startTime, 'HH:mm:ss');
+      const end = dayjs(schedule.endTime, 'HH:mm:ss');
+      const duration = end.diff(start, 'minute');
+      return duration === 30;
+    }
+    
+    return false;
+  };
+
+  // 计算课程的课时数（半小时课程按0.5计算）
+  const calculateScheduleHours = (schedule) => {
+    if (isHalfHourSchedule(schedule)) {
+      return 0.5;
+    }
+    
+    // 计算实际课时
+    if (schedule.startTime && schedule.endTime) {
+      const start = dayjs(schedule.startTime, 'HH:mm:ss');
+      const end = dayjs(schedule.endTime, 'HH:mm:ss');
+      const duration = end.diff(start, 'minute');
+      return duration / 60; // 转换为小时
+    }
+    
+    return 1; // 默认1课时
   };
 
   // 处理时间单元格点击，显示可供排课时段
@@ -734,16 +777,26 @@ const ViewTimetable = ({ user }) => {
     setAvailableTimeModalVisible(true);
   };
   
-  const handleAddSchedule = async (dayKey, timeIndex, studentName) => {
-    const trimmedName = studentName.trim();
+  const handleAddSchedule = async (dayKey, timeIndex, scheduleInfo) => {
+    const trimmedName = scheduleInfo.studentName.trim();
     if (!trimmedName) {
       message.warning('学生姓名不能为空');
       return;
     }
 
     const [startTimeStr, endTimeStr] = timeSlots[timeIndex].split('-');
-    const startTime = `${startTimeStr}:00`;
-    const endTime = `${endTimeStr}:00`;
+    const startTime = dayjs(startTimeStr, 'HH:mm');
+    
+    // 根据选择的时长计算结束时间
+    let endTime;
+    if (scheduleInfo.isHalfHour) {
+      endTime = startTime.add(30, 'minute');
+    } else {
+      endTime = startTime.add(60, 'minute');
+    }
+    
+    const startTimeFormatted = `${startTime.format('HH:mm')}:00`;
+    const endTimeFormatted = `${endTime.format('HH:mm')}:00`;
 
     let scheduleDate = null;
   // 统一规则（修正）：
@@ -770,9 +823,9 @@ const ViewTimetable = ({ user }) => {
     const payload = {
       studentName: trimmedName,
       dayOfWeek: dayKey.toUpperCase(),
-      startTime,
-      endTime,
-      note: '手动添加',
+      startTime: startTimeFormatted,
+      endTime: endTimeFormatted,
+      note: `手动添加 (${scheduleInfo.isHalfHour ? '30分钟' : '1小时'})`,
     };
 
   // 仅当需要按日期写入（实例或日期范围课表）时，才设置 scheduleDate
@@ -792,22 +845,44 @@ const ViewTimetable = ({ user }) => {
       }
       
       if (resp.success) {
+        // 立即将新课程添加到当前状态，无需等待重新获取
+        const newSchedule = resp.data || {
+          id: Date.now(), // 临时ID
+          studentName: trimmedName,
+          dayOfWeek: dayKey.toUpperCase(),
+          startTime: startTimeFormatted,
+          endTime: endTimeFormatted,
+          note: payload.note,
+          scheduleDate: payload.scheduleDate
+        };
+        
+        setAllSchedules(prev => [...prev, newSchedule]);
+        
+        // 关闭弹出框
         handlePopoverVisibleChange(`popover-${dayKey}-${timeIndex}`, false);
         
-        if (viewMode === 'instance' && currentWeekInstance) {
-          // 实例视图：直接刷新实例数据，避免影响固定课表
-          const r = await getInstanceSchedules(currentWeekInstance.id);
-          if (r && r.success) {
-            setAllSchedules(r.data || []);
-            setCurrentWeekInstance(prev => ({
-              ...prev,
-              schedules: r.data || []
-            }));
+        // 异步刷新数据以确保与服务器同步
+        const refreshData = async () => {
+          try {
+            if (viewMode === 'instance' && currentWeekInstance) {
+              const r = await getInstanceSchedules(currentWeekInstance.id);
+              if (r && r.success) {
+                setAllSchedules(r.data || []);
+                setCurrentWeekInstance(prev => ({
+                  ...prev,
+                  schedules: r.data || []
+                }));
+              }
+            } else {
+              await refreshSchedulesQuietly();
+            }
+          } catch (error) {
+            console.error('异步刷新数据失败:', error);
           }
-        } else {
-          // 模板视图：需要刷新数据
-          await refreshSchedulesQuietly();
-        }
+        };
+        
+        // 延迟执行异步刷新
+        setTimeout(refreshData, 200);
         
         message.success('添加成功');
       } else {
@@ -862,13 +937,25 @@ const ViewTimetable = ({ user }) => {
     const popoverKey = `popover-${day.key}-${timeIndex}`;
 
     const popoverContent = (
-      <div style={{ width: '180px' }}>
+      <div style={{ width: '200px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
+          <span>{timeSlots[timeIndex]}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>半小时</span>
+            <Switch
+              size="small"
+              checked={newScheduleInfo.isHalfHour}
+              onChange={(checked) => setNewScheduleInfo({ ...newScheduleInfo, isHalfHour: checked })}
+              disabled={addLoading}
+            />
+          </div>
+        </div>
         <Input
           ref={addScheduleInputRef}
           placeholder="学生姓名"
           value={newScheduleInfo.studentName}
           onChange={(e) => setNewScheduleInfo({ ...newScheduleInfo, studentName: e.target.value })}
-          onPressEnter={() => handleAddSchedule(day.key, timeIndex, newScheduleInfo.studentName)}
+          onPressEnter={() => handleAddSchedule(day.key, timeIndex, newScheduleInfo)}
           style={{ marginBottom: '8px' }}
           disabled={addLoading}
         />
@@ -879,7 +966,7 @@ const ViewTimetable = ({ user }) => {
           <Button
             type="primary"
             size="small"
-            onClick={() => handleAddSchedule(day.key, timeIndex, newScheduleInfo.studentName)}
+            onClick={() => handleAddSchedule(day.key, timeIndex, newScheduleInfo)}
             loading={addLoading}
             disabled={addLoading}
           >
@@ -1018,14 +1105,35 @@ const ViewTimetable = ({ user }) => {
         // 获取包含请假课程的完整数据
         try {
           const response = await getCurrentWeekInstanceIncludingLeaves(timetable.id);
+          console.log('API响应:', response);
           if (response && response.success && response.data && response.data.schedules) {
             schedulesForDay = response.data.schedules.filter(s => s.scheduleDate === dateStr);
+            console.log('从API获取的课程:', response.data.schedules);
+            console.log('过滤后的课程:', schedulesForDay);
           } else {
+            console.log('API响应无效，回退到allSchedules');
             schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+            console.log('从allSchedules获取的课程:', allSchedules);
+            console.log('过滤后的课程:', schedulesForDay);
           }
         } catch (error) {
           console.error('获取包含请假课程的数据失败:', error);
+          console.log('API调用失败，回退到allSchedules');
           schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
+          console.log('错误后从allSchedules获取的课程:', allSchedules);
+          console.log('过滤后的课程:', schedulesForDay);
+        }
+        
+        // 如果还是没有数据，再次尝试从allSchedules获取
+        if (schedulesForDay.length === 0) {
+          console.log('schedulesForDay为空，再次从allSchedules获取');
+          console.log('目标日期字符串:', dateStr);
+          console.log('allSchedules中的日期:', allSchedules.map(s => s.scheduleDate));
+          schedulesForDay = allSchedules.filter(s => {
+            console.log(`检查课程: ${s.studentName}, 日期: ${s.scheduleDate}, 匹配: ${s.scheduleDate === dateStr}`);
+            return s.scheduleDate === dateStr;
+          });
+          console.log('再次过滤后的课程:', schedulesForDay);
         }
         
         modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
@@ -1050,8 +1158,22 @@ const ViewTimetable = ({ user }) => {
 
     const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
+    // 调试信息
+    console.log('调试课程检查:', {
+      day: day.label,
+      dayIndex,
+      targetDate: targetDate ? targetDate.format('YYYY-MM-DD') : 'null',
+      viewMode,
+      hasCurrentWeekInstance: !!currentWeekInstance,
+      schedulesForDayCount: schedulesForDay.length,
+      allSchedulesCount: allSchedules.length,
+      schedulesForDay: schedulesForDay,
+      allSchedules: allSchedules
+    });
+
     if (sortedSchedules.length === 0) {
-      message.info('当天没有课程');
+      const dateText = targetDate ? targetDate.format('YYYY-MM-DD') : '该天';
+      message.info(`${dateText}没有课程`);
       return;
     }
 
@@ -1170,17 +1292,23 @@ const ViewTimetable = ({ user }) => {
       while (i < sorted.length) {
         let currentSchedule = sorted[i];
         let currentStartHour = parseInt(currentSchedule.startTime.substring(0, 2));
-        let currentEndHour = currentStartHour + 1; // 默认每个课程1小时
+        let currentStartMinute = parseInt(currentSchedule.startTime.substring(3, 5));
+        let currentEndHour = parseInt(currentSchedule.endTime.substring(0, 2));
+        let currentEndMinute = parseInt(currentSchedule.endTime.substring(3, 5));
         
         // 查找连续的时间段
         let j = i + 1;
         while (j < sorted.length) {
           const nextSchedule = sorted[j];
           const nextStartHour = parseInt(nextSchedule.startTime.substring(0, 2));
+          const nextStartMinute = parseInt(nextSchedule.startTime.substring(3, 5));
+          const nextEndHour = parseInt(nextSchedule.endTime.substring(0, 2));
+          const nextEndMinute = parseInt(nextSchedule.endTime.substring(3, 5));
           
           // 检查当前结束时间是否等于下一个开始时间（连续）
-          if (currentEndHour === nextStartHour) {
-            currentEndHour = nextStartHour + 1; // 扩展结束时间
+          if (currentEndHour === nextStartHour && currentEndMinute === nextStartMinute) {
+            currentEndHour = nextEndHour;
+            currentEndMinute = nextEndMinute;
             j++;
           } else {
             break;
@@ -1190,7 +1318,7 @@ const ViewTimetable = ({ user }) => {
         // 创建合并后的课程记录
         mergedSchedules.push({
           ...currentSchedule,
-          endTime: `${currentEndHour.toString().padStart(2, '0')}:00`,
+          endTime: `${currentEndHour.toString().padStart(2, '0')}:${currentEndMinute.toString().padStart(2, '0')}:00`,
           originalCount: j - i // 记录合并了多少个时间段
         });
         
@@ -1223,10 +1351,38 @@ const ViewTimetable = ({ user }) => {
     const courseList = mergedSchedules
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
       .map(schedule => {
-        const startHour = parseInt(schedule.startTime.substring(0, 2));
-        const endHour = schedule.endTime ? parseInt(schedule.endTime.substring(0, 2)) : startHour + 1;
+        // 格式化开始时间
+        const startTime = schedule.startTime.substring(0, 5); // HH:mm
+        const startHour = parseInt(startTime.substring(0, 2));
+        const startMinute = startTime.substring(3, 5);
+        
+        // 格式化结束时间
+        let endTimeStr;
+        if (schedule.endTime) {
+          const endTime = schedule.endTime.substring(0, 5); // HH:mm
+          const endHour = parseInt(endTime.substring(0, 2));
+          const endMinute = endTime.substring(3, 5);
+          
+          // 如果结束时间是整点（:00），只显示小时；否则显示完整时间
+          if (endMinute === '00') {
+            endTimeStr = endHour.toString();
+          } else {
+            endTimeStr = `${endHour}:${endMinute}`;
+          }
+        } else {
+          endTimeStr = (startHour + 1).toString();
+        }
+        
+        // 如果开始时间是整点（:00），只显示小时；否则显示完整时间
+        let startTimeStr;
+        if (startMinute === '00') {
+          startTimeStr = startHour.toString();
+        } else {
+          startTimeStr = `${startHour}:${startMinute}`;
+        }
+        
         const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
-        return `${startHour}-${endHour} ${studentName}`;
+        return `${startTimeStr}-${endTimeStr} ${studentName}`;
       }).join('\n');
 
     let result = `${title}\n${coachName}：\n${courseList}`;
@@ -1247,10 +1403,38 @@ const ViewTimetable = ({ user }) => {
         const otherCourseList = mergedOtherSchedules
           .sort((a, b) => a.startTime.localeCompare(b.startTime))
           .map(schedule => {
-            const startHour = parseInt(schedule.startTime.substring(0, 2));
-            const endHour = schedule.endTime ? parseInt(schedule.endTime.substring(0, 2)) : startHour + 1;
+            // 格式化开始时间
+            const startTime = schedule.startTime.substring(0, 5); // HH:mm
+            const startHour = parseInt(startTime.substring(0, 2));
+            const startMinute = startTime.substring(3, 5);
+            
+            // 格式化结束时间
+            let endTimeStr;
+            if (schedule.endTime) {
+              const endTime = schedule.endTime.substring(0, 5); // HH:mm
+              const endHour = parseInt(endTime.substring(0, 2));
+              const endMinute = endTime.substring(3, 5);
+              
+              // 如果结束时间是整点（:00），只显示小时；否则显示完整时间
+              if (endMinute === '00') {
+                endTimeStr = endHour.toString();
+              } else {
+                endTimeStr = `${endHour}:${endMinute}`;
+              }
+            } else {
+              endTimeStr = (startHour + 1).toString();
+            }
+            
+            // 如果开始时间是整点（:00），只显示小时；否则显示完整时间
+            let startTimeStr;
+            if (startMinute === '00') {
+              startTimeStr = startHour.toString();
+            } else {
+              startTimeStr = `${startHour}:${startMinute}`;
+            }
+            
             const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
-            return `${startHour}-${endHour} ${studentName}`;
+            return `${startTimeStr}-${endTimeStr} ${studentName}`;
           }).join('\n');
         result += `\n${otherCourseList}`;
       });
@@ -3417,6 +3601,8 @@ const ViewTimetable = ({ user }) => {
     ? tempSchedules 
     : allSchedules).filter(s => !s.isOnLeave);
   
+  // 调试信息已移除
+  
   const displayViewMode = (switchToInstanceLoading || switchToTemplateLoading) && tempViewMode 
     ? tempViewMode 
     : viewMode;
@@ -3548,10 +3734,29 @@ const ViewTimetable = ({ user }) => {
         }),
         render: (text, record) => {
           const schedules = displaySchedules.filter(s => {
-            const timeKey = `${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`;
+            const scheduleStartTime = s.startTime.substring(0, 5);
+            const scheduleEndTime = s.endTime.substring(0, 5);
+            const timeKey = `${scheduleStartTime}-${scheduleEndTime}`;
             
-            // 时间不匹配，直接过滤掉
-            if (timeKey !== record.time) return false;
+            // 解析课程表时间槽和课程时间
+            const [slotStart, slotEnd] = record.time.split('-');
+            const slotStartTime = dayjs(slotStart, 'HH:mm');
+            const slotEndTime = dayjs(slotEnd, 'HH:mm');
+            const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+            const scheduleEnd = dayjs(scheduleEndTime, 'HH:mm');
+            
+            // 检查课程是否在这个时间槽内
+            // 课程的开始时间必须在时间槽内，并且课程的结束时间不能超过时间槽的结束时间
+            const isInTimeSlot = scheduleStart.isSameOrAfter(slotStartTime) && 
+                                scheduleStart.isBefore(slotEndTime) &&
+                                scheduleEnd.isSameOrBefore(slotEndTime);
+            
+            // 调试信息已移除
+            
+            // 时间不在槽内，过滤掉
+            if (!isInTimeSlot) {
+              return false;
+            }
             
             // 根据视图模式进行不同的过滤
             if (displayViewMode === 'instance') {
@@ -3559,7 +3764,8 @@ const ViewTimetable = ({ user }) => {
               if (s.scheduleDate && currentWeekInstance) {
                 const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
                 const currentDate = instanceStartDate.add(index, 'day');
-                return s.scheduleDate === currentDate.format('YYYY-MM-DD');
+                const targetDate = currentDate.format('YYYY-MM-DD');
+                return s.scheduleDate === targetDate;
               }
               // 回退到按星期几过滤（兼容性）
               return (s.dayOfWeek || '').toLowerCase() === day.key;
@@ -3635,7 +3841,11 @@ const ViewTimetable = ({ user }) => {
               }
             };
 
-            const handleAddSchedule = async (studentName) => {
+            const handleAddSchedule = async (scheduleInfo) => {
+              // 兼容旧格式（字符串）和新格式（对象）
+              const studentName = typeof scheduleInfo === 'string' ? scheduleInfo : scheduleInfo.studentName;
+              const isHalfHour = typeof scheduleInfo === 'string' ? false : (scheduleInfo.isHalfHour || false);
+              
               const trimmedName = studentName.trim();
               if (!trimmedName) {
                 message.warning('学生姓名不能为空');
@@ -3643,8 +3853,18 @@ const ViewTimetable = ({ user }) => {
               }
 
               const [startTimeStr, endTimeStr] = record.time.split('-');
-              const startTime = `${startTimeStr}:00`;
-              const endTime = `${endTimeStr}:00`;
+              const startTime = dayjs(startTimeStr, 'HH:mm');
+              
+              // 根据选择的时长计算结束时间
+              let endTime;
+              if (isHalfHour) {
+                endTime = startTime.add(30, 'minute');
+              } else {
+                endTime = startTime.add(60, 'minute');
+              }
+              
+              const startTimeFormatted = `${startTime.format('HH:mm')}:00`;
+              const endTimeFormatted = `${endTime.format('HH:mm')}:00`;
 
               let scheduleDate = null;
               if (timetable.isWeekly && currentWeekInstance) {
@@ -3659,9 +3879,9 @@ const ViewTimetable = ({ user }) => {
               const payload = {
                 studentName: trimmedName,
                 dayOfWeek: day.key.toUpperCase(),
-                startTime,
-                endTime,
-                note: '手动添加',
+                startTime: startTimeFormatted,
+                endTime: endTimeFormatted,
+                note: `手动添加 (${isHalfHour ? '30分钟' : '1小时'})`,
               };
 
               if (scheduleDate) {
@@ -3680,24 +3900,42 @@ const ViewTimetable = ({ user }) => {
                 }
                 
                 if (resp.success) {
+                  // 立即将新课程添加到当前状态
+                  const newSchedule = resp.data || {
+                    id: Date.now(), // 临时ID
+                    studentName: trimmedName,
+                    dayOfWeek: day.key.toUpperCase(),
+                    startTime: startTimeFormatted,
+                    endTime: endTimeFormatted,
+                    note: payload.note,
+                    scheduleDate: payload.scheduleDate
+                  };
+                  
+                  setAllSchedules(prev => [...prev, newSchedule]);
                   setOpenPopoverKey(null);
                   
-                  if (viewMode === 'instance' && currentWeekInstance) {
-                    // 实例视图：直接刷新实例数据，避免影响固定课表
-                    const r = await getInstanceSchedules(currentWeekInstance.id);
-                    if (r && r.success) {
-                      setAllSchedules(r.data || []);
-                      setCurrentWeekInstance(prev => ({
-                        ...prev,
-                        schedules: r.data || []
-                      }));
+                  // 异步刷新数据
+                  const refreshData = async () => {
+                    try {
+                      if (viewMode === 'instance' && currentWeekInstance) {
+                        const r = await getInstanceSchedules(currentWeekInstance.id);
+                        if (r && r.success) {
+                          setAllSchedules(r.data || []);
+                          setCurrentWeekInstance(prev => ({
+                            ...prev,
+                            schedules: r.data || []
+                          }));
+                        }
+                      } else {
+                        invalidateTimetableCache(timetableId);
+                        await refreshSchedulesQuietly();
+                      }
+                    } catch (error) {
+                      console.error('异步刷新数据失败:', error);
                     }
-                  } else {
-                    // 模板视图：需要清除缓存并刷新数据
-                    invalidateTimetableCache(timetableId);
-                    await refreshSchedulesQuietly();
-                  }
+                  };
                   
+                  setTimeout(refreshData, 200);
                   message.success('添加成功');
                 } else {
                   message.error(resp.message || '添加失败');
@@ -3990,12 +4228,15 @@ const ViewTimetable = ({ user }) => {
                       title={titleText}
                     >
                       {(() => {
-                        const isTruncated = student.studentName.length > 4;
-                        const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
+                        const isHalf = isHalfHourSchedule(student);
+                        const nameWithIndicator = isHalf ? `${student.studentName} ½` : student.studentName;
+                        const isTruncated = nameWithIndicator.length > 4;
+                        const content = isTruncated ? `${nameWithIndicator.substring(0, 3)}…` : nameWithIndicator;
                         return (
                           <span
                             className={isTruncated ? 'student-name-truncated' : ''}
-                            title={isTruncated ? student.studentName : undefined}
+                            title={isTruncated ? nameWithIndicator : undefined}
+                            style={{ color: '#333' }}
                           >
                             {content}
                           </span>
@@ -4049,7 +4290,15 @@ const ViewTimetable = ({ user }) => {
                       textAlign: 'center'
                     }}
                   >
-                    {student.studentName}
+                    {(() => {
+                      const isHalf = isHalfHourSchedule(student);
+                      const displayName = isHalf ? `${student.studentName} ½` : student.studentName;
+                      return (
+                        <span style={{ color: '#333' }}>
+                          {displayName}
+                        </span>
+                      );
+                    })()}
                   </div>
                 ))}
                 {/* 右上角的删除选择标记 */}
@@ -4085,7 +4334,7 @@ const ViewTimetable = ({ user }) => {
               open={openPopoverKey === cellKey}
               onOpenChange={handleOpenChange}
             >
-              <div className="schedule-cell-content">
+              <div className="schedule-cell-content" style={{ position: 'relative', height: '48px' }}>
                 {schedules.map((student, idx) => {
                   // 在周实例视图中检查课程的特殊状态
                   const isManualAdded = viewMode === 'instance' && student.isManualAdded;
@@ -4117,12 +4366,28 @@ const ViewTimetable = ({ user }) => {
                     titleText = '手动添加的课程 - 点击查看详情或删除';
                   }
                   
+                  // 计算课程在时间槽中的位置和高度
+                  const isHalfHourCourse = isHalfHourSchedule(student);
+                  const scheduleStartTime = student.startTime.substring(0, 5);
+                  const [slotStart] = record.time.split('-');
+                  const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+                  const slotStartTime = dayjs(slotStart, 'HH:mm');
+                  const minutesFromSlotStart = scheduleStart.diff(slotStartTime, 'minute');
+                  
+                  // 计算高度和位置
+                  const height = isHalfHourCourse ? '50%' : (schedules.length > 1 ? `${100 / schedules.length}%` : '100%');
+                  const top = isHalfHourCourse ? (minutesFromSlotStart >= 30 ? '50%' : '0%') : `${(idx * 100) / schedules.length}%`;
+                  
                   return (
                     <div
                       key={student.id}
                       style={{
                         backgroundColor: studentColorMap.get(student.studentName) || 'transparent',
-                        flex: 1,
+                        height: height,
+                        position: 'absolute',
+                        top: top,
+                        left: '0',
+                        right: '0',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -4130,19 +4395,21 @@ const ViewTimetable = ({ user }) => {
                         fontSize: '12px',
                         wordBreak: 'break-word',
                         lineHeight: '1.2',
-                        borderTop: idx > 0 ? '1px solid #fff' : 'none',
                         border: borderColor ? `2px solid ${borderColor}` : 'none',
-                        position: 'relative',
+                        zIndex: 1,
                       }}
                       title={titleText}
                     >
                       {(() => {
-                        const isTruncated = student.studentName.length > 4;
-                        const content = isTruncated ? `${student.studentName.substring(0, 3)}…` : student.studentName;
+                        const isHalf = isHalfHourSchedule(student);
+                        const nameWithIndicator = isHalf ? `${student.studentName} ½` : student.studentName;
+                        const isTruncated = nameWithIndicator.length > 4;
+                        const content = isTruncated ? `${nameWithIndicator.substring(0, 3)}…` : nameWithIndicator;
                         return (
                           <span
                             className={isTruncated ? 'student-name-truncated' : ''}
-                            title={isTruncated ? student.studentName : undefined}
+                            title={isTruncated ? nameWithIndicator : undefined}
+                            style={{ color: '#333' }}
                           >
                             {content}
                           </span>
