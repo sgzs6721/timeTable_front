@@ -420,27 +420,88 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
   );
 };
 
-const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) => {
+const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo, hasHalfHourCourse = false, defaultHalfHourPosition = 'first', defaultIsHalfHour = false, fixedTimeSlot = null }) => {
   const [name, setName] = React.useState('');
-  const [isHalfHour, setIsHalfHour] = React.useState(false);
+  const [isHalfHour, setIsHalfHour] = React.useState(defaultIsHalfHour);
+  const [halfHourPosition, setHalfHourPosition] = React.useState(defaultHalfHourPosition); // first: 前半小时, second: 后半小时
 
   return (
     <div style={{ width: '200px', display: 'flex', flexDirection: 'column' }}>
       {/* 时间信息显示和半小时开关 */}
       {timeInfo && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
-          <span>{timeInfo}</span>
+          <span>{fixedTimeSlot || timeInfo}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span>半小时</span>
             <Switch
               size="small"
               checked={isHalfHour}
               onChange={setIsHalfHour}
-              disabled={addLoading}
+              disabled={addLoading || fixedTimeSlot}
             />
           </div>
         </div>
       )}
+      
+      {/* 当用户选择了半小时且没有固定时间段时，显示具体时间段选择 */}
+      {isHalfHour && timeInfo && !fixedTimeSlot && (
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>选择时间段：</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button
+              size="small"
+              type={halfHourPosition === 'first' ? 'primary' : 'default'}
+              onClick={() => setHalfHourPosition('first')}
+              disabled={addLoading}
+              style={{ flex: 1, fontSize: '11px' }}
+            >
+              {(() => {
+                // 从时间信息中提取时间槽，计算前半小时时间段
+                const timeMatch = timeInfo.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                if (timeMatch) {
+                  const [, startTime, endTime] = timeMatch;
+                  const startHour = parseInt(startTime.split(':')[0]);
+                  const startMinute = startTime.split(':')[1];
+                  const endHour = parseInt(endTime.split(':')[0]);
+                  const endMinute = endTime.split(':')[1];
+                  
+                  // 前半小时：14:00-14:30
+                  const firstHalfEnd = startHour + (startMinute === '30' ? 1 : 0);
+                  const firstHalfEndMinute = startMinute === '30' ? '00' : '30';
+                  return `${startHour}:${startMinute}-${firstHalfEnd}:${firstHalfEndMinute}`;
+                }
+                return '前半小时';
+              })()}
+            </Button>
+            <Button
+              size="small"
+              type={halfHourPosition === 'second' ? 'primary' : 'default'}
+              onClick={() => setHalfHourPosition('second')}
+              disabled={addLoading}
+              style={{ flex: 1, fontSize: '11px' }}
+            >
+              {(() => {
+                // 从时间信息中提取时间槽，计算后半小时时间段
+                const timeMatch = timeInfo.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                if (timeMatch) {
+                  const [, startTime, endTime] = timeMatch;
+                  const startHour = parseInt(startTime.split(':')[0]);
+                  const startMinute = startTime.split(':')[1];
+                  const endHour = parseInt(endTime.split(':')[0]);
+                  const endMinute = endTime.split(':')[1];
+                  
+                  // 后半小时：14:30-15:00
+                  const secondHalfStart = startHour + (startMinute === '30' ? 1 : 0);
+                  const secondHalfStartMinute = startMinute === '30' ? '00' : '30';
+                  return `${secondHalfStart}:${secondHalfStartMinute}-${endHour}:${endMinute}`;
+                }
+                return '后半小时';
+              })()}
+            </Button>
+          </div>
+        </div>
+      )}
+      
       <Input
         size="small"
         placeholder="学生姓名"
@@ -456,7 +517,7 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo }) =>
         <Button
           type="primary"
           size="small"
-          onClick={() => onAdd({ studentName: name, isHalfHour })}
+          onClick={() => onAdd({ studentName: name, isHalfHour, halfHourPosition })}
           loading={addLoading}
           disabled={addLoading}
         >
@@ -665,14 +726,15 @@ const ViewTimetable = ({ user }) => {
   const addScheduleInputRef = useRef(null);
   const [newScheduleInfo, setNewScheduleInfo] = useState({ 
     studentName: '', 
-    isHalfHour: false // 默认1小时，false表示1小时，true表示半小时
+    isHalfHour: false, // 默认1小时，false表示1小时，true表示半小时
+    halfHourPosition: 'first' // 半小时位置：first=前半小时，second=后半小时
   });
   const [popoverVisible, setPopoverVisible] = useState({});
 
   const handlePopoverVisibleChange = (key, visible) => {
     setPopoverVisible(prev => ({ ...prev, [key]: visible }));
     if (!visible) {
-      setNewScheduleInfo({ studentName: '', isHalfHour: false }); // 关闭时清空输入
+      setNewScheduleInfo({ studentName: '', isHalfHour: false, halfHourPosition: 'first' }); // 关闭时清空输入
     }
   };
 
@@ -785,7 +847,13 @@ const ViewTimetable = ({ user }) => {
     }
 
     const [startTimeStr, endTimeStr] = timeSlots[timeIndex].split('-');
-    const startTime = dayjs(startTimeStr, 'HH:mm');
+    let startTime = dayjs(startTimeStr, 'HH:mm');
+    
+    // 如果用户选择了半小时，根据位置调整开始时间
+    if (scheduleInfo.isHalfHour && scheduleInfo.halfHourPosition === 'second') {
+      startTime = startTime.add(30, 'minute'); // 后半小时：从时间槽开始时间+30分钟
+    }
+    // 前半小时：从时间槽开始时间（保持原时间）
     
     // 根据选择的时长计算结束时间
     let endTime;
@@ -3751,10 +3819,15 @@ const ViewTimetable = ({ user }) => {
                                 scheduleStart.isBefore(slotEndTime) &&
                                 scheduleEnd.isSameOrBefore(slotEndTime);
             
-            // 调试信息已移除
+            // 特殊处理：如果课程结束时间等于时间槽结束时间，也应该匹配（如14:30-15:00匹配14:00-15:00）
+            const isExactEndMatch = scheduleStart.isSameOrAfter(slotStartTime) && 
+                                  scheduleStart.isBefore(slotEndTime) &&
+                                  scheduleEnd.isSame(slotEndTime);
+            
+            const finalTimeMatch = isInTimeSlot || isExactEndMatch;
             
             // 时间不在槽内，过滤掉
-            if (!isInTimeSlot) {
+            if (!finalTimeMatch) {
               return false;
             }
             
@@ -3765,21 +3838,25 @@ const ViewTimetable = ({ user }) => {
                 const instanceStartDate = dayjs(currentWeekInstance.weekStartDate);
                 const currentDate = instanceStartDate.add(index, 'day');
                 const targetDate = currentDate.format('YYYY-MM-DD');
-                return s.scheduleDate === targetDate;
+                const dateMatch = s.scheduleDate === targetDate;
+                return dateMatch;
               }
               // 回退到按星期几过滤（兼容性）
-              return (s.dayOfWeek || '').toLowerCase() === day.key;
+              const dayMatch = (s.dayOfWeek || '').toLowerCase() === day.key;
+              return dayMatch;
             } else {
               // 模板视图：按星期几过滤
               if (timetable.isWeekly) {
-                return (s.dayOfWeek || '').toLowerCase() === day.key;
+                const dayMatch = (s.dayOfWeek || '').toLowerCase() === day.key;
+                return dayMatch;
               } else {
                 // 日期范围课表按日期过滤
                 const scheduleDate = dayjs(s.scheduleDate);
                 const dayIndex = scheduleDate.day();
                 const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
                 const scheduleDayKey = dayNames[dayIndex];
-                return scheduleDayKey === day.key;
+                const dayMatch = scheduleDayKey === day.key;
+                return dayMatch;
               }
             }
           });
@@ -3845,6 +3922,7 @@ const ViewTimetable = ({ user }) => {
               // 兼容旧格式（字符串）和新格式（对象）
               const studentName = typeof scheduleInfo === 'string' ? scheduleInfo : scheduleInfo.studentName;
               const isHalfHour = typeof scheduleInfo === 'string' ? false : (scheduleInfo.isHalfHour || false);
+              const halfHourPosition = typeof scheduleInfo === 'string' ? 'first' : (scheduleInfo.halfHourPosition || 'first');
               
               const trimmedName = studentName.trim();
               if (!trimmedName) {
@@ -3853,7 +3931,13 @@ const ViewTimetable = ({ user }) => {
               }
 
               const [startTimeStr, endTimeStr] = record.time.split('-');
-              const startTime = dayjs(startTimeStr, 'HH:mm');
+              let startTime = dayjs(startTimeStr, 'HH:mm');
+              
+              // 如果用户选择了半小时，根据位置调整开始时间
+              if (isHalfHour && halfHourPosition === 'second') {
+                startTime = startTime.add(30, 'minute'); // 后半小时：从时间槽开始时间+30分钟
+              }
+              // 前半小时：从时间槽开始时间（保持原时间）
               
               // 根据选择的时长计算结束时间
               let endTime;
@@ -4091,11 +4175,11 @@ const ViewTimetable = ({ user }) => {
                         restoreLoading={restoreLoading}
                       />
                       <div style={{ padding: '0 8px' }}>
-                        <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={null} />
+                        <NewSchedulePopoverContent onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={null} hasHalfHourCourse={false} />
                       </div>
                     </div>
                   ) : (
-                    <NewSchedulePopoverContent onAdd={handleAddSchedule} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} />
+                    <NewSchedulePopoverContent onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} hasHalfHourCourse={false} />
                   )
                 }
                 trigger={multiSelectMode ? "contextMenu" : (deleteMode ? "none" : "click")}
@@ -4228,8 +4312,7 @@ const ViewTimetable = ({ user }) => {
                       title={titleText}
                     >
                       {(() => {
-                        const isHalf = isHalfHourSchedule(student);
-                        const nameWithIndicator = isHalf ? `${student.studentName} ½` : student.studentName;
+                        const nameWithIndicator = student.studentName;
                         const isTruncated = nameWithIndicator.length > 4;
                         const content = isTruncated ? `${nameWithIndicator.substring(0, 3)}…` : nameWithIndicator;
                         return (
@@ -4291,8 +4374,7 @@ const ViewTimetable = ({ user }) => {
                     }}
                   >
                     {(() => {
-                      const isHalf = isHalfHourSchedule(student);
-                      const displayName = isHalf ? `${student.studentName} ½` : student.studentName;
+                      const displayName = student.studentName;
                       return (
                         <span style={{ color: '#333' }}>
                           {displayName}
@@ -4325,6 +4407,279 @@ const ViewTimetable = ({ user }) => {
             );
           }
 
+          // 检查是否有半小时课程
+          const hasHalfHourCourse = schedules.some(s => isHalfHourSchedule(s));
+          
+          if (hasHalfHourCourse) {
+            // 如果有半小时课程，需要根据课程的实际位置来渲染
+            // 分别查找前半小时和后半小时的课程
+            const [slotStart] = record.time.split('-');
+            const slotStartTime = dayjs(slotStart, 'HH:mm');
+            
+            const firstHalfCourse = schedules.find(s => {
+              if (!isHalfHourSchedule(s)) return false;
+              const scheduleStartTime = s.startTime.substring(0, 5);
+              const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+              const minutesFromSlotStart = scheduleStart.diff(slotStartTime, 'minute');
+              return minutesFromSlotStart < 30;
+            });
+            
+            const secondHalfCourse = schedules.find(s => {
+              if (!isHalfHourSchedule(s)) return false;
+              const scheduleStartTime = s.startTime.substring(0, 5);
+              const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+              const minutesFromSlotStart = scheduleStart.diff(slotStartTime, 'minute');
+              return minutesFromSlotStart >= 30;
+            })
+            
+            return (
+              <div className="schedule-cell-content" style={{ position: 'relative', height: '48px' }}>
+                {/* 前半小时区域 */}
+                <div style={{ height: '50%', position: 'relative' }}>
+                  {firstHalfCourse ? (
+                    // 前半小时有课程，显示课程
+                    (() => {
+                      const isManualAdded = viewMode === 'instance' && firstHalfCourse.isManualAdded;
+                      const isModified = viewMode === 'instance' && firstHalfCourse.isModified;
+                      let borderColor = '';
+                      let titleText = '点击查看详情或删除';
+                      
+                      const comparisonBorderColor = getScheduleBorderColor(firstHalfCourse);
+                      if (comparisonBorderColor) {
+                        borderColor = comparisonBorderColor;
+                        if (comparisonBorderColor === '#52c41a') {
+                          titleText = '手动添加的课程 - 点击查看详情或删除';
+                        } else if (comparisonBorderColor === '#faad14') {
+                          titleText = '已修改的课程 - 点击查看详情或删除';
+                        }
+                      } else if (isModified) {
+                        borderColor = '#faad14';
+                        titleText = '已修改的课程 - 点击查看详情或删除';
+                      } else if (isManualAdded && comparisonBorderColor === '#52c41a') {
+                        borderColor = '#52c41a';
+                        titleText = '手动添加的课程 - 点击查看详情或删除';
+                      }
+                      
+                      return (
+                        <Popover
+                          placement={getSmartPlacement(index, record.key)}
+                          title={null}
+                          content={
+                            <div>
+                              <SchedulePopoverContent
+                                schedule={firstHalfCourse}
+                                onDelete={() => handleDeleteSchedule(firstHalfCourse.id)}
+                                onUpdateName={(newName) => handleSaveStudentName(firstHalfCourse, newName)}
+                                onMove={handleStartMove}
+                                onCopy={handleStartCopy}
+                                timetable={timetable}
+                                isArchived={timetable?.isArchived}
+                                onClose={() => setOpenPopoverKey(null)}
+                                deleteLoading={deleteLoading}
+                                updateLoading={updateLoading}
+                                templateSchedules={templateSchedules}
+                                viewMode={viewMode}
+                                allSchedules={allSchedules}
+                                onRemoveSchedule={(id) => {
+                                  setAllSchedules(prev => prev.filter(s => s.id !== id));
+                                }}
+                              />
+                            </div>
+                          }
+                          trigger="click"
+                          open={openPopoverKey === `${cellKey}-first-half`}
+                          onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-first-half` : null)}
+                        >
+                          <div
+                            style={{
+                              backgroundColor: studentColorMap.get(firstHalfCourse.studentName) || 'transparent',
+                              height: '100%',
+                              position: 'absolute',
+                              top: '0',
+                              left: '0',
+                              right: '0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#333',
+                              fontSize: '12px',
+                              wordBreak: 'break-word',
+                              lineHeight: '1.2',
+                              border: borderColor ? `2px solid ${borderColor}` : 'none',
+                              zIndex: 1,
+                              cursor: 'pointer'
+                            }}
+                            title={titleText}
+                          >
+                            {(() => {
+                              const nameWithIndicator = firstHalfCourse.studentName;
+                              const isTruncated = nameWithIndicator.length > 4;
+                              const content = isTruncated ? `${nameWithIndicator.substring(0, 3)}…` : nameWithIndicator;
+                              return (
+                                <span
+                                  className={isTruncated ? 'student-name-truncated' : ''}
+                                  title={isTruncated ? nameWithIndicator : undefined}
+                                  style={{ color: '#333' }}
+                                >
+                                  {content}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </Popover>
+                      );
+                    })()
+                  ) : (
+                    // 前半小时没有课程，显示空白区域用于添加课程
+                    <Popover
+                      placement={getSmartPlacement(index, record.key)}
+                      title={null}
+                      content={
+                        <NewSchedulePopoverContent 
+                          onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
+                          onCancel={() => setOpenPopoverKey(null)} 
+                          addLoading={addLoading} 
+                          timeInfo={`星期${dayMap[day.key.toUpperCase()] || day.key}`}
+                          hasHalfHourCourse={hasHalfHourCourse}
+                          defaultHalfHourPosition="first"
+                          defaultIsHalfHour={true}
+                          fixedTimeSlot="14:00-14:30"
+                        />
+                      }
+                      trigger="click"
+                      open={openPopoverKey === `${cellKey}-top`}
+                      onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-top` : null)}
+                    >
+                      <div style={{ height: '100%', cursor: 'pointer' }} />
+                    </Popover>
+                  )}
+                </div>
+                
+                {/* 后半小时区域 */}
+                <div style={{ height: '50%', position: 'relative' }}>
+                  {secondHalfCourse ? (
+                    // 后半小时有课程，显示课程
+                    (() => {
+                      const isManualAdded = viewMode === 'instance' && secondHalfCourse.isManualAdded;
+                      const isModified = viewMode === 'instance' && secondHalfCourse.isModified;
+                      let borderColor = '';
+                      let titleText = '点击查看详情或删除';
+                      
+                      const comparisonBorderColor = getScheduleBorderColor(secondHalfCourse);
+                      if (comparisonBorderColor) {
+                        borderColor = comparisonBorderColor;
+                        if (comparisonBorderColor === '#52c41a') {
+                          titleText = '手动添加的课程 - 点击查看详情或删除';
+                        } else if (comparisonBorderColor === '#faad14') {
+                          titleText = '已修改的课程 - 点击查看详情或删除';
+                        }
+                      } else if (isModified) {
+                        borderColor = '#faad14';
+                        titleText = '已修改的课程 - 点击查看详情或删除';
+                      } else if (isManualAdded && comparisonBorderColor === '#52c41a') {
+                        borderColor = '#52c41a';
+                        titleText = '手动添加的课程 - 点击查看详情或删除';
+                      }
+                      
+                      return (
+                        <Popover
+                          placement={getSmartPlacement(index, record.key)}
+                          title={null}
+                          content={
+                            <div>
+                              <SchedulePopoverContent
+                                schedule={secondHalfCourse}
+                                onDelete={() => handleDeleteSchedule(secondHalfCourse.id)}
+                                onUpdateName={(newName) => handleSaveStudentName(secondHalfCourse, newName)}
+                                onMove={handleStartMove}
+                                onCopy={handleStartCopy}
+                                timetable={timetable}
+                                isArchived={timetable?.isArchived}
+                                onClose={() => setOpenPopoverKey(null)}
+                                deleteLoading={deleteLoading}
+                                updateLoading={updateLoading}
+                                templateSchedules={templateSchedules}
+                                viewMode={viewMode}
+                                allSchedules={allSchedules}
+                                onRemoveSchedule={(id) => {
+                                  setAllSchedules(prev => prev.filter(s => s.id !== id));
+                                }}
+                              />
+                            </div>
+                          }
+                          trigger="click"
+                          open={openPopoverKey === `${cellKey}-second-half`}
+                          onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-second-half` : null)}
+                        >
+                          <div
+                            style={{
+                              backgroundColor: studentColorMap.get(secondHalfCourse.studentName) || 'transparent',
+                              height: '100%',
+                              position: 'absolute',
+                              top: '0',
+                              left: '0',
+                              right: '0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#333',
+                              fontSize: '12px',
+                              wordBreak: 'break-word',
+                              lineHeight: '1.2',
+                              border: borderColor ? `2px solid ${borderColor}` : 'none',
+                              zIndex: 1,
+                              cursor: 'pointer'
+                            }}
+                            title={titleText}
+                          >
+                            {(() => {
+                              const nameWithIndicator = secondHalfCourse.studentName;
+                              const isTruncated = nameWithIndicator.length > 4;
+                              const content = isTruncated ? `${nameWithIndicator.substring(0, 3)}…` : nameWithIndicator;
+                              return (
+                                <span
+                                  className={isTruncated ? 'student-name-truncated' : ''}
+                                  title={isTruncated ? nameWithIndicator : undefined}
+                                  style={{ color: '#333' }}
+                                >
+                                  {content}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </Popover>
+                      );
+                    })()
+                  ) : (
+                    // 后半小时没有课程，显示空白区域用于添加课程
+                    <Popover
+                      placement={getSmartPlacement(index, record.key)}
+                      title={null}
+                      content={
+                        <NewSchedulePopoverContent 
+                          onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
+                          onCancel={() => setOpenPopoverKey(null)} 
+                          addLoading={addLoading} 
+                          timeInfo={`星期${dayMap[day.key.toUpperCase()] || day.key}`}
+                          hasHalfHourCourse={hasHalfHourCourse}
+                          defaultHalfHourPosition="second"
+                          defaultIsHalfHour={true}
+                          fixedTimeSlot="14:30-15:00"
+                        />
+                      }
+                      trigger="click"
+                      open={openPopoverKey === `${cellKey}-bottom`}
+                      onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-bottom` : null)}
+                    >
+                      <div style={{ height: '100%', cursor: 'pointer' }} />
+                    </Popover>
+                  )}
+                </div>
+              </div>
+            );
+          }
+          
+          // 没有半小时课程的情况，使用原来的逻辑
           return (
             <Popover
               placement={getSmartPlacement(index, record.key)}
@@ -4401,8 +4756,7 @@ const ViewTimetable = ({ user }) => {
                       title={titleText}
                     >
                       {(() => {
-                        const isHalf = isHalfHourSchedule(student);
-                        const nameWithIndicator = isHalf ? `${student.studentName} ½` : student.studentName;
+                        const nameWithIndicator = student.studentName;
                         const isTruncated = nameWithIndicator.length > 4;
                         const content = isTruncated ? `${nameWithIndicator.substring(0, 3)}…` : nameWithIndicator;
                         return (
