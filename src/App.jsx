@@ -16,6 +16,7 @@ import ArchivedTimetables from './pages/ArchivedTimetables';
 import ConvertPreview from './pages/ConvertPreview';
 import WechatTest from './pages/WechatTest';
 import UserGuide from './pages/UserGuide';
+import StudentOperationRecords from './pages/StudentOperationRecords';
 import './App.css';
 
 const { Content } = Layout;
@@ -149,6 +150,10 @@ function App() {
             <Route
               path="/guide"
               element={user ? <UserGuide /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/student-operation-records"
+              element={user ? <StudentOperationRecords /> : <Navigate to="/login" />}
             />
             <Route
               path="/convert-preview"

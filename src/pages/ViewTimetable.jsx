@@ -670,7 +670,6 @@ const ViewTimetable = ({ user }) => {
 
   // 处理时间单元格点击，显示可供排课时段
   const handleTimeCellClick = (timeSlot) => {
-    console.log('Time cell clicked:', timeSlot);
     const availableSlots = [];
     
     // 定义时间段
@@ -731,7 +730,6 @@ const ViewTimetable = ({ user }) => {
       });
     });
     
-    console.log('Available slots:', availableSlots);
     setAvailableTimeSlots(availableSlots);
     setAvailableTimeModalVisible(true);
   };
@@ -1147,6 +1145,62 @@ const ViewTimetable = ({ user }) => {
     // 如果取消勾选，不需要重新获取数据，因为数据已经在弹框打开时获取了
   };
 
+  // 合并连续时间段的函数（用于复制功能）
+  const mergeConsecutiveTimeSlotsForCopy = (schedules) => {
+    if (!schedules || schedules.length === 0) return [];
+    
+    // 按学员名称分组（去除空格等字符进行标准化）
+    const groupedByStudent = {};
+    schedules.forEach(s => {
+      const studentName = String(s.studentName || '').replace(/[\s\u3000]/g, '');
+      if (!groupedByStudent[studentName]) {
+        groupedByStudent[studentName] = [];
+      }
+      groupedByStudent[studentName].push(s);
+    });
+    
+    const mergedSchedules = [];
+    
+    // 对每个学员的课程进行时间段合并
+    Object.entries(groupedByStudent).forEach(([studentName, studentSchedules]) => {
+      // 按开始时间排序
+      const sorted = studentSchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      
+      let i = 0;
+      while (i < sorted.length) {
+        let currentSchedule = sorted[i];
+        let currentStartHour = parseInt(currentSchedule.startTime.substring(0, 2));
+        let currentEndHour = currentStartHour + 1; // 默认每个课程1小时
+        
+        // 查找连续的时间段
+        let j = i + 1;
+        while (j < sorted.length) {
+          const nextSchedule = sorted[j];
+          const nextStartHour = parseInt(nextSchedule.startTime.substring(0, 2));
+          
+          // 检查当前结束时间是否等于下一个开始时间（连续）
+          if (currentEndHour === nextStartHour) {
+            currentEndHour = nextStartHour + 1; // 扩展结束时间
+            j++;
+          } else {
+            break;
+          }
+        }
+        
+        // 创建合并后的课程记录
+        mergedSchedules.push({
+          ...currentSchedule,
+          endTime: `${currentEndHour.toString().padStart(2, '0')}:00`,
+          originalCount: j - i // 记录合并了多少个时间段
+        });
+        
+        i = j;
+      }
+    });
+    
+    return mergedSchedules;
+  };
+
   const generateCopyTextForDay = (schedules, targetDate, dayLabel, includeOtherCoaches = false, otherCoachesData = null) => {
     if (!schedules || schedules.length === 0) return '没有可复制的课程';
     
@@ -1162,13 +1216,18 @@ const ViewTimetable = ({ user }) => {
     // 构建标题
     const title = formattedDate ? `${formattedDate} ${dayLabel}课程安排` : `${dayLabel}课程安排`;
     
+    // 合并连续时间段
+    const mergedSchedules = mergeConsecutiveTimeSlotsForCopy(schedules);
+    
     // 构建当前教练的课程列表
-    const courseList = schedules.map(schedule => {
+    const courseList = mergedSchedules
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .map(schedule => {
         const startHour = parseInt(schedule.startTime.substring(0, 2));
-        const endHour = startHour + 1;
+        const endHour = schedule.endTime ? parseInt(schedule.endTime.substring(0, 2)) : startHour + 1;
         const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
         return `${startHour}-${endHour} ${studentName}`;
-    }).join('\n');
+      }).join('\n');
 
     let result = `${title}\n${coachName}：\n${courseList}`;
 
@@ -1181,11 +1240,15 @@ const ViewTimetable = ({ user }) => {
         }
 
         result += `\n${timetableInfo.ownerName}：`;
-        const otherCourseList = [...timetableInfo.schedules]
+        
+        // 合并其他教练的连续时间段
+        const mergedOtherSchedules = mergeConsecutiveTimeSlotsForCopy(timetableInfo.schedules);
+        
+        const otherCourseList = mergedOtherSchedules
           .sort((a, b) => a.startTime.localeCompare(b.startTime))
           .map(schedule => {
             const startHour = parseInt(schedule.startTime.substring(0, 2));
-            const endHour = startHour + 1;
+            const endHour = schedule.endTime ? parseInt(schedule.endTime.substring(0, 2)) : startHour + 1;
             const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
             return `${startHour}-${endHour} ${studentName}`;
           }).join('\n');
@@ -1222,7 +1285,6 @@ const ViewTimetable = ({ user }) => {
       
       // 如果找到本周实例且当前不是本周实例，则自动切换
       if (thisWeekIndex >= 0 && thisWeekIndex !== currentInstanceIndex) {
-        console.log('Auto switching to this week instance, index:', thisWeekIndex);
         switchToWeekInstanceByIndex(thisWeekIndex);
       }
     }
@@ -1433,7 +1495,6 @@ const ViewTimetable = ({ user }) => {
 
   // 4. 获取本周数据（每区块一次）- 统一走聚合接口
   const fetchWeekInstanceSchedules = async (requestId) => {
-    console.log('fetchWeekInstanceSchedules called for timetableId:', timetableId);
     
     // 同时获取本周实例数据和模板数据
     const [instanceResponse, templateResponse] = await Promise.all([
@@ -1441,11 +1502,8 @@ const ViewTimetable = ({ user }) => {
       getTemplateSchedules(timetableId)
     ]);
     
-    console.log('fetchWeekInstanceSchedules instanceResponse:', instanceResponse);
-    console.log('fetchWeekInstanceSchedules templateResponse:', templateResponse);
     
     if (instanceResponse && instanceResponse.success) {
-      console.log('Setting allSchedules to:', instanceResponse.data || []);
       if (latestRequestIdRef.current === (requestId ?? latestRequestIdRef.current)) {
         setAllSchedules(instanceResponse.data || []);
         
@@ -1455,7 +1513,6 @@ const ViewTimetable = ({ user }) => {
         }
       }
     } else {
-      console.log('Failed to fetch week instance schedules');
       setAllSchedules([]);
       
       // 即使实例数据获取失败，也要尝试设置模板数据
@@ -1471,24 +1528,19 @@ const ViewTimetable = ({ user }) => {
 
   // 获取当前周实例的课程
   const fetchInstanceSchedules = async () => {
-    console.log('fetchInstanceSchedules 被调用，instanceDataLoading:', instanceDataLoading, 'isGenerating:', isGenerating);
     
     // 防止重复调用
     if (instanceDataLoading || isGenerating) {
-      console.log('正在加载或生成中，跳过重复调用');
       return;
     }
     
-    console.log('开始获取实例数据...');
     setInstanceDataLoading(true);
     try {
       // 如果是周固定课表且还没有模板数据，先获取模板数据用于比较
       if (timetable && timetable.isWeekly && templateSchedules.length === 0) {
-        console.log('获取模板数据用于比较...');
         const templateResponse = await getTemplateSchedules(timetableId);
         if (templateResponse.success) {
           setTemplateSchedules(templateResponse.data);
-          console.log('模板数据获取完成，数量:', templateResponse.data.length);
         }
       }
 
@@ -1499,43 +1551,32 @@ const ViewTimetable = ({ user }) => {
         
         if (hasInstance) {
           // 有实例，获取实例数据
-          console.log('检测到有实例，开始获取实例数据...');
           const response = await getCurrentWeekInstance(timetableId);
-          console.log('getCurrentWeekInstance 响应:', response);
           
           if (response.success && response.data.hasInstance) {
             setCurrentWeekInstance(response.data.instance);
             setAllSchedules(response.data.schedules);
             setHasCurrentWeekInstance(true);
-            console.log('实例数据设置完成 - 实例:', response.data.instance);
-            console.log('实例数据设置完成 - 课程数量:', response.data.schedules?.length || 0);
-            console.log('实例课程详情:', response.data.schedules);
           } else {
-            console.log('获取实例数据失败或没有实例数据');
             setCurrentWeekInstance(null);
             setAllSchedules([]);
             setHasCurrentWeekInstance(false);
           }
         } else {
           // 没有实例，生成一个
-          console.log('开始生成当前周实例...');
           setIsGenerating(true);
           try {
             const generateResponse = await generateCurrentWeekInstance(timetableId);
-            console.log('生成实例结果:', generateResponse);
             
             if (generateResponse.success) {
               setCurrentWeekInstance(generateResponse.data);
               setHasCurrentWeekInstance(true);
               // 生成后调用getCurrentWeekInstance获取完整的课程数据
-              console.log('生成成功，开始获取课程数据...');
               const instanceResponse = await getCurrentWeekInstance(timetableId);
               if (instanceResponse.success && instanceResponse.data.hasInstance) {
                 setAllSchedules(instanceResponse.data.schedules);
-                console.log('获取课程数据成功，课程数量:', instanceResponse.data.schedules.length);
               } else {
                 setAllSchedules([]);
-                console.log('获取课程数据失败或没有课程');
               }
             } else {
               setCurrentWeekInstance(null);
@@ -1571,17 +1612,14 @@ const ViewTimetable = ({ user }) => {
     // 仅依赖timetableId，避免因timetable状态尚未set而提前return
     if (!timetableId) return;
     
-    console.log('fetchWeeklyInstances called for timetableId:', timetableId);
     setInstancesLoading(true);
     try {
       const response = await getWeeklyInstances(timetableId);
-      console.log('getWeeklyInstances response:', response);
       if (response.success && Array.isArray(response.data)) {
         // 按周开始日期排序
         const sortedInstances = response.data.sort((a, b) => 
           dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))
         );
-        console.log('Sorted instances:', sortedInstances);
         setWeeklyInstances(sortedInstances);
         
         // 总是更新索引，确保状态一致性
@@ -1623,18 +1661,14 @@ const ViewTimetable = ({ user }) => {
   // 切换到指定的周实例（允许传入最新的实例列表，避免异步状态滞后）
   const switchToWeekInstanceByIndex = async (instanceIndex, instancesOverride) => {
     const list = Array.isArray(instancesOverride) ? instancesOverride : weeklyInstances;
-    console.log('switchToWeekInstance called with index:', instanceIndex, 'list length:', list?.length);
     if (!Array.isArray(list) || instanceIndex < 0 || instanceIndex >= list.length) {
-      console.log('Invalid instance index:', instanceIndex);
       return;
     }
     
     const targetInstance = list[instanceIndex];
-    console.log('Target instance:', targetInstance);
     
     // 如果点击的是当前选中的实例，不做任何操作
     if (instanceIndex === currentInstanceIndex) {
-      console.log('Clicked current instance, no action needed');
       return;
     }
     
@@ -1675,14 +1709,12 @@ const ViewTimetable = ({ user }) => {
 
   // 按钮点击处理函数 - 直接调用对应API，避免useEffect循环
   const handleTodayClick = async () => {
-    console.log('点击今日按钮');
     clearModes();
     setViewMode('today');
     await fetchTodaySchedules();
   };
 
   const handleTomorrowClick = async () => {
-    console.log('点击明日按钮');
     clearModes();
     setViewMode('tomorrow');
     await fetchTomorrowSchedules();
@@ -1690,11 +1722,9 @@ const ViewTimetable = ({ user }) => {
 
   // 切换到当前周实例的函数
   const switchToCurrentWeekInstance = async () => {
-    console.log('尝试切换到本周实例');
     
     // 确保有周实例列表
     if (weeklyInstances.length === 0) {
-      console.log('没有周实例列表，先获取...');
       await fetchWeeklyInstances();
     }
     
@@ -1715,10 +1745,8 @@ const ViewTimetable = ({ user }) => {
     });
     
     if (thisWeekIndex >= 0) {
-      console.log('找到本周实例，索引:', thisWeekIndex);
       await switchToWeekInstanceByIndex(thisWeekIndex);
     } else {
-      console.log('没有找到本周实例，尝试生成本周实例...');
       // 尝试生成本周实例
       try {
         const generateResponse = await generateCurrentWeekInstance(timetableId);
@@ -1747,7 +1775,6 @@ const ViewTimetable = ({ user }) => {
   };
 
   const handleThisWeekClick = async () => {
-    console.log('点击本周按钮');
     clearModes();
     
     // 检查当前是否已经是本周实例
@@ -1762,7 +1789,6 @@ const ViewTimetable = ({ user }) => {
       
       // 如果当前实例就是本周实例，不做任何操作
       if (currentStart.isSame(thisWeekStart, 'day') && currentEnd.isSame(thisWeekEnd, 'day')) {
-        console.log('当前已经是本周实例，无需切换');
         return;
       }
     }
@@ -1773,11 +1799,9 @@ const ViewTimetable = ({ user }) => {
 
   // 上方按钮点击处理函数 - 如果当前已经是实例视图，不做任何操作
   const handleTopButtonClick = async () => {
-    console.log('点击上方按钮');
     
     // 如果当前已经是实例视图，不做任何操作
     if (viewMode === 'instance') {
-      console.log('当前已经是实例视图，不做任何操作');
       return;
     }
     
@@ -1793,7 +1817,6 @@ const ViewTimetable = ({ user }) => {
   };
 
   const handleTemplateClick = async () => {
-    console.log('点击固定按钮');
     clearModes();
     
     // 保存当前的统计信息，避免loading期间显示错误数据
@@ -2105,18 +2128,14 @@ const ViewTimetable = ({ user }) => {
 
   // 恢复请假/取消的学员
   const handleRestoreSchedule = async (cancelInfo) => {
-    console.log('handleRestoreSchedule 被调用:', cancelInfo);
     if (restoreLoading) return; // 防止重复点击
     try {
       setRestoreLoading(true);
-      console.log('restoreLoading 已设置为 true');
       
       if (cancelInfo.type === '请假') {
         // 请假恢复：使用cancelLeave API
         try {
-          console.log('尝试取消请假，scheduleId:', cancelInfo.scheduleId);
           const response = await cancelLeave(cancelInfo.scheduleId);
-          console.log('取消请假响应:', response);
           if (response.success) {
             message.success('恢复成功');
             // 清除缓存，确保获取最新数据
@@ -2153,11 +2172,9 @@ const ViewTimetable = ({ user }) => {
               error.message?.includes('课程不存在') ||
               error.response?.data?.message?.includes('不存在') ||
               error.response?.data?.message?.includes('已取消')) {
-            console.log('请假课程不存在或已取消，重新创建');
             await recreateSchedule(cancelInfo);
           } else {
             // 其他错误，也尝试重新创建作为备选方案
-            console.log('尝试重新创建课程作为备选方案');
             try {
               await recreateSchedule(cancelInfo);
             } catch (recreateError) {
@@ -2182,7 +2199,6 @@ const ViewTimetable = ({ user }) => {
   // 重新创建课程（用于恢复被删除的课程）
   const recreateSchedule = async (cancelInfo) => {
     try {
-      console.log('recreateSchedule 被调用，恢复课程信息:', cancelInfo);
       
       // 检查 cancelInfo 结构
       if (!cancelInfo || !cancelInfo.timeInfo) {
@@ -2236,11 +2252,8 @@ const ViewTimetable = ({ user }) => {
         isModified: false      // 标记为未修改，因为内容与固定课表一致
       };
       
-      console.log('创建课程 payload:', payload);
       
       if (currentWeekInstance) {
-        console.log('准备创建实例课程，currentWeekInstance.id:', currentWeekInstance.id);
-        console.log('创建课程的 payload:', payload);
         
         // 先检查课程是否已经存在
         const existingSchedules = allSchedules || [];
@@ -2252,7 +2265,6 @@ const ViewTimetable = ({ user }) => {
         );
         
         if (alreadyExists) {
-          console.log('课程已存在，无需重复创建');
           message.success('恢复成功');
           // 清除缓存，确保获取最新数据
           invalidateTimetableCache(timetableId);
@@ -2282,7 +2294,6 @@ const ViewTimetable = ({ user }) => {
         
         try {
           const response = await createInstanceSchedule(currentWeekInstance.id, payload);
-          console.log('创建实例课程的响应:', response);
           if (response.success) {
             message.success('恢复成功');
             // 清除缓存，确保获取最新数据
@@ -2318,7 +2329,6 @@ const ViewTimetable = ({ user }) => {
           if (createError.response?.status === 409 ||
               (createError.response?.data?.message &&
                createError.response.data.message.includes('已存在'))) {
-            console.log('课程已存在，刷新数据');
             message.success('恢复成功');
             // 清除缓存，确保获取最新数据
             invalidateTimetableCache(timetableId);
@@ -2494,8 +2504,6 @@ const ViewTimetable = ({ user }) => {
     }
 
     setMoveLoading(true);
-    console.log('selectedMoveTarget:', selectedMoveTarget);
-    console.log('scheduleToMove:', scheduleToMove);
     
     // 处理key格式: week-3-tuesday-5 或 weekly-tuesday-5
     const parts = selectedMoveTarget.split('-');
@@ -2514,10 +2522,8 @@ const ViewTimetable = ({ user }) => {
       return;
     }
     
-    console.log('targetDayKey:', targetDayKey, 'targetTimeIndex:', targetTimeIndex);
     
     const targetTimeSlot = timeSlots[parseInt(targetTimeIndex)];
-    console.log('targetTimeSlot:', targetTimeSlot);
     
     const [startTimeStr, endTimeStr] = targetTimeSlot.split('-');
     const startTime = `${startTimeStr}:00`;
@@ -2546,13 +2552,11 @@ const ViewTimetable = ({ user }) => {
       }
     }
 
-    console.log('移动操作payload:', payload);
     
     try {
       let response;
       if (viewMode === 'instance') {
         // 实例视图：使用实例更新API
-        console.log('使用实例API更新，scheduleId:', scheduleToMove.id);
         response = await updateInstanceSchedule(scheduleToMove.id, payload);
       } else {
         // 模板视图：使用原有更新API
@@ -2994,8 +2998,6 @@ const ViewTimetable = ({ user }) => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          console.log('开始批量删除，选中的cellKey:', Array.from(selectedSchedulesForDelete));
-          console.log('当前allSchedules:', allSchedules);
           
           // 收集所有要删除的schedule ID
           const scheduleIdsToDelete = [];
@@ -3005,7 +3007,6 @@ const ViewTimetable = ({ user }) => {
             // cellKey格式: ${day.key}-${record.key}，其中record.key是timeSlots的索引
             const [dayKey, timeIndex] = cellKey.split('-');
             const timeSlot = timeSlots[parseInt(timeIndex)];
-            console.log(`处理cellKey: ${cellKey}, dayKey: ${dayKey}, timeIndex: ${timeIndex}, timeSlot: ${timeSlot}`);
             
             const schedules = displaySchedules.filter(s => {
               const timeKeyFromSchedule = `${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`;
@@ -3021,22 +3022,17 @@ const ViewTimetable = ({ user }) => {
               return timeKeyFromSchedule === timeSlot && scheduleDayKey === dayKey;
             });
             
-            console.log(`找到的schedules:`, schedules);
 
             if (schedules.length > 0) {
               const schedule = schedules[0];
-              console.log(`准备删除schedule:`, schedule);
               scheduleIdsToDelete.push(schedule.id);
             } else {
-              console.log('没有找到匹配的schedule');
             }
           }
 
           // 使用批量删除接口
           if (scheduleIdsToDelete.length > 0) {
-            console.log('准备批量删除的schedule IDs:', scheduleIdsToDelete);
             if (viewMode === 'instance') {
-              console.log('调用deleteInstanceSchedulesBatch');
               const response = await deleteInstanceSchedulesBatch(scheduleIdsToDelete);
               if (response.success) {
                 message.success(`成功删除 ${response.data} 个课程`);
@@ -3044,7 +3040,6 @@ const ViewTimetable = ({ user }) => {
                 message.error(response.message || '批量删除失败');
               }
             } else {
-              console.log('调用deleteSchedulesBatch');
               const response = await deleteSchedulesBatch(timetableId, scheduleIdsToDelete);
               if (response.success) {
                 message.success(`成功删除 ${response.data} 个课程`);
@@ -4278,7 +4273,6 @@ const ViewTimetable = ({ user }) => {
         <Button
           type="text"
           onClick={() => {
-            console.log('返回按钮被点击');
             navigate(-1);
           }}
           icon={<LeftOutlined style={{ fontSize: 20 }} />}
@@ -4899,7 +4893,6 @@ const ViewTimetable = ({ user }) => {
                     .sort((a, b) => dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))) // 确保左到右日期递增
             ).map((instance, displayIndex) => {
               const actualIndex = displayStartIndex + displayIndex;
-              console.log('Rendering button for instance:', instance, 'displayIndex:', displayIndex, 'actualIndex:', actualIndex, 'currentIndex:', currentInstanceIndex);
               return (
                 <Button
                   key={instance.id}
@@ -4908,10 +4901,8 @@ const ViewTimetable = ({ user }) => {
                   onClick={() => {
                     // 如果点击的是当前选中的实例，不做任何操作
                     if (actualIndex === currentInstanceIndex) {
-                      console.log('Clicked current instance, no action needed');
                       return;
                     }
-                    console.log('Button clicked for actualIndex:', actualIndex);
                     switchToWeekInstanceByIndex(actualIndex);
                   }}
                   disabled={instancesLoading}

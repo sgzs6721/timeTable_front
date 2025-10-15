@@ -23,8 +23,64 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
     try {
       const response = await getStudentRecords(studentName, coachName);
       if (response && response.success) {
-        setScheduleRecords(response.data.schedules || []);
-        setLeaveRecords(response.data.leaves || []);
+        // 过滤掉未来的课程记录
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // 设置为今天开始时间
+        
+        const filteredSchedules = (response.data.schedules || []).filter(record => {
+          const recordDate = new Date(record.scheduleDate);
+          recordDate.setHours(0, 0, 0, 0);
+          return recordDate <= today; // 只保留今天及以前的课程
+        });
+        
+        // 前端排序：按日期和时间倒序排列
+        const sortedSchedules = filteredSchedules.sort((a, b) => {
+          // 先按日期比较
+          const dateA = new Date(a.scheduleDate);
+          const dateB = new Date(b.scheduleDate);
+          const dateCompare = dateB.getTime() - dateA.getTime();
+          
+          if (dateCompare !== 0) {
+            return dateCompare;
+          }
+          
+          // 日期相同时按时间比较
+          const timeA = a.timeRange ? a.timeRange.split('-')[0] : '';
+          const timeB = b.timeRange ? b.timeRange.split('-')[0] : '';
+          
+          if (timeA && timeB) {
+            // 比较时间字符串（如 "18:00" vs "17:00"）
+            return timeB.localeCompare(timeA);
+          }
+          
+          return 0;
+        });
+        
+        setScheduleRecords(sortedSchedules);
+        
+        // 请假记录也进行排序
+        const sortedLeaves = (response.data.leaves || []).sort((a, b) => {
+          // 先按日期比较
+          const dateA = new Date(a.leaveDate);
+          const dateB = new Date(b.leaveDate);
+          const dateCompare = dateB.getTime() - dateA.getTime();
+          
+          if (dateCompare !== 0) {
+            return dateCompare;
+          }
+          
+          // 日期相同时按时间比较
+          const timeA = a.timeRange ? a.timeRange.split('-')[0] : '';
+          const timeB = b.timeRange ? b.timeRange.split('-')[0] : '';
+          
+          if (timeA && timeB) {
+            return timeB.localeCompare(timeA);
+          }
+          
+          return 0;
+        });
+        
+        setLeaveRecords(sortedLeaves);
         // 使用后端返回的真正教练名称
         if (response.data.actualCoachName) {
           setActualCoachName(response.data.actualCoachName);

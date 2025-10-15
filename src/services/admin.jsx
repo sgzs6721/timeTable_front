@@ -248,11 +248,9 @@ export const getActiveWeeklySchedules = async () => {
     const now = Date.now();
     // 检查缓存
     if (weeklySchedulesCache && now - weeklySchedulesCacheTime < CACHE_TTL) {
-      console.log('使用缓存的本周课程数据');
       return { success: true, data: weeklySchedulesCache };
     }
     
-    console.log('重新获取本周课程数据');
     // 使用新的优化接口，一次性获取所有活动课表的本周数据
     const response = await api.get('/admin/active-timetables/this-week');
     
@@ -260,7 +258,6 @@ export const getActiveWeeklySchedules = async () => {
       throw new Error('获取活动课表本周数据失败');
     }
     
-    console.log('本周课程数据响应:', response);
     
     // 更新缓存
     weeklySchedulesCache = response.data || [];
@@ -321,14 +318,12 @@ export const getActiveWeeklySchedulesLegacy = async () => {
     }
     
     const activeTimetables = activeTimetablesResponse.data || [];
-    console.log('活动课表列表:', activeTimetables);
     
     // 为每个活动课表获取本周数据
     const weekResponses = await Promise.all(
       activeTimetables.map(async (timetable) => {
         try {
           const weekResponse = await api.get(`/timetables/${timetable.id}/schedules/this-week`);
-          console.log(`课表 ${timetable.id} 的本周数据响应:`, weekResponse);
           return {
             timetableId: timetable.id,
             timetableName: timetable.name,
@@ -351,7 +346,6 @@ export const getActiveWeeklySchedulesLegacy = async () => {
       })
     );
     
-    console.log('本周响应数据:', weekResponses);
     
     // 合并所有课表的课程数据
     const allSchedules = [];
@@ -370,7 +364,6 @@ export const getActiveWeeklySchedulesLegacy = async () => {
       }
     });
     
-    console.log('合并后的所有课程数据:', allSchedules);
     
     return {
       success: true,
@@ -431,11 +424,9 @@ export const getActiveWeeklyTemplates = async () => {
     const now = Date.now();
     // 检查缓存
     if (weeklyTemplatesCache && now - weeklyTemplatesCacheTime < TEMPLATE_CACHE_TTL) {
-      console.log('使用缓存的模板课程数据');
       return { success: true, data: weeklyTemplatesCache };
     }
     
-    console.log('重新获取模板课程数据');
     // 使用新的优化接口，一次性获取所有活动课表的模板数据
     const response = await api.get('/admin/active-timetables/templates');
     
@@ -443,11 +434,9 @@ export const getActiveWeeklyTemplates = async () => {
       throw new Error('获取活动课表模板数据失败');
     }
     
-    console.log('模板课程数据响应:', response);
     
     // 新接口返回的是扁平化的课程数组，直接返回给前端使用新的处理逻辑
     const templateSchedules = response.data || [];
-    console.log('模板课程数据:', templateSchedules);
     
     // 更新缓存
     weeklyTemplatesCache = templateSchedules;
@@ -490,7 +479,6 @@ export const getActiveWeeklyTemplatesLegacy = async () => {
     }
     
     const activeTimetables = activeTimetablesResponse.data || [];
-    console.log('活动课表列表:', activeTimetables);
     
     // 为每个活动课表获取模板数据
     const templateResponses = await Promise.all(
@@ -519,7 +507,6 @@ export const getActiveWeeklyTemplatesLegacy = async () => {
       })
     );
     
-    console.log('模板响应数据:', templateResponses);
     
     // 按星期几组织数据
     const weekDays = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -532,14 +519,12 @@ export const getActiveWeeklyTemplatesLegacy = async () => {
       }));
       
       const filteredSchedules = daySchedules.filter(t => t.schedules.length > 0);
-      console.log(`${dayOfWeek} 的课程数据:`, filteredSchedules);
       
       return {
         timetableSchedules: filteredSchedules
       };
     });
     
-    console.log('最终组织的数据:', schedulesByDay);
     
     return {
       success: true,

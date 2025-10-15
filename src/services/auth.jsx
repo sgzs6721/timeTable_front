@@ -4,7 +4,6 @@ import { getApiBaseUrl, TIMEOUT, HEADERS } from '../config/api.js';
 // 使用统一配置
 const API_BASE_URL = getApiBaseUrl();
 
-console.log('API_BASE_URL:', API_BASE_URL);
 
 // 创建axios实例
 const api = axios.create({

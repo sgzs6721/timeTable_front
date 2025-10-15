@@ -354,7 +354,6 @@ const ConvertPreview = () => {
   };
 
   const handleWeekChange = (week) => {
-    console.log('分页切换:', week);
     setCurrentWeek(week);
     
     // 立即重新生成预览，传递新的周次参数

@@ -100,7 +100,6 @@ export const PROXY = API_CONFIG.PROXY;
 // 导出环境切换函数（用于调试）
 export const switchEnvironment = (env) => {
   if (ENVIRONMENTS[env]) {
-    console.log(`切换到 ${env} 环境:`, ENVIRONMENTS[env]);
     return ENVIRONMENTS[env];
   }
   console.warn(`环境 ${env} 不存在`);

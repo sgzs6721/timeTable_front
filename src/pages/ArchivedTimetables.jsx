@@ -23,8 +23,6 @@ const ArchivedTimetables = () => {
   // 从导航状态获取非归档课表数量，如果没有则默认为0
   const [nonArchivedCount, setNonArchivedCount] = useState(location.state?.nonArchivedCount || 0);
 
-  console.log('归档页面接收到的非归档课表数量:', location.state?.nonArchivedCount);
-  console.log('当前nonArchivedCount状态:', nonArchivedCount);
 
   useEffect(() => {
     fetchArchived();

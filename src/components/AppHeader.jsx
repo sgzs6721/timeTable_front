@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Button, Dropdown, Avatar, Badge, message } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined, ReloadOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined, ReloadOutlined, HistoryOutlined } from '@ant-design/icons';
 import { getAllRegistrationRequests } from '../services/admin';
 import logo from '../assets/logo.png';
 
@@ -74,8 +74,6 @@ const AppHeader = ({ user, onLogout }) => {
         // 从当前页面获取非归档课表数量 - 使用更精确的选择器
         const listItems = document.querySelectorAll('.timetable-list .ant-list-item');
         const nonArchivedCount = listItems.length;
-        console.log('获取到的非归档课表数量:', nonArchivedCount);
-        console.log('找到的List项目:', listItems);
         // 无论是否管理员，头像菜单都进入个人归档页
         navigate('/archived-timetables', { state: { nonArchivedCount } });
       },
@@ -85,6 +83,12 @@ const AppHeader = ({ user, onLogout }) => {
       icon: <UserOutlined />,
       label: '个人账号',
       onClick: () => navigate('/profile'),
+    },
+    {
+      key: 'student-records',
+      icon: <HistoryOutlined />,
+      label: '学员操作记录',
+      onClick: () => navigate('/student-operation-records'),
     },
     {
       key: 'guide',

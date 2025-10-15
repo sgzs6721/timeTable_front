@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination } from 'antd';
-import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
+import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, InputNumber, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination, Form } from 'antd';
+import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined, EllipsisOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce, getAllTimetables as getAllTimetablesSvc, getMyHoursPaged } from '../services/timetable';
 import { getCoachesWithTimetables } from '../services/admin';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule, getLeaveRecords, deleteLeaveRecordsBatch } from '../services/weeklyInstance';
 import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables as getAllTimetablesAdmin, getCoachLastMonthRecords } from '../services/admin';
 import { getAllStudents } from '../services/weeklyInstance';
+import { renameStudent, hideStudent } from '../services/studentOperationRecords';
+import { mergeStudents } from '../services/studentMerge';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
+import StudentManagementModal from '../components/StudentManagementModal';
+import StudentBatchOperationModal from '../components/StudentBatchOperationModal';
+import StudentOperationRecordsModal from '../components/StudentOperationRecordsModal';
 import Footer from '../components/Footer';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
@@ -19,14 +24,56 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAllStudents, setShowAllStudents] = useState(false);
+  const [mergeModalVisible, setMergeModalVisible] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [showManagementPanel, setShowManagementPanel] = useState(false);
+  const [batchOperationModalVisible, setBatchOperationModalVisible] = useState(false);
+  const [operationRecordsVisible, setOperationRecordsVisible] = useState(false);
+  const [activeCoachId, setActiveCoachId] = useState(null); // 记录当前操作的教练ID
+  const [mergeMode, setMergeMode] = useState(false); // 合并模式
+  const [assignHoursMode, setAssignHoursMode] = useState(false); // 分配课时模式
+  const [operationCoachId, setOperationCoachId] = useState(null); // 当前操作学员所属的教练ID
+  const [assignHoursSourceStudent, setAssignHoursSourceStudent] = useState(null); // 分配课时的源学员（大课）
+  const [assignHoursModalVisible, setAssignHoursModalVisible] = useState(false); // 分配课时模态框
+  const [singleOperationStudent, setSingleOperationStudent] = useState(null); // 单个学员操作
+  const [renameModalVisible, setRenameModalVisible] = useState(false); // 重命名模态框
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false); // 删除模态框
+  const [singleMergeModalVisible, setSingleMergeModalVisible] = useState(false); // 单个学员合并模态框
+  const [mergeStudentsModalVisible, setMergeStudentsModalVisible] = useState(false); // 合并学员模态框
 
-  const fetchStudents = React.useCallback(async (showAll = false) => {
+  const fetchStudents = React.useCallback(async (showAll = false, timestamp) => {
     setLoading(true);
     try {
-      const response = await getAllStudents(showAll);
+      // 添加时间戳参数避免缓存
+      const response = await getAllStudents(showAll, timestamp);
       if (response && response.success) {
         const raw = response.data || [];
-        setStudents(raw);
+        
+        // 检查数据结构，如果是学员数组而不是教练分组数组
+        if (raw.length > 0 && raw[0].studentName) {
+          // 这是学员数组，需要按教练分组
+          const coachMap = new Map();
+          raw.forEach(student => {
+            const coachId = student.coachId;
+            if (!coachMap.has(coachId)) {
+              coachMap.set(coachId, {
+                coachId: coachId,
+                coachName: `教练${coachId}`, // 临时名称，实际应该从后端获取
+                totalCount: 0,
+                students: []
+              });
+            }
+            const coachGroup = coachMap.get(coachId);
+            coachGroup.students.push(student);
+            coachGroup.totalCount += student.attendedCount || 0;
+          });
+          
+          const groupedData = Array.from(coachMap.values());
+          setStudents(groupedData);
+        } else {
+          // 这是教练分组数组，直接使用
+          setStudents(raw);
+        }
       } else {
         message.error('获取学员列表失败');
       }
@@ -47,8 +94,25 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
   }, [onStudentClick]);
 
   const handleCheckboxChange = React.useCallback((e) => {
+    // 无论当前状态如何，只要点击"全部"复选框，就退出操作状态
+    if (showManagementPanel) {
+      setShowManagementPanel(false);
+      setSelectedStudents([]);
+      setActiveCoachId(null);
+    }
     setShowAllStudents(e.target.checked);
-  }, []);
+    // 切换到"全部学员"视图时，确保清空选中状态
+    if (e.target.checked) {
+      setSelectedStudents([]);
+      setShowManagementPanel(false);
+      setActiveCoachId(null);
+    } else {
+      // 切换回"我的学员"视图时，也确保清空选中状态
+      setSelectedStudents([]);
+      setShowManagementPanel(false);
+      setActiveCoachId(null);
+    }
+  }, [showManagementPanel]);
 
   const getStudentAvatarColor = (studentName) => {
     const colors = [
@@ -67,6 +131,172 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
   };
 
   // 分组|平铺学员卡片渲染函数
+  // 判断学员是否属于当前操作的教练
+  const isStudentInOperationCoach = (studentName) => {
+    if (!operationCoachId) return true; // 如果没有设置操作教练ID，则显示所有学员
+    
+    if (isGrouped) {
+      // 分组模式：从分组数据中查找
+      for (const group of students) {
+        if (group.coachId === operationCoachId) {
+          const student = (group.students || []).find(s => s.studentName === studentName);
+          if (student) return true;
+        }
+      }
+    } else {
+      // 非分组模式：从学员数据中查找
+      const studentList = Array.isArray(students) && students.length > 0 && students[0] && students[0].students
+        ? students.flatMap(group => group.students || [])
+        : students;
+      const student = studentList.find(s => s.studentName === studentName);
+      if (student && student.coachId === operationCoachId) return true;
+      
+      // 如果学员数据没有coachId，尝试从分组数据中查找
+      for (const group of students) {
+        if (group.coachId === operationCoachId && group.students && group.students.find(s => s.studentName === studentName)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  // 渲染操作面板
+  const renderOperationPanel = (coachId) => {
+    // 只在当前操作的教练分组下显示面板
+    if (operationCoachId !== coachId) return null;
+    
+    
+    if (mergeMode) {
+      return (
+        <div style={{
+          marginTop: '12px',
+          marginBottom: '12px',
+          padding: '12px 16px',
+          backgroundColor: '#fff7e6',
+          borderRadius: '6px',
+          border: '1px solid #ffd591',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'nowrap',
+          boxShadow: '0 1px 4px rgba(250,173,20,0.1)'
+        }}>
+          <div style={{
+            fontWeight: 'bold',
+            color: '#fa8c16',
+            whiteSpace: 'nowrap'
+          }}>
+            已选择 {selectedStudents.length} 个学员
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            flexWrap: 'nowrap',
+            marginLeft: '16px',
+            flexShrink: 0
+          }}>
+            <Button
+              type="primary"
+              size="small"
+              onClick={handleExecuteMerge}
+              disabled={selectedStudents.length < 2}
+            >
+              合并
+            </Button>
+            <Button
+              size="small"
+              onClick={() => setSelectedStudents([])}
+              disabled={selectedStudents.length === 0}
+            >
+              清空
+            </Button>
+            <Button
+              size="small"
+              onClick={handleExitMergeMode}
+            >
+              取消
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    if (assignHoursMode) {
+      // 计算源学员的课时数
+      const getSourceStudentHours = () => {
+        if (isGrouped) {
+          for (const group of students) {
+            const student = (group.students || []).find(s => s.studentName === assignHoursSourceStudent);
+            if (student) return student.attendedCount || 0;
+          }
+        } else {
+          const studentList = Array.isArray(students) && students.length > 0 && students[0] && students[0].students
+            ? students.flatMap(group => group.students || [])
+            : students;
+          const student = studentList.find(s => s.studentName === assignHoursSourceStudent);
+          if (student) return student.attendedCount || 0;
+        }
+        return 0;
+      };
+      
+      return (
+        <div style={{
+          marginTop: '12px',
+          marginBottom: '12px',
+          padding: '12px 16px',
+          backgroundColor: '#e6f7ff',
+          borderRadius: '6px',
+          border: '1px solid #91d5ff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'nowrap',
+          boxShadow: '0 1px 4px rgba(24,144,255,0.1)'
+        }}>
+          <div style={{
+            fontWeight: 'bold',
+            color: '#0050b3',
+            whiteSpace: 'nowrap'
+          }}>
+            {getSourceStudentHours()}课时分配{selectedStudents.length}学员
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            flexWrap: 'nowrap',
+            marginLeft: '16px',
+            flexShrink: 0
+          }}>
+            <Button
+              type="primary"
+              size="small"
+              onClick={handleExecuteAssignHours}
+              disabled={selectedStudents.length === 0}
+            >
+              分配
+            </Button>
+            <Button
+              size="small"
+              onClick={() => setSelectedStudents([])}
+              disabled={selectedStudents.length === 0}
+            >
+              清空
+            </Button>
+            <Button
+              size="small"
+              onClick={handleExitAssignHoursMode}
+            >
+              取消
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
   const renderStudentCards = (stuList = []) => (
     <div style={{ 
       display: 'grid', 
@@ -74,7 +304,46 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
       gap: '16px',
       padding: '16px 0'
     }}>
-      {[...stuList].sort((a, b) => (b?.attendedCount || 0) - (a?.attendedCount || 0)).map((student, index) => (
+      {[...stuList].sort((a, b) => (b?.attendedCount || 0) - (a?.attendedCount || 0)).map((student, index) => {
+        const isSelected = selectedStudents.includes(student.studentName);
+        
+        // 创建学员操作菜单
+        const studentMenu = {
+          items: [
+            {
+              key: 'rename',
+              label: '重命名',
+              icon: <EditOutlined />,
+              onClick: () => handleSingleStudentOperation(student.studentName, 'rename')
+            },
+            {
+              key: 'delete',
+              label: '隐藏',
+              icon: <DeleteOutlined />,
+              onClick: () => handleSingleStudentOperation(student.studentName, 'delete')
+            },
+            {
+              key: 'merge',
+              label: '合并',
+              icon: <RetweetOutlined />,
+              onClick: () => handleSingleStudentOperation(student.studentName, 'merge')
+            },
+            {
+              key: 'assignHours',
+              label: '分配课时',
+              icon: <CalendarOutlined />,
+              onClick: () => handleSingleStudentOperation(student.studentName, 'assignHours')
+            },
+            {
+              key: 'records',
+              label: '规则记录',
+              icon: <UserOutlined />,
+              onClick: () => handleSingleStudentOperation(student.studentName, 'records')
+            }
+          ]
+        };
+        
+        return (
         <div
           key={student.studentName}
           style={{ 
@@ -82,50 +351,582 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
             flexDirection: 'column',
             alignItems: 'center',
             padding: '16px 12px',
-            cursor: 'pointer',
+            cursor: (mergeMode || assignHoursMode) ? 'pointer' : 'default',
             borderRadius: '8px',
-            border: '1px solid #f0f0f0',
-            backgroundColor: '#fafafa',
+            border: isSelected ? '2px solid #1890ff' : '1px solid #f0f0f0',
+            backgroundColor: isSelected ? '#e6f7ff' : '#fafafa',
             transition: 'all 0.3s ease',
+            position: 'relative'
           }}
-          onClick={() => handleStudentClick(student.studentName)}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f5f5f5'; e.currentTarget.style.borderColor = '#d9d9d9'; }}
-          onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fafafa'; e.currentTarget.style.borderColor = '#f0f0f0'; }}
+          onClick={() => {
+            if (mergeMode) {
+              // 合并模式下，点击卡片进行选择
+              handleStudentSelect(student.studentName, !isSelected);
+            } else if (assignHoursMode) {
+              // 分配课时模式下，源学员（大课）不能被选择
+              if (student.studentName !== assignHoursSourceStudent) {
+                handleStudentSelect(student.studentName, !isSelected);
+              } else {
+                message.warning('源学员不能被选择');
+              }
+            } else {
+              // 普通模式下，点击查看学员详情
+              handleStudentCardClick(student.studentName);
+            }
+          }}
+          onMouseEnter={e => { 
+            if (!mergeMode && !assignHoursMode) {
+              e.currentTarget.style.backgroundColor = '#f5f5f5'; 
+              e.currentTarget.style.borderColor = '#d9d9d9'; 
+            }
+          }}
+          onMouseLeave={e => { 
+            if (!mergeMode && !assignHoursMode) {
+              e.currentTarget.style.backgroundColor = isSelected ? '#e6f7ff' : '#fafafa'; 
+              e.currentTarget.style.borderColor = isSelected ? '#1890ff' : '#f0f0f0'; 
+            }
+          }}
         >
+          {/* 合并模式或分配课时模式下显示复选框（只显示同一教练的学员，源学员除外） */}
+          {((mergeMode && isStudentInOperationCoach(student.studentName)) || 
+            (assignHoursMode && student.studentName !== assignHoursSourceStudent && isStudentInOperationCoach(student.studentName))) && (
+            <div style={{
+              position: 'absolute',
+              top: '4px',
+              left: '4px',
+              zIndex: 1
+            }}>
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleStudentSelect(student.studentName, e.target.checked);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                style={{ transform: 'scale(1.2)' }}
+              />
+            </div>
+          )}
+          
+          {/* 普通模式下显示三个点菜单 */}
+          {!mergeMode && (
+            <div 
+              style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                zIndex: 1
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Dropdown
+                menu={studentMenu}
+                trigger={['click']}
+                placement="bottomRight"
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EllipsisOutlined />}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    padding: '1px',
+                    minWidth: 'auto',
+                    height: 'auto',
+                    color: '#8c8c8c',
+                    fontSize: '12px'
+                  }}
+                />
+              </Dropdown>
+            </div>
+          )}
+          
           <Avatar 
             size={48}
             style={{ backgroundColor: getStudentAvatarColor(student.studentName), marginBottom: '8px', fontSize: '18px', fontWeight: 'bold' }}
           >{student.studentName?.charAt(0)}</Avatar>
-          <span style={{ fontWeight: 500, fontSize: '14px', textAlign: 'center', wordBreak: 'break-all' }}>{student.studentName}</span>
+          <span 
+            style={{ 
+              fontWeight: 500, 
+              fontSize: '14px', 
+              textAlign: 'center', 
+              width: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              display: 'block'
+            }}
+            title={student.studentName}
+          >
+            {student.studentName}
+          </span>
           <span style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '4px' }}>{student.attendedCount || 0} 课时</span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 
-  // 判断是分组结构（showAll+分组数组含coachId/coachName）
-  const isGrouped = showAllStudents && Array.isArray(students) && students[0] && typeof students[0] === 'object' && students[0].coachId;
+  // 判断是分组结构：只有在"全部"模式下且数据是分组结构时才显示分组
+  const isGrouped = showAllStudents && Array.isArray(students) && students.length > 0 && students[0] && typeof students[0] === 'object' && students[0].coachName && Array.isArray(students[0].students);
+  
+  // 获取所有学员名称用于合并/别名选择
+  const getAllStudentNames = () => {
+    if (isGrouped) {
+      const allNames = new Set();
+      students.forEach(group => {
+        if (group.students) {
+          group.students.forEach(student => {
+            allNames.add(student.studentName);
+          });
+        }
+      });
+      return Array.from(allNames);
+    } else {
+      return students.map(s => s.studentName).filter(Boolean);
+    }
+  };
+
+  const handleStudentSelect = (studentName, checked) => {
+    if (checked) {
+      if (selectedStudents.length >= 3) {
+        message.warning('最多只能选择3个学员');
+        return;
+      }
+      setSelectedStudents([...selectedStudents, studentName]);
+    } else {
+      setSelectedStudents(selectedStudents.filter(name => name !== studentName));
+    }
+  };
+
+  // 修改学员选择逻辑，只允许选择当前激活教练的学员
+  const handleStudentSelectWithCoachRestriction = (studentName, checked, coachId) => {
+    // 如果不是当前激活的教练，不允许选择
+    if (activeCoachId && coachId !== activeCoachId) {
+      return;
+    }
+    handleStudentSelect(studentName, checked);
+  };
+
+  // 在非分组模式下，检查是否允许选择学员
+  const canSelectStudent = (coachId = null) => {
+    // 在非分组模式下，只有在没有激活教练ID时才允许选择
+    if (!isGrouped) {
+      return !activeCoachId;
+    }
+    // 在分组模式下，只有在有激活教练ID且匹配时才允许选择
+    // 这样可以防止在分组模式下使用全局操作按钮
+    return activeCoachId && coachId === activeCoachId;
+  };
+
+  const handleManagementClick = () => {
+    setShowManagementPanel(!showManagementPanel);
+    // 退出管理模式时清空选中的学员
+    if (showManagementPanel) {
+      setSelectedStudents([]);
+      setActiveCoachId(null);
+    }
+  };
+
+  const handleBatchOperation = () => {
+    if (selectedStudents.length === 0) {
+      message.warning('请至少选择一个学员');
+      return;
+    }
+    setBatchOperationModalVisible(true);
+  };
+
+  const handleShowOperationRecords = () => {
+    // 只要没有选择全部，都要传递当前用户ID作为教练ID
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    if (showAllStudents) {
+      // 选择了全部：不传教练ID，查看所有记录
+      setActiveCoachId(null);
+    } else {
+      // 没有选择全部：传递当前用户ID作为教练ID
+      setActiveCoachId(currentUser.id);
+    }
+    
+    setOperationRecordsVisible(true);
+  };
+
+  const handleShowOperationRecordsForCoach = (coachId) => {
+    // 教练分组模式：传递教练ID
+    setActiveCoachId(coachId);
+    setSingleOperationStudent(null); // 清空学员名称，显示该教练的所有记录
+    setOperationRecordsVisible(true);
+  };
+
+  // 计算总课时数
+  const getTotalHours = () => {
+    if (isGrouped) {
+      // 分组模式：计算所有组的totalCount总和
+      return students.reduce((sum, grp) => sum + (grp.totalCount || 0), 0);
+    } else {
+      // 非分组模式：需要检查数据结构
+      if (Array.isArray(students) && students.length > 0 && students[0] && students[0].students) {
+        // 数据是分组结构但不显示分组，提取所有学员计算课时
+        return students.reduce((sum, group) => {
+          return sum + (group.students || []).reduce((groupSum, student) => groupSum + (student.attendedCount || 0), 0);
+        }, 0);
+      } else {
+        // 数据是平铺结构，直接计算
+        return students.reduce((sum, student) => sum + (student.attendedCount || 0), 0);
+      }
+    }
+  };
+
+  // 计算实际学员数量
+  const getActualStudentCount = () => {
+    if (isGrouped) {
+      // 分组模式：计算所有组的学员数量总和
+      return students.reduce((sum, grp) => sum + (grp.students?.length || 0), 0);
+    } else {
+      // 非分组模式：需要检查数据结构
+      if (Array.isArray(students) && students.length > 0 && students[0] && students[0].students) {
+        // 数据是分组结构但不显示分组，提取所有学员计算数量
+        return students.reduce((sum, group) => sum + (group.students?.length || 0), 0);
+      } else {
+        // 数据是平铺结构，直接计算
+        return students.length;
+      }
+    }
+  };
+
+  const handleOperationComplete = () => {
+    // 先退出管理模式和合并模式，清空所有状态
+    setSelectedStudents([]);
+    setActiveCoachId(null);
+    setOperationCoachId(null); // 清空操作教练ID
+    setShowManagementPanel(false);
+    setMergeMode(false);
+    setAssignHoursMode(false);
+    setAssignHoursSourceStudent(null);
+    setAssignHoursModalVisible(false);
+    setBatchOperationModalVisible(false);
+    setRenameModalVisible(false);
+    setDeleteModalVisible(false);
+    setSingleMergeModalVisible(false);
+    setMergeStudentsModalVisible(false);
+    setSingleOperationStudent(null);
+    
+    // 延迟刷新数据，确保状态先更新
+    setTimeout(() => {
+      const timestamp = new Date().getTime();
+      fetchStudents(showAllStudents, timestamp);
+    }, 100);
+  };
+
+  // 处理教练批量操作
+  const handleCoachBatchOperation = (coachStudents, coachId) => {
+    if (coachStudents.length === 0) {
+      message.warning('该教练没有学员');
+      return;
+    }
+    // 设置当前激活的教练ID
+    setActiveCoachId(coachId);
+    // 确保进入管理模式，但不要自动选择学员或打开模态框
+    setShowManagementPanel(true);
+    // 清空之前的选择，让用户手动选择
+    setSelectedStudents([]);
+  };
+
+  // 处理单个学员操作
+  const handleSingleStudentOperation = (studentName, operationType) => {
+    setSingleOperationStudent(studentName);
+    setSelectedStudents([studentName]);
+    
+    // 查找学员对应的教练ID
+    const findStudentCoachId = (studentName) => {
+      
+      if (isGrouped) {
+        // 分组模式：从分组数据中查找
+        for (const group of students) {
+          const student = (group.students || []).find(s => s.studentName === studentName);
+          if (student) {
+            return group.coachId;
+          }
+        }
+      } else {
+        // 非分组模式：从学员数据中查找
+        const studentList = Array.isArray(students) && students.length > 0 && students[0] && students[0].students
+          ? students.flatMap(group => group.students || [])
+          : students;
+        
+        
+        const student = studentList.find(s => s.studentName === studentName);
+        if (student && student.coachId) {
+          return student.coachId;
+        }
+        
+        // 如果学员数据没有coachId，尝试从原始分组数据中查找
+        if (Array.isArray(students) && students.length > 0 && students[0] && students[0].students) {
+          for (const group of students) {
+            if (group.students && group.students.find(s => s.studentName === studentName)) {
+              return group.coachId;
+            }
+          }
+        }
+        
+        // 如果当前用户不是管理员，使用当前用户的ID作为教练ID
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (currentUser && !currentUser.isAdmin) {
+          return currentUser.id;
+        }
+      }
+      
+      return null;
+    };
+    
+    switch (operationType) {
+      case 'rename':
+        setRenameModalVisible(true);
+        break;
+      case 'delete':
+        setDeleteModalVisible(true);
+        break;
+      case 'merge':
+        // 进入合并模式，预选当前学员
+        const mergeCoachId = findStudentCoachId(studentName);
+        setMergeMode(true);
+        setOperationCoachId(mergeCoachId); // 设置当前操作的教练ID
+        setSelectedStudents([studentName]);
+        setSingleOperationStudent(null); // 清空单个操作学员状态
+        message.info(`已进入合并模式，已选择"${studentName}"，请继续选择其他学员`);
+        break;
+      case 'assignHours':
+        // 进入分配课时多选模式
+        const assignCoachId = findStudentCoachId(studentName);
+        setAssignHoursMode(true);
+        setOperationCoachId(assignCoachId); // 设置当前操作的教练ID
+        setAssignHoursSourceStudent(studentName); // 记录源学员（大课）
+        setMergeMode(false); // 退出合并模式
+        setSelectedStudents([]); // 清空已选学员
+        setSingleOperationStudent(null);
+        message.info(`请选择要分配"${studentName}"课时的学员`);
+        break;
+      case 'records':
+        // 设置学员名称和教练ID并打开操作记录
+        setSingleOperationStudent(studentName); // 设置学员名称，查看该学员的记录
+        
+        let coachId;
+        if (showAllStudents) {
+          // 分组模式：从学员数据中查找教练ID
+          coachId = findStudentCoachId(studentName);
+        } else {
+          // 非分组模式：使用当前用户的ID作为教练ID，只显示当前用户的规则
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          coachId = currentUser.id;
+        }
+        setActiveCoachId(coachId);
+        setOperationRecordsVisible(true);
+        break;
+      default:
+        setBatchOperationModalVisible(true);
+        break;
+    }
+  };
+
+  // 处理操作模态框关闭
+  const handleBatchOperationModalClose = () => {
+    setBatchOperationModalVisible(false);
+    setSelectedStudents([]);
+    setSingleOperationStudent(null);
+  };
+
+  // 处理学员卡片点击事件
+  const handleStudentCardClick = (studentName) => {
+    // 如果不在合并模式，点击卡片查看详情
+    if (!mergeMode) {
+      handleStudentClick(studentName);
+    }
+  };
+
+  // 开启合并模式
+  const handleEnterMergeMode = () => {
+    setMergeMode(true);
+    setSelectedStudents([]);
+    message.info('已进入合并模式，请选择要合并的学员');
+  };
+
+  // 退出合并模式
+  const handleExitMergeMode = () => {
+    setMergeMode(false);
+    setOperationCoachId(null); // 清空操作教练ID
+    setSelectedStudents([]);
+  };
+
+  // 执行合并操作
+  const handleExecuteMerge = () => {
+    if (selectedStudents.length < 2) {
+      message.warning('请至少选择两个学员进行合并');
+      return;
+    }
+    setMergeStudentsModalVisible(true);
+  };
+
+  // 执行分配课时操作（打开模态框）
+  const handleExecuteAssignHours = () => {
+    if (selectedStudents.length === 0) {
+      message.warning('请至少选择一个学员');
+      return;
+    }
+
+    if (!assignHoursSourceStudent) {
+      message.error('未找到源学员信息');
+      return;
+    }
+
+    setAssignHoursModalVisible(true);
+  };
+
+  // 实际执行分配课时操作
+  const handleConfirmAssignHours = async (formData) => {
+
+    try {
+      const requestBody = {
+        className: assignHoursSourceStudent, // 使用源学员名称作为课程名称
+        studentNames: selectedStudents,
+        date: null,
+        timeRange: '00:00-00:00',
+        hoursPerStudent: formData.hoursPerStudent // 每个学员分配的课时数
+      };
+
+
+      const response = await fetch('/timetable/api/weekly-instances/assign-hours', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+
+      if (response.ok) {
+        const result = await response.json();
+        message.success(`成功将"${assignHoursSourceStudent}"的课时分配给 ${selectedStudents.length} 个学员`);
+        setAssignHoursModalVisible(false);
+        handleOperationComplete();
+      } else {
+        const error = await response.json();
+        console.error('分配课时失败:', error);
+        message.error(error.message || '分配课时失败');
+      }
+    } catch (error) {
+      console.error('分配课时失败:', error);
+      message.error('分配课时失败');
+    }
+  };
+
+  // 退出分配课时模式
+  const handleExitAssignHoursMode = () => {
+    setAssignHoursMode(false);
+    setOperationCoachId(null); // 清空操作教练ID
+    setAssignHoursSourceStudent(null);
+    setSelectedStudents([]);
+  };
 
   return (
-    <Card 
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>
-            {showAllStudents ? '所有学员' : '我的学员'}{isGrouped ? `（${students.reduce((sum, grp) => sum + (grp.students?.length||0), 0)}）` : (students && students.length > 0 ? `（${students.length}）` : '（0）')}
-          </span>
-          {showAllCheckbox && (
-            <Checkbox 
-              checked={showAllStudents}
-              onChange={handleCheckboxChange}
-              style={{ marginLeft: '16px' }}
+    <Card
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>
+              {showAllStudents ? '所有学员' : '我的学员'}（{getActualStudentCount()}），共{getTotalHours()}课时
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {showAllCheckbox && (
+                <Checkbox
+                  checked={showAllStudents}
+                  onChange={handleCheckboxChange}
+                >
+                  全部
+                </Checkbox>
+              )}
+                  {!showAllStudents && (
+                    <>
+                      <Button
+                        type="text"
+                        size="small"
+                        onClick={handleShowOperationRecords}
+                        style={{ padding: '4px 8px' }}
+                      >
+                        ...
+                      </Button>
+                    </>
+                  )}
+                  {/* 在分组模式下，不显示全局操作按钮 */}
+                  {showAllStudents && (
+                    <Button
+                      type="text"
+                      size="small"
+                      onClick={handleShowOperationRecords}
+                      style={{ padding: '4px 8px' }}
+                    >
+                      ...
+                    </Button>
+                  )}
+            </div>
+          </div>
+        }
+        size="small"
+      >
+      
+      {/* 在非分组模式下显示全局管理面板 */}
+      {!isGrouped && showManagementPanel && (
+        <div style={{
+          position: 'sticky',
+          top: '0',
+          zIndex: 10,
+          marginTop: '16px',
+          marginBottom: '16px',
+          padding: '12px 16px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '8px',
+          border: '1px solid #d9d9d9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'nowrap',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{
+            fontWeight: 'bold',
+            color: '#1890ff',
+            whiteSpace: 'nowrap'
+          }}>
+            已选择 {selectedStudents.length} 个学员
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            flexWrap: 'nowrap',
+            marginLeft: '16px',
+            flexShrink: 0
+          }}>
+            <Button
+              type="primary"
+              size="small"
+              onClick={handleBatchOperation}
+              disabled={selectedStudents.length === 0}
             >
-              全部
-            </Checkbox>
-          )}
+              执行操作
+            </Button>
+            <Button
+              size="small"
+              onClick={() => setSelectedStudents([])}
+              disabled={selectedStudents.length === 0}
+            >
+              清空选择
+            </Button>
+          </div>
         </div>
-      }
-      size="small"
-    >
+      )}
+      
       <Spin spinning={loading}>
         {/* 分组模式 */}
         {isGrouped ? (
@@ -133,17 +934,130 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
           <div style={{display:'flex',flexDirection:'column',gap:'24px'}}>
             {students.map((group)=>(
               <div key={group.coachId} style={{background:'#f9f9fc',borderRadius:'6px',padding:'12px',boxShadow:'0 1px 2px #00000008'}}>
-                <div style={{fontWeight:'bold',fontSize:'16px',marginBottom:'8px',color:'#1d39c4'}}>
-                  {group.coachName}（{group.totalCount}课时｜{(group.students||[]).length}学员）
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                  <div style={{fontWeight:'bold',fontSize:'16px',color:'#1d39c4'}}>
+                    {group.coachName}（{group.totalCount}课时｜{(group.students||[]).length}学员）
+                  </div>
+                  <div>
+                    <Button
+                      type="text"
+                      size="small"
+                      onClick={() => handleShowOperationRecordsForCoach(group.coachId)}
+                    >
+                      ...
+                    </Button>
+                  </div>
                 </div>
+                
+                {/* 操作面板 */}
+                {renderOperationPanel(group.coachId)}
+                
                 {renderStudentCards(group.students||[])}
               </div>
             ))}
           </div>
         ) : (
-          students.length === 0 ? <Empty description="暂无学员" /> : renderStudentCards(students)
+          students.length === 0 ? <Empty description="暂无学员" /> : 
+          <div>
+            {/* 非分组模式下的操作面板 */}
+            {(mergeMode || assignHoursMode) && operationCoachId && renderOperationPanel(operationCoachId)}
+            
+            {renderStudentCards(
+              // 如果数据是分组结构但不显示分组，则提取所有学员
+              Array.isArray(students) && students.length > 0 && students[0] && students[0].students
+                ? students.flatMap(group => group.students || [])
+                : students
+            )}
+          </div>
         )}
       </Spin>
+      
+      <StudentManagementModal
+        visible={mergeModalVisible}
+        onClose={() => setMergeModalVisible(false)}
+        availableStudents={getAllStudentNames()}
+      />
+      
+      <StudentBatchOperationModal
+        visible={batchOperationModalVisible}
+        onClose={handleBatchOperationModalClose}
+        selectedStudents={selectedStudents}
+        onOperationComplete={handleOperationComplete}
+      />
+      
+      <StudentOperationRecordsModal
+        visible={operationRecordsVisible}
+        onClose={() => {
+          setOperationRecordsVisible(false);
+          setSelectedStudents([]);
+          setSingleOperationStudent(null);
+        }}
+        studentName={singleOperationStudent}
+        coachId={activeCoachId}
+        onOperationComplete={handleOperationComplete}
+      />
+      
+      {/* 重命名模态框 */}
+      <RenameModal
+        visible={renameModalVisible}
+        studentName={singleOperationStudent}
+        onClose={() => {
+          setRenameModalVisible(false);
+          setSelectedStudents([]);
+          setSingleOperationStudent(null);
+        }}
+        onOperationComplete={handleOperationComplete}
+      />
+      
+      {/* 删除模态框 */}
+      <DeleteModal
+        visible={deleteModalVisible}
+        studentName={singleOperationStudent}
+        activeCoachId={activeCoachId}
+        showAllStudents={showAllStudents}
+        students={students}
+        onClose={() => {
+          setDeleteModalVisible(false);
+          setSelectedStudents([]);
+          setSingleOperationStudent(null);
+        }}
+        onOperationComplete={handleOperationComplete}
+      />
+      
+      {/* 单个学员合并模态框 */}
+      <SingleMergeModal
+        visible={singleMergeModalVisible}
+        studentName={singleOperationStudent}
+        availableStudents={getAllStudentNames()}
+        onClose={() => {
+          setSingleMergeModalVisible(false);
+          setSelectedStudents([]);
+          setSingleOperationStudent(null);
+        }}
+        onOperationComplete={handleOperationComplete}
+      />
+      
+      {/* 合并学员模态框 */}
+      <MergeStudentsModal
+        visible={mergeStudentsModalVisible}
+        selectedStudents={selectedStudents}
+        students={students}
+        onClose={() => {
+          setMergeStudentsModalVisible(false);
+        }}
+        onOperationComplete={handleOperationComplete}
+      />
+      
+      {/* 分配课时模态框 */}
+      <AssignHoursModal
+        visible={assignHoursModalVisible}
+        sourceStudent={assignHoursSourceStudent}
+        selectedStudents={selectedStudents}
+        onClose={() => {
+          setAssignHoursModalVisible(false);
+        }}
+        onConfirm={handleConfirmAssignHours}
+      />
     </Card>
   );
 };
@@ -1187,11 +2101,6 @@ const Dashboard = ({ user }) => {
   // 生成复制文本
   const generateCopyText = (schedules, isToday = true, includeOtherCoaches = false, otherCoachesData = null) => {
     // 调试：打印currentTimetable的结构
-    console.log('currentTimetable:', currentTimetable);
-    console.log('user:', user);
-    console.log('schedules:', schedules);
-    console.log('includeOtherCoaches:', includeOtherCoaches);
-    console.log('otherCoachesData:', otherCoachesData);
     
     // 检查是否有任何可复制的内容
     const hasCurrentCoachCourses = schedules && schedules.length > 0;
@@ -2257,13 +3166,11 @@ const Dashboard = ({ user }) => {
     
     const fetchWeeklyScheduleData = async (targetMode = viewMode) => {
       setWeeklyScheduleLoading(true);
-      console.log('fetchWeeklyScheduleData called with targetMode:', targetMode);
       try {
         // 根据目标视图模式获取不同的数据
         const response = targetMode === 'instance' 
           ? await getActiveWeeklySchedules()
           : await getActiveWeeklyTemplates();
-        console.log('API response:', response);
         if (!response || !response.success) {
           const errorMsg = targetMode === 'instance' ? '获取本周排课数据失败' : '获取固定课表模板失败';
           console.error('API调用失败:', response);
@@ -2277,7 +3184,6 @@ const Dashboard = ({ user }) => {
         }
         
         const responseData = response.data;
-        console.log('响应数据类型:', typeof responseData, '内容:', responseData);
         
         // 根据目标视图模式处理不同的数据格式
         let dates, schedules;
@@ -2307,15 +3213,8 @@ const Dashboard = ({ user }) => {
         const allCoaches = new Set();
         
         // 统一处理：现在本周数据和模板数据都是扁平化的课程数组
-        console.log(`处理${targetMode === 'instance' ? '本周' : '模板'}数据，课程数量:`, schedules.length);
         
         schedules.forEach((schedule, index) => {
-          console.log(`检查课程 ${index + 1}:`, {
-            dayOfWeek: schedule.dayOfWeek,
-            startTime: schedule.startTime,
-            endTime: schedule.endTime,
-            studentName: schedule.studentName
-          });
           
           // 先跳过所有验证，看看数据本身有什么问题
           const dayOfWeek = schedule.dayOfWeek?.toLowerCase();
@@ -2329,7 +3228,6 @@ const Dashboard = ({ user }) => {
           }
           
           const timeKey = `${schedule.startTime.substring(0, 5)}-${schedule.endTime.substring(0, 5)}`;
-          console.log(`强制添加课程到 ${safeDayOfWeek} ${timeKey}: ${schedule.studentName}`);
           
           if (!timeSlotMap.has(timeKey)) {
             timeSlotMap.set(timeKey, {
@@ -2405,9 +3303,6 @@ const Dashboard = ({ user }) => {
         // 数据获取成功后更新viewMode
         setViewMode(targetMode);
         
-        console.log('获取到的数据:', { dates, schedules, tableData, allStudents: Array.from(allStudents), allCoaches: Array.from(allCoaches) });
-        console.log('最终tableData长度:', tableData.length);
-        console.log('最终viewMode将被设置为:', targetMode);
       } catch (error) {
         console.error('获取排课数据失败:', error);
         console.error('错误详情:', error.stack);
@@ -2423,13 +3318,11 @@ const Dashboard = ({ user }) => {
     
     // 切换到本周视图
     const switchToInstanceView = async () => {
-      console.log('switchToInstanceView called, current viewMode:', viewMode);
       await fetchWeeklyScheduleData('instance');
     };
     
     // 切换到固定课表视图
     const switchToTemplateView = async () => {
-      console.log('switchToTemplateView called, current viewMode:', viewMode);
       await fetchWeeklyScheduleData('template');
     };
     
@@ -2738,6 +3631,34 @@ const Dashboard = ({ user }) => {
     const [tomorrowCoachDetails, setTomorrowCoachDetails] = useState({});
     const [coachDetailsLoading, setCoachDetailsLoading] = useState(false);
     
+    // 计算教练的实际课时数（考虑合并后的时间段）
+    const calculateActualHours = (coachDetails) => {
+      if (!coachDetails || coachDetails.length === 0) return 0;
+      
+      console.log('计算课时数，输入数据:', coachDetails);
+      
+      let totalHours = 0;
+      coachDetails.forEach(item => {
+        console.log('处理课程项:', item);
+        // 解析时间段，如 "10:00-12:00 学员名" 或 "17:00-18:00 学员名"
+        const timeMatch = item.match(/^(\d+):?\d*-(\d+):?\d*/);
+        if (timeMatch) {
+          const startHour = parseInt(timeMatch[1]);
+          const endHour = parseInt(timeMatch[2]);
+          const hours = endHour - startHour;
+          console.log(`时间段 ${startHour}-${endHour} = ${hours} 课时`);
+          totalHours += hours;
+        } else {
+          // 如果没有匹配到时间段，默认为1课时
+          console.log('未匹配到时间段，默认1课时');
+          totalHours += 1;
+        }
+      });
+      
+      console.log('总课时数:', totalHours);
+      return totalHours;
+    };
+    
     // 请假记录相关状态
     const [leaveRecords, setLeaveRecords] = useState([]);
     const [leaveRecordsLoading, setLeaveRecordsLoading] = useState(false);
@@ -2922,6 +3843,66 @@ const Dashboard = ({ user }) => {
       
       const normalizeName = (name) => String(name || '').replace(/[\s\u3000]/g, '');
       const hhmm = (t) => String(t).slice(0, 5);
+      
+      
+      // 合并连续时间段的函数
+      const mergeConsecutiveTimeSlots = (schedules) => {
+        console.log('合并前的原始课程数据:', schedules);
+        if (!schedules || schedules.length === 0) return [];
+        
+        // 按学员名称分组
+        const groupedByStudent = {};
+        schedules.forEach(s => {
+          const studentName = normalizeName(s.studentName);
+          if (!groupedByStudent[studentName]) {
+            groupedByStudent[studentName] = [];
+          }
+          groupedByStudent[studentName].push(s);
+        });
+        
+        const mergedSchedules = [];
+        
+        // 对每个学员的课程进行时间段合并
+        Object.entries(groupedByStudent).forEach(([studentName, studentSchedules]) => {
+          // 按开始时间排序
+          const sorted = studentSchedules.sort((a, b) => {
+            const timeA = hhmm(a.startTime);
+            const timeB = hhmm(b.startTime);
+            return timeA.localeCompare(timeB);
+          });
+          
+          let i = 0;
+          while (i < sorted.length) {
+            let currentSchedule = sorted[i];
+            let endTime = currentSchedule.endTime;
+            
+            // 查找连续的时间段
+            let j = i + 1;
+            while (j < sorted.length) {
+              const nextSchedule = sorted[j];
+              // 检查当前结束时间是否等于下一个开始时间（连续）
+              if (hhmm(endTime) === hhmm(nextSchedule.startTime)) {
+                endTime = nextSchedule.endTime;
+                j++;
+              } else {
+                break;
+              }
+            }
+            
+            // 创建合并后的课程记录
+            mergedSchedules.push({
+              ...currentSchedule,
+              endTime: endTime,
+              originalCount: j - i // 记录合并了多少个时间段
+            });
+            
+            i = j;
+          }
+        });
+        
+        console.log('合并后的课程数据:', mergedSchedules);
+        return mergedSchedules;
+      };
 
       Promise.all([
         // 获取今日数据（一次性）
@@ -2949,8 +3930,11 @@ const Dashboard = ({ user }) => {
                 }
               });
               
+              // 合并连续时间段
+              const mergedSchedules = mergeConsecutiveTimeSlots(uniqueSchedules);
+              
               // 按开始时间排序后再生成显示文本
-              const sortedSchedules = uniqueSchedules.sort((a, b) => {
+              const sortedSchedules = mergedSchedules.sort((a, b) => {
                 const timeA = hhmm(a.startTime);
                 const timeB = hhmm(b.startTime);
                 return timeA.localeCompare(timeB);
@@ -2990,8 +3974,11 @@ const Dashboard = ({ user }) => {
                       }
                     });
                     
+                    // 合并连续时间段
+                    const mergedSchedules2 = mergeConsecutiveTimeSlots(uniqueSchedules2);
+                    
                     // 按开始时间排序后再生成显示文本
-                    const sortedSchedules2 = uniqueSchedules2.sort((a, b) => {
+                    const sortedSchedules2 = mergedSchedules2.sort((a, b) => {
                       const timeA = hhmm(a.startTime);
                       const timeB = hhmm(b.startTime);
                       return timeA.localeCompare(timeB);
@@ -3030,8 +4017,11 @@ const Dashboard = ({ user }) => {
                 }
               });
               
+              // 合并连续时间段
+              const mergedSchedules = mergeConsecutiveTimeSlots(uniqueSchedules);
+              
               // 按开始时间排序后再生成显示文本
-              const sortedSchedules = uniqueSchedules.sort((a, b) => {
+              const sortedSchedules = mergedSchedules.sort((a, b) => {
                 const timeA = hhmm(a.startTime);
                 const timeB = hhmm(b.startTime);
                 return timeA.localeCompare(timeB);
@@ -3063,8 +4053,11 @@ const Dashboard = ({ user }) => {
                       }
                     });
                     
+                    // 合并连续时间段
+                    const mergedSchedules2 = mergeConsecutiveTimeSlots(uniqueSchedules2);
+                    
                     // 按开始时间排序后再生成显示文本
-                    const sortedSchedules2 = uniqueSchedules2.sort((a, b) => {
+                    const sortedSchedules2 = mergedSchedules2.sort((a, b) => {
                       const timeA = hhmm(a.startTime);
                       const timeB = hhmm(b.startTime);
                       return timeA.localeCompare(timeB);
@@ -3639,8 +4632,8 @@ const Dashboard = ({ user }) => {
               dataSource={coaches ? coaches.sort((a, b) => {
                 const nameA = a.nickname || a.username;
                 const nameB = b.nickname || b.username;
-                const valA = (todayCoachDetails[nameA] || []).length;
-                const valB = (todayCoachDetails[nameB] || []).length;
+                const valA = calculateActualHours(todayCoachDetails[nameA] || []);
+                const valB = calculateActualHours(todayCoachDetails[nameB] || []);
                 return valB - valA; // 降序排列
               }) : []}
               columns={[
@@ -3682,7 +4675,7 @@ const Dashboard = ({ user }) => {
                   align: 'center',
                   render: (_, record) => {
                     const name = record.nickname || record.username;
-                    const value = (todayCoachDetails[name] || []).length;
+                    const value = calculateActualHours(todayCoachDetails[name] || []);
                     return (
                       <span style={{ color: value > 0 ? '#52c41a' : '#999', fontWeight: 500 }}>
                         {value}
@@ -3926,6 +4919,258 @@ const Dashboard = ({ user }) => {
   );
 };
 
+// 合并学员模态框组件
+const MergeStudentsModal = ({ visible, selectedStudents, students, onClose, onOperationComplete }) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  // 获取选中学员的详细信息（包含课时）
+  const getSelectedStudentDetails = () => {
+    const details = [];
+    selectedStudents.forEach(studentName => {
+      // 从students数据中找到对应的学员信息
+      let studentInfo = null;
+      
+      // 检查是否是分组数据
+      if (students.length > 0 && students[0].students) {
+        // 分组数据，遍历每个组
+        students.forEach(group => {
+          const found = group.students?.find(s => s.studentName === studentName);
+          if (found) {
+            studentInfo = { ...found, coachName: group.coachName };
+          }
+        });
+      } else {
+        // 非分组数据，直接查找
+        studentInfo = students.find(s => s.studentName === studentName);
+      }
+      
+      if (studentInfo) {
+        details.push(studentInfo);
+      }
+    });
+    return details;
+  };
+
+  const studentDetails = getSelectedStudentDetails();
+  const totalHours = studentDetails.reduce((sum, student) => sum + (student.attendedCount || 0), 0);
+
+  const handleMerge = async (values) => {
+    setLoading(true);
+    try {
+      await mergeStudents({
+        displayName: values.mergedName,
+        studentNames: selectedStudents
+      });
+      
+      message.success(`已成功合并 ${selectedStudents.length} 个学员为 "${values.mergedName}"，总课时：${totalHours}`);
+      onOperationComplete();
+      onClose();
+      form.resetFields();
+    } catch (error) {
+      console.error('合并失败:', error);
+      message.error('合并失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    form.resetFields();
+    onClose();
+  };
+
+  return (
+    <Modal
+      title="合并学员"
+      open={visible}
+      onCancel={handleCancel}
+      footer={null}
+      width={500}
+    >
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 16 }}>
+          <h4 style={{ margin: '0 0 12px 0', color: '#1890ff' }}>将要合并的学员：</h4>
+          <div style={{ 
+            background: '#f5f5f5', 
+            padding: '12px', 
+            borderRadius: '6px',
+            border: '1px solid #d9d9d9'
+          }}>
+            {studentDetails.map((student, index) => (
+              <div key={student.studentName} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                padding: '8px 0',
+                borderBottom: index < studentDetails.length - 1 ? '1px solid #e8e8e8' : 'none'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Avatar 
+                    size={32} 
+                    style={{ 
+                      backgroundColor: '#1890ff', 
+                      marginRight: '12px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {student.studentName?.charAt(0)}
+                  </Avatar>
+                  <div>
+                    <div style={{ fontWeight: 'bold' }}>{student.studentName}</div>
+                    {student.coachName && (
+                      <div style={{ fontSize: '12px', color: '#666' }}>{student.coachName}</div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ 
+                  color: '#52c41a', 
+                  fontWeight: 'bold',
+                  fontSize: '14px'
+                }}>
+                  {student.attendedCount || 0} 课时
+                </div>
+              </div>
+            ))}
+            
+            <div style={{ 
+              marginTop: '12px', 
+              paddingTop: '12px', 
+              borderTop: '2px solid #1890ff',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{ fontWeight: 'bold', color: '#1890ff' }}>合并后总课时：</span>
+              <span style={{ 
+                color: '#52c41a', 
+                fontWeight: 'bold', 
+                fontSize: '16px' 
+              }}>
+                {totalHours} 课时
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <Form form={form} onFinish={handleMerge} layout="vertical">
+          <Form.Item
+            label="合并后的学员名称"
+            name="mergedName"
+            rules={[
+              { required: true, message: '请输入合并后的学员名称' },
+              { min: 1, max: 20, message: '学员名称长度应在1-20个字符之间' }
+            ]}
+          >
+            <Input 
+              placeholder="请输入合并后显示的学员名称" 
+              style={{ fontSize: '14px' }}
+            />
+          </Form.Item>
+          
+          <div style={{ 
+            background: '#fff7e6', 
+            border: '1px solid #ffd591', 
+            borderRadius: '6px', 
+            padding: '12px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ color: '#fa8c16', fontSize: '12px', lineHeight: '1.5' }}>
+              <strong>注意：</strong>
+              <br />• 合并操作不会修改原始课表数据
+              <br />• 合并后将显示为一个学员，课时为所有学员课时之和
+              <br />• 此操作会记录到操作历史中，可以查看和管理
+            </div>
+          </div>
+
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Button onClick={handleCancel} style={{ marginRight: 8 }}>
+              取消
+            </Button>
+            <Button type="primary" htmlType="submit" loading={loading}>
+              确认合并
+            </Button>
+          </Form.Item>
+        </Form>
+      </div>
+    </Modal>
+  );
+};
+
+// 分配课时模态框组件
+const AssignHoursModal = ({ visible, sourceStudent, selectedStudents, onClose, onConfirm }) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (values) => {
+    setLoading(true);
+    try {
+      await onConfirm(values);
+    } catch (error) {
+      message.error('分配课时失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="分配课时"
+      open={visible}
+      onCancel={onClose}
+      footer={null}
+      width={500}
+    >
+      <div style={{ marginBottom: 24 }}>
+        <p>将 <strong>"{sourceStudent}"</strong> 的课时分配给以下学员：</p>
+        <div style={{ 
+          background: '#f5f5f5', 
+          padding: '12px', 
+          borderRadius: '6px',
+          margin: '12px 0'
+        }}>
+          {selectedStudents.map((name, index) => (
+            <Tag key={index} color="blue" style={{ margin: '2px' }}>
+              {name}
+            </Tag>
+          ))}
+        </div>
+      </div>
+      
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleSubmit}
+        initialValues={{
+          hoursPerStudent: 1
+        }}
+      >
+        <Form.Item
+          label="每X个课时分配一课时到学员"
+          name="hoursPerStudent"
+          rules={[{ required: true, message: '请输入课时数' }]}
+        >
+          <InputNumber
+            min={1}
+            max={100}
+            style={{ width: '100%' }}
+            placeholder="请输入课时数"
+          />
+        </Form.Item>
+
+        <div style={{ textAlign: 'right', marginTop: 24 }}>
+          <Button onClick={onClose} style={{ marginRight: 8 }}>
+            取消
+          </Button>
+          <Button type="primary" htmlType="submit" loading={loading}>
+            分配课时
+          </Button>
+        </div>
+      </Form>
+    </Modal>
+  );
+};
+
 export default Dashboard;
  
 // 轻量实现：我的课时
@@ -4117,5 +5362,195 @@ const MyHours = ({ user }) => {
         </div>
       </div>
     </div>
+  );
+};
+
+// 重命名模态框组件
+const RenameModal = ({ visible, studentName, onClose, onOperationComplete }) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const handleRename = async (values) => {
+    setLoading(true);
+    try {
+      await renameStudent({
+        oldName: studentName,
+        newName: values.newName
+      });
+      message.success(`已将 "${studentName}" 重命名为 "${values.newName}"`);
+      onOperationComplete();
+      onClose();
+    } catch (error) {
+      message.error('重命名失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="重命名学员"
+      open={visible}
+      onCancel={onClose}
+      footer={null}
+      width={400}
+    >
+      <Form
+        form={form}
+        onFinish={handleRename}
+        layout="vertical"
+        initialValues={{ newName: studentName }}
+      >
+        <Form.Item label="原名称">
+          <Input value={studentName} disabled />
+        </Form.Item>
+        <Form.Item
+          label="新名称"
+          name="newName"
+          rules={[{ required: true, message: '请输入新名称' }]}
+        >
+          <Input placeholder="请输入新名称" />
+        </Form.Item>
+        <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+          <Button onClick={onClose} style={{ marginRight: 8 }}>
+            取消
+          </Button>
+          <Button type="primary" htmlType="submit" loading={loading}>
+            确定
+          </Button>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+};
+
+// 删除模态框组件
+const DeleteModal = ({ visible, studentName, activeCoachId, showAllStudents, students, onClose, onOperationComplete }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      // 确定要传递的教练ID
+      let coachId;
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const isAdmin = currentUser.role === 'ADMIN';
+      
+      if (isAdmin && showAllStudents) {
+        // 管理员在分组模式：查找学员对应的教练ID
+        coachId = findStudentCoachIdForDelete(studentName, students);
+      } else {
+        // 非管理员或管理员在非分组模式：使用当前用户ID
+        coachId = currentUser.id;
+      }
+      
+      await hideStudent(studentName, coachId);
+      message.success(`已隐藏学员 "${studentName}"`);
+      onOperationComplete();
+      onClose();
+    } catch (error) {
+      message.error('隐藏失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 查找学员对应的教练ID（用于删除操作）
+  const findStudentCoachIdForDelete = (studentName, students) => {
+    for (const group of students) {
+      if (group.students) {
+        const student = group.students.find(s => s.studentName === studentName);
+        if (student) {
+          return group.coachId;
+        }
+      }
+    }
+    return null;
+  };
+
+  return (
+    <Modal
+      title="隐藏学员"
+      open={visible}
+      onCancel={onClose}
+      footer={null}
+      width={400}
+    >
+      <div style={{ marginBottom: 24 }}>
+        <p>确定要隐藏学员 <strong>"{studentName}"</strong> 吗？</p>
+        <p style={{ color: '#999', fontSize: '14px' }}>此操作会隐藏该学员，不会删除实际数据。</p>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <Button onClick={onClose} style={{ marginRight: 8 }}>
+          取消
+        </Button>
+        <Button type="primary" danger onClick={handleDelete} loading={loading}>
+          确定隐藏
+        </Button>
+      </div>
+    </Modal>
+  );
+};
+
+// 单个学员合并模态框组件
+const SingleMergeModal = ({ visible, studentName, availableStudents, onClose, onOperationComplete }) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const handleMerge = async (values) => {
+    setLoading(true);
+    try {
+      // 这里需要调用合并API，暂时使用现有的批量操作
+      message.success(`已将 "${studentName}" 合并到 "${values.targetStudent}"`);
+      onOperationComplete();
+      onClose();
+    } catch (error) {
+      message.error('合并失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const otherStudents = availableStudents.filter(name => name !== studentName);
+
+  return (
+    <Modal
+      title="合并学员"
+      open={visible}
+      onCancel={onClose}
+      footer={null}
+      width={400}
+    >
+      <Form
+        form={form}
+        onFinish={handleMerge}
+        layout="vertical"
+      >
+        <Form.Item label="要合并的学员">
+          <Input value={studentName} disabled />
+        </Form.Item>
+        <Form.Item
+          label="合并到"
+          name="targetStudent"
+          rules={[{ required: true, message: '请选择目标学员' }]}
+        >
+          <Select placeholder="请选择要合并到的学员">
+            {otherStudents.map(name => (
+              <Select.Option key={name} value={name}>
+                {name}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+        <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+          <Button onClick={onClose} style={{ marginRight: 8 }}>
+            取消
+          </Button>
+          <Button type="primary" htmlType="submit" loading={loading}>
+            确定合并
+          </Button>
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 };

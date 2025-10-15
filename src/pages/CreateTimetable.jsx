@@ -46,7 +46,6 @@ const CreateTimetable = ({ user }) => {
     navigate('/dashboard?tab=timetables');
   };
 
-  console.log('CreateTimetable rendering, user:', user);
   
   return (
     <div className="page-container">
