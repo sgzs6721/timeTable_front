@@ -932,18 +932,18 @@ const ViewTimetable = ({ user }) => {
         // 异步刷新数据以确保与服务器同步
         const refreshData = async () => {
           try {
-            if (viewMode === 'instance' && currentWeekInstance) {
-              const r = await getInstanceSchedules(currentWeekInstance.id);
-              if (r && r.success) {
-                setAllSchedules(r.data || []);
-                setCurrentWeekInstance(prev => ({
-                  ...prev,
-                  schedules: r.data || []
-                }));
-              }
-            } else {
-              await refreshSchedulesQuietly();
-            }
+        if (viewMode === 'instance' && currentWeekInstance) {
+          const r = await getInstanceSchedules(currentWeekInstance.id);
+          if (r && r.success) {
+            setAllSchedules(r.data || []);
+            setCurrentWeekInstance(prev => ({
+              ...prev,
+              schedules: r.data || []
+            }));
+          }
+        } else {
+          await refreshSchedulesQuietly();
+        }
           } catch (error) {
             console.error('异步刷新数据失败:', error);
           }
@@ -3918,11 +3918,10 @@ const ViewTimetable = ({ user }) => {
               }
             };
 
-            const handleAddSchedule = async (scheduleInfo) => {
-              // 兼容旧格式（字符串）和新格式（对象）
-              const studentName = typeof scheduleInfo === 'string' ? scheduleInfo : scheduleInfo.studentName;
-              const isHalfHour = typeof scheduleInfo === 'string' ? false : (scheduleInfo.isHalfHour || false);
-              const halfHourPosition = typeof scheduleInfo === 'string' ? 'first' : (scheduleInfo.halfHourPosition || 'first');
+            const handleAddSchedule = async (dayKey, timeIndex, scheduleInfo) => {
+              const studentName = scheduleInfo.studentName;
+              const isHalfHour = scheduleInfo.isHalfHour || false;
+              const halfHourPosition = scheduleInfo.halfHourPosition || 'first';
               
               const trimmedName = studentName.trim();
               if (!trimmedName) {
@@ -4001,19 +4000,19 @@ const ViewTimetable = ({ user }) => {
                   // 异步刷新数据
                   const refreshData = async () => {
                     try {
-                      if (viewMode === 'instance' && currentWeekInstance) {
-                        const r = await getInstanceSchedules(currentWeekInstance.id);
-                        if (r && r.success) {
-                          setAllSchedules(r.data || []);
-                          setCurrentWeekInstance(prev => ({
-                            ...prev,
-                            schedules: r.data || []
-                          }));
-                        }
-                      } else {
-                        invalidateTimetableCache(timetableId);
-                        await refreshSchedulesQuietly();
-                      }
+                  if (viewMode === 'instance' && currentWeekInstance) {
+                    const r = await getInstanceSchedules(currentWeekInstance.id);
+                    if (r && r.success) {
+                      setAllSchedules(r.data || []);
+                      setCurrentWeekInstance(prev => ({
+                        ...prev,
+                        schedules: r.data || []
+                      }));
+                    }
+                  } else {
+                    invalidateTimetableCache(timetableId);
+                    await refreshSchedulesQuietly();
+                  }
                     } catch (error) {
                       console.error('异步刷新数据失败:', error);
                     }
@@ -4247,6 +4246,87 @@ const ViewTimetable = ({ user }) => {
             const sourceHighlightColor = isSourceCellForCopy ? '#722ed1' : '#ff4d4f'; // 紫色用于复制，红色用于移动
             const sourceHighlightBoxShadow = isSourceCellForCopy ? '0 0 8px rgba(114, 46, 209, 0.7)' : '0 0 8px rgba(255, 77, 79, 0.7)';
 
+            // 检查是否有半小时课程
+            const hasHalfHourCourse = schedules.some(s => isHalfHourSchedule(s));
+            
+            if (hasHalfHourCourse) {
+              // 如果有半小时课程，需要根据课程的实际位置来渲染
+              const [slotStart] = record.time.split('-');
+              const slotStartTime = dayjs(slotStart, 'HH:mm');
+              
+              const firstHalfCourse = schedules.find(s => {
+                if (!isHalfHourSchedule(s)) return false;
+                const scheduleStartTime = s.startTime.substring(0, 5);
+                const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+                const minutesFromSlotStart = scheduleStart.diff(slotStartTime, 'minute');
+                return minutesFromSlotStart < 30;
+              });
+              
+              const secondHalfCourse = schedules.find(s => {
+                if (!isHalfHourSchedule(s)) return false;
+                const scheduleStartTime = s.startTime.substring(0, 5);
+                const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+                const minutesFromSlotStart = scheduleStart.diff(slotStartTime, 'minute');
+                return minutesFromSlotStart >= 30;
+              });
+              
+              return (
+                <div style={{
+                  height: '100%',
+                  minHeight: '48px',
+                  position: 'relative',
+                  width: '100%',
+                  cursor: 'not-allowed',
+                  border: isSourceCell ? `2px solid ${sourceHighlightColor}` : 'none',
+                  boxShadow: isSourceCell ? sourceHighlightBoxShadow : 'none',
+                  borderRadius: isSourceCell ? '4px' : '0',
+                  opacity: isSourceCell ? 1 : 0.6
+                }}>
+                  {/* 前半小时区域 */}
+                  {firstHalfCourse && (
+                    <div style={{
+                      backgroundColor: studentColorMap.get(firstHalfCourse.studentName) || 'transparent',
+                      height: '50%',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#333',
+                      fontSize: '12px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.2',
+                    }}>
+                      {firstHalfCourse.studentName}
+                    </div>
+                  )}
+                  
+                  {/* 后半小时区域 */}
+                  {secondHalfCourse && (
+                    <div style={{
+                      backgroundColor: studentColorMap.get(secondHalfCourse.studentName) || 'transparent',
+                      height: '50%',
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#333',
+                      fontSize: '12px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.2',
+                    }}>
+                      {secondHalfCourse.studentName}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             return (
               <div style={{
                 height: '100%',
@@ -4335,6 +4415,116 @@ const ViewTimetable = ({ user }) => {
           // 删除模式下的有内容单元格
           if (deleteMode) {
             const isSelected = selectedSchedulesForDelete.has(cellKey);
+            
+            // 检查是否有半小时课程
+            const hasHalfHourCourse = schedules.some(s => isHalfHourSchedule(s));
+            
+            if (hasHalfHourCourse) {
+              // 如果有半小时课程，需要根据课程的实际位置来渲染
+              const [slotStart] = record.time.split('-');
+              const slotStartTime = dayjs(slotStart, 'HH:mm');
+              
+              const firstHalfCourse = schedules.find(s => {
+                if (!isHalfHourSchedule(s)) return false;
+                const scheduleStartTime = s.startTime.substring(0, 5);
+                const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+                const minutesFromSlotStart = scheduleStart.diff(slotStartTime, 'minute');
+                return minutesFromSlotStart < 30;
+              });
+              
+              const secondHalfCourse = schedules.find(s => {
+                if (!isHalfHourSchedule(s)) return false;
+                const scheduleStartTime = s.startTime.substring(0, 5);
+                const scheduleStart = dayjs(scheduleStartTime, 'HH:mm');
+                const minutesFromSlotStart = scheduleStart.diff(slotStartTime, 'minute');
+                return minutesFromSlotStart >= 30;
+              });
+              
+              return (
+                <div
+                  style={{
+                    height: '100%',
+                    minHeight: '48px',
+                    position: 'relative',
+                    width: '100%',
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? '#fff7e6' : 'transparent',
+                    border: isSelected ? '2px solid #fa8c16' : '1px solid #f0f0f0',
+                    borderRadius: '4px'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCellSelection(cellKey, day.key, record.key);
+                  }}
+                  title={isSelected ? '点击取消选择' : '点击选择删除'}
+                >
+                  {/* 前半小时区域 */}
+                  {firstHalfCourse && (
+                    <div style={{
+                      backgroundColor: studentColorMap.get(firstHalfCourse.studentName) || 'transparent',
+                      height: '50%',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#333',
+                      fontSize: '12px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.2',
+                    }}>
+                      {firstHalfCourse.studentName}
+                    </div>
+                  )}
+                  
+                  {/* 后半小时区域 */}
+                  {secondHalfCourse && (
+                    <div style={{
+                      backgroundColor: studentColorMap.get(secondHalfCourse.studentName) || 'transparent',
+                      height: '50%',
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#333',
+                      fontSize: '12px',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.2',
+                    }}>
+                      {secondHalfCourse.studentName}
+                    </div>
+                  )}
+                  
+                  {/* 右上角的删除选择标记 */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      width: '12px',
+                      height: '12px',
+                      border: isSelected ? '2px solid #fa8c16' : '1px solid #d9d9d9',
+                      borderRadius: '2px',
+                      backgroundColor: isSelected ? '#fa8c16' : 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '8px',
+                      color: isSelected ? 'white' : '#ccc',
+                      zIndex: 10
+                    }}
+                  >
+                    {isSelected ? '✓' : ''}
+                  </div>
+                </div>
+              );
+            }
+            
             return (
               <div
                 style={{
@@ -4539,11 +4729,7 @@ const ViewTimetable = ({ user }) => {
                           onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
                           onCancel={() => setOpenPopoverKey(null)} 
                           addLoading={addLoading} 
-                          timeInfo={`星期${dayMap[day.key.toUpperCase()] || day.key}`}
-                          hasHalfHourCourse={hasHalfHourCourse}
-                          defaultHalfHourPosition="first"
-                          defaultIsHalfHour={true}
-                          fixedTimeSlot="14:00-14:30"
+                          timeInfo={`${record.time} 星期${dayMap[day.key.toUpperCase()] || day.key}`}
                         />
                       }
                       trigger="click"
@@ -4660,11 +4846,7 @@ const ViewTimetable = ({ user }) => {
                           onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
                           onCancel={() => setOpenPopoverKey(null)} 
                           addLoading={addLoading} 
-                          timeInfo={`星期${dayMap[day.key.toUpperCase()] || day.key}`}
-                          hasHalfHourCourse={hasHalfHourCourse}
-                          defaultHalfHourPosition="second"
-                          defaultIsHalfHour={true}
-                          fixedTimeSlot="14:30-15:00"
+                          timeInfo={`${record.time} 星期${dayMap[day.key.toUpperCase()] || day.key}`}
                         />
                       }
                       trigger="click"
