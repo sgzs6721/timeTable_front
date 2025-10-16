@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Button, Dropdown, Avatar, Badge, message } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined, ReloadOutlined, HistoryOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getAllRegistrationRequests } from '../services/admin';
 import logo from '../assets/logo.png';
 
@@ -83,12 +83,6 @@ const AppHeader = ({ user, onLogout }) => {
       icon: <UserOutlined />,
       label: '个人账号',
       onClick: () => navigate('/profile'),
-    },
-    {
-      key: 'student-records',
-      icon: <HistoryOutlined />,
-      label: '学员操作记录',
-      onClick: () => navigate('/student-operation-records'),
     },
     {
       key: 'guide',
