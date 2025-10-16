@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Table, Tag, Button, message, Space, Tooltip } from 'antd';
+import { Modal, Table, Tag, Button, message, Space, Tooltip, Popconfirm } from 'antd';
 import { DeleteOutlined, EditOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { getStudentOperationRecords, deleteStudentOperationRecord, updateStudentOperationRecord } from '../services/studentOperationRecords';
 import dayjs from 'dayjs';
@@ -157,15 +157,22 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
               style={{ padding: '1px 3px' }}
             />
           )}
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id)}
-            size="small"
-            title="删除"
-            style={{ padding: '1px 3px' }}
-          />
+          <Popconfirm
+            title="确认删除"
+            description="确定要删除这条操作记录吗？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              title="删除"
+              style={{ padding: '1px 3px' }}
+            />
+          </Popconfirm>
         </Space>
       ),
       width: 50,
@@ -204,15 +211,22 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
             title="编辑"
             style={{ padding: '1px 3px' }}
           />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id)}
-            size="small"
-            title="删除"
-            style={{ padding: '1px 3px' }}
-          />
+          <Popconfirm
+            title="确认删除"
+            description="确定要删除这条操作记录吗？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              title="删除"
+              style={{ padding: '1px 3px' }}
+            />
+          </Popconfirm>
         </Space>
       ),
       width: 50,
@@ -259,15 +273,22 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
             title="编辑"
             style={{ padding: '1px 3px' }}
           />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id)}
-            size="small"
-            title="删除"
-            style={{ padding: '1px 3px' }}
-          />
+          <Popconfirm
+            title="确认删除"
+            description="确定要删除这条操作记录吗？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              title="删除"
+              style={{ padding: '1px 3px' }}
+            />
+          </Popconfirm>
         </Space>
       ),
       width: 50,
@@ -328,15 +349,22 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
             title="编辑"
             style={{ padding: '1px 3px' }}
           />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id)}
-            size="small"
-            title="删除"
-            style={{ padding: '1px 3px' }}
-          />
+          <Popconfirm
+            title="确认删除"
+            description="确定要删除这条操作记录吗？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              title="删除"
+              style={{ padding: '1px 3px' }}
+            />
+          </Popconfirm>
         </Space>
       ),
       width: 50,
