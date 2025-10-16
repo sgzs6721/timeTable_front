@@ -533,12 +533,13 @@ export const getSchedulesOverview = async (timetableId) => {
 };
 
 // 报表：分页查询课时
-export const getMyHoursPaged = async ({ startDate, endDate, coachId, page, size }) => {
+export const getMyHoursPaged = async ({ startDate, endDate, coachId, page, size, sortOrder = 'desc' }) => {
   try {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     if (coachId) params.append('coachId', coachId);
+    params.append('sortOrder', sortOrder);
     params.append('page', page);
     params.append('size', size);
     const url = `/reports/my-hours?${params.toString()}`;

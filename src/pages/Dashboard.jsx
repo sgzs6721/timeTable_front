@@ -5218,6 +5218,7 @@ const MyHours = ({ user }) => {
   const [timetables, setTimetables] = React.useState([]);
   const [coachId, setCoachId] = React.useState(null);
   const [coachOptions, setCoachOptions] = React.useState([]);
+  const [sortOrder, setSortOrder] = React.useState('desc'); // 排序顺序：desc=倒序，asc=正序
   const isInitialized = React.useRef(false);
 
   const fetchData = React.useCallback(async () => {
@@ -5240,6 +5241,7 @@ const MyHours = ({ user }) => {
         startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : undefined,
         endDate: endDate ? dayjs(endDate).format('YYYY-MM-DD') : undefined,
         coachId: user?.role?.toUpperCase() === 'ADMIN' ? (coachId ? String(coachId) : undefined) : undefined,
+        sortOrder,
         page,
         size: pageSize
       };
@@ -5273,7 +5275,7 @@ const MyHours = ({ user }) => {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, coachId, page]);
+  }, [startDate, endDate, coachId, page, sortOrder]);
 
   // 初始化时加载数据
   React.useEffect(() => { 
@@ -5339,6 +5341,28 @@ const MyHours = ({ user }) => {
       }
     },
     { title: '学员', dataIndex: 'studentName', key: 'student', width: 100, align: 'center' },
+    { 
+      title: '课时', 
+      key: 'duration',
+      width: 80,
+      align: 'center',
+      render: (_, record) => {
+        if (!record.startTime || !record.endTime) {
+          return '1'; // 默认1课时
+        }
+        
+        // 计算时长
+        const start = dayjs(`2000-01-01 ${record.startTime}`);
+        const end = dayjs(`2000-01-01 ${record.endTime}`);
+        const durationMinutes = end.diff(start, 'minute');
+        
+        // 转换为课时（1小时=1课时，半小时=0.5课时）
+        const duration = durationMinutes / 60;
+        
+        // 如果是整数，显示整数；否则显示小数
+        return duration % 1 === 0 ? duration.toString() : duration.toFixed(1);
+      }
+    },
   ];
 
   const columns = React.useMemo(() => {
@@ -5353,20 +5377,52 @@ const MyHours = ({ user }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'center', marginBottom: 12, width: '100%' }}>
-        <DatePicker placeholder="开始日期" value={startDate} onChange={setStartDate} style={{ width: '100%' }} />
-        <DatePicker placeholder="结束日期" value={endDate} onChange={setEndDate} style={{ width: '100%' }} />
-        <Button type="primary" onClick={() => { setPage(1); fetchData(); }} loading={loading} style={{ minWidth: 72 }}>查询</Button>
-        {user?.role?.toUpperCase() === 'ADMIN' && (
-          <Select
-            placeholder="选择教练"
-            allowClear
-            style={{ gridColumn: '1 / span 1', width: '100%' }}
-            value={coachId}
-            onChange={setCoachId}
-            options={coachOptions}
-          />
-        )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12, width: '100%' }}>
+        {/* 第一行：日期选择器和查询按钮 */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ flex: 1 }}>
+            <DatePicker placeholder="开始日期" value={startDate} onChange={setStartDate} style={{ width: '100%' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <DatePicker placeholder="结束日期" value={endDate} onChange={setEndDate} style={{ width: '100%' }} />
+          </div>
+          <div style={{ flex: 0, minWidth: 72 }}>
+            <Button type="primary" onClick={() => { setPage(1); fetchData(); }} loading={loading} style={{ width: '100%' }}>查询</Button>
+          </div>
+        </div>
+        
+        {/* 第二行：排序选项和教练选择器，与第一行前两列对齐 */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ flex: 1 }}>
+            <Select
+              placeholder="排序方式"
+              value={sortOrder}
+              onChange={setSortOrder}
+              style={{ width: '100%' }}
+              options={[
+                { value: 'desc', label: '倒序' },
+                { value: 'asc', label: '正序' }
+              ]}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            {user?.role?.toUpperCase() === 'ADMIN' ? (
+              <Select
+                placeholder="选择教练"
+                allowClear
+                style={{ width: '100%' }}
+                value={coachId}
+                onChange={setCoachId}
+                options={coachOptions}
+              />
+            ) : (
+              <div style={{ width: '100%', height: 32 }}></div>
+            )}
+          </div>
+          <div style={{ flex: 0, minWidth: 72 }}>
+            <div style={{ width: '100%', height: 32 }}></div>
+          </div>
+        </div>
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Table
