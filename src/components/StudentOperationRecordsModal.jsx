@@ -11,7 +11,15 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
 
   useEffect(() => {
     if (visible) {
+      // 重置状态，避免显示上次的数据
+      setRecords([]);
+      setLoading(true);
       fetchRecords();
+    } else {
+      // 模态框关闭时重置状态
+      setRecords([]);
+      setLoading(false);
+      setEditingRecord(null);
     }
   }, [visible, studentName, coachId]);
 
@@ -448,7 +456,34 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
         // 检查是否有任何记录
         const hasAnyRecords = sections.some(section => section.records.length > 0);
         
-        if (!hasAnyRecords && !loading) {
+        // 如果正在加载，显示loading状态
+        if (loading) {
+          return (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: '#999'
+            }}>
+              <div style={{
+                fontSize: '48px',
+                marginBottom: '16px',
+                color: '#d9d9d9'
+              }}>
+                ⏳
+              </div>
+              <div style={{
+                fontSize: '16px',
+                marginBottom: '8px',
+                color: '#666'
+              }}>
+                正在加载操作记录...
+              </div>
+            </div>
+          );
+        }
+        
+        // 如果没有记录且不在加载中，显示空状态
+        if (!hasAnyRecords) {
           return (
             <div style={{
               textAlign: 'center',

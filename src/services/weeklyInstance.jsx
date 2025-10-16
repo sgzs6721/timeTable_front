@@ -155,10 +155,13 @@ export const getStudentRecords = (studentName, coachName) => {
 };
 
 // 获取学员汇总（返回 [{ studentName, attendedCount }]，已按 attendedCount 倒序）
-export const getAllStudents = (showAll = false, timestamp) => {
+export const getAllStudents = (showAll = false, timestamp, coachId = null) => {
   const params = { showAll };
   if (timestamp) {
     params._t = timestamp; // 添加时间戳参数避免缓存
+  }
+  if (coachId) {
+    params.coachId = coachId; // 添加教练ID参数
   }
   return api.get('/weekly-instances/students', {
     params

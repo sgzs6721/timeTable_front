@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown, Switch } from 'antd';
+import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown, Switch, AutoComplete } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules } from '../services/timetable';
@@ -25,7 +25,7 @@ import {
   requestLeave,
   cancelLeave
 } from '../services/weeklyInstance';
-import { deleteNextWeekInstance } from '../services/weeklyInstance';
+import { deleteNextWeekInstance, getAllStudents } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import weekday from 'dayjs/plugin/weekday';
@@ -420,7 +420,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
   );
 };
 
-const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo, hasHalfHourCourse = false, defaultHalfHourPosition = 'first', defaultIsHalfHour = false, fixedTimeSlot = null }) => {
+const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo, hasHalfHourCourse = false, defaultHalfHourPosition = 'first', defaultIsHalfHour = false, fixedTimeSlot = null, studentOptions = [] }) => {
   const [name, setName] = React.useState('');
   const [isHalfHour, setIsHalfHour] = React.useState(defaultIsHalfHour);
   const [halfHourPosition, setHalfHourPosition] = React.useState(defaultHalfHourPosition); // first: 前半小时, second: 后半小时
@@ -502,13 +502,20 @@ const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo, hasH
         </div>
       )}
       
-      <Input
+      <AutoComplete
         size="small"
         placeholder="学生姓名"
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(value) => setName(value)}
+        onSearch={(value) => {
+          // 可以在这里实现搜索逻辑，目前使用默认的过滤
+        }}
+        options={studentOptions}
         disabled={addLoading}
         style={{ width: '100%', marginBottom: '8px' }}
+        filterOption={(inputValue, option) =>
+          option.value.toLowerCase().indexOf(inputValue.toLowerCase()) >= 0
+        }
       />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
         <Button size="small" onClick={onCancel} style={{ marginRight: 8 }} disabled={addLoading}>
@@ -730,6 +737,10 @@ const ViewTimetable = ({ user }) => {
     halfHourPosition: 'first' // 半小时位置：first=前半小时，second=后半小时
   });
   const [popoverVisible, setPopoverVisible] = useState({});
+  
+  // 学员自动完成相关状态
+  const [studentOptions, setStudentOptions] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   const handlePopoverVisibleChange = (key, visible) => {
     setPopoverVisible(prev => ({ ...prev, [key]: visible }));
@@ -737,6 +748,47 @@ const ViewTimetable = ({ user }) => {
       setNewScheduleInfo({ studentName: '', isHalfHour: false, halfHourPosition: 'first' }); // 关闭时清空输入
     }
   };
+
+  // 获取课表拥有者的学员列表
+  const fetchStudentOptions = useCallback(async () => {
+    if (loadingStudents || !timetableOwner) return;
+    
+    setLoadingStudents(true);
+    try {
+      // 根据课表拥有者ID获取学员列表
+      const response = await getAllStudents(false, null, timetableOwner.id);
+      if (response && response.success) {
+        const students = response.data || [];
+        let studentNames = [];
+        
+        // 处理数据结构，可能是学员数组或教练分组数组
+        if (students.length > 0 && students[0].studentName) {
+          // 直接是学员数组
+          studentNames = students.map(s => s.studentName).filter(Boolean);
+        } else if (students.length > 0 && students[0].students) {
+          // 是教练分组数组，提取所有学员
+          students.forEach(group => {
+            if (group.students && Array.isArray(group.students)) {
+              studentNames.push(...group.students.map(s => s.studentName).filter(Boolean));
+            }
+          });
+        }
+        
+        // 去重并转换为AutoComplete选项格式
+        const uniqueNames = [...new Set(studentNames)];
+        const options = uniqueNames.map(name => ({
+          value: name,
+          label: name
+        }));
+        
+        setStudentOptions(options);
+      }
+    } catch (error) {
+      console.error('获取学员列表失败:', error);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, [loadingStudents, timetableOwner]);
 
   // 判断课程是否为半小时课程
   const isHalfHourSchedule = (schedule) => {
@@ -1018,14 +1070,21 @@ const ViewTimetable = ({ user }) => {
             />
           </div>
         </div>
-        <Input
+        <AutoComplete
           ref={addScheduleInputRef}
           placeholder="学生姓名"
           value={newScheduleInfo.studentName}
-          onChange={(e) => setNewScheduleInfo({ ...newScheduleInfo, studentName: e.target.value })}
+          onChange={(value) => setNewScheduleInfo({ ...newScheduleInfo, studentName: value })}
+          onSearch={(value) => {
+            // 可以在这里实现搜索逻辑，目前使用默认的过滤
+          }}
+          options={studentOptions}
           onPressEnter={() => handleAddSchedule(day.key, timeIndex, newScheduleInfo)}
           style={{ marginBottom: '8px' }}
           disabled={addLoading}
+          filterOption={(inputValue, option) =>
+            option.value.toLowerCase().indexOf(inputValue.toLowerCase()) >= 0
+          }
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <Button size="small" onClick={() => handlePopoverVisibleChange(popoverKey, false)} disabled={addLoading}>
@@ -1516,6 +1575,13 @@ const ViewTimetable = ({ user }) => {
   useEffect(() => {
     fetchTimetable();
   }, [timetableId]);
+
+  // 获取学员列表用于自动完成
+  useEffect(() => {
+    if (timetableOwner) {
+      fetchStudentOptions();
+    }
+  }, [fetchStudentOptions, timetableOwner]);
 
   // 移除自动触发的useEffect，改为按钮点击时手动调用
   // 这样避免了无限循环调用API的问题
@@ -4174,11 +4240,11 @@ const ViewTimetable = ({ user }) => {
                         restoreLoading={restoreLoading}
                       />
                       <div style={{ padding: '0 8px' }}>
-                        <NewSchedulePopoverContent onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={null} hasHalfHourCourse={false} />
+                        <NewSchedulePopoverContent onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={null} hasHalfHourCourse={false} studentOptions={studentOptions} />
                       </div>
                     </div>
                   ) : (
-                    <NewSchedulePopoverContent onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} hasHalfHourCourse={false} />
+                    <NewSchedulePopoverContent onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} onCancel={() => handleOpenChange(false)} addLoading={addLoading} timeInfo={timeInfo} hasHalfHourCourse={false} studentOptions={studentOptions} />
                   )
                 }
                 trigger={multiSelectMode ? "contextMenu" : (deleteMode ? "none" : "click")}
@@ -4730,6 +4796,7 @@ const ViewTimetable = ({ user }) => {
                           onCancel={() => setOpenPopoverKey(null)} 
                           addLoading={addLoading} 
                           timeInfo={`${record.time} 星期${dayMap[day.key.toUpperCase()] || day.key}`}
+                          studentOptions={studentOptions}
                         />
                       }
                       trigger="click"
@@ -4847,6 +4914,7 @@ const ViewTimetable = ({ user }) => {
                           onCancel={() => setOpenPopoverKey(null)} 
                           addLoading={addLoading} 
                           timeInfo={`${record.time} 星期${dayMap[day.key.toUpperCase()] || day.key}`}
+                          studentOptions={studentOptions}
                         />
                       }
                       trigger="click"
