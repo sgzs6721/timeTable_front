@@ -49,6 +49,26 @@ export const getAllUsers = async () => {
   }
 };
 
+// 创建新用户
+export const createUser = async (userData) => {
+  try {
+    const response = await api.post('/admin/users/create', userData);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 管理员为指定用户创建课表
+export const createTimetableForUser = async (timetableData) => {
+  try {
+    const response = await api.post('/admin/timetables/create-for-user', timetableData);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // 更新用户权限
 // 统一接口：更新用户信息（角色、用户名等）
 export const updateUserInfo = async (userId, data) => {
@@ -128,9 +148,9 @@ export const getBatchTimetablesInfo = async (timetableIds) => {
 // };
 
 // 批准用户注册申请
-export const approveUserRegistration = async (userId) => {
+export const approveUserRegistration = async (userId, position) => {
   try {
-    const response = await api.put(`/admin/users/${userId}/approve`);
+    const response = await api.put(`/admin/users/${userId}/approve`, { position });
     return response;
   } catch (error) {
     throw error;

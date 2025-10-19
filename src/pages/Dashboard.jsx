@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, InputNumber, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination, Form } from 'antd';
-import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined, EllipsisOutlined } from '@ant-design/icons';
+import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined, EllipsisOutlined, MoneyCollectOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce, getAllTimetables as getAllTimetablesSvc, getMyHoursPaged } from '../services/timetable';
 import { getCoachesWithTimetables } from '../services/admin';
@@ -16,6 +16,7 @@ import StudentManagementModal from '../components/StudentManagementModal';
 import StudentBatchOperationModal from '../components/StudentBatchOperationModal';
 import StudentOperationRecordsModal from '../components/StudentOperationRecordsModal';
 import Footer from '../components/Footer';
+import MySalary from './MySalary';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
 
@@ -2593,15 +2594,40 @@ const Dashboard = ({ user }) => {
     }
 
     if (timetables.length === 0) {
-      return <Empty description="暂无课表，快去创建一个吧" />;
+      return (
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreateTimetable}
+              disabled={timetables.length >= 5}
+            >
+              创建课表
+            </Button>
+          </div>
+          <Empty description="暂无课表，快去创建一个吧" />
+        </div>
+      );
     }
 
     return (
-      <List
-        className="timetable-list"
-        itemLayout="horizontal"
-        dataSource={timetables}
-        renderItem={(item) => (
+      <div>
+        <div style={{ marginBottom: '16px' }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreateTimetable}
+            disabled={timetables.length >= 5}
+          >
+            创建课表
+          </Button>
+        </div>
+        <List
+          className="timetable-list"
+          itemLayout="horizontal"
+          dataSource={timetables}
+          renderItem={(item) => (
           <List.Item
             style={{ position: 'relative' }}
             actions={[
@@ -2705,6 +2731,7 @@ const Dashboard = ({ user }) => {
           </List.Item>
         )}
       />
+      </div>
     );
   };
 
@@ -4869,7 +4896,7 @@ const Dashboard = ({ user }) => {
       });
     }
     
-    // 所有用户都显示我的课表和我的学员
+    // 所有用户都显示我的课表、我的学员、我的课时
     tabItems.push(
       {
         key: 'timetables',
@@ -4903,6 +4930,15 @@ const Dashboard = ({ user }) => {
       }
     );
     
+          // 暂时只对管理员显示我的工资
+          if (user?.role?.toUpperCase() === 'ADMIN') {
+            tabItems.push({
+              key: 'salary',
+              label: '我的工资',
+              children: <MySalary user={user} />
+            });
+          }
+    
     return tabItems;
   };
 
@@ -4918,18 +4954,6 @@ const Dashboard = ({ user }) => {
         items={tabItems}
         size="large"
         tabBarGutter={12}
-        tabBarExtraContent={{
-          right: (
-            <Button
-              type="link"
-              icon={<PlusOutlined />}
-              onClick={handleCreateTimetable}
-              disabled={timetables.length >= 5}
-            >
-              创建课表
-            </Button>
-          )
-        }}
       />
       {/* 模态框等保持不变 */}
       {renderModals()}
@@ -5178,18 +5202,29 @@ const AssignHoursModal = ({ visible, sourceStudent, selectedStudents, onClose, o
           hoursPerStudent: 1
         }}
       >
-        <Form.Item
-          label="每X个课时分配一课时到学员"
-          name="hoursPerStudent"
-          rules={[{ required: true, message: '请输入课时数' }]}
-        >
-          <InputNumber
-            min={1}
-            max={100}
-            style={{ width: '100%' }}
-            placeholder="请输入课时数"
-          />
-        </Form.Item>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: 8 }}>
+            <span style={{ color: 'rgba(0, 0, 0, 0.88)', fontSize: '14px' }}>
+              <span style={{ color: '#ff4d4f', marginRight: '4px' }}>*</span>
+              其中每
+            </span>
+            <Form.Item
+              name="hoursPerStudent"
+              rules={[{ required: true, message: '请输入课时数' }]}
+              style={{ margin: 0, display: 'inline-block' }}
+            >
+              <InputNumber
+                min={1}
+                max={100}
+                style={{ width: '80px' }}
+                placeholder="课时数"
+              />
+            </Form.Item>
+            <span style={{ color: 'rgba(0, 0, 0, 0.88)', fontSize: '14px' }}>
+              课时消耗被分配学员1课时
+            </span>
+          </div>
+        </div>
 
         <div style={{ textAlign: 'right', marginTop: 24 }}>
           <Button onClick={onClose} style={{ marginRight: 8 }}>
@@ -5265,7 +5300,7 @@ const MyHours = ({ user }) => {
         studentName: s.studentName,
         timetableOwner: s.coachName || selectedCoachName
       }));
-      setTotalCount(total);
+      setTotalCount(total); // 使用后端返回的总数
       setRecords(mapped);
       setStats({ 
         count: total, 

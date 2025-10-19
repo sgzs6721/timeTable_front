@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, message, Space, Tag, Modal, Select, Input, Tooltip, Spin, Badge, Tabs } from 'antd';
-import { UserOutlined, CrownOutlined, KeyOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
-import { getAllUsers, updateUserInfo, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, updateUserUsername, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
+import { CrownOutlined, KeyOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, CheckCircleOutlined, StopOutlined, UserAddOutlined, FilterOutlined } from '@ant-design/icons';
+import { getAllUsers, createUser, updateUserInfo, updateUserRole, resetUserPassword, deleteUser, updateUserNickname, updateUserUsername, getAllRegistrationRequests, approveUserRegistration, rejectUserRegistration } from '../services/admin';
 import Footer from '../components/Footer';
 import './UserManagement.css';
 
@@ -15,16 +15,30 @@ const UserManagement = ({ activeTab = 'users' }) => {
   const [roleModalVisible, setRoleModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
-
+  const [createUserModalVisible, setCreateUserModalVisible] = useState(false);
 
   const [editingUser, setEditingUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState('');
+  const [selectedPosition, setSelectedPosition] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newNickname, setNewNickname] = useState('');
   const [newUsername, setNewUsername] = useState('');
   const [roleLoading, setRoleLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [nicknameLoading, setNicknameLoading] = useState(false);
+  
+  // 过滤状态
+  const [positionFilter, setPositionFilter] = useState('all');
+  
+  // 新用户表单
+  const [newUserForm, setNewUserForm] = useState({
+    username: '',
+    password: '123456',
+    nickname: '',
+    role: 'USER',
+    position: 'COACH'
+  });
+  const [createUserLoading, setCreateUserLoading] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -65,15 +79,34 @@ const UserManagement = ({ activeTab = 'users' }) => {
   };
 
   const handleApproveUser = async (userId) => {
+    let positionValue = '';
+    
     Modal.confirm({
       title: '确认批准用户注册申请',
-      content: '确定要批准该用户的注册申请吗？批准后用户将可以登录系统。',
+      content: (
+        <div>
+          <p style={{ marginBottom: 16 }}>确定要批准该用户的注册申请吗？批准后用户将可以登录系统。</p>
+          <div>
+            <label>请设置职位：</label>
+            <Select
+              defaultValue="COACH"
+              onChange={(value) => { positionValue = value; }}
+              style={{ width: '100%', marginTop: 8 }}
+            >
+              <Option value="COACH">教练</Option>
+              <Option value="SALES">销售</Option>
+              <Option value="RECEPTIONIST">前台</Option>
+              <Option value="MANAGER">管理</Option>
+            </Select>
+          </div>
+        </div>
+      ),
       okText: '批准',
       okType: 'primary',
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await approveUserRegistration(userId);
+          const response = await approveUserRegistration(userId, positionValue || 'COACH');
           if (response.success) {
             message.success('用户注册申请已批准');
             fetchRegistrationRequests();
@@ -114,6 +147,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
   const handleEditRole = (user) => {
     setEditingUser(user);
     setSelectedRole(user.role);
+    setSelectedPosition(user.position || '');
     setNewUsername(user.username || '');
     setNewNickname(user.nickname || '');
     setRoleModalVisible(true);
@@ -185,7 +219,12 @@ const UserManagement = ({ activeTab = 'users' }) => {
     // 角色：后端要求必须传 USER/ADMIN。若未变更，也要传当前角色。
     payload.role = selectedRole || editingUser.role;
 
-    if (Object.keys(payload).length === 0) {
+    // 职位变化
+    if (selectedPosition !== (editingUser.position || '')) {
+      payload.position = selectedPosition;
+    }
+
+    if (Object.keys(payload).length === 0 || (Object.keys(payload).length === 1 && payload.role === editingUser.role)) {
       message.warning('未检测到变更');
       setRoleModalVisible(false);
       return;
@@ -302,27 +341,98 @@ const UserManagement = ({ activeTab = 'users' }) => {
     }
   };
 
+  // 处理新建用户
+  const handleCreateUser = () => {
+    setNewUserForm({
+      username: '',
+      password: '123456',
+      nickname: '',
+      role: 'USER',
+      position: 'COACH'
+    });
+    setCreateUserModalVisible(true);
+  };
+
+  // 确认创建新用户
+  const handleConfirmCreateUser = async () => {
+    const { username, password, nickname, role, position } = newUserForm;
+    
+    if (!username || !username.trim()) {
+      message.error('用户名不能为空');
+      return;
+    }
+    
+    if (username.trim().length < 2 || username.trim().length > 32) {
+      message.error('用户名长度需在 2-32 个字符之间');
+      return;
+    }
+    
+    if (!password || password.length < 6) {
+      message.error('密码至少6个字符');
+      return;
+    }
+    
+    if (nickname && nickname.length > 50) {
+      message.error('昵称长度不能超过50个字符');
+      return;
+    }
+    
+    setCreateUserLoading(true);
+    try {
+      const payload = {
+        username: username.trim(),
+        password: password,
+        nickname: nickname.trim() || null,
+        role: role,
+        position: position
+      };
+      
+      const response = await createUser(payload);
+      
+      if (response && response.success) {
+        message.success('用户创建成功');
+        setCreateUserModalVisible(false);
+        // 刷新用户列表
+        fetchUsers();
+        // 重置表单
+        setNewUserForm({
+          username: '',
+          password: '123456',
+          nickname: '',
+          role: 'USER',
+          position: 'COACH'
+        });
+      } else {
+        message.error(response?.message || '创建用户失败');
+      }
+    } catch (error) {
+      message.error('创建用户失败，请检查网络连接');
+    } finally {
+      setCreateUserLoading(false);
+    }
+  };
+
+  // 过滤用户数据
+  const filteredUsers = users.filter(user => {
+    if (positionFilter === 'all') return true;
+    if (positionFilter === 'admin') return user.role === 'ADMIN';
+    if (positionFilter === 'no_position') return user.role !== 'ADMIN' && !user.position;
+    return user.position === positionFilter;
+  });
+
   const columns = [
     {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
-      align: 'left',
-      onHeaderCell: () => ({
-        style: { textAlign: 'center' },
-      }),
+      align: 'center',
       render: (text, record) => {
         const displayName = record.nickname || text;
-        const showText = displayName && displayName.length > 7 ? displayName.slice(0, 7) + '…' : displayName;
+        const showText = displayName && displayName.length > 10 ? displayName.slice(0, 10) + '…' : displayName;
         return (
-          <Space>
-            {record.role === 'ADMIN' 
-              ? <CrownOutlined style={{ color: '#f5222d' }} /> 
-              : <UserOutlined style={{ color: '#1890ff' }} />}
-            <Tooltip title={`用户名: ${text}${record.nickname ? ` | 昵称: ${record.nickname}` : ''}`} placement="topLeft" mouseEnterDelay={0.2}>
-              <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{showText}</span>
-            </Tooltip>
-          </Space>
+          <Tooltip title={`用户名: ${text}${record.nickname ? ` | 昵称: ${record.nickname}` : ''}`} placement="topLeft" mouseEnterDelay={0.2}>
+            <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{showText}</span>
+          </Tooltip>
         );
       },
     },
@@ -331,14 +441,78 @@ const UserManagement = ({ activeTab = 'users' }) => {
       dataIndex: 'role',
       key: 'role',
       align: 'center',
-      render: (role) => (
-        <Tag 
-          color={role === 'ADMIN' ? 'red' : 'blue'} 
-          style={{ minWidth: '80px', textAlign: 'center' }}
-        >
-          {role === 'ADMIN' ? '管理员' : '普通用户'}
-        </Tag>
-      ),
+      render: (role, record) => {
+        const positionMap = {
+          'COACH': { label: '教练', bgColor: 'rgba(82, 196, 26, 0.15)', textColor: '#52c41a', borderColor: 'rgba(82, 196, 26, 0.3)' },
+          'SALES': { label: '销售', bgColor: 'rgba(250, 140, 22, 0.15)', textColor: '#fa8c16', borderColor: 'rgba(250, 140, 22, 0.3)' },
+          'RECEPTIONIST': { label: '前台', bgColor: 'rgba(114, 46, 209, 0.15)', textColor: '#722ed1', borderColor: 'rgba(114, 46, 209, 0.3)' },
+          'MANAGER': { label: '管理', bgColor: 'rgba(24, 144, 255, 0.15)', textColor: '#1890ff', borderColor: 'rgba(24, 144, 255, 0.3)' }
+        };
+        
+        const roleLabel = role === 'ADMIN' ? '管理员' : '普通用户';
+        const roleBgColor = role === 'ADMIN' ? 'rgba(245, 34, 45, 0.15)' : 'rgba(24, 144, 255, 0.15)';
+        const roleTextColor = role === 'ADMIN' ? '#f5222d' : '#1890ff';
+        const roleBorderColor = role === 'ADMIN' ? 'rgba(245, 34, 45, 0.3)' : 'rgba(24, 144, 255, 0.3)';
+        
+        // 如果没有职位，只显示角色标签
+        if (!record.position) {
+          return (
+            <div style={{
+              display: 'inline-block',
+              backgroundColor: roleBgColor,
+              color: roleTextColor,
+              borderRadius: '4px',
+              padding: '2px 10px',
+              fontSize: '12px',
+              minWidth: '80px',
+              textAlign: 'center',
+              fontWeight: 500
+            }}>
+              {roleLabel}
+            </div>
+          );
+        }
+        
+        // 如果有职位，显示分割标签（管理员和普通用户都一样）
+        const positionInfo = positionMap[record.position] || { 
+          label: record.position, 
+          bgColor: 'rgba(24, 144, 255, 0.15)', 
+          textColor: '#1890ff',
+          borderColor: 'rgba(24, 144, 255, 0.3)'
+        };
+        
+        return (
+          <div style={{ 
+            display: 'inline-flex',
+            borderRadius: '4px',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              backgroundColor: roleBgColor,
+              color: roleTextColor,
+              padding: '2px 8px',
+              fontSize: '12px',
+              minWidth: '55px',
+              textAlign: 'center',
+              fontWeight: 500
+            }}>
+              {roleLabel}
+            </div>
+            <div style={{ 
+              backgroundColor: positionInfo.bgColor,
+              color: positionInfo.textColor,
+              padding: '2px 8px',
+              fontSize: '12px',
+              minWidth: '40px',
+              textAlign: 'center',
+              borderLeft: `1px solid ${positionInfo.borderColor}`,
+              fontWeight: 500
+            }}>
+              {positionInfo.label}
+            </div>
+          </div>
+        );
+      },
     },
     {
       title: '操作',
@@ -635,19 +809,63 @@ const UserManagement = ({ activeTab = 'users' }) => {
   // 权限管理内容
   return (
     <>
+      {/* 表格上方的操作栏 */}
+      <div style={{ 
+        marginBottom: '16px', 
+        display: 'flex', 
+        justifyContent: 'flex-start', 
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <Button 
+          type="primary" 
+          icon={<UserAddOutlined />}
+          onClick={handleCreateUser}
+        >
+          新建用户
+        </Button>
+        
+        <Select
+          value={positionFilter}
+          onChange={setPositionFilter}
+          style={{ minWidth: '140px' }}
+          suffixIcon={<FilterOutlined />}
+        >
+          <Option value="all">全部职位</Option>
+          <Option value="COACH">教练</Option>
+          <Option value="SALES">销售</Option>
+          <Option value="RECEPTIONIST">前台</Option>
+          <Option value="MANAGER">管理</Option>
+        </Select>
+      </div>
+
       <Table
         columns={columns}
-        dataSource={users}
+        dataSource={filteredUsers}
         loading={loading}
         rowKey="id"
-        pagination={{
+        className="user-management-table"
+        pagination={filteredUsers.length > 10 ? {
           pageSize: 10,
           showSizeChanger: true,
           showQuickJumper: true,
           showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
-        }}
+        } : false}
         scroll={{ x: 'max-content' }}
       />
+      
+      {/* 表格下方显示总记录数 */}
+      {filteredUsers.length <= 10 && (
+        <div style={{ 
+          textAlign: 'center', 
+          marginTop: '16px',
+          color: '#999',
+          fontSize: '14px'
+        }}>
+          共 {filteredUsers.length} 条记录
+        </div>
+      )}
       
       {/* 角色编辑模态框 */}
       <Modal
@@ -681,7 +899,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
             style={{ width: '100%', marginTop: 8 }}
           />
         </div>
-        <div>
+        <div style={{ marginBottom: 12 }}>
           <label>新角色：</label>
           <Select
             value={selectedRole}
@@ -690,6 +908,21 @@ const UserManagement = ({ activeTab = 'users' }) => {
           >
             <Option value="USER">普通用户</Option>
             <Option value="ADMIN">管理员</Option>
+          </Select>
+        </div>
+        <div>
+          <label>新职位：</label>
+          <Select
+            value={selectedPosition}
+            onChange={setSelectedPosition}
+            style={{ width: '100%', marginTop: 8 }}
+            placeholder="请选择职位"
+            allowClear
+          >
+            <Option value="COACH">教练</Option>
+            <Option value="SALES">销售</Option>
+            <Option value="RECEPTIONIST">前台</Option>
+            <Option value="MANAGER">管理</Option>
           </Select>
         </div>
       </Modal>
@@ -744,6 +977,81 @@ const UserManagement = ({ activeTab = 'users' }) => {
       </Modal>
 
       {/* 移除单独的用户名编辑弹窗，功能已合并到角色编辑弹窗 */}
+
+      {/* 新建用户模态框 */}
+      <Modal
+        title="新建用户"
+        open={createUserModalVisible}
+        onOk={handleConfirmCreateUser}
+        onCancel={() => setCreateUserModalVisible(false)}
+        confirmLoading={createUserLoading}
+        okText="创建"
+        cancelText="取消"
+        width={500}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px' }}>
+              用户名 <span style={{ color: 'red' }}>*</span>
+            </label>
+            <Input
+              value={newUserForm.username}
+              onChange={(e) => setNewUserForm({ ...newUserForm, username: e.target.value })}
+              placeholder="请输入用户名（2-32个字符）"
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px' }}>
+              密码 <span style={{ color: 'red' }}>*</span>
+            </label>
+            <Input.Password
+              value={newUserForm.password}
+              onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+              placeholder="请输入密码（至少6个字符）"
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px' }}>昵称</label>
+            <Input
+              value={newUserForm.nickname}
+              onChange={(e) => setNewUserForm({ ...newUserForm, nickname: e.target.value })}
+              placeholder="请输入昵称（可选）"
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px' }}>
+              角色 <span style={{ color: 'red' }}>*</span>
+            </label>
+            <Select
+              value={newUserForm.role}
+              onChange={(value) => setNewUserForm({ ...newUserForm, role: value })}
+              style={{ width: '100%' }}
+            >
+              <Option value="USER">普通用户</Option>
+              <Option value="ADMIN">管理员</Option>
+            </Select>
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px' }}>
+              职位 <span style={{ color: 'red' }}>*</span>
+            </label>
+            <Select
+              value={newUserForm.position}
+              onChange={(value) => setNewUserForm({ ...newUserForm, position: value })}
+              style={{ width: '100%' }}
+            >
+              <Option value="COACH">教练</Option>
+              <Option value="SALES">销售</Option>
+              <Option value="RECEPTIONIST">前台</Option>
+              <Option value="MANAGER">管理</Option>
+            </Select>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 };

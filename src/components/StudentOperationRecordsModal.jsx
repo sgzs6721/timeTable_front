@@ -328,7 +328,16 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
       render: (_, record) => {
         try {
           const details = JSON.parse(record.details || '{}');
-          return `${details.hoursPerStudent || 1}课时/人`;
+          const hoursPerStudent = details.hoursPerStudent || 1;
+          const tooltipText = `${record.newName}每${hoursPerStudent}个课时消耗${record.oldName}1课时`;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              <span>{hoursPerStudent}</span>
+              <Tooltip title={tooltipText}>
+                <InfoCircleOutlined style={{ color: '#1890ff', fontSize: '12px', cursor: 'help' }} />
+              </Tooltip>
+            </div>
+          );
         } catch {
           return '详情解析失败';
         }
@@ -607,6 +616,67 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
                   style={{ width: '100%', padding: '8px', border: '1px solid #d9d9d9', borderRadius: '4px' }}
                 />
               </div>
+            ) : editingRecord.operationType === 'ASSIGN_HOURS' ? (
+              // 分配课时操作显示目标学员、源课程和分配详情
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <label>目标学员：</label>
+                  <input
+                    type="text"
+                    value={editingRecord.oldName}
+                    onChange={(e) => setEditingRecord({
+                      ...editingRecord,
+                      oldName: e.target.value
+                    })}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #d9d9d9', borderRadius: '4px' }}
+                  />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label>源课程：</label>
+                  <input
+                    type="text"
+                    value={editingRecord.newName}
+                    onChange={(e) => setEditingRecord({
+                      ...editingRecord,
+                      newName: e.target.value
+                    })}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #d9d9d9', borderRadius: '4px' }}
+                  />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ color: 'rgba(0, 0, 0, 0.88)', fontSize: '14px' }}>
+                      其中每
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={(() => {
+                        try {
+                          const details = JSON.parse(editingRecord.details || '{}');
+                          return details.hoursPerStudent || 1;
+                        } catch {
+                          return 1;
+                        }
+                      })()}
+                      onChange={(e) => {
+                        const hoursPerStudent = parseFloat(e.target.value) || 1;
+                        const details = JSON.stringify({ hoursPerStudent });
+                        setEditingRecord({
+                          ...editingRecord,
+                          details
+                        });
+                      }}
+                      style={{ width: '80px', padding: '8px', border: '1px solid #d9d9d9', borderRadius: '4px' }}
+                    />
+                    <span style={{ color: 'rgba(0, 0, 0, 0.88)', fontSize: '14px' }}>
+                      课时消耗 {editingRecord.oldName} 1课时
+                    </span>
+                  </div>
+                </div>
+              </>
             ) : (
               // 其他操作显示原名称和新名称
               <>

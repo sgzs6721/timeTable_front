@@ -28,7 +28,7 @@ const ActiveBadge = ({ isArchived = false }) => (
     </div>
   );
 
-const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batchMode, onBatchModeChange }) => {
+const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batchMode, onBatchModeChange, refreshTrigger }) => {
   const [allTimetables, setAllTimetables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTimetables, setSelectedTimetables] = useState([]);
@@ -51,6 +51,10 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
 
   useEffect(() => {
     fetchAllTimetables();
+  }, [showArchived, refreshTrigger]);
+
+  // 单独处理批量模式重置，避免在 fetchAllTimetables 的 useEffect 中引起额外渲染
+  useEffect(() => {
     // 切换课表类型时取消批量操作模式
     if (batchMode) {
       setBatchMode(false);

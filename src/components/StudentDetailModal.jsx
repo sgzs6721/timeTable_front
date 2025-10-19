@@ -137,12 +137,12 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
                   </div>
                   <div style={{ minWidth: '80px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                     <Tag 
-                      color={item.timetableType === '实例课表' ? undefined : undefined} 
+                      color={item.timetableType === '实例课表' ? undefined : (item.timetableType === '大课分配课时' ? undefined : undefined)} 
                       style={{ 
                         fontSize: '10px',
-                        backgroundColor: item.timetableType === '实例课表' ? 'rgba(114, 46, 209, 0.2)' : 'rgba(24, 144, 255, 0.2)',
-                        color: item.timetableType === '实例课表' ? '#722ed1' : '#1890ff',
-                        border: item.timetableType === '实例课表' ? '1px solid rgba(114, 46, 209, 0.3)' : '1px solid rgba(24, 144, 255, 0.3)',
+                        backgroundColor: item.timetableType === '实例课表' ? 'rgba(114, 46, 209, 0.2)' : (item.timetableType === '大课分配课时' ? 'rgba(255, 193, 7, 0.2)' : 'rgba(24, 144, 255, 0.2)'),
+                        color: item.timetableType === '实例课表' ? '#722ed1' : (item.timetableType === '大课分配课时' ? '#ff8c00' : '#1890ff'),
+                        border: item.timetableType === '实例课表' ? '1px solid rgba(114, 46, 209, 0.3)' : (item.timetableType === '大课分配课时' ? '1px solid rgba(255, 193, 7, 0.3)' : '1px solid rgba(24, 144, 255, 0.3)'),
                         display: 'inline-flex',
                         alignItems: 'center',
                         height: '20px'
