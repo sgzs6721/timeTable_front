@@ -5489,18 +5489,6 @@ const MyHours = ({ user }) => {
           </div>
           <div style={{ flex: '1 1 auto', maxWidth: 'calc(50% + 78px)', display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
-              <Select
-                placeholder="排序方式"
-                value={sortOrder}
-                onChange={setSortOrder}
-                style={{ width: '100%' }}
-                options={[
-                  { value: 'desc', label: '倒序' },
-                  { value: 'asc', label: '正序' }
-                ]}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
               {user?.role?.toUpperCase() === 'ADMIN' ? (
                 <Select
                   placeholder="教练"
@@ -5513,6 +5501,18 @@ const MyHours = ({ user }) => {
               ) : (
                 <div style={{ width: '100%' }}></div>
               )}
+            </div>
+            <div style={{ flex: 1 }}>
+              <Select
+                placeholder="排序方式"
+                value={sortOrder}
+                onChange={setSortOrder}
+                style={{ width: '100%' }}
+                options={[
+                  { value: 'desc', label: '倒序' },
+                  { value: 'asc', label: '正序' }
+                ]}
+              />
             </div>
           </div>
         </div>
