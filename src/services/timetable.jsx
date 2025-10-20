@@ -547,3 +547,16 @@ export const getMyHoursPaged = async ({ startDate, endDate, coachId, page, size,
     return response;
   } catch (error) { throw error; }
 };
+
+// 调换两个课程
+export const swapSchedules = async (timetableId, scheduleId1, scheduleId2) => {
+  try {
+    const response = await api.post(`/timetables/${timetableId}/schedules/swap`, {
+      scheduleId1,
+      scheduleId2
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};

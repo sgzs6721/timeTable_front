@@ -167,3 +167,11 @@ export const getAllStudents = (showAll = false, timestamp, coachId = null) => {
     params
   });
 };
+
+// 调换两个周实例课程
+export const swapInstanceSchedules = (scheduleId1, scheduleId2) => {
+  return api.post('/weekly-instances/schedules/swap', {
+    scheduleId1,
+    scheduleId2
+  });
+};

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown, Switch, AutoComplete } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules } from '../services/timetable';
+import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules, swapSchedules } from '../services/timetable';
+import { swapInstanceSchedules } from '../services/weeklyInstance';
 import { invalidateWeeklyTemplatesCache, getInstanceSchedulesByDate } from '../services/admin';
 import { getThisWeekSchedulesSessionOnce } from '../services/timetable';
 import {
@@ -109,7 +110,7 @@ const CancelledOrLeavePopoverContent = ({ info, onClose, onRestore, restoreLoadi
   );
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCopy, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCopy, onSwap, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const [showAllInfo, setShowAllInfo] = React.useState(false);
   const [showLeaveForm, setShowLeaveForm] = React.useState(false);
@@ -239,22 +240,6 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
             {showAllInfo ? '收起' : '全部'}
           </Button>
         )}
-        {/* 占用时间段不显示"请假"按钮，实例课表模式下显示请假按钮 */}
-        {!isBlocked && !isArchived && viewMode === 'instance' && (
-          <Button
-            type="default"
-            size="small"
-            onClick={() => { setShowLeaveForm(!showLeaveForm); setShowAllInfo(false); }}
-            style={{
-              flex: 1,
-              backgroundColor: '#fa8c16',
-              borderColor: '#fa8c16',
-              color: 'white'
-            }}
-          >
-            {showLeaveForm ? '收起' : '请假'}
-          </Button>
-        )}
         {!isArchived && (
           <>
             <Button
@@ -282,6 +267,43 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
               }}
             >
               复制
+            </Button>
+          </>
+        )}
+      </div>
+
+      {/* 第二行：请假、调换、删除按钮 */}
+      <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+        {/* 占用时间段不显示"请假"按钮，实例课表模式下显示请假按钮 */}
+        {!isBlocked && !isArchived && viewMode === 'instance' && (
+          <Button
+            type="default"
+            size="small"
+            onClick={() => { setShowLeaveForm(!showLeaveForm); setShowAllInfo(false); }}
+            style={{
+              flex: 1,
+              backgroundColor: '#fa8c16',
+              borderColor: '#fa8c16',
+              color: 'white'
+            }}
+          >
+            {showLeaveForm ? '收起' : '请假'}
+          </Button>
+        )}
+        {!isArchived && (
+          <>
+            <Button
+              type="default"
+              size="small"
+              onClick={() => onSwap(schedule)}
+              style={{
+                flex: 1,
+                backgroundColor: '#13c2c2',
+                borderColor: '#13c2c2',
+                color: 'white'
+              }}
+            >
+              调换
             </Button>
             <Button
               type="primary"
@@ -691,6 +713,13 @@ const ViewTimetable = ({ user }) => {
   const [selectedCopyTargets, setSelectedCopyTargets] = useState(new Set());
   const [copyLoading, setCopyLoading] = useState(false);
 
+  // 调换功能状态
+  const [swapMode, setSwapMode] = useState(false);
+  const [scheduleToSwap, setScheduleToSwap] = useState(null);
+  const [selectedSwapTarget, setSelectedSwapTarget] = useState(null);
+  const [swapTargetText, setSwapTargetText] = useState('请选择要调换的课程');
+  const [swapLoading, setSwapLoading] = useState(false);
+
   // 删除功能状态
   const [deleteLoading, setDeleteLoading] = useState(false);
   
@@ -872,6 +901,23 @@ const ViewTimetable = ({ user }) => {
   // 获取显示的学生名称（占用时间段显示"占用"）
   const getDisplayName = (schedule) => {
     return schedule.studentName === '【占用】' ? '占用' : schedule.studentName;
+  };
+
+  // 根据日期和时间获取对应的课程
+  const getScheduleForCell = (dayKey, timeIndex) => {
+    const timeSlots = ['09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00'];
+    const timeSlot = timeSlots[timeIndex];
+    if (!timeSlot) return null;
+    
+    const [startTime, endTime] = timeSlot.split('-');
+    const startTimeFormatted = `${startTime}:00`;
+    const endTimeFormatted = `${endTime}:00`;
+    
+    return allSchedules.find(schedule => 
+      schedule.dayOfWeek?.toUpperCase() === dayKey.toUpperCase() &&
+      schedule.startTime === startTimeFormatted &&
+      schedule.endTime === endTimeFormatted
+    );
   };
 
   // 计算课程的课时数（半小时课程按0.5计算，占用时间段不计入课时）
@@ -1210,10 +1256,17 @@ const ViewTimetable = ({ user }) => {
       } else if (copyMode) {
         e.stopPropagation();
         handleSelectCopyTarget(day.key, timeIndex);
+      } else if (swapMode) {
+        e.stopPropagation();
+        // 在调换模式下，需要点击有内容的单元格
+        const schedule = getScheduleForCell(day.key, timeIndex);
+        if (schedule && schedule.id !== scheduleToSwap?.id) {
+          handleSelectSwapTarget(schedule);
+        }
       }
     };
 
-    if (multiSelectMode || moveMode || copyMode) {
+    if (multiSelectMode || moveMode || copyMode || swapMode) {
        // ... existing multi-select/move/copy rendering logic ...
        // This part is simplified for brevity. The original logic remains.
        return (
@@ -2362,6 +2415,21 @@ const ViewTimetable = ({ user }) => {
       setDeleteMode(false);
       setSelectedSchedulesForDelete(new Set());
     }
+    if (moveMode) {
+      setMoveMode(false);
+      setScheduleToMove(null);
+      setSelectedMoveTarget(null);
+    }
+    if (copyMode) {
+      setCopyMode(false);
+      setScheduleToCopy(null);
+      setSelectedCopyTargets(new Set());
+    }
+    if (swapMode) {
+      setSwapMode(false);
+      setScheduleToSwap(null);
+      setSelectedSwapTarget(null);
+    }
   };
 
   // 兼容旧函数名
@@ -3123,6 +3191,123 @@ const ViewTimetable = ({ user }) => {
     setSelectedCopyTargets(new Set());
     setOpenPopoverKey(null);
     message.info('选择要复制到的时间段（可多选），点击确认复制');
+  };
+
+  const handleStartSwap = (schedule) => {
+    setSwapMode(true);
+    setScheduleToSwap(schedule);
+    setSelectedSwapTarget(null);
+    setOpenPopoverKey(null);
+    message.info('请选择要调换的课程');
+  };
+
+  const handleCancelSwap = () => {
+    setSwapMode(false);
+    setScheduleToSwap(null);
+    setSelectedSwapTarget(null);
+    setSwapTargetText('请选择要调换的课程');
+  };
+
+  const handleSelectSwapTarget = (targetSchedule) => {
+    // 检查源课程和目标课程的课程类型是否匹配
+    const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
+    const targetIsHalfHour = isHalfHourSchedule(targetSchedule);
+    
+    if (sourceIsHalfHour !== targetIsHalfHour) {
+      message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
+      return;
+    }
+    
+    setSelectedSwapTarget(targetSchedule);
+    const dayText = dayMap[targetSchedule.dayOfWeek?.toUpperCase()] || targetSchedule.dayOfWeek;
+    const timeText = `${targetSchedule.startTime?.substring(0, 5)}~${targetSchedule.endTime?.substring(0, 5)}`;
+    setSwapTargetText(`与 ${targetSchedule.studentName} (周${dayText}，${timeText}) 调换`);
+  };
+
+  const handleConfirmSwap = async () => {
+    if (!selectedSwapTarget || !scheduleToSwap) {
+      message.warning('请先选择要调换的课程');
+      return;
+    }
+
+    setSwapLoading(true);
+    
+    try {
+      let response;
+      
+      if (viewMode === 'instance') {
+        // 在实例视图下，使用实例课程的 ID 调用周实例调换接口
+        const schedule1Id = scheduleToSwap.id;
+        const schedule2Id = selectedSwapTarget.id;
+        
+        console.log('调换周实例课程信息:', {
+          viewMode,
+          scheduleToSwap: {
+            id: scheduleToSwap.id,
+            studentName: scheduleToSwap.studentName
+          },
+          selectedSwapTarget: {
+            id: selectedSwapTarget.id,
+            studentName: selectedSwapTarget.studentName
+          },
+          schedule1Id,
+          schedule2Id
+        });
+        
+        if (!schedule1Id || !schedule2Id) {
+          message.error('无法获取课程ID，请重试');
+          setSwapLoading(false);
+          return;
+        }
+        
+        response = await swapInstanceSchedules(schedule1Id, schedule2Id);
+      } else {
+        // 在固定课表视图下，使用固定课表的 ID 调用固定课表调换接口
+        const schedule1Id = scheduleToSwap.id;
+        const schedule2Id = selectedSwapTarget.id;
+        
+        console.log('调换固定课表课程信息:', {
+          viewMode,
+          timetableId: timetable.id,
+          scheduleToSwap: {
+            id: scheduleToSwap.id,
+            studentName: scheduleToSwap.studentName
+          },
+          selectedSwapTarget: {
+            id: selectedSwapTarget.id,
+            studentName: selectedSwapTarget.studentName
+          },
+          schedule1Id,
+          schedule2Id
+        });
+        
+        if (!schedule1Id || !schedule2Id) {
+          message.error('无法获取课程ID，请重试');
+          setSwapLoading(false);
+          return;
+        }
+        
+        response = await swapSchedules(timetable.id, schedule1Id, schedule2Id);
+      }
+      
+      if (response && response.success) {
+        message.success('课程调换成功');
+        // 固定课表视图需要清除缓存
+        if (viewMode === 'template') {
+          invalidateTimetableCache(timetableId);
+        }
+        // 刷新数据
+        await refreshSchedulesQuietly();
+        handleCancelSwap();
+      } else {
+        message.error(response?.message || '课程调换失败');
+      }
+    } catch (error) {
+      console.error('调换课程失败:', error);
+      message.error('调换课程失败，请重试');
+    } finally {
+      setSwapLoading(false);
+    }
   };
 
   const handleCancelCopy = () => {
@@ -4180,6 +4365,13 @@ const ViewTimetable = ({ user }) => {
               } else if (copyMode) {
                 e.stopPropagation();
                 handleSelectCopyTarget(day.key, record.key);
+              } else if (swapMode) {
+                e.stopPropagation();
+                // 在调换模式下，需要点击有内容的单元格
+                const schedule = getScheduleForCell(day.key, record.key);
+                if (schedule && schedule.id !== scheduleToSwap?.id) {
+                  handleSelectSwapTarget(schedule);
+                }
               }
             };
 
@@ -4481,6 +4673,7 @@ const ViewTimetable = ({ user }) => {
             );
           }
 
+
           const cellKey = `${day.key}-${record.key}`;
           const handleOpenChange = (newOpen) => {
             setOpenPopoverKey(newOpen ? cellKey : null);
@@ -4496,6 +4689,7 @@ const ViewTimetable = ({ user }) => {
                     onUpdateName={(newName) => handleSaveStudentName(student, newName)}
                     onMove={handleStartMove}
                     onCopy={handleStartCopy}
+                    onSwap={handleStartSwap}
                     timetable={timetable}
                     isArchived={timetable?.isArchived}
                     onClose={() => setOpenPopoverKey(null)}
@@ -4515,11 +4709,13 @@ const ViewTimetable = ({ user }) => {
             </div>
           );
 
-          // 在移动模式、复制模式或多选模式下，有内容的单元格不可点击
-          if (moveMode || copyMode || multiSelectMode) {
+          // 在移动模式、复制模式、调换模式或多选模式下，有内容的单元格需要特殊处理
+          // 在调换模式下，有内容的单元格可以点击选择要调换的目标课程
+          if (moveMode || copyMode || multiSelectMode || swapMode) {
             const isSourceCellForMove = moveMode && scheduleToMove && schedules.some(s => s.id === scheduleToMove.id);
             const isSourceCellForCopy = copyMode && scheduleToCopy && schedules.some(s => s.id === scheduleToCopy.id);
-            const isSourceCell = isSourceCellForMove || isSourceCellForCopy;
+            const isSourceCellForSwap = swapMode && scheduleToSwap && schedules.some(s => s.id === scheduleToSwap.id);
+            const isSourceCell = isSourceCellForMove || isSourceCellForCopy || isSourceCellForSwap;
 
             let modeText = '此模式下无法操作已有课程';
             if (moveMode) modeText = '移动模式下无法操作已有课程';
@@ -4529,9 +4725,10 @@ const ViewTimetable = ({ user }) => {
             let sourceCellTitle = '';
             if (isSourceCellForMove) sourceCellTitle = `正在移动: ${scheduleToMove.studentName}`;
             if (isSourceCellForCopy) sourceCellTitle = `正在复制: ${scheduleToCopy.studentName}`;
+            if (isSourceCellForSwap) sourceCellTitle = `源课程: ${scheduleToSwap.studentName}`;
 
-            const sourceHighlightColor = isSourceCellForCopy ? '#722ed1' : '#ff4d4f'; // 紫色用于复制，红色用于移动
-            const sourceHighlightBoxShadow = isSourceCellForCopy ? '0 0 8px rgba(114, 46, 209, 0.7)' : '0 0 8px rgba(255, 77, 79, 0.7)';
+            const sourceHighlightColor = isSourceCellForCopy ? '#722ed1' : isSourceCellForSwap ? '#ff4d4f' : '#ff4d4f'; // 紫色用于复制，红色用于调换和移动
+            const sourceHighlightBoxShadow = isSourceCellForCopy ? '0 0 8px rgba(114, 46, 209, 0.7)' : isSourceCellForSwap ? '0 0 8px rgba(82, 196, 26, 0.7)' : '0 0 8px rgba(255, 77, 79, 0.7)';
 
             // 检查是否有半小时课程
             const hasHalfHourCourse = schedules.some(s => isHalfHourSchedule(s));
@@ -4557,18 +4754,41 @@ const ViewTimetable = ({ user }) => {
                 return minutesFromSlotStart >= 30;
               });
               
+              const isSelectedForSwap = swapMode && selectedSwapTarget && schedules.some(s => s.id === selectedSwapTarget.id);
+              
               return (
-                <div style={{
-                  height: '100%',
-                  minHeight: '48px',
-                  position: 'relative',
-                  width: '100%',
-                  cursor: 'not-allowed',
-                  border: isSourceCell ? `2px solid ${sourceHighlightColor}` : 'none',
-                  boxShadow: isSourceCell ? sourceHighlightBoxShadow : 'none',
-                  borderRadius: isSourceCell ? '4px' : '0',
-                  opacity: isSourceCell ? 1 : 0.6
-                }}>
+                <div 
+                  style={{
+                    height: '100%',
+                    minHeight: '48px',
+                    position: 'relative',
+                    width: '100%',
+                    cursor: swapMode ? 'pointer' : 'not-allowed',
+                    border: isSourceCell ? `2px solid ${sourceHighlightColor}` : (isSelectedForSwap ? '2px solid #52c41a' : 'none'),
+                    boxShadow: isSourceCell ? sourceHighlightBoxShadow : (isSelectedForSwap ? '0 0 8px rgba(82, 196, 26, 0.5)' : 'none'),
+                    borderRadius: isSourceCell || isSelectedForSwap ? '4px' : '0',
+                    opacity: isSourceCell ? 1 : (swapMode ? 1 : 0.6)
+                  }}
+                  onClick={(e) => {
+                    if (swapMode && schedules.length > 0) {
+                      e.stopPropagation();
+                      const targetSchedule = schedules[0];
+                      if (scheduleToSwap && targetSchedule.id === scheduleToSwap.id) {
+                        handleCancelSwap();
+                      } else {
+                        const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
+                        const targetIsHalfHour = isHalfHourSchedule(targetSchedule);
+                        
+                        if (sourceIsHalfHour !== targetIsHalfHour) {
+                          message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
+                          return;
+                        }
+                        
+                        handleSelectSwapTarget(targetSchedule);
+                      }
+                    }
+                  }}
+                >
                   {/* 前半小时区域 */}
                   {firstHalfCourse && (
                     <div style={{
@@ -4612,20 +4832,43 @@ const ViewTimetable = ({ user }) => {
               );
             }
 
+            const isSelectedForSwap = swapMode && selectedSwapTarget && schedules.some(s => s.id === selectedSwapTarget.id);
+            
             return (
-              <div style={{
-                height: '100%',
-                minHeight: '48px',
-                display: 'flex',
-                flexDirection: 'column',
-                width: '100%',
-                cursor: 'not-allowed',
-                // 高亮源单元格
-                border: isSourceCell ? `2px solid ${sourceHighlightColor}` : 'none',
-                boxShadow: isSourceCell ? sourceHighlightBoxShadow : 'none',
-                borderRadius: isSourceCell ? '4px' : '0',
-                opacity: isSourceCell ? 1 : 0.6
-              }}>
+              <div 
+                style={{
+                  height: '100%',
+                  minHeight: '48px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  width: '100%',
+                  cursor: swapMode ? 'pointer' : 'not-allowed',
+                  // 高亮源单元格或已选择的调换目标
+                  border: isSourceCell ? `2px solid ${sourceHighlightColor}` : (isSelectedForSwap ? '2px solid #52c41a' : 'none'),
+                  boxShadow: isSourceCell ? sourceHighlightBoxShadow : (isSelectedForSwap ? '0 0 8px rgba(82, 196, 26, 0.5)' : 'none'),
+                  borderRadius: isSourceCell || isSelectedForSwap ? '4px' : '0',
+                  opacity: isSourceCell ? 1 : (swapMode ? 1 : 0.6)
+                }}
+                onClick={(e) => {
+                  if (swapMode && schedules.length > 0) {
+                    e.stopPropagation();
+                    const targetSchedule = schedules[0];
+                    if (scheduleToSwap && targetSchedule.id === scheduleToSwap.id) {
+                      handleCancelSwap();
+                    } else {
+                      const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
+                      const targetIsHalfHour = isHalfHourSchedule(targetSchedule);
+                      
+                      if (sourceIsHalfHour !== targetIsHalfHour) {
+                        message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
+                        return;
+                      }
+                      
+                      handleSelectSwapTarget(targetSchedule);
+                    }
+                  }
+                }}
+              >
                 {schedules.map((student, idx) => {
                   // 在周实例视图中检查课程的特殊状态
                   const isBlocked = student.studentName === '【占用】';
@@ -4740,13 +4983,61 @@ const ViewTimetable = ({ user }) => {
                     cursor: 'pointer',
                     backgroundColor: isSelected ? '#fff7e6' : 'transparent',
                     border: isSelected ? '2px solid #fa8c16' : '1px solid #f0f0f0',
-                    borderRadius: '4px'
+                    borderRadius: '4px',
+                    // 调换模式下的边框样式
+                    ...(swapMode && (() => {
+                      const isSourceCell = scheduleToSwap && schedules.some(s => s.id === scheduleToSwap.id);
+                      if (isSourceCell) {
+                        return {
+                          border: '2px solid #ff4d4f',
+                          boxShadow: '0 0 8px rgba(255, 77, 79, 0.7)'
+                        };
+                      }
+                      
+                    // 检查是否已选择为调换目标
+                    const isSelectedForSwap = selectedSwapTarget && schedules.some(s => s.id === selectedSwapTarget.id);
+                    if (isSelectedForSwap) {
+                      return {
+                        border: '2px solid #52c41a',
+                        boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)'
+                      };
+                    }
+                    
+                    return {};
+                    })())
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDeleteCellSelection(cellKey, day.key, record.key);
+                    if (swapMode) {
+                      // 调换模式下选择课程
+                      if (schedules.length > 0) {
+                        const targetSchedule = schedules[0];
+                        if (scheduleToSwap && targetSchedule.id === scheduleToSwap.id) {
+                          // 如果点击的是源课程，取消调换
+                          handleCancelSwap();
+                        } else if (targetSchedule.id !== scheduleToSwap?.id) {
+                          // 检查课程类型是否匹配
+                          const sourceIsHalfHour = scheduleToSwap?.isHalfHour || false;
+                          const targetIsHalfHour = targetSchedule?.isHalfHour || false;
+                          
+                          if (sourceIsHalfHour !== targetIsHalfHour) {
+                            message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
+                            return;
+                          }
+                          
+                          // 选择目标课程
+                          handleSelectSwapTarget(targetSchedule);
+                        }
+                      }
+                    } else {
+                      handleDeleteCellSelection(cellKey, day.key, record.key);
+                    }
                   }}
-                  title={isSelected ? '点击取消选择' : '点击选择删除'}
+                  title={swapMode ? (
+                    scheduleToSwap && schedules.some(s => s.id === scheduleToSwap.id) ? 
+                      `源课程: ${scheduleToSwap.studentName} (点击取消)` : 
+                      '点击选择要调换的课程'
+                  ) : (isSelected ? '点击取消选择' : '点击选择删除')}
                 >
                   {/* 前半小时区域 */}
                   {firstHalfCourse && (
@@ -4825,13 +5116,61 @@ const ViewTimetable = ({ user }) => {
                   backgroundColor: isSelected ? '#fff7e6' : 'transparent',
                   border: isSelected ? '2px solid #fa8c16' : '1px solid #f0f0f0',
                   borderRadius: '4px',
-                  position: 'relative'
+                  position: 'relative',
+                  // 调换模式下的边框样式
+                  ...(swapMode && (() => {
+                    const isSourceCell = scheduleToSwap && schedules.some(s => s.id === scheduleToSwap.id);
+                    if (isSourceCell) {
+                      return {
+                        border: '2px solid #ff4d4f',
+                        boxShadow: '0 0 8px rgba(255, 77, 79, 0.7)'
+                      };
+                    }
+                    
+                    // 检查是否已选择为调换目标
+                    const isSelectedForSwap = selectedSwapTarget && schedules.some(s => s.id === selectedSwapTarget.id);
+                    if (isSelectedForSwap) {
+                      return {
+                        border: '2px solid #52c41a',
+                        boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)'
+                      };
+                    }
+                    
+                    return {};
+                  })())
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteCellSelection(cellKey, day.key, record.key);
+                  if (swapMode) {
+                    // 调换模式下选择课程
+                    if (schedules.length > 0) {
+                      const targetSchedule = schedules[0];
+                      if (scheduleToSwap && targetSchedule.id === scheduleToSwap.id) {
+                        // 如果点击的是源课程，取消调换
+                        handleCancelSwap();
+                      } else if (targetSchedule.id !== scheduleToSwap?.id) {
+                        // 检查课程类型是否匹配
+                        const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
+                        const targetIsHalfHour = isHalfHourSchedule(targetSchedule);
+                        
+                        if (sourceIsHalfHour !== targetIsHalfHour) {
+                          message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
+                          return;
+                        }
+                        
+                        // 选择目标课程
+                        handleSelectSwapTarget(targetSchedule);
+                      }
+                    }
+                  } else {
+                    handleDeleteCellSelection(cellKey, day.key, record.key);
+                  }
                 }}
-                title={isSelected ? '点击取消选择' : '点击选择删除'}
+                title={swapMode ? (
+                  scheduleToSwap && schedules.some(s => s.id === scheduleToSwap.id) ? 
+                    `源课程: ${scheduleToSwap.studentName} (点击取消)` : 
+                    '点击选择要调换的课程'
+                ) : (isSelected ? '点击取消选择' : '点击选择删除')}
               >
                 {schedules.map((student, idx) => (
                   <div
@@ -4956,6 +5295,7 @@ const ViewTimetable = ({ user }) => {
                                 onUpdateName={(newName) => handleSaveStudentName(firstHalfCourse, newName)}
                                 onMove={handleStartMove}
                                 onCopy={handleStartCopy}
+                                onSwap={handleStartSwap}
                                 timetable={timetable}
                                 isArchived={timetable?.isArchived}
                                 onClose={() => setOpenPopoverKey(null)}
@@ -4971,10 +5311,28 @@ const ViewTimetable = ({ user }) => {
                             </div>
                           }
                           trigger="click"
-                          open={openPopoverKey === `${cellKey}-first-half`}
-                          onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-first-half` : null)}
+                          open={!swapMode && openPopoverKey === `${cellKey}-first-half`}
+                          onOpenChange={(newOpen) => !swapMode && setOpenPopoverKey(newOpen ? `${cellKey}-first-half` : null)}
                         >
                           <div
+                            onClick={(e) => {
+                              if (swapMode) {
+                                e.stopPropagation();
+                                if (scheduleToSwap && firstHalfCourse.id === scheduleToSwap.id) {
+                                  handleCancelSwap();
+                                } else {
+                                  const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
+                                  const targetIsHalfHour = isHalfHourSchedule(firstHalfCourse);
+                                  
+                                  if (sourceIsHalfHour !== targetIsHalfHour) {
+                                    message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
+                                    return;
+                                  }
+                                  
+                                  handleSelectSwapTarget(firstHalfCourse);
+                                }
+                              }
+                            }}
                             style={{
                               ...getScheduleStyle(firstHalfCourse, studentColorMap.get(firstHalfCourse.studentName)),
                               height: '100%',
@@ -4988,6 +5346,28 @@ const ViewTimetable = ({ user }) => {
                               fontSize: '12px',
                               wordBreak: 'break-word',
                               lineHeight: '1.2',
+                              cursor: swapMode ? 'pointer' : 'default',
+                              // 调换模式下的边框样式
+                              ...(swapMode && (() => {
+                                const isSourceCell = scheduleToSwap && firstHalfCourse.id === scheduleToSwap.id;
+                                if (isSourceCell) {
+                                  return {
+                                    border: '2px solid #ff4d4f',
+                                    boxShadow: '0 0 8px rgba(255, 77, 79, 0.7)'
+                                  };
+                                }
+                                
+                                const sourceIsHalfHour = scheduleToSwap?.isHalfHour || false;
+                                const targetIsHalfHour = firstHalfCourse?.isHalfHour || false;
+                                const canSwap = sourceIsHalfHour === targetIsHalfHour;
+                                
+                                return {
+                                  border: canSwap ? '2px solid #52c41a' : '2px solid #d9d9d9',
+                                  boxShadow: canSwap ? '0 0 8px rgba(82, 196, 26, 0.5)' : 'none',
+                                  opacity: canSwap ? 1 : 0.5,
+                                  cursor: canSwap ? 'pointer' : 'not-allowed'
+                                };
+                              })()),
                               border: borderColor ? `2px solid ${borderColor}` : 'none',
                               zIndex: 1,
                               cursor: 'pointer'
@@ -5083,6 +5463,7 @@ const ViewTimetable = ({ user }) => {
                                 onUpdateName={(newName) => handleSaveStudentName(secondHalfCourse, newName)}
                                 onMove={handleStartMove}
                                 onCopy={handleStartCopy}
+                                onSwap={handleStartSwap}
                                 timetable={timetable}
                                 isArchived={timetable?.isArchived}
                                 onClose={() => setOpenPopoverKey(null)}
@@ -5098,10 +5479,28 @@ const ViewTimetable = ({ user }) => {
                             </div>
                           }
                           trigger="click"
-                          open={openPopoverKey === `${cellKey}-second-half`}
-                          onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-second-half` : null)}
+                          open={!swapMode && openPopoverKey === `${cellKey}-second-half`}
+                          onOpenChange={(newOpen) => !swapMode && setOpenPopoverKey(newOpen ? `${cellKey}-second-half` : null)}
                         >
                           <div
+                            onClick={(e) => {
+                              if (swapMode) {
+                                e.stopPropagation();
+                                if (scheduleToSwap && secondHalfCourse.id === scheduleToSwap.id) {
+                                  handleCancelSwap();
+                                } else {
+                                  const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
+                                  const targetIsHalfHour = isHalfHourSchedule(secondHalfCourse);
+                                  
+                                  if (sourceIsHalfHour !== targetIsHalfHour) {
+                                    message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
+                                    return;
+                                  }
+                                  
+                                  handleSelectSwapTarget(secondHalfCourse);
+                                }
+                              }
+                            }}
                             style={{
                               ...getScheduleStyle(secondHalfCourse, studentColorMap.get(secondHalfCourse.studentName)),
                               height: '100%',
@@ -5115,6 +5514,28 @@ const ViewTimetable = ({ user }) => {
                               fontSize: '12px',
                               wordBreak: 'break-word',
                               lineHeight: '1.2',
+                              cursor: swapMode ? 'pointer' : 'default',
+                              // 调换模式下的边框样式
+                              ...(swapMode && (() => {
+                                const isSourceCell = scheduleToSwap && secondHalfCourse.id === scheduleToSwap.id;
+                                if (isSourceCell) {
+                                  return {
+                                    border: '2px solid #ff4d4f',
+                                    boxShadow: '0 0 8px rgba(255, 77, 79, 0.7)'
+                                  };
+                                }
+                                
+                                const sourceIsHalfHour = scheduleToSwap?.isHalfHour || false;
+                                const targetIsHalfHour = secondHalfCourse?.isHalfHour || false;
+                                const canSwap = sourceIsHalfHour === targetIsHalfHour;
+                                
+                                return {
+                                  border: canSwap ? '2px solid #52c41a' : '2px solid #d9d9d9',
+                                  boxShadow: canSwap ? '0 0 8px rgba(82, 196, 26, 0.5)' : 'none',
+                                  opacity: canSwap ? 1 : 0.5,
+                                  cursor: canSwap ? 'pointer' : 'not-allowed'
+                                };
+                              })()),
                               border: borderColor ? `2px solid ${borderColor}` : 'none',
                               zIndex: 1,
                               cursor: 'pointer'
@@ -5443,37 +5864,41 @@ const ViewTimetable = ({ user }) => {
 
 
 
-      {/* 移动和复制模式的控制区域 */}
-      {(!timetable?.isArchived || isInitialLoading) && (moveMode || copyMode) && (
+      {/* 移动、复制和调换模式的控制区域 */}
+      {(!timetable?.isArchived || isInitialLoading) && (moveMode || copyMode || swapMode) && (
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '1rem',
           padding: '8px 12px',
-          backgroundColor: moveMode ? '#e6f4ff' : '#f6ffed',
+          backgroundColor: moveMode ? '#e6f4ff' : copyMode ? '#f6ffed' : swapMode ? '#f6ffed' : '#e6fffb',
           borderRadius: '6px',
-          border: moveMode ? '1px solid #91caff' : '1px solid #b7eb8f'
+          border: moveMode ? '1px solid #91caff' : copyMode ? '1px solid #b7eb8f' : swapMode ? '1px solid #b7eb8f' : '1px solid #87e8de'
         }}>
-          <span style={{ 
-            fontSize: '14px', 
-            color: moveMode ? '#1890ff' : '#722ed1', 
-            fontWeight: 'bold' 
-          }}>
-            {moveMode ? moveTargetText : '请选择要复制到的时间段'}
-          </span>
+        <span style={{ 
+          fontSize: '14px', 
+          color: moveMode ? '#1890ff' : copyMode ? '#722ed1' : swapMode ? '#52c41a' : '#13c2c2', 
+          fontWeight: 'bold' 
+        }}>
+          {moveMode ? moveTargetText : copyMode ? `已选择 ${selectedCopyTargets.size} 个时间段` : (swapMode ? (
+            scheduleToSwap ? 
+              (selectedSwapTarget ? `调换: ${scheduleToSwap.studentName} ↔ ${selectedSwapTarget.studentName}` : `已选择源课程: ${scheduleToSwap.studentName}，请选择目标课程`) :
+              '请选择要调换的源课程'
+          ) : swapTargetText)}
+        </span>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <Button
               type="default"
               size="small"
-              onClick={moveMode ? handleCancelMove : handleCancelCopy}
+              onClick={moveMode ? handleCancelMove : copyMode ? handleCancelCopy : handleCancelSwap}
               style={{
                 backgroundColor: '#fff2f0',
                 borderColor: '#ffccc7',
                 color: '#cf1322'
               }}
             >
-              {moveMode ? '取消移动' : '取消复制'}
+              {moveMode ? '取消移动' : copyMode ? '取消复制' : '取消调换'}
             </Button>
             {moveMode && selectedMoveTarget && (
               <Button
@@ -5505,6 +5930,22 @@ const ViewTimetable = ({ user }) => {
                 }}
               >
                 确认复制 ({selectedCopyTargets.size})
+              </Button>
+            )}
+            {swapMode && selectedSwapTarget && (
+              <Button
+                type="primary"
+                size="small"
+                loading={swapLoading}
+                onClick={handleConfirmSwap}
+                disabled={swapLoading}
+                style={{
+                  backgroundColor: '#52c41a',
+                  borderColor: '#52c41a',
+                  color: '#ffffff'
+                }}
+              >
+                确认调换
               </Button>
             )}
           </div>
@@ -5829,7 +6270,7 @@ const ViewTimetable = ({ user }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '32px' }}>
             {/* 左侧：多选排课按钮 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
-              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !deleteMode ? (
+              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !swapMode && !deleteMode ? (
                 <Button
                   type={multiSelectMode ? 'default' : 'default'}
                   size="small"
@@ -5867,7 +6308,7 @@ const ViewTimetable = ({ user }) => {
                 </span>
               ) : null}
               {/* 非多选模式时显示课时信息 */}
-              {!multiSelectMode && !deleteMode && !moveMode && !copyMode ? (
+              {!multiSelectMode && !deleteMode && !moveMode && !copyMode && !swapMode ? (
                 <span style={{ 
                   fontSize: '14px', 
                   color: '#666',
@@ -5898,7 +6339,7 @@ const ViewTimetable = ({ user }) => {
             
             {/* 右侧：多选删除按钮、批量排课按钮和批量删除按钮 */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !multiSelectMode ? (
+              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !swapMode && !multiSelectMode ? (
                 <Button
                   type={deleteMode ? 'default' : 'default'}
                   size="small"

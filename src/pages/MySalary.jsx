@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Select, message, Spin, Tag, Statistic, Row, Col, Typography, Empty } from 'antd';
-import { MoneyCollectOutlined } from '@ant-design/icons';
+import { Card, Table, Select, message, Spin, Tag, Typography, Empty } from 'antd';
 import { getAllSalaryCalculations, getSalaryCalculations, getAvailableMonths } from '../services/salaryCalculation';
 import useMediaQuery from '../hooks/useMediaQuery';
 import dayjs from 'dayjs';
@@ -12,15 +11,8 @@ const MySalary = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [salaryData, setSalaryData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'));
-  const [coachFilter, setCoachFilter] = useState('all');
-  const [coaches, setCoaches] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState('all');
   const [availableMonths, setAvailableMonths] = useState([]);
-  const [summaryData, setSummaryData] = useState({
-    totalSalary: 0,
-    totalHours: 0,
-    totalTeachers: 0
-  });
   const isMobile = useMediaQuery('(max-width: 768px)');
   
   // 判断是否为管理员
@@ -32,9 +24,8 @@ const MySalary = ({ user }) => {
   }, []);
 
   useEffect(() => {
-    fetchCoaches();
     filterData();
-  }, [salaryData, selectedMonth, coachFilter]);
+  }, [salaryData, selectedMonth]);
 
   const fetchAvailableMonths = async () => {
     try {
@@ -107,31 +98,6 @@ const MySalary = ({ user }) => {
     }
   };
 
-  const fetchCoaches = async () => {
-    try {
-      // 从工资数据中提取教练列表
-      const uniqueCoaches = [];
-      const coachMap = new Map();
-      
-      salaryData.forEach(item => {
-        if (!coachMap.has(item.coachId)) {
-          coachMap.set(item.coachId, {
-            id: item.coachId,
-            name: item.coachName
-          });
-          uniqueCoaches.push({
-            id: item.coachId,
-            name: item.coachName
-          });
-        }
-      });
-      
-      setCoaches(uniqueCoaches);
-    } catch (error) {
-      console.error('获取教练列表失败:', error);
-    }
-  };
-
   const filterData = () => {
     let filtered = [...salaryData]; // 创建副本避免修改原数组
 
@@ -144,16 +110,16 @@ const MySalary = ({ user }) => {
     if (isAdmin && selectedMonth && selectedMonth !== 'all') {
       filtered = filtered.filter(item => item.month === selectedMonth);
     }
-
-    // 对于管理员，按教练过滤
-    if (isAdmin && coachFilter && coachFilter !== 'all') {
-      filtered = filtered.filter(item => item.coachId === parseInt(coachFilter));
-    }
     
     // 对于普通用户，只显示当年的数据
     if (!isAdmin) {
       const currentYear = dayjs().format('YYYY');
       filtered = filtered.filter(item => item.month.startsWith(currentYear));
+    }
+    
+    // 对于普通用户，只显示有课程的月份（课时数大于0）
+    if (!isAdmin) {
+      filtered = filtered.filter(item => item.totalHours > 0);
     }
 
     // 再次去重（双重保险）：同一个教练在同一个月份只保留一条记录
@@ -176,15 +142,6 @@ const MySalary = ({ user }) => {
     });
 
     setFilteredData(filtered);
-
-    // 计算汇总数据
-    const summary = filtered.reduce((acc, item) => ({
-      totalSalary: acc.totalSalary + item.totalSalary,
-      totalHours: acc.totalHours + item.totalHours,
-      totalTeachers: isAdmin ? filtered.length : 1
-    }), { totalSalary: 0, totalHours: 0, totalTeachers: 0 });
-
-    setSummaryData(summary);
   };
 
   // 处理表格分组数据
@@ -276,21 +233,40 @@ const MySalary = ({ user }) => {
         colSpan: record.isMonthHeader ? 7 : 1
       })
     },
-        {
-          title: '底薪',
-          dataIndex: 'baseSalary',
-          key: 'baseSalary',
-          width: 80,
-          align: 'center',
-          render: (value, record) => {
-            if (record.isMonthHeader) return null;
-            return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
-          },
-          onCell: (record) => ({
-            style: { whiteSpace: 'nowrap', textAlign: 'center' },
-            colSpan: record.isMonthHeader ? 0 : 1
-          })
-        },
+    {
+      title: '应发工资',
+      dataIndex: 'totalSalary',
+      key: 'totalSalary',
+      width: 100,
+      align: 'center',
+      render: (value, record) => {
+        if (record.isMonthHeader) return null;
+        return (
+          <Text strong style={{ fontSize: '16px', whiteSpace: 'nowrap' }}>
+            ¥{Math.round(value)}
+          </Text>
+        );
+      },
+      onCell: (record) => ({
+        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        colSpan: record.isMonthHeader ? 0 : 1
+      })
+    },
+    {
+      title: '底薪',
+      dataIndex: 'baseSalary',
+      key: 'baseSalary',
+      width: 80,
+      align: 'center',
+      render: (value, record) => {
+        if (record.isMonthHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+      },
+      onCell: (record) => ({
+        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        colSpan: record.isMonthHeader ? 0 : 1
+      })
+    },
     {
       title: '课时数',
       dataIndex: 'totalHours',
@@ -306,78 +282,72 @@ const MySalary = ({ user }) => {
         colSpan: record.isMonthHeader ? 0 : 1
       })
     },
-        {
-          title: '课时费',
-          dataIndex: 'hourlyPay',
-          key: 'hourlyPay',
-          width: 90,
-          align: 'center',
-          render: (value, record) => {
-            if (record.isMonthHeader) return null;
-            return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
-          },
-          onCell: (record) => ({
-            style: { whiteSpace: 'nowrap', textAlign: 'center' },
-            colSpan: record.isMonthHeader ? 0 : 1
-          })
-        },
-        {
-          title: '提成',
-          dataIndex: 'commission',
-          key: 'commission',
-          width: 70,
-          align: 'center',
-          render: (value, record) => {
-            if (record.isMonthHeader) return null;
-            return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
-          },
-          onCell: (record) => ({
-            style: { whiteSpace: 'nowrap', textAlign: 'center' },
-            colSpan: record.isMonthHeader ? 0 : 1
-          })
-        },
-        {
-          title: '社保',
-          dataIndex: 'socialSecurity',
-          key: 'socialSecurity',
-          width: 80,
-          align: 'center',
-          render: (value, record) => {
-            if (record.isMonthHeader) return null;
-            return <Text style={{ color: '#52c41a', whiteSpace: 'nowrap' }}>¥{Math.round(value)}</Text>;
-          },
-          onCell: (record) => ({
-            style: { whiteSpace: 'nowrap', textAlign: 'center' },
-            colSpan: record.isMonthHeader ? 0 : 1
-          })
-        },
-        {
-          title: '应发工资',
-          dataIndex: 'totalSalary',
-          key: 'totalSalary',
-          width: 100,
-          align: 'center',
-          render: (value, record) => {
-            if (record.isMonthHeader) return null;
-            return (
-              <Text strong style={{ color: '#52c41a', fontSize: '16px', whiteSpace: 'nowrap' }}>
-                ¥{Math.round(value)}
-              </Text>
-            );
-          },
-          onCell: (record) => ({
-            style: { whiteSpace: 'nowrap', textAlign: 'center' },
-            colSpan: record.isMonthHeader ? 0 : 1
-          })
-        }
+    {
+      title: '课时费',
+      dataIndex: 'hourlyPay',
+      key: 'hourlyPay',
+      width: 90,
+      align: 'center',
+      render: (value, record) => {
+        if (record.isMonthHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+      },
+      onCell: (record) => ({
+        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        colSpan: record.isMonthHeader ? 0 : 1
+      })
+    },
+    {
+      title: '提成',
+      dataIndex: 'commission',
+      key: 'commission',
+      width: 70,
+      align: 'center',
+      render: (value, record) => {
+        if (record.isMonthHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+      },
+      onCell: (record) => ({
+        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        colSpan: record.isMonthHeader ? 0 : 1
+      })
+    },
+    {
+      title: '社保',
+      dataIndex: 'socialSecurity',
+      key: 'socialSecurity',
+      width: 80,
+      align: 'center',
+      render: (value, record) => {
+        if (record.isMonthHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+      },
+      onCell: (record) => ({
+        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        colSpan: record.isMonthHeader ? 0 : 1
+      })
+    }
   ];
 
-  // 生成月份选项（从后端API获取的可用月份列表）
-  const monthOptions = availableMonths.map(month => (
-    <Option key={month} value={month}>
-      {dayjs(month).format('YYYY年MM月')}
-    </Option>
-  ));
+  // 生成月份选项（从后端API获取的可用月份列表，并附带记薪周期）
+  const monthOptions = availableMonths.map(month => {
+    // 找到该月份的salaryPeriod
+    const monthData = salaryData.find(item => item.month === month);
+    const salaryPeriod = monthData?.salaryPeriod;
+    
+    return (
+      <Option key={month} value={month}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{dayjs(month).format('YYYY年MM月')}</span>
+          {salaryPeriod && (
+            <span style={{ fontSize: '12px', color: '#8c8c8c', marginLeft: '12px' }}>
+              {salaryPeriod}
+            </span>
+          )}
+        </div>
+      </Option>
+    );
+  });
 
   return (
     <div style={{ padding: isMobile ? '4px 8px' : '8px 8px 24px 8px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -390,166 +360,28 @@ const MySalary = ({ user }) => {
         }}
         bodyStyle={{ padding: isMobile ? '16px' : '24px' }}
       >
-        {/* 标题 */}
-        <div style={{ marginBottom: 20, fontSize: '16px', fontWeight: 500 }}>
-          <MoneyCollectOutlined style={{ marginRight: 8 }} />
-          我的工资
-        </div>
-
-        {/* 过滤器和记薪周期容器 - 只对管理员显示 */}
+        {/* 月份选择 - 只对管理员显示 */}
         {isAdmin && (
-          <div style={{ 
-            marginBottom: 20, 
-            padding: '20px', 
-            backgroundColor: '#fff', 
-            borderRadius: '8px',
-            border: '1px solid #e8e8e8',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-          }}>
-            {/* 过滤器 */}
-            <Row gutter={16} align="middle" style={{ marginBottom: filteredData.length > 0 ? 20 : 0 }}>
-              <Col xs={12} sm={12}>
-                <div>
-                  <div style={{ 
-                    marginBottom: 8, 
-                    fontSize: '14px', 
-                    fontWeight: 500, 
-                    color: '#262626',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ 
-                      display: 'inline-block', 
-                      width: '3px', 
-                      height: '14px', 
-                      backgroundColor: '#1890ff', 
-                      borderRadius: '2px',
-                      marginRight: '8px'
-                    }}></span>
-                    月份筛选
-                  </div>
-                  <Select
-                    value={selectedMonth}
-                    onChange={setSelectedMonth}
-                    style={{ 
-                      width: '100%', 
-                      minWidth: isMobile ? 100 : 140,
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                    placeholder="请选择月份"
-                    size="large"
-                    suffixIcon={<span style={{ color: '#bfbfbf' }}>▼</span>}
-                  >
-                    <Option value="all">
-                      <span style={{ color: '#1890ff', fontWeight: 500 }}>全部月份</span>
-                    </Option>
-                    {monthOptions}
-                  </Select>
-                </div>
-              </Col>
-              <Col xs={12} sm={12}>
-                <div>
-                  <div style={{ 
-                    marginBottom: 8, 
-                    fontSize: '14px', 
-                    fontWeight: 500, 
-                    color: '#262626',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ 
-                      display: 'inline-block', 
-                      width: '3px', 
-                      height: '14px', 
-                      backgroundColor: '#52c41a', 
-                      borderRadius: '2px',
-                      marginRight: '8px'
-                    }}></span>
-                    教练筛选
-                  </div>
-                  <Select
-                    value={coachFilter}
-                    onChange={setCoachFilter}
-                    style={{ 
-                      width: '100%', 
-                      minWidth: isMobile ? 100 : 140,
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                    placeholder="请选择教练"
-                    size="large"
-                    suffixIcon={<span style={{ color: '#bfbfbf' }}>▼</span>}
-                  >
-                    <Option value="all">
-                      <span style={{ color: '#52c41a', fontWeight: 500 }}>全部教练</span>
-                    </Option>
-                    {coaches.map(coach => (
-                      <Option key={coach.id} value={coach.id}>
-                        {coach.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-              </Col>
-            </Row>
-
-            {/* 记薪周期显示 */}
-            {filteredData.length > 0 && (
-              <div style={{ 
-                padding: '12px 16px', 
-                backgroundColor: '#f0f9ff', 
-                borderRadius: '6px', 
-                borderLeft: '4px solid #1890ff' 
-              }}>
-                <Text style={{ fontSize: '14px', color: '#666' }}>
-                  记薪周期：<Text strong style={{ color: '#1890ff' }}>{filteredData[0].salaryPeriod}</Text>
-                </Text>
-              </div>
-            )}
+          <div style={{ marginBottom: 20 }}>
+            <Select
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              style={{ 
+                width: isMobile ? '100%' : '350px'
+              }}
+              placeholder="请选择月份"
+              size="large"
+            >
+              <Option value="all">
+                <span style={{ color: '#1890ff', fontWeight: 500 }}>全部月份</span>
+              </Option>
+              {monthOptions}
+            </Select>
           </div>
         )}
 
-        {/* 汇总卡片 */}
-        <Row gutter={8} style={{ marginBottom: 20 }}>
-          <Col xs={isAdmin ? 8 : 12} sm={isAdmin ? 8 : 12}>
-            <Card size="small" style={{ textAlign: 'center' }}>
-              <Statistic
-                title={<span style={{ fontSize: '12px' }}>{isAdmin ? '总工资' : `${dayjs().format('YYYY')}年总工资`}</span>}
-                value={Math.round(summaryData.totalSalary)}
-                prefix="¥"
-                valueStyle={{ color: '#52c41a', fontSize: isMobile ? '16px' : '20px' }}
-              />
-            </Card>
-          </Col>
-          <Col xs={isAdmin ? 8 : 12} sm={isAdmin ? 8 : 12}>
-            <Card size="small" style={{ textAlign: 'center' }}>
-              <Statistic
-                title={<span style={{ fontSize: '12px' }}>{isAdmin ? '总课时' : `${dayjs().format('YYYY')}年总课时`}</span>}
-                value={summaryData.totalHours}
-                valueStyle={{ color: '#1890ff', fontSize: isMobile ? '16px' : '20px' }}
-                formatter={(value) => (
-                  <span>{value}{isMobile ? '' : '课时'}</span>
-                )}
-              />
-            </Card>
-          </Col>
-          {isAdmin && (
-            <Col xs={8} sm={8}>
-              <Card size="small" style={{ textAlign: 'center' }}>
-                <Statistic
-                  title={<span style={{ fontSize: '12px' }}>教练数</span>}
-                  value={summaryData.totalTeachers}
-                  valueStyle={{ color: '#722ed1', fontSize: isMobile ? '16px' : '20px' }}
-                  formatter={(value) => (
-                    <span>{value}{isMobile ? '' : '人'}</span>
-                  )}
-                />
-              </Card>
-            </Col>
-          )}
-        </Row>
-
         {/* 工资列表 */}
-        <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '20px' }}>
+        <div>
           <Spin spinning={loading}>
             {filteredData.length === 0 ? (
               <Empty 
@@ -572,6 +404,50 @@ const MySalary = ({ user }) => {
                 })}
                 scroll={{ x: 570 }}
                 size={isMobile ? 'small' : 'middle'}
+                summary={(pageData) => {
+                  // 过滤掉月份标题行
+                  const dataRows = pageData.filter(row => !row.isMonthHeader);
+                  
+                  if (dataRows.length === 0) return null;
+                  
+                  // 计算总计
+                  const totalBaseSalary = dataRows.reduce((sum, row) => sum + (row.baseSalary || 0), 0);
+                  const totalHours = dataRows.reduce((sum, row) => sum + (row.totalHours || 0), 0);
+                  const totalHourlyPay = dataRows.reduce((sum, row) => sum + (row.hourlyPay || 0), 0);
+                  const totalCommission = dataRows.reduce((sum, row) => sum + (row.commission || 0), 0);
+                  const totalSocialSecurity = dataRows.reduce((sum, row) => sum + (row.socialSecurity || 0), 0);
+                  const totalSalarySum = dataRows.reduce((sum, row) => sum + (row.totalSalary || 0), 0);
+                  
+                  return (
+                    <Table.Summary fixed>
+                      <Table.Summary.Row style={{ backgroundColor: '#fafafa', fontWeight: 'bold' }}>
+                        <Table.Summary.Cell index={0} align="center">
+                          <Text strong style={{ color: '#1890ff' }}>总计</Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={1} align="center">
+                          <Text strong style={{ fontSize: '16px' }}>
+                            ¥{Math.round(totalSalarySum)}
+                          </Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={2} align="center">
+                          <Text strong>¥{Math.round(totalBaseSalary)}</Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={3} align="center">
+                          <Text strong>{totalHours}</Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={4} align="center">
+                          <Text strong>¥{Math.round(totalHourlyPay)}</Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={5} align="center">
+                          <Text strong>¥{Math.round(totalCommission)}</Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={6} align="center">
+                          <Text strong>¥{Math.round(totalSocialSecurity)}</Text>
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                    </Table.Summary>
+                  );
+                }}
               />
             )}
           </Spin>

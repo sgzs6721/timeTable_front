@@ -9,6 +9,7 @@ import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedu
 import { getAllStudents } from '../services/weeklyInstance';
 import { renameStudent, hideStudent } from '../services/studentOperationRecords';
 import { mergeStudents } from '../services/studentMerge';
+import { getAllSalaryCalculations, getAvailableMonths } from '../services/salaryCalculation';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
@@ -4930,14 +4931,14 @@ const Dashboard = ({ user }) => {
       }
     );
     
-          // 暂时只对管理员显示我的工资
-          if (user?.role?.toUpperCase() === 'ADMIN') {
-            tabItems.push({
-              key: 'salary',
-              label: '我的工资',
-              children: <MySalary user={user} />
-            });
-          }
+    // 我的工资 - 只有管理员可见
+    if (user?.role?.toUpperCase() === 'ADMIN') {
+      tabItems.push({
+        key: 'salary',
+        label: '我的工资',
+        children: <MySalary user={user} />
+      });
+    }
     
     return tabItems;
   };
@@ -5254,6 +5255,9 @@ const MyHours = ({ user }) => {
   const [coachId, setCoachId] = React.useState(null);
   const [coachOptions, setCoachOptions] = React.useState([]);
   const [sortOrder, setSortOrder] = React.useState('desc'); // 排序顺序：desc=倒序，asc=正序
+  const [selectedMonth, setSelectedMonth] = React.useState(null); // 选择的月份
+  const [availableMonths, setAvailableMonths] = React.useState([]); // 可用月份列表
+  const [salaryData, setSalaryData] = React.useState([]); // 工资数据（用于获取记薪周期）
   const isInitialized = React.useRef(false);
 
   const fetchData = React.useCallback(async () => {
@@ -5312,9 +5316,49 @@ const MyHours = ({ user }) => {
     }
   }, [startDate, endDate, coachId, page, sortOrder]);
 
+  // 获取可用月份和工资数据
+  const fetchAvailableMonthsAndSalary = React.useCallback(async () => {
+    try {
+      const [monthsResp, salaryResp] = await Promise.all([
+        getAvailableMonths(),
+        getAllSalaryCalculations()
+      ]);
+      
+      if (monthsResp && monthsResp.success) {
+        setAvailableMonths(monthsResp.data || []);
+      }
+      
+      if (salaryResp && salaryResp.success) {
+        setSalaryData(salaryResp.data || []);
+      }
+    } catch (error) {
+      console.error('获取月份和工资数据失败:', error);
+    }
+  }, []);
+
+  // 处理月份选择
+  const handleMonthChange = (month) => {
+    setSelectedMonth(month);
+    
+    if (!month) {
+      // 清空选择
+      setStartDate(null);
+      setEndDate(null);
+      return;
+    }
+    
+    // 从工资数据中找到该月份的记薪周期
+    const monthData = salaryData.find(item => item.month === month);
+    if (monthData && monthData.salaryPeriodStart && monthData.salaryPeriodEnd) {
+      setStartDate(dayjs(monthData.salaryPeriodStart));
+      setEndDate(dayjs(monthData.salaryPeriodEnd));
+    }
+  };
+
   // 初始化时加载数据
   React.useEffect(() => { 
-    fetchData(); 
+    fetchData();
+    fetchAvailableMonthsAndSalary();
     isInitialized.current = true;
   }, []); // 空依赖数组，只在组件挂载时执行一次
   
@@ -5426,8 +5470,23 @@ const MyHours = ({ user }) => {
           </div>
         </div>
         
-        {/* 第二行：排序选项和教练选择器，与第一行前两列对齐 */}
+        {/* 第二行：月份选择器、排序选项，与第一行完全对齐 */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ flex: 1 }}>
+            <Select
+              placeholder="选择月份（自动填充记薪周期）"
+              allowClear
+              value={selectedMonth}
+              onChange={handleMonthChange}
+              style={{ width: '100%' }}
+            >
+              {availableMonths.map(month => (
+                <Select.Option key={month} value={month}>
+                  {dayjs(month).format('YYYY年MM月')}
+                </Select.Option>
+              ))}
+            </Select>
+          </div>
           <div style={{ flex: 1 }}>
             <Select
               placeholder="排序方式"
@@ -5440,12 +5499,12 @@ const MyHours = ({ user }) => {
               ]}
             />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 0, minWidth: 72 }}>
             {user?.role?.toUpperCase() === 'ADMIN' ? (
               <Select
-                placeholder="选择教练"
+                placeholder="教练"
                 allowClear
-                style={{ width: '100%' }}
+                style={{ width: 100 }}
                 value={coachId}
                 onChange={setCoachId}
                 options={coachOptions}
@@ -5453,9 +5512,6 @@ const MyHours = ({ user }) => {
             ) : (
               <div style={{ width: '100%', height: 32 }}></div>
             )}
-          </div>
-          <div style={{ flex: 0, minWidth: 72 }}>
-            <div style={{ width: '100%', height: 32 }}></div>
           </div>
         </div>
       </div>
