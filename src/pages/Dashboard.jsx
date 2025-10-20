@@ -5470,11 +5470,11 @@ const MyHours = ({ user }) => {
           </div>
         </div>
         
-        {/* 第二行：月份选择器、排序选项，与第一行完全对齐 */}
+        {/* 第二行：月份选择器和排序选项，与第一行对齐 */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ flex: 1 }}>
             <Select
-              placeholder="选择月份（自动填充记薪周期）"
+              placeholder="选择月份"
               allowClear
               value={selectedMonth}
               onChange={handleMonthChange}
@@ -5487,31 +5487,33 @@ const MyHours = ({ user }) => {
               ))}
             </Select>
           </div>
-          <div style={{ flex: 1 }}>
-            <Select
-              placeholder="排序方式"
-              value={sortOrder}
-              onChange={setSortOrder}
-              style={{ width: '100%' }}
-              options={[
-                { value: 'desc', label: '倒序' },
-                { value: 'asc', label: '正序' }
-              ]}
-            />
-          </div>
-          <div style={{ flex: 0, minWidth: 72 }}>
-            {user?.role?.toUpperCase() === 'ADMIN' ? (
+          <div style={{ flex: '1 1 auto', maxWidth: 'calc(50% + 78px)', display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
               <Select
-                placeholder="教练"
-                allowClear
-                style={{ width: 100 }}
-                value={coachId}
-                onChange={setCoachId}
-                options={coachOptions}
+                placeholder="排序方式"
+                value={sortOrder}
+                onChange={setSortOrder}
+                style={{ width: '100%' }}
+                options={[
+                  { value: 'desc', label: '倒序' },
+                  { value: 'asc', label: '正序' }
+                ]}
               />
-            ) : (
-              <div style={{ width: '100%', height: 32 }}></div>
-            )}
+            </div>
+            <div style={{ flex: 1 }}>
+              {user?.role?.toUpperCase() === 'ADMIN' ? (
+                <Select
+                  placeholder="教练"
+                  allowClear
+                  style={{ width: '100%' }}
+                  value={coachId}
+                  onChange={setCoachId}
+                  options={coachOptions}
+                />
+              ) : (
+                <div style={{ width: '100%' }}></div>
+              )}
+            </div>
           </div>
         </div>
       </div>
