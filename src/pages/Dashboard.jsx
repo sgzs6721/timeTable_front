@@ -18,6 +18,7 @@ import StudentBatchOperationModal from '../components/StudentBatchOperationModal
 import StudentOperationRecordsModal from '../components/StudentOperationRecordsModal';
 import Footer from '../components/Footer';
 import MySalary from './MySalary';
+import CustomerManagement from './CustomerManagement';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
 
@@ -1211,6 +1212,9 @@ const Dashboard = ({ user }) => {
     const tabParam = searchParams.get('tab');
     if (tabParam) {
       return tabParam;
+    }
+    if (user?.position?.toUpperCase() === 'SALES') {
+      return 'customers';
     }
     return user?.role?.toUpperCase() === 'ADMIN' ? 'overview' : 'timetables';
   });
@@ -4897,39 +4901,58 @@ const Dashboard = ({ user }) => {
       });
     }
     
-    // 所有用户都显示我的课表、我的学员、我的课时
-    tabItems.push(
-      {
-        key: 'timetables',
-        label: '我的课表',
-        children: (
-          <div>
-            {renderTimetableList()}
-          </div>
-        )
-      },
-      {
-        key: 'students',
-        label: '我的学员',
-        children: <MyStudents 
-          onStudentClick={(studentName) => {
-            setSelectedStudent(studentName);
-            setSelectedCoach(user?.role?.toUpperCase() === 'ADMIN' ? null : user?.nickname || user?.username); // 普通用户传递自己的名称
-            setStudentDetailVisible(true);
-          }}
-          showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
-        />
-      },
-      {
-        key: 'hours',
-        label: '我的课时',
-        children: (
-          <div style={{ padding: '8px 0' }}>
-            <MyHours user={user} />
-          </div>
-        )
+    // 销售用户只显示我的客户，管理员显示所有tab包括客户管理，其他用户显示我的课表、我的学员、我的课时
+    if (user?.position?.toUpperCase() === 'SALES') {
+      // 销售用户只显示我的客户tab
+      tabItems.push({
+        key: 'customers',
+        label: '我的客户',
+        children: <CustomerManagement user={user} />
+      });
+    } else {
+      // 其他用户显示我的课表、我的学员、我的课时
+      tabItems.push(
+        {
+          key: 'timetables',
+          label: '我的课表',
+          children: (
+            <div>
+              {renderTimetableList()}
+            </div>
+          )
+        },
+        {
+          key: 'students',
+          label: '我的学员',
+          children: <MyStudents 
+            onStudentClick={(studentName) => {
+              setSelectedStudent(studentName);
+              setSelectedCoach(user?.role?.toUpperCase() === 'ADMIN' ? null : user?.nickname || user?.username); // 普通用户传递自己的名称
+              setStudentDetailVisible(true);
+            }}
+            showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
+          />
+        },
+        {
+          key: 'hours',
+          label: '我的课时',
+          children: (
+            <div style={{ padding: '8px 0' }}>
+              <MyHours user={user} />
+            </div>
+          )
+        }
+      );
+      
+      // 管理员也显示客户管理tab
+      if (user?.role?.toUpperCase() === 'ADMIN') {
+        tabItems.push({
+          key: 'customers',
+          label: '客户管理',
+          children: <CustomerManagement user={user} />
+        });
       }
-    );
+    }
     
     // 我的工资 - 只有管理员可见
     if (user?.role?.toUpperCase() === 'ADMIN') {
