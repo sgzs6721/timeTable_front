@@ -21,7 +21,10 @@ import {
   EditOutlined, 
   DeleteOutlined,
   HistoryOutlined,
-  CalendarOutlined
+  CalendarOutlined,
+  CopyOutlined,
+  LeftOutlined,
+  RightOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { 
@@ -214,7 +217,8 @@ const CustomerManagement = ({ user }) => {
       const response = await deleteCustomer(id);
       if (response && response.success) {
         message.success('删除成功');
-        fetchCustomers();
+        // 局部刷新：从列表中移除被删除的客户
+        setCustomers(prevCustomers => prevCustomers.filter(c => c.id !== id));
       } else {
         message.error('删除失败');
       }
@@ -232,8 +236,54 @@ const CustomerManagement = ({ user }) => {
     setHistoryModalVisible(true);
   };
 
-  const handleHistorySuccess = () => {
-    fetchCustomers();
+  const handleHistorySuccess = async (newStatus, lastChangeNote) => {
+    // 局部刷新：只更新当前客户的状态和流转记录
+    if (selectedCustomer) {
+      setCustomers(prevCustomers => 
+        prevCustomers.map(c => {
+          if (c.id === selectedCustomer.id) {
+            return {
+              ...c,
+              status: newStatus,
+              statusText: getStatusText(newStatus),
+              lastStatusChangeNote: lastChangeNote,
+              lastStatusChangeTime: new Date().toISOString()
+            };
+          }
+          return c;
+        })
+      );
+    }
+  };
+
+  const handleCopyCustomerInfo = (customer) => {
+    let copyText = `${customer.childName}\n`;
+    if (customer.parentPhone) {
+      copyText += `${customer.parentPhone}\n`;
+    }
+    if (customer.source) {
+      copyText += `地点：${customer.source}\n`;
+    }
+    copyText += `${getStatusText(customer.status)}\n`;
+    if (customer.notes) {
+      copyText += `${customer.notes}\n`;
+    }
+    if (customer.lastStatusChangeNote) {
+      copyText += `\n最近流转：\n${customer.lastStatusChangeNote}`;
+      if (customer.lastStatusChangeTime) {
+        copyText += ` ${dayjs(customer.lastStatusChangeTime).format('MM-DD HH:mm')}`;
+      }
+      copyText += '\n';
+    }
+    if (customer.createdAt) {
+      copyText += `\n上官 ${dayjs(customer.createdAt).format('YYYY-MM-DD HH:mm')}`;
+    }
+
+    navigator.clipboard.writeText(copyText).then(() => {
+      message.success('客户信息已复制');
+    }).catch(() => {
+      message.error('复制失败');
+    });
   };
 
   const handleResetFilters = () => {
@@ -287,7 +337,17 @@ const CustomerManagement = ({ user }) => {
       if (response && response.success) {
         message.success(editingCustomer ? '更新成功' : '创建成功');
         setModalVisible(false);
-        fetchCustomers();
+        
+        // 局部刷新：只更新或添加当前客户数据
+        if (editingCustomer) {
+          // 更新现有客户
+          setCustomers(prevCustomers => 
+            prevCustomers.map(c => c.id === response.data.id ? response.data : c)
+          );
+        } else {
+          // 添加新客户
+          setCustomers(prevCustomers => [response.data, ...prevCustomers]);
+        }
       } else {
         message.error(response?.message || '操作失败');
       }
@@ -479,8 +539,19 @@ const CustomerManagement = ({ user }) => {
                 {customer.childName}
               </span>
               {customer.parentPhone && (
-                <span style={{ color: '#999', fontSize: '13px', marginLeft: '12px' }}>
+                <span style={{ color: '#999', fontSize: '13px', marginLeft: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   {customer.parentPhone}
+                  <CopyOutlined 
+                    style={{ cursor: 'pointer', fontSize: '12px' }} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(customer.parentPhone).then(() => {
+                        message.success('电话号码已复制');
+                      }).catch(() => {
+                        message.error('复制失败');
+                      });
+                    }}
+                  />
                 </span>
               )}
             </div>
@@ -539,8 +610,8 @@ const CustomerManagement = ({ user }) => {
           )}
         </div>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0', height: '32px' }}>
-          <div style={{ display: 'flex', gap: '8px', color: '#999', fontSize: '12px', flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+          <div style={{ display: 'flex', gap: '8px', color: '#999', fontSize: '12px', flex: 1, alignItems: 'center' }}>
             {customer.createdByName && (
               <span>{customer.createdByName}</span>
             )}
@@ -548,18 +619,30 @@ const CustomerManagement = ({ user }) => {
               <span>{dayjs(customer.createdAt).format('YYYY-MM-DD HH:mm')}</span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
             <Button 
               type="text"
               icon={<HistoryOutlined />}
               title="状态流转记录"
               onClick={(e) => handleOpenHistory(customer, e)}
+              size="small"
+            />
+            <Button 
+              type="text"
+              icon={<CopyOutlined />}
+              title="复制客户信息"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCopyCustomerInfo(customer);
+              }}
+              size="small"
             />
             <Button 
               type="text"
               icon={<EditOutlined />}
               title="编辑"
               onClick={() => handleEdit(customer)}
+              size="small"
             />
             <Popconfirm
               title="确定要删除这个客户吗？"
@@ -573,6 +656,7 @@ const CustomerManagement = ({ user }) => {
                 icon={<DeleteOutlined />}
                 title="删除"
                 onClick={(e) => e.stopPropagation()}
+                size="small"
               />
             </Popconfirm>
           </div>
@@ -734,38 +818,80 @@ const CustomerManagement = ({ user }) => {
               
               return (
                 <>
-                  <div style={{ marginBottom: 12, overflow: 'hidden', width: '100%' }}>
+                  <div style={{ marginBottom: 12, overflow: 'hidden', width: '100%', padding: '0 8px' }}>
                     <div style={{ 
                       display: 'flex', 
-                      justifyContent: 'center', 
+                      justifyContent: 'space-between', 
                       alignItems: 'center', 
                       marginBottom: 12,
                       padding: '8px 20px',
-                      gap: '4em',
                       background: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
                       borderRadius: '8px',
-                      boxShadow: '0 2px 8px rgba(67, 206, 162, 0.25)'
+                      boxShadow: '0 2px 8px rgba(67, 206, 162, 0.25)',
+                      flexWrap: 'nowrap'
                     }}>
-                      <h3 style={{ 
-                        margin: 0,
-                        color: '#fff',
-                        fontSize: '15px',
-                        fontWeight: '500',
-                        letterSpacing: '0.5px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
+                      {/* 左侧上一页按钮 */}
+                      <div style={{ width: '32px', textAlign: 'left', flexShrink: 0 }}>
+                        {validPage > 0 && (
+                          <LeftOutlined 
+                            style={{ 
+                              color: '#fff', 
+                              fontSize: '16px', 
+                              cursor: 'pointer',
+                              padding: '4px'
+                            }}
+                            onClick={() => setCurrentDatePage(validPage - 1)}
+                          />
+                        )}
+                      </div>
+                      
+                      {/* 中间日期和数据 */}
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '2em',
+                        flex: 1,
+                        justifyContent: 'center',
+                        flexWrap: 'nowrap'
                       }}>
-                        <CalendarOutlined />
-                        {formatDateTitle(currentDate)}
-                      </h3>
-                      <span style={{ 
-                        color: 'rgba(255, 255, 255, 0.9)', 
-                        fontSize: '13px',
-                        fontWeight: '400'
-                      }}>
-                        共 {currentCustomers.length} 条数据
-                      </span>
+                        <h3 style={{ 
+                          margin: 0,
+                          color: '#fff',
+                          fontSize: '15px',
+                          fontWeight: '500',
+                          letterSpacing: '0.5px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          <CalendarOutlined />
+                          {formatDateTitle(currentDate)}
+                        </h3>
+                        <span style={{ 
+                          color: 'rgba(255, 255, 255, 0.9)', 
+                          fontSize: '13px',
+                          fontWeight: '400',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          共 {currentCustomers.length} 条数据
+                        </span>
+                      </div>
+                      
+                      {/* 右侧下一页按钮 */}
+                      <div style={{ width: '32px', textAlign: 'right', flexShrink: 0 }}>
+                        {validPage < totalPages - 1 && (
+                          <RightOutlined 
+                            style={{ 
+                              color: '#fff', 
+                              fontSize: '16px', 
+                              cursor: 'pointer',
+                              padding: '4px'
+                            }}
+                            onClick={() => setCurrentDatePage(validPage + 1)}
+                          />
+                        )}
+                      </div>
                     </div>
                     <Row gutter={[4, 8]} style={{ margin: 0, width: '100%' }}>
                       {currentCustomers.map(customer => renderCustomerCard(customer))}

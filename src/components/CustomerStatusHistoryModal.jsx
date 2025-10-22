@@ -58,7 +58,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess }) 
         message.success('状态变更成功');
         form.resetFields();
         if (onSuccess) {
-          onSuccess();
+          onSuccess(values.toStatus, values.notes);
         }
         onCancel();
       } else {
