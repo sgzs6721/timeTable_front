@@ -469,10 +469,8 @@ const CustomerManagement = ({ user }) => {
   const renderCustomerCard = (customer) => (
     <Col key={customer.id} xs={24} sm={12} md={8} lg={8} xl={8}>
       <Card
-        hoverable
         style={{ height: '100%' }}
         bodyStyle={{ padding: '12px' }}
-        onClick={() => handleEdit(customer)}
       >
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -509,9 +507,39 @@ const CustomerManagement = ({ user }) => {
               {customer.notes}
             </div>
           )}
+
+          {customer.lastStatusChangeNote && (
+            <div style={{ 
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: '1px dashed #e8e8e8'
+            }}>
+              <div style={{ 
+                color: '#666', 
+                fontSize: '12px',
+                marginBottom: 2
+              }}>
+                最近流转：
+              </div>
+              <div style={{ 
+                color: '#999', 
+                fontSize: '12px',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                lineHeight: '1.5'
+              }}>
+                {customer.lastStatusChangeNote}
+                {customer.lastStatusChangeTime && (
+                  <span style={{ marginLeft: '8px', color: '#bbb' }}>
+                    {dayjs(customer.lastStatusChangeTime).format('MM-DD HH:mm')}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0', height: '32px' }}>
           <div style={{ display: 'flex', gap: '8px', color: '#999', fontSize: '12px', flex: 1 }}>
             {customer.createdByName && (
               <span>{customer.createdByName}</span>
@@ -531,17 +559,11 @@ const CustomerManagement = ({ user }) => {
               type="text"
               icon={<EditOutlined />}
               title="编辑"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEdit(customer);
-              }}
+              onClick={() => handleEdit(customer)}
             />
             <Popconfirm
               title="确定要删除这个客户吗？"
-              onConfirm={(e) => {
-                e.stopPropagation();
-                handleDelete(customer.id);
-              }}
+              onConfirm={() => handleDelete(customer.id)}
               okText="确定"
               cancelText="取消"
             >
