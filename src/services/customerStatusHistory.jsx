@@ -35,3 +35,30 @@ export const getCustomerStatusHistory = async (customerId) => {
   }
 };
 
+export const updateCustomerStatusHistory = async (historyId, data) => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/customers/status-history/${historyId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('更新历史记录失败:', error);
+    throw error;
+  }
+};
+
+export const deleteCustomerStatusHistory = async (historyId) => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/customers/status-history/${historyId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('删除历史记录失败:', error);
+    throw error;
+  }
+};
+

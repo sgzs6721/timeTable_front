@@ -10,11 +10,14 @@ import {
   Tag, 
   Space, 
   Popconfirm,
+  Popover,
   Row,
   Col,
   Spin,
   Radio,
-  Pagination
+  Pagination,
+  DatePicker,
+  TimePicker
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -24,7 +27,9 @@ import {
   CalendarOutlined,
   CopyOutlined,
   LeftOutlined,
-  RightOutlined
+  RightOutlined,
+  BellOutlined,
+  PhoneOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { 
@@ -34,6 +39,7 @@ import {
   deleteCustomer, 
   getCustomersByStatus 
 } from '../services/customer';
+import { createTodo, checkCustomerHasTodo, getTodos, updateTodo } from '../services/todo';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 import './CustomerManagement.css';
@@ -41,7 +47,7 @@ import './CustomerManagement.css';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const CustomerManagement = ({ user }) => {
+const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
@@ -51,6 +57,12 @@ const CustomerManagement = ({ user }) => {
   const [activeTab, setActiveTab] = useState('all');
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [todoModalVisible, setTodoModalVisible] = useState(false);
+  const [todoCustomer, setTodoCustomer] = useState(null);
+  const [todoReminderDate, setTodoReminderDate] = useState(null);
+  const [todoReminderTime, setTodoReminderTime] = useState(null);
+  const [todoContent, setTodoContent] = useState('');
+  const [editingTodoId, setEditingTodoId] = useState(null);
   const [salesFilter, setSalesFilter] = useState('all');
   const [timeFilterType, setTimeFilterType] = useState('all');
   const [selectedDate, setSelectedDate] = useState('');
@@ -59,6 +71,20 @@ const CustomerManagement = ({ user }) => {
   const [availableDates, setAvailableDates] = useState([]);
   const [availableWeeks, setAvailableWeeks] = useState([]);
   const [availableMonths, setAvailableMonths] = useState([]);
+  const [customerTodoStatus, setCustomerTodoStatus] = useState({});
+  const [latestTodoByCustomer, setLatestTodoByCustomer] = useState({});
+  const [todoInfoLoadingId, setTodoInfoLoadingId] = useState(null);
+  // 供外部调用：当其它地方创建了待办后，局部刷新某个客户的铃铛和数据
+  React.useImperativeHandle(ref, () => ({
+    onTodoCreatedExternally: ({ id, childName, parentPhone }) => {
+      setCustomerTodoStatus(prev => ({ ...prev, [id]: true }));
+      // 简单更新最新提醒缓存，避免再次点击为空
+      setLatestTodoByCustomer(prev => ({
+        ...prev,
+        [id]: prev[id] || { customerId: id, customerName: childName, customerPhone: parentPhone }
+      }));
+    }
+  }));
 
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
   const isSales = user?.position?.toUpperCase() === 'SALES';
@@ -72,6 +98,7 @@ const CustomerManagement = ({ user }) => {
 
   useEffect(() => {
     extractAvailableDates();
+    checkAllCustomerTodos();
   }, [customers]);
 
   useEffect(() => {
@@ -97,6 +124,65 @@ const CustomerManagement = ({ user }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkAllCustomerTodos = async () => {
+    if (!customers || customers.length === 0) return;
+    
+    const todoStatus = {};
+    // 先批量获取所有待办，构建映射，避免逐个请求
+    let allTodos = [];
+    try {
+      const todosResp = await getTodos();
+      if (todosResp && todosResp.success) {
+        allTodos = todosResp.data || [];
+      }
+    } catch (e) {
+      console.error('获取待办列表失败:', e);
+    }
+
+    const latestMap = {};
+    const byCustomerId = new Map();
+    allTodos.forEach(t => {
+      const key = t.customerId != null ? String(t.customerId) : null;
+      if (key) {
+        const arr = byCustomerId.get(key) || [];
+        arr.push(t);
+        byCustomerId.set(key, arr);
+      }
+    });
+
+    for (const customer of customers) {
+      try {
+        const response = await checkCustomerHasTodo(customer.id);
+        if (response && response.success) {
+          todoStatus[customer.id] = response.data;
+        }
+      } catch (error) {
+        console.error(`检查客户${customer.id}待办失败:`, error);
+      }
+
+      // 匹配该客户最近一条待办（兼容缺失customerId的数据）
+      let candidates = byCustomerId.get(String(customer.id)) || [];
+      if (candidates.length === 0) {
+        candidates = allTodos.filter(t => {
+          const nameMatch = t.customerName === customer.childName;
+          const phoneMatch = customer.parentPhone ? (t.customerPhone === customer.parentPhone) : false;
+          return nameMatch || phoneMatch;
+        });
+      }
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+          const aKey = `${a.reminderDate || a.createdAt || ''} ${a.reminderTime || ''}`;
+          const bKey = `${b.reminderDate || b.createdAt || ''} ${b.reminderTime || ''}`;
+          return bKey.localeCompare(aKey);
+        });
+        latestMap[customer.id] = candidates[0];
+      }
+    }
+
+    setCustomerTodoStatus(todoStatus);
+    setLatestTodoByCustomer(latestMap);
   };
 
   const fetchSalesList = async () => {
@@ -192,7 +278,6 @@ const CustomerManagement = ({ user }) => {
     }
 
     setFilteredCustomers(filtered);
-    setCurrentDatePage(0);
   };
 
   const handleCreate = () => {
@@ -244,15 +329,131 @@ const CustomerManagement = ({ user }) => {
           if (c.id === selectedCustomer.id) {
             return {
               ...c,
-              status: newStatus,
-              statusText: getStatusText(newStatus),
-              lastStatusChangeNote: lastChangeNote,
-              lastStatusChangeTime: new Date().toISOString()
+              status: newStatus || c.status, // 如果 newStatus 为 null，保持原状态
+              statusText: newStatus ? getStatusText(newStatus) : c.statusText,
+              lastStatusChangeNote: lastChangeNote !== undefined ? lastChangeNote : c.lastStatusChangeNote,
+              lastStatusChangeTime: lastChangeNote !== undefined ? new Date().toISOString() : c.lastStatusChangeTime
             };
           }
           return c;
         })
       );
+      
+      // 同时更新 filteredCustomers 以确保筛选后的列表也更新
+      setFilteredCustomers(prevFiltered => 
+        prevFiltered.map(c => {
+          if (c.id === selectedCustomer.id) {
+            return {
+              ...c,
+              status: newStatus || c.status,
+              statusText: newStatus ? getStatusText(newStatus) : c.statusText,
+              lastStatusChangeNote: lastChangeNote !== undefined ? lastChangeNote : c.lastStatusChangeNote,
+              lastStatusChangeTime: lastChangeNote !== undefined ? new Date().toISOString() : c.lastStatusChangeTime
+            };
+          }
+          return c;
+        })
+      );
+    }
+  };
+
+  const handleOpenTodoModal = async (customer, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setTodoCustomer(customer);
+    
+    // 检查是否有现有的待办，如果有则回显
+    const existingTodo = latestTodoByCustomer[customer.id];
+    if (existingTodo) {
+      setEditingTodoId(existingTodo.id);
+      setTodoContent(existingTodo.content || `跟进客户 ${customer.childName}`);
+      setTodoReminderDate(existingTodo.reminderDate ? dayjs(existingTodo.reminderDate) : null);
+      setTodoReminderTime(existingTodo.reminderTime ? dayjs(existingTodo.reminderTime, 'HH:mm:ss') : null);
+    } else {
+      setEditingTodoId(null);
+      setTodoContent(`跟进客户 ${customer.childName}`);
+      setTodoReminderDate(null);
+      setTodoReminderTime(null);
+    }
+    
+    setTodoModalVisible(true);
+  };
+
+  const handleCreateTodo = async () => {
+    if (!todoCustomer) return;
+    
+    if (!todoReminderDate) {
+      message.warning('请选择提醒日期');
+      return;
+    }
+
+    if (!todoReminderTime) {
+      message.warning('请选择提醒时间');
+      return;
+    }
+
+    if (!todoContent || todoContent.trim() === '') {
+      message.warning('请输入待办内容');
+      return;
+    }
+
+    try {
+      const todoData = {
+        customerId: todoCustomer.id,
+        customerName: todoCustomer.childName,
+        content: todoContent,
+        reminderDate: todoReminderDate.format('YYYY-MM-DD'),
+        reminderTime: todoReminderTime.format('HH:mm:ss'),
+        type: 'CUSTOMER_FOLLOW_UP',
+        status: 'PENDING'
+      };
+
+      let response;
+      if (editingTodoId) {
+        // 更新现有待办
+        response = await updateTodo(editingTodoId, todoData);
+        if (response && response.success) {
+          message.success('待办提醒已更新');
+        }
+      } else {
+        // 创建新待办
+        response = await createTodo(todoData);
+        if (response && response.success) {
+          message.success('待办提醒已创建');
+        }
+      }
+
+      if (response && response.success) {
+        setTodoModalVisible(false);
+        setTodoCustomer(null);
+        setTodoContent('');
+        setTodoReminderDate(null);
+        setTodoReminderTime(null);
+        setEditingTodoId(null);
+        
+        // 更新客户待办状态
+        setCustomerTodoStatus(prev => ({
+          ...prev,
+          [todoCustomer.id]: true
+        }));
+
+        // 更新缓存的待办信息
+        setLatestTodoByCustomer(prev => ({
+          ...prev,
+          [todoCustomer.id]: response.data
+        }));
+        
+        // 刷新Dashboard的待办数量
+        if (onTodoCreated) {
+          onTodoCreated();
+        }
+      } else {
+        message.error(response?.message || '操作失败');
+      }
+    } catch (error) {
+      console.error('操作失败:', error);
+      message.error('操作失败');
     }
   };
 
@@ -264,19 +465,16 @@ const CustomerManagement = ({ user }) => {
     if (customer.source) {
       copyText += `地点：${customer.source}\n`;
     }
-    copyText += `${getStatusText(customer.status)}\n`;
+    copyText += `状态：${getStatusText(customer.status)}\n`;
     if (customer.notes) {
-      copyText += `${customer.notes}\n`;
+      copyText += `备注：${customer.notes}\n`;
     }
     if (customer.lastStatusChangeNote) {
-      copyText += `\n最近流转：\n${customer.lastStatusChangeNote}`;
+      copyText += `\n最近流转：\n${getStatusText(customer.status)}：${customer.lastStatusChangeNote}`;
       if (customer.lastStatusChangeTime) {
         copyText += ` ${dayjs(customer.lastStatusChangeTime).format('MM-DD HH:mm')}`;
       }
       copyText += '\n';
-    }
-    if (customer.createdAt) {
-      copyText += `\n上官 ${dayjs(customer.createdAt).format('YYYY-MM-DD HH:mm')}`;
     }
 
     navigator.clipboard.writeText(copyText).then(() => {
@@ -291,10 +489,12 @@ const CustomerManagement = ({ user }) => {
     setTimeFilterType('all');
     setSelectedDate('');
     setActiveTab('all');
+    setCurrentDatePage(0);
   };
 
   const handleTimeFilterTypeChange = (type) => {
     setTimeFilterType(type);
+    setCurrentDatePage(0);
     // 切换时间类型时，自动选择第一个可用日期
     if (type === 'day' && availableDates.length > 0) {
       setSelectedDate(availableDates[0]);
@@ -305,6 +505,21 @@ const CustomerManagement = ({ user }) => {
     } else {
       setSelectedDate('');
     }
+  };
+
+  const handleSalesFilterChange = (value) => {
+    setSalesFilter(value);
+    setCurrentDatePage(0);
+  };
+
+  const handleActiveTabChange = (value) => {
+    setActiveTab(value);
+    setCurrentDatePage(0);
+  };
+
+  const handleDateChange = (value) => {
+    setSelectedDate(value);
+    setCurrentDatePage(0);
   };
 
   const getMonthDisplayText = (monthStr) => {
@@ -369,6 +584,37 @@ const CustomerManagement = ({ user }) => {
       'CLOSED': 'default'
     };
     return colors[status] || 'default';
+  };
+
+  const fetchLatestTodoForCustomer = async (customerObj) => {
+    try {
+      if (!customerObj) return;
+      setTodoInfoLoadingId(customerObj.id);
+      const resp = await getTodos();
+      const list = (resp && resp.success ? (resp.data || []) : [])
+        .filter(t => {
+          if (t.customerId != null) {
+            return String(t.customerId) === String(customerObj.id);
+          }
+          const nameMatch = t.customerName === customerObj.childName;
+          const phoneMatch = customerObj.parentPhone ? (t.customerPhone === customerObj.parentPhone) : true;
+          return nameMatch && phoneMatch;
+        });
+      if (list.length > 0) {
+        list.sort((a, b) => {
+          const aKey = `${a.reminderDate || a.createdAt || ''} ${a.reminderTime || ''}`;
+          const bKey = `${b.reminderDate || b.createdAt || ''} ${b.reminderTime || ''}`;
+          return bKey.localeCompare(aKey);
+        });
+        setLatestTodoByCustomer(prev => ({ ...prev, [customerObj.id]: list[0] }));
+      } else {
+        setLatestTodoByCustomer(prev => ({ ...prev, [customerObj.id]: null }));
+      }
+    } catch (e) {
+      console.error('获取客户待办信息失败:', e);
+    } finally {
+      setTodoInfoLoadingId(null);
+    }
   };
 
   const columns = [
@@ -484,9 +730,9 @@ const CustomerManagement = ({ user }) => {
     const statusMap = {
       'NEW': '新建',
       'CONTACTED': '已联系',
-      'SCHEDULED': '已安排上门',
+      'SCHEDULED': '待体验',
       'PENDING_CONFIRM': '待确认',
-      'VISITED': '已上门',
+      'VISITED': '已体验',
       'SOLD': '已成交',
       'RE_EXPERIENCE': '待再体验',
       'CLOSED': '已结束'
@@ -518,6 +764,7 @@ const CustomerManagement = ({ user }) => {
   };
 
   const groupedCustomers = groupCustomersByDate(filteredCustomers);
+  const totalPages = Object.keys(groupedCustomers).length;
 
   // 格式化日期显示
   const formatDateTitle = (dateStr) => {
@@ -538,6 +785,26 @@ const CustomerManagement = ({ user }) => {
               <span style={{ fontSize: '16px', fontWeight: 'bold' }}>
                 {customer.childName}
               </span>
+              {customerTodoStatus[customer.id] && (
+                <BellOutlined 
+                  style={{ 
+                    marginLeft: '8px', 
+                    color: '#faad14',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    animation: 'pulse 2s infinite'
+                  }} 
+                  title="编辑提醒"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // 确保已加载待办信息
+                    if (!latestTodoByCustomer[customer.id]) {
+                      fetchLatestTodoForCustomer(customer);
+                    }
+                    handleOpenTodoModal(customer, e);
+                  }}
+                />
+              )}
               {customer.parentPhone && (
                 <span style={{ color: '#999', fontSize: '13px', marginLeft: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   {customer.parentPhone}
@@ -629,6 +896,23 @@ const CustomerManagement = ({ user }) => {
             />
             <Button 
               type="text"
+              icon={<BellOutlined />}
+              title={customerTodoStatus[customer.id] ? '编辑提醒' : '设置待办提醒'}
+              onClick={(e) => {
+                // 确保已加载待办信息
+                if (customerTodoStatus[customer.id] && !latestTodoByCustomer[customer.id]) {
+                  fetchLatestTodoForCustomer(customer);
+                }
+                handleOpenTodoModal(customer, e);
+              }}
+              size="small"
+              style={{ 
+                color: '#faad14',
+                cursor: 'pointer'
+              }}
+            />
+            <Button 
+              type="text"
               icon={<CopyOutlined />}
               title="复制客户信息"
               onClick={(e) => {
@@ -666,8 +950,8 @@ const CustomerManagement = ({ user }) => {
   );
 
   return (
-    <div style={{ padding: '2px' }}>
-        <Card bodyStyle={{ padding: '8px' }}>
+    <div style={{ padding: '2px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Card bodyStyle={{ padding: '8px', flex: 1, overflow: 'auto' }}>
           {/* 过滤器 */}
           <div className="customer-filter-area" style={{ marginBottom: 12 }}>
             <Row gutter={8}>
@@ -681,7 +965,7 @@ const CustomerManagement = ({ user }) => {
               <Col span={12} style={{ marginBottom: 12 }}>
                 <Select
                   value={salesFilter}
-                  onChange={setSalesFilter}
+                  onChange={handleSalesFilterChange}
                   style={{ width: '100%' }}
                   placeholder="全部销售"
                   size="large"
@@ -699,7 +983,7 @@ const CustomerManagement = ({ user }) => {
             <Col span={isAdmin ? 12 : 24} style={{ marginBottom: 12 }}>
               <Select
                 value={activeTab}
-                onChange={setActiveTab}
+                onChange={handleActiveTabChange}
                 style={{ width: '100%' }}
                 placeholder="全部状态"
                 size="large"
@@ -707,11 +991,11 @@ const CustomerManagement = ({ user }) => {
                 <Option value="all">全部状态</Option>
                 <Option value="NEW">新建</Option>
                 <Option value="CONTACTED">已联系</Option>
-                <Option value="SCHEDULED">已安排上门</Option>
                 <Option value="PENDING_CONFIRM">待确认</Option>
-                <Option value="VISITED">已上门</Option>
-                <Option value="SOLD">已成交</Option>
+                <Option value="SCHEDULED">待体验</Option>
+                <Option value="VISITED">已体验</Option>
                 <Option value="RE_EXPERIENCE">待再体验</Option>
+                <Option value="SOLD">已成交</Option>
                 <Option value="CLOSED">已结束</Option>
               </Select>
             </Col>
@@ -744,7 +1028,7 @@ const CustomerManagement = ({ user }) => {
                 {timeFilterType === 'day' && (
                   <Select
                     value={selectedDate}
-                    onChange={setSelectedDate}
+                    onChange={handleDateChange}
                     style={{ width: '100%' }}
                     placeholder="选择日期"
                     size="large"
@@ -757,7 +1041,7 @@ const CustomerManagement = ({ user }) => {
                 {timeFilterType === 'week' && (
                   <Select
                     value={selectedDate}
-                    onChange={setSelectedDate}
+                    onChange={handleDateChange}
                     style={{ width: '100%' }}
                     placeholder="选择周"
                     size="large"
@@ -772,7 +1056,7 @@ const CustomerManagement = ({ user }) => {
                 {timeFilterType === 'month' && (
                   <Select
                     value={selectedDate}
-                    onChange={setSelectedDate}
+                    onChange={handleDateChange}
                     style={{ width: '100%' }}
                     placeholder="选择月份"
                     size="large"
@@ -898,23 +1182,33 @@ const CustomerManagement = ({ user }) => {
                     </Row>
                   </div>
                   
-                  {totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
-                      <Pagination
-                        current={validPage + 1}
-                        total={totalPages}
-                        pageSize={1}
-                        onChange={(page) => setCurrentDatePage(page - 1)}
-                        showSizeChanger={false}
-                      />
-                    </div>
-                  )}
+                  {/* 分页已移到卡片外部显示 */}
                 </>
               );
             })()}
           </div>
         )}
       </Card>
+
+      {/* 外部分页区域 - 固定在底部 */}
+      {totalPages > 1 && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          padding: '12px 0',
+          backgroundColor: '#fff',
+          borderTop: '1px solid #f0f0f0',
+          flexShrink: 0
+        }}>
+          <Pagination
+            current={Math.min(currentDatePage + 1, totalPages)}
+            total={totalPages}
+            pageSize={1}
+            onChange={(page) => setCurrentDatePage(page - 1)}
+            showSizeChanger={false}
+          />
+        </div>
+      )}
 
       {/* 客户表单模态框 */}
       <Modal
@@ -987,9 +1281,83 @@ const CustomerManagement = ({ user }) => {
         onCancel={() => setHistoryModalVisible(false)}
         customer={selectedCustomer}
         onSuccess={handleHistorySuccess}
+        onTodoCreated={onTodoCreated}
       />
+
+      {/* 待办提醒模态框 */}
+      <Modal
+        title={`${editingTodoId ? '编辑' : '设置'}待办提醒 - ${todoCustomer?.childName || ''}`}
+        open={todoModalVisible}
+        onCancel={() => {
+          setTodoModalVisible(false);
+          setTodoCustomer(null);
+          setTodoContent('');
+          setTodoReminderDate(null);
+          setTodoReminderTime(null);
+          setEditingTodoId(null);
+        }}
+        onOk={handleCreateTodo}
+        okText={editingTodoId ? '保存' : '创建待办'}
+        cancelText="取消"
+        width={500}
+      >
+        <div style={{ padding: '12px 0' }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 8, fontSize: '14px', fontWeight: '500' }}>
+              待办内容
+            </div>
+            <TextArea
+              value={todoContent}
+              onChange={(e) => setTodoContent(e.target.value)}
+              placeholder="请输入待办内容，如：电话回访、预约上门等"
+              rows={3}
+              maxLength={200}
+              showCount
+            />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 8, fontSize: '14px', fontWeight: '500' }}>
+              提醒日期和时间
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <DatePicker
+                value={todoReminderDate}
+                onChange={setTodoReminderDate}
+                style={{ flex: 1 }}
+                placeholder="请选择提醒日期"
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+                format="YYYY-MM-DD"
+              />
+              <TimePicker
+                value={todoReminderTime}
+                onChange={setTodoReminderTime}
+                style={{ flex: 1 }}
+                placeholder="请选择提醒时间"
+                format="HH:mm"
+              />
+            </div>
+          </div>
+
+          {todoCustomer && (
+            <div style={{ 
+              marginTop: 16, 
+              padding: '12px',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '4px',
+              fontSize: '13px',
+              color: '#666'
+            }}>
+              <div><strong>客户信息：</strong></div>
+              <div>姓名：{todoCustomer.childName}</div>
+              {todoCustomer.parentPhone && <div>电话：{todoCustomer.parentPhone}</div>}
+              {todoCustomer.source && <div>来源：{todoCustomer.source}</div>}
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };
 
-export default CustomerManagement;
+export default React.forwardRef(CustomerManagement);

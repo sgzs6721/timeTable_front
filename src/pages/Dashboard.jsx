@@ -19,6 +19,7 @@ import StudentOperationRecordsModal from '../components/StudentOperationRecordsM
 import Footer from '../components/Footer';
 import MySalary from './MySalary';
 import CustomerManagement from './CustomerManagement';
+import TodoList from '../components/TodoList';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
 
@@ -1213,10 +1214,11 @@ const Dashboard = ({ user }) => {
     if (tabParam) {
       return tabParam;
     }
-    if (user?.position?.toUpperCase() === 'SALES') {
-      return 'customers';
+    // 销售和管理员默认打开待办tab
+    if (user?.position?.toUpperCase() === 'SALES' || user?.role?.toUpperCase() === 'ADMIN') {
+      return 'todos';
     }
-    return user?.role?.toUpperCase() === 'ADMIN' ? 'overview' : 'timetables';
+    return 'timetables';
   });
   const [coachesStatistics, setCoachesStatistics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
@@ -1258,6 +1260,32 @@ const Dashboard = ({ user }) => {
   const [selectedWeekStart, setSelectedWeekStart] = useState(null);
   const [dateRange, setDateRange] = useState([]);
 
+  // 待办相关
+  const [unreadTodoCount, setUnreadTodoCount] = useState(0);
+  const [todoListKey, setTodoListKey] = useState(0); // 用于强制刷新TodoList
+
+  const refreshTodoCount = async (payload) => {
+    try {
+      const { getUnreadTodoCount } = await import('../services/todo');
+      const response = await getUnreadTodoCount();
+      if (response && response.success) {
+        setUnreadTodoCount(response.data || 0);
+      }
+      // 如果当前在待办tab，也刷新待办列表
+      if (activeTab === 'todos') {
+        setTodoListKey(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('刷新待办数量失败:', error);
+    }
+    // 透传给客户列表做局部刷新（铃铛置灰）
+    try {
+      if (payload && payload.id != null && customersRef?.current?.onTodoCreatedExternally) {
+        customersRef.current.onTodoCreatedExternally(payload);
+      }
+    } catch (_) {}
+  };
+
 
   // 复制其他教练课程相关状态
   const [copyOtherCoachesToday, setCopyOtherCoachesToday] = useState(true);
@@ -1287,6 +1315,11 @@ const Dashboard = ({ user }) => {
   const handleTabChange = (key) => {
     setActiveTab(key);
     setSearchParams({ tab: key });
+    
+    // 当切换到待办tab时，刷新待办列表
+    if (key === 'todos') {
+      setTodoListKey(prev => prev + 1);
+    }
   };
 
   // 获取所有课表信息并建立教练课表映射
@@ -4892,25 +4925,65 @@ const Dashboard = ({ user }) => {
   const buildTabItems = () => {
     const tabItems = [];
     
-    // 管理员显示教练概览
-    if (user?.role?.toUpperCase() === 'ADMIN') {
+    const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+    const isSales = user?.position?.toUpperCase() === 'SALES';
+    
+    // 管理员显示总览
+    if (isAdmin) {
       tabItems.push({
         key: 'overview',
-        label: '教练概览',
+        label: '总览',
         children: <AdminOverview dayTab={adminDayTab} setDayTab={setAdminDayTab} />
       });
     }
     
-    // 销售用户只显示我的客户，管理员显示所有tab包括客户管理，其他用户显示我的课表、我的学员、我的课时
-    if (user?.position?.toUpperCase() === 'SALES') {
+    // 待办tab - 管理员和销售都可见（在总览或第一个位置）
+    if (isAdmin || isSales) {
+      tabItems.push({
+        key: 'todos',
+        label: unreadTodoCount > 0 ? (
+          <span style={{ position: 'relative', display: 'inline-block' }}>
+            待办
+            <span style={{ 
+              position: 'absolute',
+              top: '-8px',
+              right: '-12px',
+              backgroundColor: '#ff4d4f',
+              color: 'white',
+              borderRadius: '10px',
+              padding: '0 5px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              minWidth: '18px',
+              height: '18px',
+              lineHeight: '18px',
+              textAlign: 'center',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}>{unreadTodoCount}</span>
+          </span>
+        ) : '待办',
+        children: <TodoList key={todoListKey} onUnreadCountChange={setUnreadTodoCount} />
+      });
+    }
+    
+    // 销售用户只显示我的客户，管理员显示所有tab包括数据管理，其他用户显示我的课表、我的学员、我的课时
+    if (isSales) {
       // 销售用户只显示我的客户tab
       tabItems.push({
         key: 'customers',
         label: '我的客户',
-        children: <CustomerManagement user={user} />
+        children: <CustomerManagement user={user} onTodoCreated={refreshTodoCount} />
       });
     } else {
-      // 其他用户显示我的课表、我的学员、我的课时
+      // 其他用户显示：我的课表、我的学员、客源、我的课时（客源在“我的课表”左侧，实际顺序：客源、我的课表、我的学员、我的课时）
+      if (isAdmin) {
+        tabItems.push({
+          key: 'customers',
+          label: '客源',
+          children: <CustomerManagement ref={customersRef} user={user} onTodoCreated={refreshTodoCount} />
+        });
+      }
+
       tabItems.push(
         {
           key: 'timetables',
@@ -4932,30 +5005,23 @@ const Dashboard = ({ user }) => {
             }}
             showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
           />
-        },
-        {
-          key: 'hours',
-          label: '我的课时',
-          children: (
-            <div style={{ padding: '8px 0' }}>
-              <MyHours user={user} />
-            </div>
-          )
         }
       );
       
-      // 管理员也显示客户管理tab
-      if (user?.role?.toUpperCase() === 'ADMIN') {
-        tabItems.push({
-          key: 'customers',
-          label: '客户管理',
-          children: <CustomerManagement user={user} />
-        });
-      }
+      // 我的课时tab
+      tabItems.push({
+        key: 'hours',
+        label: '我的课时',
+        children: (
+          <div style={{ padding: '8px 0' }}>
+            <MyHours user={user} />
+          </div>
+        )
+      });
     }
     
     // 我的工资 - 只有管理员可见
-    if (user?.role?.toUpperCase() === 'ADMIN') {
+    if (isAdmin) {
       tabItems.push({
         key: 'salary',
         label: '我的工资',
@@ -4967,17 +5033,21 @@ const Dashboard = ({ user }) => {
   };
 
   // 显示Tab界面（管理员和普通用户都显示）
+  const customersRef = React.useRef();
   const tabItems = buildTabItems();
   
   return (
-    <div className="page-container" style={{ paddingTop: '0.25rem', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 45px)' }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div className="page-container" style={{ paddingTop: '0.25rem', display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Tabs
         activeKey={activeTab}
         onChange={handleTabChange}
         items={tabItems}
         size="large"
         tabBarGutter={12}
+        style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+        tabBarStyle={{ flexShrink: 0 }}
+        className="dashboard-tabs"
       />
       {/* 模态框等保持不变 */}
       {renderModals()}

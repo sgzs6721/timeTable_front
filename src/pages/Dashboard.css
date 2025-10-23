@@ -421,3 +421,48 @@
   justify-content: center;
   align-items: center;
 }
+/* Dashboard Tabs 滚动控制 */
+.dashboard-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-tabs .ant-tabs-nav {
+  flex-shrink: 0;
+}
+
+.dashboard-tabs .ant-tabs-content-holder {
+  flex: 1;
+  overflow-y: auto; /* 恢复滚动 */
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+.dashboard-tabs .ant-tabs-content {
+  min-height: 100%;
+  padding-bottom: 20px; /* 防止被底部Footer挡住 */
+}
+
+.dashboard-tabs .ant-tabs-tabpane {
+  min-height: 100%;
+}
+
+/* 页面容器完全禁止滚动 */
+.page-container {
+  overflow: hidden !important;
+}
+
+/* 隐藏body和html的滚动条 */
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+body,
+html {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
