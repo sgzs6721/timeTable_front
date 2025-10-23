@@ -2478,38 +2478,54 @@ const ViewTimetable = ({ user }) => {
       // 确保时间是 HH:MM 格式
       return timeStr;
     };
+
+    const normalizeStudentName = (v) => {
+      if (!v) return '';
+      // 去除所有空格、换行符等空白字符
+      return String(v).replace(/\s+/g, '').trim();
+    };
     
     const iDay = normalizeDay(instanceSchedule.dayOfWeek);
     const iStart = normalizeTime(instanceSchedule.startTime);
     const iEnd = normalizeTime(instanceSchedule.endTime);
+    const iStudentName = normalizeStudentName(instanceSchedule.studentName);
     
-    // 使用更宽松的匹配逻辑，先尝试精确匹配
-    let templateSchedule = templateSchedules.find(template => {
+    // 精确匹配：必须星期、开始时间、结束时间都相同
+    const templateSchedule = templateSchedules.find(template => {
       const tDay = normalizeDay(template.dayOfWeek);
       const tStart = normalizeTime(template.startTime);
       const tEnd = normalizeTime(template.endTime);
       return tDay === iDay && tStart === iStart && tEnd === iEnd;
     });
     
-    // 如果精确匹配失败，尝试只匹配时间段（忽略星期）
-    if (!templateSchedule) {
-      templateSchedule = templateSchedules.find(template => {
-        const tStart = normalizeTime(template.startTime);
-        const tEnd = normalizeTime(template.endTime);
-        return tStart === iStart && tEnd === iEnd;
-      });
-    }
-    
-    
     if (!templateSchedule) {
       // 固定课表中没有，但实例中有 - 绿色边框（手动添加）
+      console.log('未找到匹配的模板课程:', {
+        day: iDay,
+        start: iStart,
+        end: iEnd,
+        student: instanceSchedule.studentName
+      });
       return '#52c41a';
     } else {
-      // 固定课表中有，检查学生名是否一致
-      if ((templateSchedule.studentName || '') !== (instanceSchedule.studentName || '')) {
+      // 固定课表中有，检查学生名是否一致（使用标准化后的学生名比较）
+      const tStudentName = normalizeStudentName(templateSchedule.studentName);
+      
+      if (tStudentName !== iStudentName) {
+        console.log('学生名不一致:', {
+          template: templateSchedule.studentName,
+          instance: instanceSchedule.studentName,
+          normalizedTemplate: tStudentName,
+          normalizedInstance: iStudentName
+        });
         return '#faad14'; // 橙色边框
       }
       // 完全一致，不显示任何边框
+      console.log('课程完全一致，无边框:', {
+        day: iDay,
+        time: `${iStart}-${iEnd}`,
+        student: instanceSchedule.studentName
+      });
       return '';
     }
   };
@@ -4887,23 +4903,14 @@ const ViewTimetable = ({ user }) => {
                     // 优先使用比较逻辑确定的边框颜色
                     const comparisonBorderColor = getScheduleBorderColor(student);
                     
+                    // 完全依赖比较逻辑的结果，忽略 isModified 和 isManualAdded 标志
+                    // 如果返回空字符串，说明与固定课表完全一致，不显示边框
+                    borderColor = comparisonBorderColor;
                     
-                    if (comparisonBorderColor) {
-                      borderColor = comparisonBorderColor;
-                      if (comparisonBorderColor === '#52c41a') {
-                        titleText = isSourceCell ? sourceCellTitle : `手动添加的课程 - ${modeText}`;
-                      } else if (comparisonBorderColor === '#faad14') {
-                        titleText = isSourceCell ? sourceCellTitle : `已修改的课程 - ${modeText}`;
-                      }
-                    } else if (isModified) {
-                      borderColor = '#faad14';
-                      titleText = isSourceCell ? sourceCellTitle : `已修改的课程 - ${modeText}`;
-                    }
-                    // 只有在比较逻辑返回绿色边框时，才使用isManualAdded标志
-                    // 这样可以避免与固定课表完全匹配的课程被错误标记为手动添加
-                    else if (isManualAdded && comparisonBorderColor === '#52c41a') {
-                      borderColor = '#52c41a';
+                    if (comparisonBorderColor === '#52c41a') {
                       titleText = isSourceCell ? sourceCellTitle : `手动添加的课程 - ${modeText}`;
+                    } else if (comparisonBorderColor === '#faad14') {
+                      titleText = isSourceCell ? sourceCellTitle : `已修改的课程 - ${modeText}`;
                     }
                   }
                   
@@ -5266,20 +5273,14 @@ const ViewTimetable = ({ user }) => {
                         borderColor = '#1890ff';
                         titleText = '占用时间段 - 点击查看详情或删除';
                       } else {
+                        // 完全依赖比较逻辑的结果
                         const comparisonBorderColor = getScheduleBorderColor(firstHalfCourse);
-                        if (comparisonBorderColor) {
-                          borderColor = comparisonBorderColor;
-                          if (comparisonBorderColor === '#52c41a') {
-                            titleText = '手动添加的课程 - 点击查看详情或删除';
-                          } else if (comparisonBorderColor === '#faad14') {
-                            titleText = '已修改的课程 - 点击查看详情或删除';
-                          }
-                        } else if (isModified) {
-                          borderColor = '#faad14';
-                          titleText = '已修改的课程 - 点击查看详情或删除';
-                        } else if (isManualAdded && comparisonBorderColor === '#52c41a') {
-                          borderColor = '#52c41a';
+                        borderColor = comparisonBorderColor;
+                        
+                        if (comparisonBorderColor === '#52c41a') {
                           titleText = '手动添加的课程 - 点击查看详情或删除';
+                        } else if (comparisonBorderColor === '#faad14') {
+                          titleText = '已修改的课程 - 点击查看详情或删除';
                         }
                       }
                       
@@ -5434,20 +5435,14 @@ const ViewTimetable = ({ user }) => {
                         borderColor = '#1890ff';
                         titleText = '占用时间段 - 点击查看详情或删除';
                       } else {
+                        // 完全依赖比较逻辑的结果
                         const comparisonBorderColor = getScheduleBorderColor(secondHalfCourse);
-                        if (comparisonBorderColor) {
-                          borderColor = comparisonBorderColor;
-                          if (comparisonBorderColor === '#52c41a') {
-                            titleText = '手动添加的课程 - 点击查看详情或删除';
-                          } else if (comparisonBorderColor === '#faad14') {
-                            titleText = '已修改的课程 - 点击查看详情或删除';
-                          }
-                        } else if (isModified) {
-                          borderColor = '#faad14';
-                          titleText = '已修改的课程 - 点击查看详情或删除';
-                        } else if (isManualAdded && comparisonBorderColor === '#52c41a') {
-                          borderColor = '#52c41a';
+                        borderColor = comparisonBorderColor;
+                        
+                        if (comparisonBorderColor === '#52c41a') {
                           titleText = '手动添加的课程 - 点击查看详情或删除';
+                        } else if (comparisonBorderColor === '#faad14') {
+                          titleText = '已修改的课程 - 点击查看详情或删除';
                         }
                       }
                       
@@ -5615,26 +5610,14 @@ const ViewTimetable = ({ user }) => {
                     borderColor = '#1890ff';
                     titleText = '占用时间段 - 点击查看详情或删除';
                   } else {
-                    // 优先使用比较逻辑确定的边框颜色
+                    // 完全依赖比较逻辑的结果
                     const comparisonBorderColor = getScheduleBorderColor(student);
+                    borderColor = comparisonBorderColor;
                     
-                    
-                    if (comparisonBorderColor) {
-                      borderColor = comparisonBorderColor;
-                      if (comparisonBorderColor === '#52c41a') {
-                        titleText = '手动添加的课程 - 点击查看详情或删除';
-                      } else if (comparisonBorderColor === '#faad14') {
-                        titleText = '已修改的课程 - 点击查看详情或删除';
-                      }
-                    } else if (isModified) {
-                      borderColor = '#faad14';
-                      titleText = '已修改的课程 - 点击查看详情或删除';
-                    }
-                    // 只有在比较逻辑返回绿色边框时，才使用isManualAdded标志
-                    // 这样可以避免与固定课表完全匹配的课程被错误标记为手动添加
-                    else if (isManualAdded && comparisonBorderColor === '#52c41a') {
-                      borderColor = '#52c41a';
+                    if (comparisonBorderColor === '#52c41a') {
                       titleText = '手动添加的课程 - 点击查看详情或删除';
+                    } else if (comparisonBorderColor === '#faad14') {
+                      titleText = '已修改的课程 - 点击查看详情或删除';
                     }
                   }
                   

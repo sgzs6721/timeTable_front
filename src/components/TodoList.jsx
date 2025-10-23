@@ -379,31 +379,74 @@ const TodoList = ({ onUnreadCountChange }) => {
 
   return (
     <div style={{ padding: '12px' }}>
-      {/* 顶部筛选按钮 */}
-      <div style={{ marginBottom: 12 }}>
-        <Space>
-          <Button 
-            type={filter === 'all' ? 'primary' : 'default'}
-            onClick={() => setFilter('all')}
-            size="small"
-          >
-            全部 ({todos.length})
-          </Button>
-          <Button 
-            type={filter === 'pending' ? 'primary' : 'default'}
-            onClick={() => setFilter('pending')}
-            size="small"
-          >
-            待办 ({todos.filter(t => t.status !== 'COMPLETED').length})
-          </Button>
-          <Button 
-            type={filter === 'completed' ? 'primary' : 'default'}
-            onClick={() => setFilter('completed')}
-            size="small"
-          >
-            已完成 ({todos.filter(t => t.status === 'COMPLETED').length})
-          </Button>
-        </Space>
+      {/* 顶部筛选tab */}
+      <div style={{ 
+        marginBottom: 16, 
+        display: 'flex', 
+        gap: '4px',
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        backdropFilter: 'blur(10px)',
+        padding: '4px',
+        borderRadius: '8px',
+        border: '1px solid rgba(217, 217, 217, 0.3)'
+      }}>
+        <div 
+          onClick={() => setFilter('all')}
+          style={{
+            flex: 1,
+            padding: '8px 16px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '500',
+            transition: 'all 0.3s',
+            backgroundColor: filter === 'all' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
+            color: filter === 'all' ? '#1890ff' : '#666',
+            backdropFilter: filter === 'all' ? 'blur(10px)' : 'none',
+            border: filter === 'all' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
+          }}
+        >
+          全部 ({todos.length})
+        </div>
+        <div 
+          onClick={() => setFilter('pending')}
+          style={{
+            flex: 1,
+            padding: '8px 16px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '500',
+            transition: 'all 0.3s',
+            backgroundColor: filter === 'pending' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
+            color: filter === 'pending' ? '#1890ff' : '#666',
+            backdropFilter: filter === 'pending' ? 'blur(10px)' : 'none',
+            border: filter === 'pending' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
+          }}
+        >
+          待办 ({todos.filter(t => t.status !== 'COMPLETED').length})
+        </div>
+        <div 
+          onClick={() => setFilter('completed')}
+          style={{
+            flex: 1,
+            padding: '8px 16px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '500',
+            transition: 'all 0.3s',
+            backgroundColor: filter === 'completed' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
+            color: filter === 'completed' ? '#1890ff' : '#666',
+            backdropFilter: filter === 'completed' ? 'blur(10px)' : 'none',
+            border: filter === 'completed' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
+          }}
+        >
+          已完成 ({todos.filter(t => t.status === 'COMPLETED').length})
+        </div>
       </div>
 
       {/* 待办列表 */}

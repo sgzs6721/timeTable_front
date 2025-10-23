@@ -4587,6 +4587,16 @@ const Dashboard = ({ user }) => {
                     flex: 1
                   }}>
                     {(() => {
+                      // 格式化时间：整点显示数字，半点用点号
+                      const formatTime = (timeStr) => {
+                        if (!timeStr) return '';
+                        const [hour, minute] = timeStr.split(':');
+                        if (minute === '00') {
+                          return hour; // 整点只显示小时
+                        }
+                        return `${hour}.${minute}`; // 半点用点号
+                      };
+
                       const rawItems = detailItems;
                       const parsed = rawItems.length > 0
                         ? rawItems.map((item) => {
@@ -4597,15 +4607,21 @@ const Dashboard = ({ user }) => {
                               const name = spaceIdx > 0 ? item.slice(spaceIdx + 1) : item;
                               const [sh, sm, eh, em] = [timeStr.slice(0,2), timeStr.slice(3,5), timeStr.slice(6,8), timeStr.slice(9,11)];
                               const startHour = sh || timeStr.slice(0,2);
-                              const endHour = eh || timeStr.slice(3,5);
-                              return { time: `${startHour}-${endHour}`, name };
+                              const startMinute = sm || timeStr.slice(3,5);
+                              const endHour = eh || timeStr.slice(6,8);
+                              const endMinute = em || timeStr.slice(9,11);
+                              const startFormatted = formatTime(`${startHour}:${startMinute}`);
+                              const endFormatted = formatTime(`${endHour}:${endMinute}`);
+                              return { time: `${startFormatted}-${endFormatted}`, name };
                             }
                             // 后端对象: LocalTime
                             const st = String(item.startTime);
                             const et = String(item.endTime);
-                            const startHour = st.slice(0,2);
-                            const endHour = et.slice(0,2);
-                            return { time: `${startHour}-${endHour}`, name: item.studentName };
+                            const startTime = st.slice(0,5);
+                            const endTime = et.slice(0,5);
+                            const startFormatted = formatTime(startTime);
+                            const endFormatted = formatTime(endTime);
+                            return { time: `${startFormatted}-${endFormatted}`, name: item.studentName };
                           })
                         : [];
 
@@ -5412,22 +5428,37 @@ const MyHours = ({ user }) => {
   // 获取可用月份和工资数据
   const fetchAvailableMonthsAndSalary = React.useCallback(async () => {
     try {
-      const [monthsResp, salaryResp] = await Promise.all([
-        getAvailableMonths(),
-        getAllSalaryCalculations()
-      ]);
-      
-      if (monthsResp && monthsResp.success) {
-        setAvailableMonths(monthsResp.data || []);
-      }
+      const salaryResp = await getAllSalaryCalculations();
       
       if (salaryResp && salaryResp.success) {
         setSalaryData(salaryResp.data || []);
       }
+      
+      // 从课时记录中提取月份（不限制记薪周期）
+      const params = {
+        coachId: user?.role?.toUpperCase() === 'ADMIN' ? (coachId ? String(coachId) : undefined) : undefined,
+        page: 1,
+        size: 1000 // 获取足够多的记录以提取所有月份
+      };
+      const hoursResp = await getMyHoursPaged(params);
+      if (hoursResp && hoursResp.success) {
+        const records = hoursResp.data?.list || [];
+        // 提取所有不重复的月份
+        const monthsSet = new Set();
+        records.forEach(record => {
+          if (record.scheduleDate) {
+            const month = dayjs(record.scheduleDate).format('YYYY-MM');
+            monthsSet.add(month);
+          }
+        });
+        // 转为数组并排序（降序）
+        const monthsArray = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+        setAvailableMonths(monthsArray);
+      }
     } catch (error) {
       console.error('获取月份和工资数据失败:', error);
     }
-  }, []);
+  }, [coachId, user]);
 
   // 处理月份选择
   const handleMonthChange = (month) => {
@@ -5454,6 +5485,13 @@ const MyHours = ({ user }) => {
     fetchAvailableMonthsAndSalary();
     isInitialized.current = true;
   }, []); // 空依赖数组，只在组件挂载时执行一次
+  
+  // 切换教练时重新获取月份
+  React.useEffect(() => {
+    if (isInitialized.current && coachId) {
+      fetchAvailableMonthsAndSalary();
+    }
+  }, [coachId, fetchAvailableMonthsAndSalary]);
   
   // 分页时自动查询
   React.useEffect(() => { 
@@ -5845,3 +5883,4 @@ const SingleMergeModal = ({ visible, studentName, availableStudents, onClose, on
     </Modal>
   );
 };
+

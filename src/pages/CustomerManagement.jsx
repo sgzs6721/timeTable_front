@@ -774,7 +774,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   };
 
   const renderCustomerCard = (customer) => (
-    <Col key={customer.id} xs={24} sm={12} md={8} lg={8} xl={8}>
+    <Col key={customer.id} xs={24} sm={12} md={12} lg={12} xl={12}>
       <Card
         style={{ height: '100%' }}
         bodyStyle={{ padding: '12px' }}
