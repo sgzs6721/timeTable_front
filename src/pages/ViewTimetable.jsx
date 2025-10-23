@@ -2255,6 +2255,15 @@ const ViewTimetable = ({ user }) => {
     setInstancesLoading(true);
     
     try {
+      // 确保模板数据已加载（用于边框颜色比较）
+      if (timetable && timetable.isWeekly && templateSchedules.length === 0) {
+        const templateResponse = await getTemplateSchedules(timetableId);
+        if (templateResponse.success) {
+          setTemplateSchedules(templateResponse.data || []);
+          console.log('已加载固定课表模板数据，共', templateResponse.data?.length || 0, '条');
+        }
+      }
+      
       // 获取指定周实例的课程数据
       const response = await getInstanceSchedules(targetInstance.id);
       if (response.success) {
@@ -2440,14 +2449,19 @@ const ViewTimetable = ({ user }) => {
     if (!timetable || !timetable.isWeekly) {
       return ''; // 非周固定课表，不显示特殊边框
     }
-    if (viewMode !== 'instance' && !loading) {
+    if (viewMode !== 'instance') {
+      console.log('非实例视图，不显示边框，当前viewMode:', viewMode);
       return '';
     }
     
     // 确保模板数据已加载
     if (!templateSchedules || templateSchedules.length === 0) {
+      console.warn('⚠️ 模板数据未加载或为空！templateSchedules:', templateSchedules, 'timetableId:', timetableId);
+      console.warn('课程将不会显示边框，因为无法与固定课表比较');
       return ''; // 模板数据未加载，不显示边框
     }
+    
+    console.log('🔍 开始比较课程边框，模板数据条数:', templateSchedules.length);
     
     // 标准化处理函数，确保格式一致
     const normalizeDay = (v) => {
