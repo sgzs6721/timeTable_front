@@ -467,21 +467,33 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
   const [name, setName] = React.useState('');
   const [isHalfHour, setIsHalfHour] = React.useState(defaultIsHalfHour);
   const [halfHourPosition, setHalfHourPosition] = React.useState(defaultHalfHourPosition); // first: 前半小时, second: 后半小时
+  const [isTrial, setIsTrial] = React.useState(false); // 是否为体验课程
 
   return (
-    <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
-      {/* 时间信息显示和半小时开关 */}
+    <div style={{ width: '300px', display: 'flex', flexDirection: 'column' }}>
+      {/* 时间信息显示、半小时开关和体验开关 */}
       {timeInfo && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
-          <span>{fixedTimeSlot || timeInfo}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>半小时</span>
-            <Switch
-              size="small"
-              checked={isHalfHour}
-              onChange={setIsHalfHour}
-              disabled={addLoading || fixedTimeSlot || disableHalfHourSwitch}
-            />
+          <span style={{ whiteSpace: 'nowrap' }}>{fixedTimeSlot || timeInfo}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ whiteSpace: 'nowrap' }}>半小时</span>
+              <Switch
+                size="small"
+                checked={isHalfHour}
+                onChange={setIsHalfHour}
+                disabled={addLoading || fixedTimeSlot || disableHalfHourSwitch}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ whiteSpace: 'nowrap' }}>体验</span>
+              <Switch
+                size="small"
+                checked={isTrial}
+                onChange={setIsTrial}
+                disabled={addLoading}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -560,6 +572,22 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
           option.value.toLowerCase().indexOf(inputValue.toLowerCase()) >= 0
         }
       />
+      
+      {/* 当没有timeInfo时，单独显示体验开关 */}
+      {!timeInfo && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+            <span style={{ whiteSpace: 'nowrap' }}>体验</span>
+            <Switch
+              size="small"
+              checked={isTrial}
+              onChange={setIsTrial}
+              disabled={addLoading}
+            />
+          </div>
+        </div>
+      )}
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, gap: '8px' }}>
         {onBlock && (
           <Button 
@@ -583,7 +611,7 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
           <Button
             type="primary"
             size="small"
-            onClick={() => onAdd({ studentName: name, isHalfHour, halfHourPosition })}
+            onClick={() => onAdd({ studentName: name, isHalfHour, halfHourPosition, isTrial })}
             loading={addLoading}
             disabled={addLoading}
           >

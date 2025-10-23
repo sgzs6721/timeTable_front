@@ -243,7 +243,7 @@ const TodoList = ({ onUnreadCountChange }) => {
                   <Tag color="blue" style={{ margin: 0, border: 'none' }} icon={<ExclamationCircleOutlined />}>未处理</Tag>
                 )}
                 {isCompleted && (
-                  <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0, border: 'none' }}>已完成</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0, border: 'none' }}>已处理</Tag>
                 )}
                 {isPast && !isCompleted && (
                   <Tag color="red" style={{ margin: 0, border: 'none' }}>已逾期</Tag>
@@ -426,7 +426,7 @@ const TodoList = ({ onUnreadCountChange }) => {
             border: filter === 'pending' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
           }}
         >
-          待办 ({todos.filter(t => t.status !== 'COMPLETED').length})
+          未处理 <span style={{ color: '#ff4d4f' }}>({todos.filter(t => t.status !== 'COMPLETED').length})</span>
         </div>
         <div 
           onClick={() => setFilter('completed')}
@@ -445,7 +445,7 @@ const TodoList = ({ onUnreadCountChange }) => {
             border: filter === 'completed' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
           }}
         >
-          已完成 ({todos.filter(t => t.status === 'COMPLETED').length})
+          已处理 <span style={{ color: '#52c41a' }}>({todos.filter(t => t.status === 'COMPLETED').length})</span>
         </div>
       </div>
 
@@ -457,7 +457,7 @@ const TodoList = ({ onUnreadCountChange }) => {
           </div>
         ) : filteredTodos.length === 0 ? (
           <Empty 
-            description={filter === 'all' ? '暂无待办' : filter === 'pending' ? '暂无待办事项' : '暂无已完成事项'}
+            description={filter === 'all' ? '暂无待办' : filter === 'pending' ? '暂无待办事项' : '暂无已处理事项'}
             style={{ padding: '50px 0' }}
           />
         ) : (

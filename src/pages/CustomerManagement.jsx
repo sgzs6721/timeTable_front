@@ -380,6 +380,41 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     setTodoModalVisible(true);
   };
 
+  // 渲染提醒信息的 Popover 内容
+  const renderTodoPopoverContent = (customer) => {
+    const todo = latestTodoByCustomer[customer.id];
+    if (!todo) {
+      return <div>暂无提醒信息</div>;
+    }
+
+    return (
+      <div style={{ maxWidth: '280px' }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: '13px', color: '#666', marginBottom: 4 }}>提醒时间</div>
+          <div style={{ fontSize: '14px', fontWeight: '500' }}>
+            {todo.reminderDate ? dayjs(todo.reminderDate).format('YYYY-MM-DD') : ''} {todo.reminderTime || ''}
+          </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: '13px', color: '#666', marginBottom: 4 }}>待办内容</div>
+          <div style={{ fontSize: '14px' }}>{todo.content}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <Button 
+            type="primary" 
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenTodoModal(customer, e);
+            }}
+          >
+            编辑
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const handleCreateTodo = async () => {
     if (!todoCustomer) return;
     
@@ -786,24 +821,30 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                 {customer.childName}
               </span>
               {customerTodoStatus[customer.id] && (
-                <BellOutlined 
-                  style={{ 
-                    marginLeft: '8px', 
-                    color: '#faad14',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    animation: 'pulse 2s infinite'
-                  }} 
-                  title="编辑提醒"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // 确保已加载待办信息
-                    if (!latestTodoByCustomer[customer.id]) {
+                <Popover
+                  content={() => renderTodoPopoverContent(customer)}
+                  title="待办提醒"
+                  trigger="click"
+                  onOpenChange={(visible) => {
+                    if (visible && !latestTodoByCustomer[customer.id]) {
                       fetchLatestTodoForCustomer(customer);
                     }
-                    handleOpenTodoModal(customer, e);
                   }}
-                />
+                >
+                  <BellOutlined 
+                    style={{ 
+                      marginLeft: '8px', 
+                      color: '#faad14',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      animation: 'pulse 2s infinite'
+                    }} 
+                    title="查看提醒"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  />
+                </Popover>
               )}
               {customer.parentPhone && (
                 <span style={{ color: '#999', fontSize: '13px', marginLeft: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -894,23 +935,46 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
               onClick={(e) => handleOpenHistory(customer, e)}
               size="small"
             />
-            <Button 
-              type="text"
-              icon={<BellOutlined />}
-              title={customerTodoStatus[customer.id] ? '编辑提醒' : '设置待办提醒'}
-              onClick={(e) => {
-                // 确保已加载待办信息
-                if (customerTodoStatus[customer.id] && !latestTodoByCustomer[customer.id]) {
-                  fetchLatestTodoForCustomer(customer);
-                }
-                handleOpenTodoModal(customer, e);
-              }}
-              size="small"
-              style={{ 
-                color: '#faad14',
-                cursor: 'pointer'
-              }}
-            />
+            {customerTodoStatus[customer.id] ? (
+              <Popover
+                content={() => renderTodoPopoverContent(customer)}
+                title="待办提醒"
+                trigger="click"
+                onOpenChange={(visible) => {
+                  if (visible && !latestTodoByCustomer[customer.id]) {
+                    fetchLatestTodoForCustomer(customer);
+                  }
+                }}
+              >
+                <Button 
+                  type="text"
+                  icon={<BellOutlined />}
+                  title="查看提醒"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  size="small"
+                  style={{ 
+                    color: '#faad14',
+                    cursor: 'pointer'
+                  }}
+                />
+              </Popover>
+            ) : (
+              <Button 
+                type="text"
+                icon={<BellOutlined />}
+                title="设置待办提醒"
+                onClick={(e) => {
+                  handleOpenTodoModal(customer, e);
+                }}
+                size="small"
+                style={{ 
+                  color: '#faad14',
+                  cursor: 'pointer'
+                }}
+              />
+            )}
             <Button 
               type="text"
               icon={<CopyOutlined />}
