@@ -158,17 +158,17 @@ const UserProfile = ({ user }) => {
 
   // 判断是否是微信登录用户（临时账号）
   const isWechatTempUser = () => {
-    return currentUser?.username && currentUser.username.startsWith('wx_');
+    return user?.username && user.username.startsWith('wx_');
   };
 
   // 判断是否是已绑定微信的正式账号
   const isWechatBoundUser = () => {
-    return currentUser?.wechatAvatar && !currentUser?.username?.startsWith('wx_');
+    return user?.wechatAvatar && user?.username && !user.username.startsWith('wx_');
   };
 
   // 判断昵称是否应该禁用（所有微信用户）
   const shouldDisableNickname = () => {
-    return currentUser?.wechatAvatar || currentUser?.username?.startsWith('wx_');
+    return (user?.wechatAvatar || (user?.username && user.username.startsWith('wx_')));
   };
 
   // 判断用户名是否应该禁用（只有已绑定的微信用户）
