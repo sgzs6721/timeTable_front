@@ -14,8 +14,7 @@ import {
   getTodos, 
   markTodoAsRead, 
   markTodoAsCompleted, 
-  deleteTodo,
-  getUnreadTodoCount
+  deleteTodo
 } from '../services/todo';
 import dayjs from 'dayjs';
 import './TodoList.css';
@@ -23,10 +22,10 @@ import './TodoList.css';
 const TodoList = ({ onUnreadCountChange }) => {
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState('all'); // all, pending, completed
+  const [filter, setFilter] = useState('today'); // today, all, pending, completed
   const [expandedHistory, setExpandedHistory] = useState({}); // 控制流转记录展开状态
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(5); // 每页5个
+  const [pageSize] = useState(10); // 每页10个
 
   const handleCopyPhone = (phone) => {
     if (!phone) return;
@@ -48,21 +47,20 @@ const TodoList = ({ onUnreadCountChange }) => {
     }
   };
 
+  // 计算今日待办数量
+  const getTodayTodoCount = (todoList) => {
+    const today = dayjs().format('YYYY-MM-DD');
+    return todoList.filter(todo => {
+      if (todo.status === 'COMPLETED') return false;
+      if (!todo.reminderDate) return false;
+      const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
+      return reminderDay === today;
+    }).length;
+  };
+
   useEffect(() => {
     fetchTodos();
-    fetchUnreadCount();
   }, []);
-
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await getUnreadTodoCount();
-      if (response && response.success && onUnreadCountChange) {
-        onUnreadCountChange(response.data || 0);
-      }
-    } catch (error) {
-      console.error('获取未读数量失败:', error);
-    }
-  };
 
   const fetchTodos = async () => {
     setLoading(true);
@@ -74,6 +72,12 @@ const TodoList = ({ onUnreadCountChange }) => {
           return new Date(b.createdAt) - new Date(a.createdAt);
         });
         setTodos(sortedTodos);
+        
+        // 更新今日待办数量
+        if (onUnreadCountChange) {
+          const todayCount = getTodayTodoCount(sortedTodos);
+          onUnreadCountChange(todayCount);
+        }
       } else {
         message.error('获取待办列表失败');
       }
@@ -89,12 +93,19 @@ const TodoList = ({ onUnreadCountChange }) => {
     try {
       const response = await markTodoAsRead(todoId);
       if (response && response.success) {
-        setTodos(prevTodos => 
-          prevTodos.map(todo => 
+        setTodos(prevTodos => {
+          const newTodos = prevTodos.map(todo => 
             todo.id === todoId ? { ...todo, isRead: true } : todo
-          )
-        );
-        fetchUnreadCount(); // 刷新未读数量
+          );
+          
+          // 更新今日待办数量
+          if (onUnreadCountChange) {
+            const todayCount = getTodayTodoCount(newTodos);
+            onUnreadCountChange(todayCount);
+          }
+          
+          return newTodos;
+        });
         message.success('已标记为已读');
       } else {
         message.error('操作失败');
@@ -123,9 +134,14 @@ const TodoList = ({ onUnreadCountChange }) => {
             }
           }
           
+          // 更新今日待办数量
+          if (onUnreadCountChange) {
+            const todayCount = getTodayTodoCount(newTodos);
+            onUnreadCountChange(todayCount);
+          }
+          
           return newTodos;
         });
-        fetchUnreadCount(); // 刷新未读数量
         message.success('已标记为完成');
       } else {
         message.error('操作失败');
@@ -155,9 +171,14 @@ const TodoList = ({ onUnreadCountChange }) => {
             setCurrentPage(maxPage);
           }
           
+          // 更新今日待办数量
+          if (onUnreadCountChange) {
+            const todayCount = getTodayTodoCount(newTodos);
+            onUnreadCountChange(todayCount);
+          }
+          
           return newTodos;
         });
-        fetchUnreadCount(); // 刷新未读数量
         message.success('删除成功');
       } else {
         message.error('删除失败');
@@ -169,7 +190,16 @@ const TodoList = ({ onUnreadCountChange }) => {
   };
 
   const getFilteredTodos = () => {
-    if (filter === 'pending') {
+    if (filter === 'today') {
+      // 今日待办：提醒日期是今天的未完成待办
+      const today = dayjs().format('YYYY-MM-DD');
+      return todos.filter(todo => {
+        if (todo.status === 'COMPLETED') return false;
+        if (!todo.reminderDate) return false;
+        const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
+        return reminderDay === today;
+      });
+    } else if (filter === 'pending') {
       return todos.filter(todo => todo.status !== 'COMPLETED');
     } else if (filter === 'completed') {
       return todos.filter(todo => todo.status === 'COMPLETED');
@@ -404,10 +434,39 @@ const TodoList = ({ onUnreadCountChange }) => {
             backgroundColor: filter === 'all' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
             color: filter === 'all' ? '#1890ff' : '#666',
             backdropFilter: filter === 'all' ? 'blur(10px)' : 'none',
-            border: filter === 'all' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
+            border: filter === 'all' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent',
+            whiteSpace: 'nowrap'
           }}
         >
-          全部 ({todos.length})
+          全部
+        </div>
+        <div 
+          onClick={() => setFilter('today')}
+          style={{
+            flex: 1,
+            padding: '8px 16px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: '500',
+            transition: 'all 0.3s',
+            backgroundColor: filter === 'today' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
+            color: filter === 'today' ? '#1890ff' : '#666',
+            backdropFilter: filter === 'today' ? 'blur(10px)' : 'none',
+            border: filter === 'today' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          今日 (<span style={{ color: '#ff4d4f' }}>{(() => {
+            const today = dayjs().format('YYYY-MM-DD');
+            return todos.filter(todo => {
+              if (todo.status === 'COMPLETED') return false;
+              if (!todo.reminderDate) return false;
+              const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
+              return reminderDay === today;
+            }).length;
+          })()}</span>)
         </div>
         <div 
           onClick={() => setFilter('pending')}
@@ -423,10 +482,11 @@ const TodoList = ({ onUnreadCountChange }) => {
             backgroundColor: filter === 'pending' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
             color: filter === 'pending' ? '#1890ff' : '#666',
             backdropFilter: filter === 'pending' ? 'blur(10px)' : 'none',
-            border: filter === 'pending' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
+            border: filter === 'pending' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent',
+            whiteSpace: 'nowrap'
           }}
         >
-          未处理 <span style={{ color: '#ff4d4f' }}>({todos.filter(t => t.status !== 'COMPLETED').length})</span>
+          未处理 (<span style={{ color: '#ff4d4f' }}>{todos.filter(t => t.status !== 'COMPLETED').length}</span>)
         </div>
         <div 
           onClick={() => setFilter('completed')}
@@ -442,10 +502,11 @@ const TodoList = ({ onUnreadCountChange }) => {
             backgroundColor: filter === 'completed' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
             color: filter === 'completed' ? '#1890ff' : '#666',
             backdropFilter: filter === 'completed' ? 'blur(10px)' : 'none',
-            border: filter === 'completed' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent'
+            border: filter === 'completed' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent',
+            whiteSpace: 'nowrap'
           }}
         >
-          已处理 <span style={{ color: '#52c41a' }}>({todos.filter(t => t.status === 'COMPLETED').length})</span>
+          已处理 (<span style={{ color: '#52c41a' }}>{todos.filter(t => t.status === 'COMPLETED').length}</span>)
         </div>
       </div>
 
@@ -457,7 +518,12 @@ const TodoList = ({ onUnreadCountChange }) => {
           </div>
         ) : filteredTodos.length === 0 ? (
           <Empty 
-            description={filter === 'all' ? '暂无待办' : filter === 'pending' ? '暂无待办事项' : '暂无已处理事项'}
+            description={
+              filter === 'all' ? '暂无待办' : 
+              filter === 'today' ? '今日暂无待办事项' :
+              filter === 'pending' ? '暂无待办事项' : 
+              '暂无已处理事项'
+            }
             style={{ padding: '50px 0' }}
           />
         ) : (

@@ -1266,10 +1266,19 @@ const Dashboard = ({ user }) => {
 
   const refreshTodoCount = async (payload) => {
     try {
-      const { getUnreadTodoCount } = await import('../services/todo');
-      const response = await getUnreadTodoCount();
+      const { getTodos } = await import('../services/todo');
+      const response = await getTodos();
       if (response && response.success) {
-        setUnreadTodoCount(response.data || 0);
+        // 计算今日待办数量
+        const dayjs = (await import('dayjs')).default;
+        const today = dayjs().format('YYYY-MM-DD');
+        const todayCount = (response.data || []).filter(todo => {
+          if (todo.status === 'COMPLETED') return false;
+          if (!todo.reminderDate) return false;
+          const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
+          return reminderDay === today;
+        }).length;
+        setUnreadTodoCount(todayCount);
       }
       // 如果当前在待办tab，也刷新待办列表
       if (activeTab === 'todos') {

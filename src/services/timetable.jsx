@@ -569,3 +569,13 @@ export const swapSchedules = async (timetableId, scheduleId1, scheduleId2) => {
     throw error;
   }
 };
+
+// 查询学生的体验课程
+export const getTrialSchedule = async (studentName) => {
+  try {
+    const response = await api.get(`/schedules/trial/${encodeURIComponent(studentName)}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};

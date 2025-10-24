@@ -3,6 +3,8 @@ import { Modal, Form, Select, Input, Timeline, Spin, message, Button, Space, Tag
 import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
 import { createTodo, getLatestTodoByCustomer, updateTodo } from '../services/todo';
+import { getTrialSchedule } from '../services/timetable';
+import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -20,6 +22,19 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const [editingHistoryId, setEditingHistoryId] = useState(null);
   const [editingNotes, setEditingNotes] = useState('');
   const [existingTodoId, setExistingTodoId] = useState(null);
+  const [isEditingReminder, setIsEditingReminder] = useState(false);
+  const [tempReminderDate, setTempReminderDate] = useState(null);
+  const [tempReminderTime, setTempReminderTime] = useState(null);
+  const [reminderContent, setReminderContent] = useState('');
+  const [tempReminderContent, setTempReminderContent] = useState('');
+  
+  // 待体验相关状态
+  const [showExperienceSchedule, setShowExperienceSchedule] = useState(false);
+  const [experienceDate, setExperienceDate] = useState(null);
+  const [experienceTimeRange, setExperienceTimeRange] = useState(null);
+  const [availableCoaches, setAvailableCoaches] = useState([]);
+  const [selectedCoach, setSelectedCoach] = useState(null);
+  const [loadingCoaches, setLoadingCoaches] = useState(false);
 
   useEffect(() => {
     if (visible && customer) {
@@ -30,6 +45,24 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       fetchExistingTodo();
       setEditingHistoryId(null);
       setEditingNotes('');
+      
+      // 重置体验安排状态
+      setShowExperienceSchedule(false);
+      setExperienceDate(null);
+      setExperienceTimeRange(null);
+      setAvailableCoaches([]);
+      setSelectedCoach(null);
+    } else if (!visible) {
+      // 关闭模态框时重置状态
+      setShowExperienceSchedule(false);
+      setExperienceDate(null);
+      setExperienceTimeRange(null);
+      setAvailableCoaches([]);
+      setSelectedCoach(null);
+      setIsEditingReminder(false);
+      setTempReminderDate(null);
+      setTempReminderTime(null);
+      setTempReminderContent('');
     }
   }, [visible, customer]);
 
@@ -45,12 +78,14 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         setShowTodoReminder(true);
         setReminderDate(todo.reminderDate ? dayjs(todo.reminderDate) : null);
         setReminderTime(todo.reminderTime ? dayjs(todo.reminderTime, 'HH:mm:ss') : null);
+        setReminderContent(todo.content || '');
       } else {
         // 没有现有的待办，重置
         setExistingTodoId(null);
         setShowTodoReminder(false);
         setReminderDate(null);
         setReminderTime(null);
+        setReminderContent('');
       }
     } catch (error) {
       console.error('获取待办信息失败:', error);
@@ -59,6 +94,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       setShowTodoReminder(false);
       setReminderDate(null);
       setReminderTime(null);
+      setReminderContent('');
     }
   };
 
@@ -153,6 +189,14 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const handleSubmit = async (values) => {
     if (!customer) return;
 
+    // 如果是待体验状态，验证是否选择了时间
+    if (values.toStatus === 'SCHEDULED') {
+      if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
+        message.warning('请选择体验日期和时间');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       // 如果选择的状态和当前状态一样，编辑最近一条历史记录
@@ -179,7 +223,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                 const todoData = {
                   customerId: customer.id,
                   customerName: customer.childName,
-                  content: `跟进客户 ${customer.childName} - ${values.notes || '状态变更提醒'}`,
+                  content: reminderContent || `跟进客户 ${customer.childName} - ${values.notes || '状态变更提醒'}`,
                   reminderDate: reminderDate.format('YYYY-MM-DD'),
                   reminderTime: reminderTime.format('HH:mm:ss'),
                   type: 'CUSTOMER_FOLLOW_UP',
@@ -217,6 +261,12 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
             setShowTodoReminder(false);
             setReminderDate(null);
             setReminderTime(null);
+            setReminderContent('');
+            setShowExperienceSchedule(false);
+            setExperienceDate(null);
+            setExperienceTimeRange(null);
+            setAvailableCoaches([]);
+            setSelectedCoach(null);
             if (onSuccess) {
               onSuccess(values.toStatus, values.notes);
             }
@@ -231,13 +281,56 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       }
 
       // 正常的状态变更
-      const response = await changeCustomerStatus(customer.id, {
+      const statusChangeData = {
         toStatus: values.toStatus,
         notes: values.notes
-      });
+      };
+      
+      // 如果是待体验状态且设置了体验时间，一并保存
+      if (values.toStatus === 'SCHEDULED' && experienceDate && experienceTimeRange && experienceTimeRange.length === 2) {
+        statusChangeData.trialScheduleDate = experienceDate.format('YYYY-MM-DD');
+        statusChangeData.trialStartTime = experienceTimeRange[0].format('HH:mm:ss');
+        statusChangeData.trialEndTime = experienceTimeRange[1].format('HH:mm:ss');
+        statusChangeData.trialCoachId = selectedCoach || null;
+      }
+      
+      const response = await changeCustomerStatus(customer.id, statusChangeData);
 
       if (response && response.success) {
         message.success('状态变更成功');
+        
+        // 如果是待体验状态，创建体验课程
+        if (values.toStatus === 'SCHEDULED' && experienceDate && experienceTimeRange && selectedCoach) {
+          try {
+            const scheduleResponse = await fetch(`${getApiBaseUrl()}/schedules/trial`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                coachId: selectedCoach,
+                studentName: customer.childName,
+                scheduleDate: experienceDate.format('YYYY-MM-DD'),
+                startTime: experienceTimeRange[0].format('HH:mm'),
+                endTime: experienceTimeRange[1].format('HH:mm'),
+                isTrial: true,
+                isHalfHour: true,
+                customerPhone: customer.parentPhone
+              })
+            });
+            
+            const scheduleData = await scheduleResponse.json();
+            if (scheduleData.success) {
+              message.success('体验课已添加到课表');
+            } else {
+              message.error(scheduleData.message || '添加体验课失败');
+            }
+          } catch (error) {
+            console.error('添加体验课失败:', error);
+            message.error('添加体验课失败');
+          }
+        }
         
         // 如果设置了待办提醒，创建或更新待办
         if (showTodoReminder && reminderDate && reminderTime) {
@@ -245,7 +338,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
             const todoData = {
               customerId: customer.id,
               customerName: customer.childName,
-              content: `跟进客户 ${customer.childName} - ${values.notes || '状态变更提醒'}`,
+              content: reminderContent || `跟进客户 ${customer.childName} - ${values.notes || '状态变更提醒'}`,
               reminderDate: reminderDate.format('YYYY-MM-DD'),
               reminderTime: reminderTime.format('HH:mm:ss'),
               type: 'CUSTOMER_FOLLOW_UP',
@@ -284,6 +377,12 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         setShowTodoReminder(false);
         setReminderDate(null);
         setReminderTime(null);
+        setReminderContent('');
+        setShowExperienceSchedule(false);
+        setExperienceDate(null);
+        setExperienceTimeRange(null);
+        setAvailableCoaches([]);
+        setSelectedCoach(null);
         if (onSuccess) {
           onSuccess(values.toStatus, values.notes);
         }
@@ -299,7 +398,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     }
   };
 
-  const handleStatusChange = (selectedStatus) => {
+  const handleStatusChange = async (selectedStatus) => {
     // 如果选择的状态和当前状态相同，回显最近一条历史记录的备注
     if (selectedStatus === customer?.status && histories.length > 0) {
       const latestHistory = histories[0];
@@ -307,8 +406,91 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         notes: latestHistory.notes || ''
       });
     }
-    // 不再清空备注，保留用户输入的内容
+    
+    // 如果选择"待体验"状态，显示体验安排选项
+    if (selectedStatus === 'SCHEDULED') {
+      setShowExperienceSchedule(true);
+      
+      // 查询是否已有体验课程，如果有则回显
+      if (customer && customer.childName) {
+        try {
+          const response = await getTrialSchedule(customer.childName);
+          if (response && response.success && response.data) {
+            const trialData = response.data;
+            // 回显体验日期
+            if (trialData.scheduleDate) {
+              setExperienceDate(dayjs(trialData.scheduleDate));
+            }
+            // 回显体验时间
+            if (trialData.startTime && trialData.endTime) {
+              setExperienceTimeRange([
+                dayjs(trialData.startTime, 'HH:mm:ss'),
+                dayjs(trialData.endTime, 'HH:mm:ss')
+              ]);
+            }
+            // 回显教练（如果有教练ID）
+            if (trialData.coachId) {
+              setSelectedCoach(trialData.coachId);
+            }
+          }
+        } catch (error) {
+          console.error('查询体验课程失败:', error);
+        }
+      }
+    } else {
+      setShowExperienceSchedule(false);
+      setExperienceDate(null);
+      setExperienceTimeRange(null);
+      setAvailableCoaches([]);
+      setSelectedCoach(null);
+    }
   };
+  
+  // 查询有空的教练
+  const fetchAvailableCoaches = async () => {
+    if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
+      return;
+    }
+    
+    setLoadingCoaches(true);
+    try {
+      const dateStr = experienceDate.format('YYYY-MM-DD');
+      const startTime = experienceTimeRange[0].format('HH:mm');
+      const endTime = experienceTimeRange[1].format('HH:mm');
+      
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${getApiBaseUrl()}/schedules/available-coaches?date=${dateStr}&startTime=${startTime}&endTime=${endTime}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        setAvailableCoaches(data.data || []);
+      } else {
+        message.error(data.message || '查询失败');
+        setAvailableCoaches([]);
+      }
+    } catch (error) {
+      console.error('查询有空教练失败:', error);
+      message.error('查询失败');
+      setAvailableCoaches([]);
+    } finally {
+      setLoadingCoaches(false);
+    }
+  };
+  
+  // 当时间选择完成后自动查询教练
+  useEffect(() => {
+    if (experienceDate && experienceTimeRange && experienceTimeRange.length === 2) {
+      fetchAvailableCoaches();
+    } else {
+      setAvailableCoaches([]);
+      setSelectedCoach(null);
+    }
+  }, [experienceDate, experienceTimeRange]);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -396,6 +578,115 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
             />
           </Form.Item>
 
+          {/* 待体验安排 */}
+          {showExperienceSchedule && (
+            <div style={{ 
+              marginBottom: 24, 
+              padding: '16px',
+              backgroundColor: '#f0f5ff',
+              borderRadius: '4px',
+              border: '1px solid #91caff'
+            }}>
+              <div style={{ marginBottom: 12, fontSize: '15px', fontWeight: '500', color: '#1890ff' }}>
+                体验课安排
+              </div>
+              
+              <div style={{ display: 'flex', gap: '12px', marginBottom: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ marginBottom: 4, color: 'rgba(0, 0, 0, 0.85)' }}>
+                    <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+                    体验日期
+                  </div>
+                  <DatePicker 
+                    value={experienceDate}
+                    onChange={setExperienceDate}
+                    format="YYYY-MM-DD"
+                    style={{ width: '100%' }}
+                    placeholder="选择体验日期"
+                    disabledDate={(current) => {
+                      // 不能选择过去的日期
+                      return current && current < dayjs().startOf('day');
+                    }}
+                  />
+                </div>
+                
+                <div style={{ flex: 1 }}>
+                  <div style={{ marginBottom: 4, color: 'rgba(0, 0, 0, 0.85)' }}>
+                    <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+                    体验时间
+                  </div>
+                  <TimePicker.RangePicker
+                    value={experienceTimeRange}
+                    onChange={(times) => {
+                      if (times && times.length === 2 && times[0] && !times[1]) {
+                        // 如果只选择了开始时间，自动设置结束时间为开始时间+30分钟
+                        const endTime = times[0].add(30, 'minute');
+                        setExperienceTimeRange([times[0], endTime]);
+                      } else {
+                        setExperienceTimeRange(times);
+                      }
+                    }}
+                    onCalendarChange={(times) => {
+                      // 当选择完第一个时间时触发
+                      if (times && times[0] && !times[1]) {
+                        const endTime = times[0].add(30, 'minute');
+                        setExperienceTimeRange([times[0], endTime]);
+                      }
+                    }}
+                    format="HH:mm"
+                    style={{ width: '100%' }}
+                    placeholder={['开始时间', '结束时间']}
+                    minuteStep={30}
+                    disabledTime={() => ({
+                      disabledHours: () => {
+                        // 禁用10点之前和20点之后的小时（保留10-20点）
+                        return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
+                      }
+                    })}
+                    showTime={{
+                      hideDisabledOptions: true
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {loadingCoaches ? (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <Spin tip="正在查询有空的教练..." />
+                </div>
+              ) : availableCoaches.length > 0 ? (
+                <div>
+                  <div style={{ marginBottom: 4, color: 'rgba(0, 0, 0, 0.85)' }}>
+                    选择教练
+                  </div>
+                  <Select
+                    value={selectedCoach}
+                    onChange={setSelectedCoach}
+                    placeholder="请选择教练（可选）"
+                    style={{ width: '100%' }}
+                    allowClear
+                  >
+                    {availableCoaches.map(coach => (
+                      <Option key={coach.id} value={coach.id}>
+                        {coach.nickname || coach.username}
+                      </Option>
+                    ))}
+                  </Select>
+                </div>
+              ) : (experienceDate && experienceTimeRange && experienceTimeRange.length === 2) ? (
+                <div style={{ 
+                  padding: '12px', 
+                  backgroundColor: '#fff2e8', 
+                  borderRadius: '4px',
+                  color: '#d46b08',
+                  border: '1px solid #ffd591'
+                }}>
+                  该时间段暂无可用教练
+                </div>
+              ) : null}
+            </div>
+          )}
+
           <Form.Item>
             <div style={{ marginBottom: 12 }}>
               <Button 
@@ -416,20 +707,112 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
               <div style={{ 
                 marginBottom: 12, 
                 padding: '12px',
-                backgroundColor: '#f5f5f5',
+                backgroundColor: existingTodoId && !isEditingReminder ? '#f5f5f5' : '#e6f7ff',
                 borderRadius: '4px',
-                border: '1px solid #d9d9d9'
+                border: existingTodoId && !isEditingReminder ? '1px solid #d9d9d9' : '1px dashed #1890ff'
               }}>
-                <div style={{ marginBottom: 8, fontSize: '13px', color: '#666' }}>
-                  <BellOutlined style={{ marginRight: 4 }} />
-                  已设置提醒（点击客户卡片的铃铛图标可编辑）
-                </div>
-                <div style={{ fontSize: '14px', color: '#333' }}>
-                  <div style={{ marginBottom: 4 }}>
-                    <ClockCircleOutlined style={{ marginRight: 4 }} />
-                    提醒时间：{reminderDate?.format('YYYY-MM-DD')} {reminderTime?.format('HH:mm')}
-                  </div>
-                </div>
+                {existingTodoId && !isEditingReminder ? (
+                  // 已有提醒且未编辑状态：显示只读信息 + 编辑按钮
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: '14px', color: '#333' }}>
+                        <ClockCircleOutlined style={{ marginRight: 4 }} />
+                        提醒时间：{reminderDate?.format('YYYY-MM-DD')} {reminderTime?.format('HH:mm')}
+                      </div>
+                      <Button 
+                        size="small" 
+                        icon={<EditOutlined />}
+                        onClick={() => {
+                          setIsEditingReminder(true);
+                          setTempReminderDate(reminderDate);
+                          setTempReminderTime(reminderTime);
+                          setTempReminderContent(reminderContent);
+                        }}
+                      >
+                        编辑
+                      </Button>
+                    </div>
+                    {reminderContent && (
+                      <div style={{ 
+                        fontSize: '13px', 
+                        color: '#666',
+                        padding: '8px',
+                        backgroundColor: '#fafafa',
+                        borderRadius: '4px',
+                        border: '1px solid #e8e8e8'
+                      }}>
+                        {reminderContent}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // 新建提醒 或 编辑模式：显示日期时间选择器
+                  <>
+                    <div style={{ marginBottom: 12, fontSize: '13px', color: '#1890ff', fontWeight: 500 }}>
+                      <ClockCircleOutlined style={{ marginRight: 4 }} />
+                      {isEditingReminder ? '编辑提醒时间：' : '提醒时间：'}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: 12 }}>
+                      <DatePicker
+                        value={isEditingReminder ? tempReminderDate : reminderDate}
+                        onChange={isEditingReminder ? setTempReminderDate : setReminderDate}
+                        style={{ flex: 1 }}
+                        placeholder="请选择日期"
+                        format="YYYY-MM-DD"
+                      />
+                      <TimePicker
+                        value={isEditingReminder ? tempReminderTime : reminderTime}
+                        onChange={isEditingReminder ? setTempReminderTime : setReminderTime}
+                        style={{ flex: 1 }}
+                        placeholder="请选择时间"
+                        format="HH:mm"
+                      />
+                    </div>
+                    <div style={{ marginBottom: isEditingReminder ? 8 : 0 }}>
+                      <div style={{ marginBottom: 8, fontSize: '13px', color: '#1890ff', fontWeight: 500 }}>
+                        提醒内容：
+                      </div>
+                      <TextArea
+                        value={isEditingReminder ? tempReminderContent : reminderContent}
+                        onChange={(e) => isEditingReminder ? setTempReminderContent(e.target.value) : setReminderContent(e.target.value)}
+                        placeholder="输入状态变更的相关信息，如联系系统、预约时间等"
+                        rows={3}
+                        maxLength={500}
+                        showCount
+                      />
+                    </div>
+                    {isEditingReminder && (
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: 8 }}>
+                        <Button 
+                          size="small" 
+                          icon={<CloseOutlined />}
+                          onClick={() => {
+                            setIsEditingReminder(false);
+                            setTempReminderDate(null);
+                            setTempReminderTime(null);
+                            setTempReminderContent('');
+                          }}
+                        >
+                          取消
+                        </Button>
+                        <Button 
+                          size="small" 
+                          type="primary"
+                          icon={<SaveOutlined />}
+                          onClick={() => {
+                            setReminderDate(tempReminderDate);
+                            setReminderTime(tempReminderTime);
+                            setReminderContent(tempReminderContent);
+                            setIsEditingReminder(false);
+                            message.success('提醒信息已更新');
+                          }}
+                        >
+                          确认
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

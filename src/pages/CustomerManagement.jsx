@@ -29,7 +29,8 @@ import {
   LeftOutlined,
   RightOutlined,
   BellOutlined,
-  PhoneOutlined
+  PhoneOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { 
@@ -40,6 +41,7 @@ import {
   getCustomersByStatus 
 } from '../services/customer';
 import { createTodo, checkCustomerHasTodo, getTodos, updateTodo } from '../services/todo';
+import { getTrialSchedule } from '../services/timetable';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 import './CustomerManagement.css';
@@ -74,6 +76,10 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const [customerTodoStatus, setCustomerTodoStatus] = useState({});
   const [latestTodoByCustomer, setLatestTodoByCustomer] = useState({});
   const [todoInfoLoadingId, setTodoInfoLoadingId] = useState(null);
+  const [trialScheduleCache, setTrialScheduleCache] = useState({});
+  const [loadingTrialSchedule, setLoadingTrialSchedule] = useState(false);
+  const [viewTodoModalVisible, setViewTodoModalVisible] = useState(false);
+  const [viewTodoCustomer, setViewTodoCustomer] = useState(null);
   // 供外部调用：当其它地方创建了待办后，局部刷新某个客户的铃铛和数据
   React.useImperativeHandle(ref, () => ({
     onTodoCreatedExternally: ({ id, childName, parentPhone }) => {
@@ -380,39 +386,28 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     setTodoModalVisible(true);
   };
 
-  // 渲染提醒信息的 Popover 内容
-  const renderTodoPopoverContent = (customer) => {
-    const todo = latestTodoByCustomer[customer.id];
-    if (!todo) {
-      return <div>暂无提醒信息</div>;
+  // 打开查看待办模态框
+  const handleViewTodoModal = async (customer, e) => {
+    if (e) {
+      e.stopPropagation();
     }
+    
+    // 如果没有缓存的待办信息，先获取
+    if (!latestTodoByCustomer[customer.id]) {
+      await fetchLatestTodoForCustomer(customer);
+    }
+    
+    setViewTodoCustomer(customer);
+    setViewTodoModalVisible(true);
+  };
 
-    return (
-      <div style={{ maxWidth: '280px' }}>
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: '13px', color: '#666', marginBottom: 4 }}>提醒时间</div>
-          <div style={{ fontSize: '14px', fontWeight: '500' }}>
-            {todo.reminderDate ? dayjs(todo.reminderDate).format('YYYY-MM-DD') : ''} {todo.reminderTime || ''}
-          </div>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: '13px', color: '#666', marginBottom: 4 }}>待办内容</div>
-          <div style={{ fontSize: '14px' }}>{todo.content}</div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <Button 
-            type="primary" 
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenTodoModal(customer, e);
-            }}
-          >
-            编辑
-          </Button>
-        </div>
-      </div>
-    );
+  // 从查看模态框切换到编辑模态框
+  const handleSwitchToEditTodo = (customer) => {
+    setViewTodoModalVisible(false);
+    // 延迟一下，让关闭动画完成
+    setTimeout(() => {
+      handleOpenTodoModal(customer);
+    }, 200);
   };
 
   const handleCreateTodo = async () => {
@@ -652,6 +647,24 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     }
   };
 
+  const fetchTrialScheduleForCustomer = async (customerObj) => {
+    try {
+      if (!customerObj || !customerObj.childName) return;
+      setLoadingTrialSchedule(true);
+      const resp = await getTrialSchedule(customerObj.childName);
+      if (resp && resp.success && resp.data) {
+        setTrialScheduleCache(prev => ({ ...prev, [customerObj.id]: resp.data }));
+      } else {
+        setTrialScheduleCache(prev => ({ ...prev, [customerObj.id]: null }));
+      }
+    } catch (e) {
+      console.error('获取体验课程信息失败:', e);
+      setTrialScheduleCache(prev => ({ ...prev, [customerObj.id]: null }));
+    } finally {
+      setLoadingTrialSchedule(false);
+    }
+  };
+
   const columns = [
     {
       title: '孩子姓名',
@@ -821,36 +834,37 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                 {customer.childName}
               </span>
               {customerTodoStatus[customer.id] && (
-                <Popover
-                  content={() => renderTodoPopoverContent(customer)}
-                  title="待办提醒"
-                  trigger="click"
-                  onOpenChange={(visible) => {
-                    if (visible && !latestTodoByCustomer[customer.id]) {
-                      fetchLatestTodoForCustomer(customer);
-                    }
+                <BellOutlined 
+                  style={{ 
+                    marginLeft: '8px', 
+                    color: '#faad14',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    animation: 'pulse 2s infinite'
+                  }} 
+                  title="查看提醒"
+                  onClick={(e) => {
+                    handleViewTodoModal(customer, e);
                   }}
-                >
-                  <BellOutlined 
+                />
+              )}
+              {customer.parentPhone && (
+                <span style={{ fontSize: '13px', marginLeft: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <a 
+                    href={`tel:${customer.parentPhone}`}
                     style={{ 
-                      marginLeft: '8px', 
-                      color: '#faad14',
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      animation: 'pulse 2s infinite'
-                    }} 
-                    title="查看提醒"
+                      color: '#1890ff', 
+                      textDecoration: 'none',
+                      cursor: 'pointer'
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                     }}
-                  />
-                </Popover>
-              )}
-              {customer.parentPhone && (
-                <span style={{ color: '#999', fontSize: '13px', marginLeft: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  {customer.parentPhone}
+                  >
+                    {customer.parentPhone}
+                  </a>
                   <CopyOutlined 
-                    style={{ cursor: 'pointer', fontSize: '12px' }} 
+                    style={{ cursor: 'pointer', fontSize: '12px', color: '#999' }} 
                     onClick={(e) => {
                       e.stopPropagation();
                       navigator.clipboard.writeText(customer.parentPhone).then(() => {
@@ -869,9 +883,85 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                   {customer.source}
                 </span>
               )}
-              <Tag color={getStatusColor(customer.status)}>
-                {getStatusText(customer.status)}
-              </Tag>
+              {customer.status === 'SCHEDULED' ? (
+                <Popover
+                  content={
+                    <div style={{ maxWidth: '300px' }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: 8 }}>
+                          体验课安排
+                        </div>
+                        {loadingTrialSchedule && !trialScheduleCache[customer.id] ? (
+                          <Spin size="small" />
+                        ) : trialScheduleCache[customer.id] ? (
+                          <div style={{ fontSize: '13px', color: '#333' }}>
+                            <div style={{ marginBottom: 6 }}>
+                              <CalendarOutlined style={{ marginRight: 4 }} />
+                              <strong>日期：</strong>
+                              {trialScheduleCache[customer.id].scheduleDate ? 
+                                dayjs(trialScheduleCache[customer.id].scheduleDate).format('YYYY-MM-DD') : '-'}
+                            </div>
+                            <div style={{ marginBottom: 6 }}>
+                              <ClockCircleOutlined style={{ marginRight: 4 }} />
+                              <strong>时间：</strong>
+                              {trialScheduleCache[customer.id].startTime && trialScheduleCache[customer.id].endTime ?
+                                `${trialScheduleCache[customer.id].startTime} - ${trialScheduleCache[customer.id].endTime}` : '-'}
+                            </div>
+                            {trialScheduleCache[customer.id].coachName && (
+                              <div style={{ marginBottom: 6 }}>
+                                <strong>教练：</strong>
+                                {trialScheduleCache[customer.id].coachName}
+                              </div>
+                            )}
+                            {trialScheduleCache[customer.id].note && (
+                              <div style={{ marginTop: 8, padding: '6px', background: '#f5f5f5', borderRadius: '4px', fontSize: '12px' }}>
+                                {trialScheduleCache[customer.id].note}
+                              </div>
+                            )}
+                          </div>
+                        ) : customer.lastStatusChangeNote ? (
+                          <div style={{ fontSize: '13px', color: '#666', whiteSpace: 'pre-wrap' }}>
+                            {customer.lastStatusChangeNote}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '13px', color: '#999' }}>
+                            暂无体验时间信息
+                          </div>
+                        )}
+                      </div>
+                      <Button 
+                        type="primary" 
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenHistory(customer, e);
+                        }}
+                      >
+                        查看/编辑详情
+                      </Button>
+                    </div>
+                  }
+                  title="待体验信息"
+                  trigger="click"
+                  onOpenChange={(visible) => {
+                    if (visible && !trialScheduleCache[customer.id]) {
+                      fetchTrialScheduleForCustomer(customer);
+                    }
+                  }}
+                >
+                  <Tag 
+                    color={getStatusColor(customer.status)}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {getStatusText(customer.status)}
+                  </Tag>
+                </Popover>
+              ) : (
+                <Tag color={getStatusColor(customer.status)}>
+                  {getStatusText(customer.status)}
+                </Tag>
+              )}
             </div>
           </div>
           
@@ -936,30 +1026,19 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
               size="small"
             />
             {customerTodoStatus[customer.id] ? (
-              <Popover
-                content={() => renderTodoPopoverContent(customer)}
-                title="待办提醒"
-                trigger="click"
-                onOpenChange={(visible) => {
-                  if (visible && !latestTodoByCustomer[customer.id]) {
-                    fetchLatestTodoForCustomer(customer);
-                  }
+              <Button 
+                type="text"
+                icon={<BellOutlined />}
+                title="查看提醒"
+                onClick={(e) => {
+                  handleViewTodoModal(customer, e);
                 }}
-              >
-                <Button 
-                  type="text"
-                  icon={<BellOutlined />}
-                  title="查看提醒"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  size="small"
-                  style={{ 
-                    color: '#faad14',
-                    cursor: 'pointer'
-                  }}
-                />
-              </Popover>
+                size="small"
+                style={{ 
+                  color: '#faad14',
+                  cursor: 'pointer'
+                }}
+              />
             ) : (
               <Button 
                 type="text"
@@ -1419,6 +1498,50 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* 查看待办提醒模态框 */}
+      <Modal
+        open={viewTodoModalVisible}
+        onCancel={() => {
+          setViewTodoModalVisible(false);
+          setViewTodoCustomer(null);
+        }}
+        footer={null}
+        width={360}
+        closable={true}
+        centered
+      >
+        {viewTodoCustomer && latestTodoByCustomer[viewTodoCustomer.id] && (
+          <div style={{ padding: '12px 0' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              gap: '16px',
+              marginBottom: 16,
+              paddingBottom: 12,
+              borderBottom: '1px solid #f0f0f0'
+            }}>
+              <div style={{ fontSize: '14px', color: '#333' }}>
+                <ClockCircleOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                {latestTodoByCustomer[viewTodoCustomer.id].reminderDate 
+                  ? dayjs(latestTodoByCustomer[viewTodoCustomer.id].reminderDate).format('YYYY-MM-DD') 
+                  : ''} {latestTodoByCustomer[viewTodoCustomer.id].reminderTime || ''}
+              </div>
+              <Button 
+                type="primary" 
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleSwitchToEditTodo(viewTodoCustomer)}
+              >
+                编辑
+              </Button>
+            </div>
+            <div style={{ fontSize: '14px', color: '#333', lineHeight: '1.6' }}>
+              {latestTodoByCustomer[viewTodoCustomer.id].content}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

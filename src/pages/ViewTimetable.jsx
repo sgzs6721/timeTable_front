@@ -65,7 +65,7 @@ const dayMap = {
 const CancelledOrLeavePopoverContent = ({ info, onClose, onRestore, restoreLoading }) => {
   if (!info) return null;
   return (
-    <div style={{ width: '220px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: 'min(280px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <div style={{ fontSize: '12px', color: '#666' }}>{info.timeInfo}</div>
         <Button type="text" size="small" icon={<CloseOutlined />} onClick={onClose} style={{ padding: 0, minWidth: 'auto', height: 'auto' }} />
@@ -142,9 +142,9 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
 
 
   return (
-    <div style={{ width: '280px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '300px', maxWidth: '92vw', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
       {/* 时间信息和关闭图标在同一行 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
         <div style={{ fontSize: '12px', color: '#666' }}>
           {timetable.isWeekly ? (
             `星期${dayMap[schedule.dayOfWeek.toUpperCase()] || schedule.dayOfWeek}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`
@@ -161,8 +161,8 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
         />
       </div>
 
-      {/* 如果是已修改的课程，显示固定课表原始内容 */}
-      {isModified && templateSchedule && schedule.note !== '恢复的课程' && (
+      {/* 如果是已修改的课程且学员名不同，显示固定课表原始内容 */}
+      {isModified && templateSchedule && schedule.note !== '恢复的课程' && templateSchedule.studentName !== schedule.studentName && (
         <div style={{ 
           backgroundColor: '#f6f6f6', 
           padding: '6px 8px', 
@@ -192,14 +192,15 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
           【占用】
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', textAlign: 'left', gap: 4 }}>
-          <strong>学生:</strong>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
+          <strong style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>学员:</strong>
           <Input
             size="small"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            style={{ flex: 1 }}
+            placeholder="学员姓名"
             disabled={isArchived}
+            style={{ flex: 1 }}
           />
           {!isArchived && (
             <Button
@@ -208,9 +209,13 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
               disabled={!isNameChanged || updateLoading}
               loading={updateLoading}
               style={{
-                backgroundColor: isNameChanged ? '#faad14' : undefined,
-                borderColor: isNameChanged ? '#faad14' : undefined,
-                color: isNameChanged ? 'white' : undefined
+                backgroundColor: isNameChanged ? '#faad14' : '#d9d9d9',
+                borderColor: isNameChanged ? '#faad14' : '#d9d9d9',
+                color: 'white',
+                padding: '0 8px',
+                height: '22px',
+                fontSize: '12px',
+                flexShrink: 0
               }}
             >
               修改
@@ -224,7 +229,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
 
 
 
-      <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+      <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
         {/* 占用时间段不显示"全部"按钮 */}
         {!isBlocked && (
           <Button
@@ -273,7 +278,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
       </div>
 
       {/* 第二行：请假、调换、删除按钮 */}
-      <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
         {/* 占用时间段不显示"请假"按钮，实例课表模式下显示请假按钮 */}
         {!isBlocked && !isArchived && viewMode === 'instance' && (
           <Button
@@ -470,7 +475,7 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
   const [isTrial, setIsTrial] = React.useState(false); // 是否为体验课程
 
   return (
-    <div style={{ width: '260px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: 'auto', minWidth: '160px', maxWidth: '92vw', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
       {/* 时间信息显示、半小时开关和体验开关 */}
       {timeInfo && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
@@ -573,9 +578,18 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
         }
       />
       
-      {/* 当没有timeInfo时，单独显示体验开关 */}
+      {/* 当没有timeInfo时，也显示半小时与体验开关（紧凑靠右） */}
       {!timeInfo && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '8px', fontSize: '12px', color: '#666', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+            <span style={{ whiteSpace: 'nowrap' }}>半小时</span>
+            <Switch
+              size="small"
+              checked={isHalfHour}
+              onChange={setIsHalfHour}
+              disabled={addLoading || disableHalfHourSwitch}
+            />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
             <span style={{ whiteSpace: 'nowrap' }}>体验</span>
             <Switch
@@ -584,6 +598,33 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
               onChange={setIsTrial}
               disabled={addLoading}
             />
+          </div>
+        </div>
+      )}
+
+      {/* 当没有timeInfo也允许选择前后半小时（仅标签） */}
+      {isHalfHour && !timeInfo && (
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>选择时间段：</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button
+              size="small"
+              type={halfHourPosition === 'first' ? 'primary' : 'default'}
+              onClick={() => setHalfHourPosition('first')}
+              disabled={addLoading || (disableHalfHourSwitch && halfHourPosition !== 'first')}
+              style={{ flex: 1, fontSize: '11px' }}
+            >
+              前半小时
+            </Button>
+            <Button
+              size="small"
+              type={halfHourPosition === 'second' ? 'primary' : 'default'}
+              onClick={() => setHalfHourPosition('second')}
+              disabled={addLoading || (disableHalfHourSwitch && halfHourPosition !== 'second')}
+              style={{ flex: 1, fontSize: '11px' }}
+            >
+              后半小时
+            </Button>
           </div>
         </div>
       )}
@@ -622,7 +663,6 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
     </div>
   );
 };
-
 const ViewTimetable = ({ user }) => {
   const [timetable, setTimetable] = useState(null);
   const [timetableOwner, setTimetableOwner] = useState(null);
@@ -793,11 +833,11 @@ const ViewTimetable = ({ user }) => {
     if (dayIndex <= 1) {
       // 周一、周二：弹框显示在右侧
       horizontalPlacement = 'right';
-    } else if (dayIndex >= 5) {
-      // 周六、周日：弹框显示在左侧
+    } else if (dayIndex >= 4) {
+      // 周五、周六、周日：弹框显示在左侧（避免超出屏幕右边）
       horizontalPlacement = 'left';
     } else {
-      // 周三、周四、周五：根据时间位置决定，优先使用上下方向
+      // 周三、周四：根据时间位置决定，优先使用上下方向
       if (timeIndex <= Math.floor(totalTimeSlots / 3)) {
         return 'bottom';
       } else if (timeIndex >= Math.floor(totalTimeSlots * 2 / 3)) {
@@ -1384,12 +1424,13 @@ const ViewTimetable = ({ user }) => {
             }, 100);
           }
         }}
+                          overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                      overlayStyle={{ maxWidth: '90vw' }}
       >
         <div style={{ height: '48px', cursor: 'pointer' }} />
       </Popover>
     );
   };
-
   // 兼容移动端的复制函数
   const copyToClipboard = async (text) => {
     try {
@@ -1499,35 +1540,21 @@ const ViewTimetable = ({ user }) => {
         // 获取包含请假课程的完整数据
         try {
           const response = await getCurrentWeekInstanceIncludingLeaves(timetable.id);
-          console.log('API响应:', response);
           if (response && response.success && response.data && response.data.schedules) {
             schedulesForDay = response.data.schedules.filter(s => s.scheduleDate === dateStr);
-            console.log('从API获取的课程:', response.data.schedules);
-            console.log('过滤后的课程:', schedulesForDay);
           } else {
-            console.log('API响应无效，回退到allSchedules');
             schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
-            console.log('从allSchedules获取的课程:', allSchedules);
-            console.log('过滤后的课程:', schedulesForDay);
           }
         } catch (error) {
           console.error('获取包含请假课程的数据失败:', error);
-          console.log('API调用失败，回退到allSchedules');
           schedulesForDay = allSchedules.filter(s => s.scheduleDate === dateStr);
-          console.log('错误后从allSchedules获取的课程:', allSchedules);
-          console.log('过滤后的课程:', schedulesForDay);
         }
         
         // 如果还是没有数据，再次尝试从allSchedules获取
         if (schedulesForDay.length === 0) {
-          console.log('schedulesForDay为空，再次从allSchedules获取');
-          console.log('目标日期字符串:', dateStr);
-          console.log('allSchedules中的日期:', allSchedules.map(s => s.scheduleDate));
           schedulesForDay = allSchedules.filter(s => {
-            console.log(`检查课程: ${s.studentName}, 日期: ${s.scheduleDate}, 匹配: ${s.scheduleDate === dateStr}`);
             return s.scheduleDate === dateStr;
           });
-          console.log('再次过滤后的课程:', schedulesForDay);
         }
         
         modalTitle = `${timetable.name} - ${dateStr} (${day.label})`;
@@ -1551,19 +1578,6 @@ const ViewTimetable = ({ user }) => {
     }
 
     const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-    // 调试信息
-    console.log('调试课程检查:', {
-      day: day.label,
-      dayIndex,
-      targetDate: targetDate ? targetDate.format('YYYY-MM-DD') : 'null',
-      viewMode,
-      hasCurrentWeekInstance: !!currentWeekInstance,
-      schedulesForDayCount: schedulesForDay.length,
-      allSchedulesCount: allSchedules.length,
-      schedulesForDay: schedulesForDay,
-      allSchedules: allSchedules
-    });
 
     if (sortedSchedules.length === 0) {
       const dateText = targetDate ? targetDate.format('YYYY-MM-DD') : '该天';
@@ -2145,7 +2159,6 @@ const ViewTimetable = ({ user }) => {
 
 
   // 移除initializeWeeklyInstance函数，避免重复调用
-
   // 获取当前周实例的课程
   const fetchInstanceSchedules = async () => {
     
@@ -2297,7 +2310,6 @@ const ViewTimetable = ({ user }) => {
         const templateResponse = await getTemplateSchedules(timetableId);
         if (templateResponse.success) {
           setTemplateSchedules(templateResponse.data || []);
-          console.log('已加载固定课表模板数据，共', templateResponse.data?.length || 0, '条');
         }
       }
       
@@ -2487,18 +2499,13 @@ const ViewTimetable = ({ user }) => {
       return ''; // 非周固定课表，不显示特殊边框
     }
     if (viewMode !== 'instance') {
-      console.log('非实例视图，不显示边框，当前viewMode:', viewMode);
       return '';
     }
     
     // 确保模板数据已加载
     if (!templateSchedules || templateSchedules.length === 0) {
-      console.warn('⚠️ 模板数据未加载或为空！templateSchedules:', templateSchedules, 'timetableId:', timetableId);
-      console.warn('课程将不会显示边框，因为无法与固定课表比较');
       return ''; // 模板数据未加载，不显示边框
     }
-    
-    console.log('🔍 开始比较课程边框，模板数据条数:', templateSchedules.length);
     
     // 标准化处理函数，确保格式一致
     const normalizeDay = (v) => {
@@ -2541,42 +2548,51 @@ const ViewTimetable = ({ user }) => {
     const iEnd = normalizeTime(instanceSchedule.endTime);
     const iStudentName = normalizeStudentName(instanceSchedule.studentName);
     
+    // 判断是否为半小时课程
+    const isHalfHour = isHalfHourSchedule(instanceSchedule);
+    
     // 精确匹配：必须星期、开始时间、结束时间都相同
+    // 对于半小时课程，需要找到它所在的整小时时间段的模板课程
     const templateSchedule = templateSchedules.find(template => {
       const tDay = normalizeDay(template.dayOfWeek);
       const tStart = normalizeTime(template.startTime);
       const tEnd = normalizeTime(template.endTime);
-      return tDay === iDay && tStart === iStart && tEnd === iEnd;
+      
+      if (isHalfHour) {
+        // 半小时课程：先尝试精确匹配（模板课程也是半小时且时间完全相同）
+        if (tDay === iDay && tStart === iStart && tEnd === iEnd) {
+          return true;
+        }
+        
+        // 如果精确匹配失败，再尝试匹配整小时课程
+        // 例如：16:00-16:30 或 16:30-17:00 都应该匹配 16:00-17:00
+        const start = dayjs(iStart, 'HH:mm');
+        const end = dayjs(iEnd, 'HH:mm');
+        const templateStart = dayjs(tStart, 'HH:mm');
+        const templateEnd = dayjs(tEnd, 'HH:mm');
+        
+        // 检查半小时课程是否在模板课程的时间范围内
+        return tDay === iDay && 
+               start.isSameOrAfter(templateStart) && 
+               end.isSameOrBefore(templateEnd) &&
+               templateEnd.diff(templateStart, 'minute') === 60; // 模板课程必须是1小时
+      } else {
+        // 整小时课程：精确匹配
+        return tDay === iDay && tStart === iStart && tEnd === iEnd;
+      }
     });
     
     if (!templateSchedule) {
       // 固定课表中没有，但实例中有 - 绿色边框（手动添加）
-      console.log('未找到匹配的模板课程:', {
-        day: iDay,
-        start: iStart,
-        end: iEnd,
-        student: instanceSchedule.studentName
-      });
       return '#52c41a';
     } else {
       // 固定课表中有，检查学生名是否一致（使用标准化后的学生名比较）
       const tStudentName = normalizeStudentName(templateSchedule.studentName);
       
       if (tStudentName !== iStudentName) {
-        console.log('学生名不一致:', {
-          template: templateSchedule.studentName,
-          instance: instanceSchedule.studentName,
-          normalizedTemplate: tStudentName,
-          normalizedInstance: iStudentName
-        });
         return '#faad14'; // 橙色边框
       }
       // 完全一致，不显示任何边框
-      console.log('课程完全一致，无边框:', {
-        day: iDay,
-        time: `${iStart}-${iEnd}`,
-        student: instanceSchedule.studentName
-      });
       return '';
     }
   };
@@ -2850,7 +2866,6 @@ const ViewTimetable = ({ user }) => {
       setRestoreLoading(false);
     }
   };
-
   // 重新创建课程（用于恢复被删除的课程）
   const recreateSchedule = async (cancelInfo) => {
     try {
@@ -3307,20 +3322,6 @@ const ViewTimetable = ({ user }) => {
         const schedule1Id = scheduleToSwap.id;
         const schedule2Id = selectedSwapTarget.id;
         
-        console.log('调换周实例课程信息:', {
-          viewMode,
-          scheduleToSwap: {
-            id: scheduleToSwap.id,
-            studentName: scheduleToSwap.studentName
-          },
-          selectedSwapTarget: {
-            id: selectedSwapTarget.id,
-            studentName: selectedSwapTarget.studentName
-          },
-          schedule1Id,
-          schedule2Id
-        });
-        
         if (!schedule1Id || !schedule2Id) {
           message.error('无法获取课程ID，请重试');
           setSwapLoading(false);
@@ -3332,21 +3333,6 @@ const ViewTimetable = ({ user }) => {
         // 在固定课表视图下，使用固定课表的 ID 调用固定课表调换接口
         const schedule1Id = scheduleToSwap.id;
         const schedule2Id = selectedSwapTarget.id;
-        
-        console.log('调换固定课表课程信息:', {
-          viewMode,
-          timetableId: timetable.id,
-          scheduleToSwap: {
-            id: scheduleToSwap.id,
-            studentName: scheduleToSwap.studentName
-          },
-          selectedSwapTarget: {
-            id: selectedSwapTarget.id,
-            studentName: selectedSwapTarget.studentName
-          },
-          schedule1Id,
-          schedule2Id
-        });
         
         if (!schedule1Id || !schedule2Id) {
           message.error('无法获取课程ID，请重试');
@@ -3589,7 +3575,6 @@ const ViewTimetable = ({ user }) => {
       message.error('导出失败，请检查网络连接');
     }
   };
-
   const handleExportTable = () => {
     const tableNode = tableRef.current;
     if (!tableNode) {
@@ -4203,7 +4188,6 @@ const ViewTimetable = ({ user }) => {
     studentColorMap.set(name, colorPalette[index % colorPalette.length]);
     studentTextColorMap.set(name, textColorPalette[index % textColorPalette.length]);
   });
-
   const generateColumns = () => {
     const weekDates = getCurrentWeekDates();
 
@@ -4696,7 +4680,7 @@ const ViewTimetable = ({ user }) => {
                 title={null}
                 content={
                   cancelInfo ? (
-                    <div style={{ width: 220 }}>
+                    <div style={{ width: 'min(280px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
                       <CancelledOrLeavePopoverContent 
                         info={cancelInfo} 
                         onClose={() => handleOpenChange(false)}
@@ -4730,6 +4714,8 @@ const ViewTimetable = ({ user }) => {
                 trigger={multiSelectMode ? "contextMenu" : (deleteMode ? "none" : "click")}
                 open={!timetable?.isArchived && !deleteMode && openPopoverKey === cellKey}
                 onOpenChange={handleOpenChange}
+                overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                overlayStyle={{ maxWidth: '90vw' }}
               >
                 <div style={{ 
                   ...emptyCellStyle,
@@ -4747,7 +4733,7 @@ const ViewTimetable = ({ user }) => {
           };
 
           const popoverContent = (
-            <div>
+            <div style={{ width: '300px', maxWidth: '92vw' }}>
               {schedules.map((student, idx) => (
                 <div key={student.id}>
                   <SchedulePopoverContent
@@ -5310,8 +5296,7 @@ const ViewTimetable = ({ user }) => {
               <div className="schedule-cell-content" style={{ position: 'relative', height: '48px' }}>
                 {/* 前半小时区域 */}
                 <div style={{ height: '50%', position: 'relative' }}>
-                  {firstHalfCourse ? (
-                    // 前半小时有课程，显示课程
+                  {firstHalfCourse && (
                     (() => {
                       const isBlocked = firstHalfCourse.studentName === '【占用】';
                       const isManualAdded = viewMode === 'instance' && firstHalfCourse.isManualAdded;
@@ -5365,115 +5350,53 @@ const ViewTimetable = ({ user }) => {
                           trigger="click"
                           open={!swapMode && openPopoverKey === `${cellKey}-first-half`}
                           onOpenChange={(newOpen) => !swapMode && setOpenPopoverKey(newOpen ? `${cellKey}-first-half` : null)}
-                        >
-                          <div
-                            onClick={(e) => {
-                              if (swapMode) {
-                                e.stopPropagation();
-                                if (scheduleToSwap && firstHalfCourse.id === scheduleToSwap.id) {
-                                  handleCancelSwap();
-                                } else {
-                                  const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
-                                  const targetIsHalfHour = isHalfHourSchedule(firstHalfCourse);
-                                  
-                                  if (sourceIsHalfHour !== targetIsHalfHour) {
-                                    message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
-                                    return;
-                                  }
-                                  
-                                  handleSelectSwapTarget(firstHalfCourse);
-                                }
-                              }
-                            }}
-                            style={{
-                              ...getScheduleStyle(firstHalfCourse, studentColorMap.get(firstHalfCourse.studentName)),
-                              height: '100%',
-                              position: 'absolute',
-                              top: '0',
-                              left: '0',
-                              right: '0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '12px',
-                              wordBreak: 'break-word',
-                              lineHeight: '1.2',
-                              cursor: swapMode ? 'pointer' : 'default',
-                              // 调换模式下的边框样式
-                              ...(swapMode && (() => {
-                                const isSourceCell = scheduleToSwap && firstHalfCourse.id === scheduleToSwap.id;
-                                if (isSourceCell) {
-                                  return {
-                                    border: '2px solid #ff4d4f',
-                                    boxShadow: '0 0 8px rgba(255, 77, 79, 0.7)'
-                                  };
-                                }
-                                
-                                const sourceIsHalfHour = scheduleToSwap?.isHalfHour || false;
-                                const targetIsHalfHour = firstHalfCourse?.isHalfHour || false;
-                                const canSwap = sourceIsHalfHour === targetIsHalfHour;
-                                
-                                return {
-                                  border: canSwap ? '2px solid #52c41a' : '2px solid #d9d9d9',
-                                  boxShadow: canSwap ? '0 0 8px rgba(82, 196, 26, 0.5)' : 'none',
-                                  opacity: canSwap ? 1 : 0.5,
-                                  cursor: canSwap ? 'pointer' : 'not-allowed'
-                                };
-                              })()),
-                              border: borderColor ? `2px solid ${borderColor}` : 'none',
-                              zIndex: 1,
-                              cursor: 'pointer'
-                            }}
-                            title={titleText}
-                          >
-                            {(() => {
-                              const displayName = getDisplayName(firstHalfCourse);
-                              const isTruncated = displayName.length > 4;
-                              const content = isTruncated ? `${displayName.substring(0, 3)}…` : displayName;
-                              return (
-                                <span
-                                  className={isTruncated ? 'student-name-truncated' : ''}
-                                  title={isTruncated ? displayName : undefined}
-                                >
-                                  {content}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </Popover>
-                      );
-                    })()
-                  ) : (
-                    // 前半小时没有课程，显示空白区域用于添加课程
-                    <Popover
-                      placement={getSmartPlacement(index, record.key)}
-                      title={null}
-                      content={
-                        <NewSchedulePopoverContent 
-                          onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
-                          onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, scheduleInfo)}
-                          onCancel={() => setOpenPopoverKey(null)} 
-                          addLoading={addLoading} 
-                          timeInfo={`${record.time} 星期${dayMap[day.key.toUpperCase()] || day.key}`}
-                          studentOptions={studentOptions}
-                          defaultIsHalfHour={secondHalfCourse ? true : false}
-                          defaultHalfHourPosition="first"
-                          disableHalfHourSwitch={secondHalfCourse ? true : false}
-                        />
-                      }
-                      trigger="click"
-                      open={openPopoverKey === `${cellKey}-top`}
-                      onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-top` : null)}
+                          overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                          overlayStyle={{ maxWidth: '90vw' }}
                     >
-                      <div style={{ height: '100%', cursor: 'pointer' }} />
+                      <div
+                        style={{
+                          ...getScheduleStyle(firstHalfCourse, studentColorMap.get(firstHalfCourse.studentName)),
+                          height: '100%',
+                          position: 'absolute',
+                          top: '0',
+                          left: '0',
+                          right: '0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          wordBreak: 'break-word',
+                          lineHeight: '1.2',
+                          cursor: 'pointer',
+                          border: borderColor ? `2px solid ${borderColor}` : 'none',
+                          boxSizing: 'border-box',
+                          zIndex: 1
+                        }}
+                        title={titleText}
+                      >
+                        {(() => {
+                          const displayName = getDisplayName(firstHalfCourse);
+                          const isTruncated = displayName.length > 4;
+                          const content = isTruncated ? `${displayName.substring(0, 3)}…` : displayName;
+                          return (
+                            <span
+                              className={isTruncated ? 'student-name-truncated' : ''}
+                              title={isTruncated ? displayName : undefined}
+                            >
+                              {content}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </Popover>
+                  );
+                })()
                   )}
                 </div>
                 
                 {/* 后半小时区域 */}
                 <div style={{ height: '50%', position: 'relative' }}>
-                  {secondHalfCourse ? (
-                    // 后半小时有课程，显示课程
+                  {secondHalfCourse && (
                     (() => {
                       const isBlocked = secondHalfCourse.studentName === '【占用】';
                       const isManualAdded = viewMode === 'instance' && secondHalfCourse.isManualAdded;
@@ -5527,108 +5450,47 @@ const ViewTimetable = ({ user }) => {
                           trigger="click"
                           open={!swapMode && openPopoverKey === `${cellKey}-second-half`}
                           onOpenChange={(newOpen) => !swapMode && setOpenPopoverKey(newOpen ? `${cellKey}-second-half` : null)}
-                        >
-                          <div
-                            onClick={(e) => {
-                              if (swapMode) {
-                                e.stopPropagation();
-                                if (scheduleToSwap && secondHalfCourse.id === scheduleToSwap.id) {
-                                  handleCancelSwap();
-                                } else {
-                                  const sourceIsHalfHour = isHalfHourSchedule(scheduleToSwap);
-                                  const targetIsHalfHour = isHalfHourSchedule(secondHalfCourse);
-                                  
-                                  if (sourceIsHalfHour !== targetIsHalfHour) {
-                                    message.warning('半小时课程只能和半小时课程调换，整小时课程只能和整小时课程调换');
-                                    return;
-                                  }
-                                  
-                                  handleSelectSwapTarget(secondHalfCourse);
-                                }
-                              }
-                            }}
-                            style={{
-                              ...getScheduleStyle(secondHalfCourse, studentColorMap.get(secondHalfCourse.studentName)),
-                              height: '100%',
-                              position: 'absolute',
-                              top: '0',
-                              left: '0',
-                              right: '0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '12px',
-                              wordBreak: 'break-word',
-                              lineHeight: '1.2',
-                              cursor: swapMode ? 'pointer' : 'default',
-                              // 调换模式下的边框样式
-                              ...(swapMode && (() => {
-                                const isSourceCell = scheduleToSwap && secondHalfCourse.id === scheduleToSwap.id;
-                                if (isSourceCell) {
-                                  return {
-                                    border: '2px solid #ff4d4f',
-                                    boxShadow: '0 0 8px rgba(255, 77, 79, 0.7)'
-                                  };
-                                }
-                                
-                                const sourceIsHalfHour = scheduleToSwap?.isHalfHour || false;
-                                const targetIsHalfHour = secondHalfCourse?.isHalfHour || false;
-                                const canSwap = sourceIsHalfHour === targetIsHalfHour;
-                                
-                                return {
-                                  border: canSwap ? '2px solid #52c41a' : '2px solid #d9d9d9',
-                                  boxShadow: canSwap ? '0 0 8px rgba(82, 196, 26, 0.5)' : 'none',
-                                  opacity: canSwap ? 1 : 0.5,
-                                  cursor: canSwap ? 'pointer' : 'not-allowed'
-                                };
-                              })()),
-                              border: borderColor ? `2px solid ${borderColor}` : 'none',
-                              zIndex: 1,
-                              cursor: 'pointer'
-                            }}
-                            title={titleText}
-                          >
-                            {(() => {
-                              const displayName = getDisplayName(secondHalfCourse);
-                              const isTruncated = displayName.length > 4;
-                              const content = isTruncated ? `${displayName.substring(0, 3)}…` : displayName;
-                              return (
-                                <span
-                                  className={isTruncated ? 'student-name-truncated' : ''}
-                                  title={isTruncated ? displayName : undefined}
-                                >
-                                  {content}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </Popover>
-                      );
-                    })()
-                  ) : (
-                    // 后半小时没有课程，显示空白区域用于添加课程
-                    <Popover
-                      placement={getSmartPlacement(index, record.key)}
-                      title={null}
-                      content={
-                        <NewSchedulePopoverContent 
-                          onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
-                          onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, scheduleInfo)}
-                          onCancel={() => setOpenPopoverKey(null)} 
-                          addLoading={addLoading} 
-                          timeInfo={`${record.time} 星期${dayMap[day.key.toUpperCase()] || day.key}`}
-                          studentOptions={studentOptions}
-                          defaultIsHalfHour={firstHalfCourse ? true : false}
-                          defaultHalfHourPosition="second"
-                          disableHalfHourSwitch={firstHalfCourse ? true : false}
-                        />
-                      }
-                      trigger="click"
-                      open={openPopoverKey === `${cellKey}-bottom`}
-                      onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-bottom` : null)}
+                          overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                          overlayStyle={{ maxWidth: '90vw' }}
                     >
-                      <div style={{ height: '100%', cursor: 'pointer' }} />
+                      <div
+                        style={{
+                          ...getScheduleStyle(secondHalfCourse, studentColorMap.get(secondHalfCourse.studentName)),
+                          height: '100%',
+                          position: 'absolute',
+                          top: '0',
+                          left: '0',
+                          right: '0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          wordBreak: 'break-word',
+                          lineHeight: '1.2',
+                          cursor: 'pointer',
+                          border: borderColor ? `2px solid ${borderColor}` : 'none',
+                          boxSizing: 'border-box',
+                          zIndex: 1
+                        }}
+                        title={titleText}
+                      >
+                        {(() => {
+                          const displayName = getDisplayName(secondHalfCourse);
+                          const isTruncated = displayName.length > 4;
+                          const content = isTruncated ? `${displayName.substring(0, 3)}…` : displayName;
+                          return (
+                            <span
+                              className={isTruncated ? 'student-name-truncated' : ''}
+                              title={isTruncated ? displayName : undefined}
+                            >
+                              {content}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </Popover>
+                  );
+                })()
                   )}
                 </div>
               </div>
@@ -5644,6 +5506,8 @@ const ViewTimetable = ({ user }) => {
               trigger="click"
               open={openPopoverKey === cellKey}
               onOpenChange={handleOpenChange}
+              overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+              overlayStyle={{ maxWidth: '90vw' }}
             >
               <div className="schedule-cell-content" style={{ position: 'relative', height: '48px' }}>
                 {schedules.map((student, idx) => {
@@ -5837,9 +5701,8 @@ const ViewTimetable = ({ user }) => {
       return false;
     }
   }, [timetable, weeklyInstances]);
-
   return (
-    <div className="page-container" onTouchStart={isInitialLoading ? undefined : handleTouchStart} onTouchEnd={isInitialLoading ? undefined : handleTouchEnd}>
+    <div className="page-container" onTouchStart={isInitialLoading ? undefined : handleTouchStart} onTouchEnd={isInitialLoading ? undefined : handleTouchEnd} style={{ overflowX: 'hidden', maxWidth: '100vw' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <Button
           type="text"
