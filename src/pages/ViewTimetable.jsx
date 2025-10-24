@@ -470,12 +470,12 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
   const [isTrial, setIsTrial] = React.useState(false); // 是否为体验课程
 
   return (
-    <div style={{ width: '300px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '260px', display: 'flex', flexDirection: 'column' }}>
       {/* 时间信息显示、半小时开关和体验开关 */}
       {timeInfo && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', color: '#666' }}>
-          <span style={{ whiteSpace: 'nowrap' }}>{fixedTimeSlot || timeInfo}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <span style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>{fixedTimeSlot || timeInfo}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, whiteSpace: 'nowrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ whiteSpace: 'nowrap' }}>半小时</span>
               <Switch
@@ -5894,100 +5894,6 @@ const ViewTimetable = ({ user }) => {
         )}
       </div>
 
-
-
-
-
-      {/* 移动、复制和调换模式的控制区域 */}
-      {(!timetable?.isArchived || isInitialLoading) && (moveMode || copyMode || swapMode) && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1rem',
-          padding: '8px 12px',
-          backgroundColor: moveMode ? '#e6f4ff' : copyMode ? '#f6ffed' : swapMode ? '#f6ffed' : '#e6fffb',
-          borderRadius: '6px',
-          border: moveMode ? '1px solid #91caff' : copyMode ? '1px solid #b7eb8f' : swapMode ? '1px solid #b7eb8f' : '1px solid #87e8de'
-        }}>
-        <span style={{ 
-          fontSize: '14px', 
-          color: moveMode ? '#1890ff' : copyMode ? '#722ed1' : swapMode ? '#52c41a' : '#13c2c2', 
-          fontWeight: 'bold' 
-        }}>
-          {moveMode ? moveTargetText : copyMode ? `已选择 ${selectedCopyTargets.size} 个时间段` : (swapMode ? (
-            scheduleToSwap ? 
-              (selectedSwapTarget ? `调换: ${scheduleToSwap.studentName} ↔ ${selectedSwapTarget.studentName}` : `已选择源课程: ${scheduleToSwap.studentName}，请选择目标课程`) :
-              '请选择要调换的源课程'
-          ) : swapTargetText)}
-        </span>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <Button
-              type="default"
-              size="small"
-              onClick={moveMode ? handleCancelMove : copyMode ? handleCancelCopy : handleCancelSwap}
-              style={{
-                backgroundColor: '#fff2f0',
-                borderColor: '#ffccc7',
-                color: '#cf1322'
-              }}
-            >
-              {moveMode ? '取消移动' : copyMode ? '取消复制' : '取消调换'}
-            </Button>
-            {moveMode && selectedMoveTarget && (
-              <Button
-                type="primary"
-                size="small"
-                loading={moveLoading}
-                onClick={handleConfirmMove}
-                disabled={moveLoading}
-                style={{
-                  backgroundColor: '#1890ff',
-                  borderColor: '#1890ff',
-                  color: '#ffffff'
-                }}
-              >
-                确认移动
-              </Button>
-            )}
-            {copyMode && (
-              <Button
-                type="primary"
-                size="small"
-                loading={copyLoading}
-                onClick={handleConfirmCopy}
-                disabled={selectedCopyTargets.size === 0 || copyLoading}
-                style={{
-                  backgroundColor: '#1890ff',
-                  borderColor: '#1890ff',
-                  color: '#ffffff'
-                }}
-              >
-                确认复制 ({selectedCopyTargets.size})
-              </Button>
-            )}
-            {swapMode && selectedSwapTarget && (
-              <Button
-                type="primary"
-                size="small"
-                loading={swapLoading}
-                onClick={handleConfirmSwap}
-                disabled={swapLoading}
-                style={{
-                  backgroundColor: '#52c41a',
-                  borderColor: '#52c41a',
-                  color: '#ffffff'
-                }}
-              >
-                确认调换
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-
-
       {/* 图例说明和视图切换按钮 */}
       {(timetable || isInitialLoading) && (
         <div style={{ 
@@ -6301,113 +6207,191 @@ const ViewTimetable = ({ user }) => {
           )}
           
           {/* 第二行：多选排课按钮和课时信息 */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '32px' }}>
-            {/* 左侧：多选排课按钮 */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
-              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !swapMode && !deleteMode ? (
+          {(moveMode || copyMode || swapMode) ? (
+            /* 移动、复制和调换模式的提示信息 - 占满整行 */
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              backgroundColor: moveMode ? '#e6f4ff' : copyMode ? '#f6ffed' : '#f6ffed',
+              borderRadius: '4px',
+              border: moveMode ? '1px solid #91caff' : copyMode ? '1px solid #b7eb8f' : '1px solid #b7eb8f',
+              minHeight: '40px'
+            }}>
+              <span style={{ 
+                fontSize: '14px', 
+                color: moveMode ? '#1890ff' : copyMode ? '#722ed1' : '#52c41a', 
+                fontWeight: 'bold',
+                flex: 1
+              }}>
+                {moveMode ? moveTargetText : copyMode ? `已选择 ${selectedCopyTargets.size} 个时间段` : (swapMode ? (
+                  scheduleToSwap ? 
+                    (selectedSwapTarget ? `调换: ${scheduleToSwap.studentName} ↔ ${selectedSwapTarget.studentName}` : `已选择源课程: ${scheduleToSwap.studentName}，请选择目标课程`) :
+                    '请选择要调换的源课程'
+                ) : swapTargetText)}
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <Button
-                  type={multiSelectMode ? 'default' : 'default'}
+                  type="default"
                   size="small"
-                  onClick={toggleMultiSelectMode}
-                  style={multiSelectMode ? {
+                  onClick={moveMode ? handleCancelMove : copyMode ? handleCancelCopy : handleCancelSwap}
+                  style={{
                     backgroundColor: '#fff2f0',
                     borderColor: '#ffccc7',
                     color: '#cf1322'
-                  } : {}}
+                  }}
                 >
-                  {multiSelectMode ? '退出多选' : '多选排课'}
+                  {moveMode ? '取消移动' : copyMode ? '取消复制' : '取消调换'}
                 </Button>
-              ) : null}
+                {moveMode && selectedMoveTarget && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    loading={moveLoading}
+                    onClick={handleConfirmMove}
+                    disabled={moveLoading}
+                  >
+                    确认移动
+                  </Button>
+                )}
+                {copyMode && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    loading={copyLoading}
+                    onClick={handleConfirmCopy}
+                    disabled={selectedCopyTargets.size === 0 || copyLoading}
+                  >
+                    确认复制 ({selectedCopyTargets.size})
+                  </Button>
+                )}
+                {swapMode && selectedSwapTarget && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    loading={swapLoading}
+                    onClick={handleConfirmSwap}
+                    disabled={swapLoading}
+                    style={{
+                      backgroundColor: '#52c41a',
+                      borderColor: '#52c41a'
+                    }}
+                  >
+                    确认调换
+                  </Button>
+                )}
+              </div>
             </div>
-            
-            {/* 中间：多选状态信息 */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-              {multiSelectMode && selectedCells.size > 0 ? (
-                <span style={{ fontSize: '14px', color: '#666' }}>
-                  {timetable?.isWeekly ? (
-                    `已选择 ${selectedCells.size} 个时间段`
-                  ) : (
-                    (() => {
-                      const currentPageCount = getCurrentPageSelectionCount();
-                      return currentPageCount > 0 
-                        ? `共选择 ${selectedCells.size} 个时间段 (本页 ${currentPageCount} 个)`
-                        : `共选择 ${selectedCells.size} 个时间段`;
-                    })()
-                  )}
-                </span>
-              ) : null}
-              {deleteMode && selectedSchedulesForDelete.size > 0 ? (
-                <span style={{ fontSize: '14px', color: '#fa8c16' }}>
-                  已选择 {selectedSchedulesForDelete.size} 个课程
-                </span>
-              ) : null}
-              {/* 非多选模式时显示课时信息 */}
-              {!multiSelectMode && !deleteMode && !moveMode && !copyMode && !swapMode ? (
-                <span style={{ 
-                  fontSize: '14px', 
-                  color: '#666',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {displayViewMode === 'instance' ? '本周' : '每周'}
-                  <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 2px' }}>
-                    {isInitialLoading ? '0' : displayWeeklyStats.count}
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '32px' }}>
+              {/* 左侧：多选排课按钮 */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+                {(!timetable?.isArchived || isInitialLoading) && !deleteMode ? (
+                  <Button
+                    type={multiSelectMode ? 'default' : 'default'}
+                    size="small"
+                    onClick={toggleMultiSelectMode}
+                    style={multiSelectMode ? {
+                      backgroundColor: '#fff2f0',
+                      borderColor: '#ffccc7',
+                      color: '#cf1322'
+                    } : {}}
+                  >
+                    {multiSelectMode ? '退出多选' : '多选排课'}
+                  </Button>
+                ) : null}
+              </div>
+              
+              {/* 中间：多选状态信息 */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                {multiSelectMode && selectedCells.size > 0 ? (
+                  <span style={{ fontSize: '14px', color: '#666' }}>
+                    {timetable?.isWeekly ? (
+                      `已选择 ${selectedCells.size} 个时间段`
+                    ) : (
+                      (() => {
+                        const currentPageCount = getCurrentPageSelectionCount();
+                        return currentPageCount > 0 
+                          ? `共选择 ${selectedCells.size} 个时间段 (本页 ${currentPageCount} 个)`
+                          : `共选择 ${selectedCells.size} 个时间段`;
+                      })()
+                    )}
                   </span>
-                  节课
-                  <span style={{ margin: '0 4px' }}>学员</span>
-                  <span style={{ color: '#52c41a', fontWeight: 'bold', margin: '0 2px' }}>
-                    {isInitialLoading ? '0' : displayWeeklyStats.students}
+                ) : null}
+                {deleteMode && selectedSchedulesForDelete.size > 0 ? (
+                  <span style={{ fontSize: '14px', color: '#fa8c16' }}>
+                    已选择 {selectedSchedulesForDelete.size} 个课程
                   </span>
-                  <span>个</span>
-                  {displayViewMode === 'instance' && !isInitialLoading && weeklyLeaveCount > 0 && (
-                    <>
-                      <span style={{ margin: '0 4px' }}>请假</span>
-                      <span style={{ color: '#fa8c16', fontWeight: 'bold', margin: '0 2px' }}>
-                        {weeklyLeaveCount}
-                      </span>
-                      <span>课时</span>
-                    </>
-                  )}
-                </span>
-              ) : null}
+                ) : null}
+                {/* 非多选模式时显示课时信息 */}
+                {!multiSelectMode && !deleteMode ? (
+                  <span style={{ 
+                    fontSize: '14px', 
+                    color: '#666',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {displayViewMode === 'instance' ? '本周' : '每周'}
+                    <span style={{ color: '#8a2be2', fontWeight: 'bold', margin: '0 2px' }}>
+                      {isInitialLoading ? '0' : displayWeeklyStats.count}
+                    </span>
+                    节课
+                    <span style={{ margin: '0 4px' }}>学员</span>
+                    <span style={{ color: '#52c41a', fontWeight: 'bold', margin: '0 2px' }}>
+                      {isInitialLoading ? '0' : displayWeeklyStats.students}
+                    </span>
+                    <span>个</span>
+                    {displayViewMode === 'instance' && !isInitialLoading && weeklyLeaveCount > 0 && (
+                      <>
+                        <span style={{ margin: '0 4px' }}>请假</span>
+                        <span style={{ color: '#fa8c16', fontWeight: 'bold', margin: '0 2px' }}>
+                          {weeklyLeaveCount}
+                        </span>
+                        <span>课时</span>
+                      </>
+                    )}
+                  </span>
+                ) : null}
+              </div>
+              
+              {/* 右侧：多选删除按钮、批量排课按钮和批量删除按钮 */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                {(!timetable?.isArchived || isInitialLoading) && !multiSelectMode ? (
+                  <Button
+                    type={deleteMode ? 'default' : 'default'}
+                    size="small"
+                    onClick={toggleDeleteMode}
+                    style={deleteMode ? {
+                      backgroundColor: '#fff2f0',
+                      borderColor: '#ffccc7',
+                      color: '#cf1322'
+                    } : {}}
+                  >
+                    {deleteMode ? '退出删除' : '多选删除'}
+                  </Button>
+                ) : null}
+                {multiSelectMode && selectedCells.size > 0 ? (
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={openBatchScheduleModal}
+                  >
+                    批量排课
+                  </Button>
+                ) : null}
+                {deleteMode && selectedSchedulesForDelete.size > 0 ? (
+                  <Button
+                    type="primary"
+                    danger
+                    size="small"
+                    onClick={handleBatchDelete}
+                  >
+                    批量删除
+                  </Button>
+                ) : null}
+              </div>
             </div>
-            
-            {/* 右侧：多选删除按钮、批量排课按钮和批量删除按钮 */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              {(!timetable?.isArchived || isInitialLoading) && !moveMode && !copyMode && !swapMode && !multiSelectMode ? (
-                <Button
-                  type={deleteMode ? 'default' : 'default'}
-                  size="small"
-                  onClick={toggleDeleteMode}
-                  style={deleteMode ? {
-                    backgroundColor: '#fff2f0',
-                    borderColor: '#ffccc7',
-                    color: '#cf1322'
-                  } : {}}
-                >
-                  {deleteMode ? '退出删除' : '多选删除'}
-                </Button>
-              ) : null}
-              {multiSelectMode && selectedCells.size > 0 && !moveMode ? (
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={openBatchScheduleModal}
-                >
-                  批量排课
-                </Button>
-              ) : null}
-              {deleteMode && selectedSchedulesForDelete.size > 0 ? (
-                <Button
-                  type="primary"
-                  danger
-                  size="small"
-                  onClick={handleBatchDelete}
-                >
-                  批量删除
-                </Button>
-              ) : null}
-            </div>
-          </div>
+          )}
         </div>
       )}
 
