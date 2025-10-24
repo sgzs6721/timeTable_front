@@ -29,6 +29,8 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
     // 检查 URL 参数中是否有 token（微信登录跳转）
     const urlParams = new URLSearchParams(location.search);
     const tokenFromUrl = urlParams.get('token');
+    const avatarFromUrl = urlParams.get('avatar');
+    const nicknameFromUrl = urlParams.get('nickname');
 
     const handleTokenValidation = async () => {
       if (tokenFromUrl) {
@@ -40,9 +42,16 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           const response = await validateToken();
           
           if (response.success && response.data) {
+            // 合并用户信息，优先使用 URL 参数中的头像和昵称
+            const userData = {
+              ...response.data,
+              avatar: avatarFromUrl || response.data.avatar,
+              nickname: nicknameFromUrl || response.data.nickname
+            };
+            
             // 保存用户信息
-            localStorage.setItem('user', JSON.stringify(response.data));
-            setUser(response.data);
+            localStorage.setItem('user', JSON.stringify(userData));
+            setUser(userData);
             message.success('微信登录成功');
           } else {
             message.error('Token 验证失败');
@@ -54,8 +63,10 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           localStorage.removeItem('token');
         }
         
-        // 清除 URL 中的 token 参数
+        // 清除 URL 中的参数
         urlParams.delete('token');
+        urlParams.delete('avatar');
+        urlParams.delete('nickname');
         const newSearch = urlParams.toString();
         const newUrl = location.pathname + (newSearch ? `?${newSearch}` : '');
         navigate(newUrl, { replace: true });

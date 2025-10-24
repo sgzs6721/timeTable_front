@@ -40,7 +40,7 @@ import {
   deleteCustomer, 
   getCustomersByStatus 
 } from '../services/customer';
-import { createTodo, checkCustomerHasTodo, getTodos, updateTodo } from '../services/todo';
+import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo } from '../services/todo';
 import { getTrialSchedule } from '../services/timetable';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
@@ -80,6 +80,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const [loadingTrialSchedule, setLoadingTrialSchedule] = useState(false);
   const [viewTodoModalVisible, setViewTodoModalVisible] = useState(false);
   const [viewTodoCustomer, setViewTodoCustomer] = useState(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   // 供外部调用：当其它地方创建了待办后，局部刷新某个客户的铃铛和数据
   React.useImperativeHandle(ref, () => ({
     onTodoCreatedExternally: ({ id, childName, parentPhone }) => {
@@ -410,6 +411,39 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     }, 200);
   };
 
+  // 取消提醒
+  const handleCancelReminder = async (customer) => {
+    if (!customer || !latestTodoByCustomer[customer.id]) return;
+    
+    try {
+      const todoId = latestTodoByCustomer[customer.id].id;
+      const response = await deleteTodo(todoId);
+      
+      if (response && response.success) {
+        message.success('提醒已取消');
+        
+        // 更新本地状态
+        setCustomerTodoStatus(prev => ({ ...prev, [customer.id]: false }));
+        setLatestTodoByCustomer(prev => {
+          const newState = { ...prev };
+          delete newState[customer.id];
+          return newState;
+        });
+        
+        // 关闭模态框
+        setViewTodoModalVisible(false);
+        setViewTodoCustomer(null);
+        
+        // 不需要刷新整个页面，本地状态已更新
+      } else {
+        message.error('取消提醒失败');
+      }
+    } catch (error) {
+      console.error('取消提醒失败:', error);
+      message.error('取消提醒失败');
+    }
+  };
+
   const handleCreateTodo = async () => {
     if (!todoCustomer) return;
     
@@ -609,8 +643,9 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       'SCHEDULED': 'purple',
       'PENDING_CONFIRM': 'yellow',
       'VISITED': 'green',
-      'SOLD': 'success',
       'RE_EXPERIENCE': 'cyan',
+      'PENDING_SOLD': 'lime',
+      'SOLD': 'success',
       'CLOSED': 'default'
     };
     return colors[status] || 'default';
@@ -781,8 +816,9 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       'SCHEDULED': '待体验',
       'PENDING_CONFIRM': '待确认',
       'VISITED': '已体验',
-      'SOLD': '已成交',
       'RE_EXPERIENCE': '待再体验',
+      'PENDING_SOLD': '待成交',
+      'SOLD': '已成交',
       'CLOSED': '已结束'
     };
     return statusMap[status] || status;
@@ -883,13 +919,13 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                   {customer.source}
                 </span>
               )}
-              {customer.status === 'SCHEDULED' ? (
+              {(customer.status === 'SCHEDULED' || customer.status === 'RE_EXPERIENCE') ? (
                 <Popover
                   content={
                     <div style={{ maxWidth: '300px' }}>
                       <div style={{ marginBottom: 12 }}>
                         <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: 8 }}>
-                          体验课安排
+                          {customer.status === 'RE_EXPERIENCE' ? '再体验课安排' : '体验课安排'}
                         </div>
                         {loadingTrialSchedule && !trialScheduleCache[customer.id] ? (
                           <Spin size="small" />
@@ -941,7 +977,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                       </Button>
                     </div>
                   }
-                  title="待体验信息"
+                  title={customer.status === 'RE_EXPERIENCE' ? '待再体验信息' : '待体验信息'}
                   trigger="click"
                   onOpenChange={(visible) => {
                     if (visible && !trialScheduleCache[customer.id]) {
@@ -984,11 +1020,19 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
               borderTop: '1px dashed #e8e8e8'
             }}>
               <div style={{ 
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
                 color: '#666', 
                 fontSize: '12px',
                 marginBottom: 2
               }}>
-                最近流转：
+                <span>最近流转：</span>
+                {customer.lastStatusChangeTime && (
+                  <span style={{ color: '#bbb', fontSize: '11px' }}>
+                    {dayjs(customer.lastStatusChangeTime).format('MM-DD HH:mm')}
+                  </span>
+                )}
               </div>
               <div style={{ 
                 color: '#999', 
@@ -998,11 +1042,6 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                 lineHeight: '1.5'
               }}>
                 {customer.lastStatusChangeNote}
-                {customer.lastStatusChangeTime && (
-                  <span style={{ marginLeft: '8px', color: '#bbb' }}>
-                    {dayjs(customer.lastStatusChangeTime).format('MM-DD HH:mm')}
-                  </span>
-                )}
               </div>
             </div>
           )}
@@ -1138,6 +1177,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                 <Option value="SCHEDULED">待体验</Option>
                 <Option value="VISITED">已体验</Option>
                 <Option value="RE_EXPERIENCE">待再体验</Option>
+                <Option value="PENDING_SOLD">待成交</Option>
                 <Option value="SOLD">已成交</Option>
                 <Option value="CLOSED">已结束</Option>
               </Select>
@@ -1478,6 +1518,18 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                 style={{ flex: 1 }}
                 placeholder="请选择提醒时间"
                 format="HH:mm"
+                minuteStep={10}
+                disabledTime={() => ({
+                  disabledHours: () => {
+                    // 只允许10-20点
+                    return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
+                  }
+                })}
+                showTime={{
+                  hideDisabledOptions: true
+                }}
+                showNow={false}
+                popupClassName="custom-time-picker"
               />
             </div>
           </div>
@@ -1506,6 +1558,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
         onCancel={() => {
           setViewTodoModalVisible(false);
           setViewTodoCustomer(null);
+          setShowCancelConfirm(false);
         }}
         footer={null}
         width={360}
@@ -1515,31 +1568,84 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
         {viewTodoCustomer && latestTodoByCustomer[viewTodoCustomer.id] && (
           <div style={{ padding: '12px 0' }}>
             <div style={{ 
-              display: 'flex', 
-              alignItems: 'center',
-              gap: '16px',
               marginBottom: 16,
               paddingBottom: 12,
               borderBottom: '1px solid #f0f0f0'
             }}>
-              <div style={{ fontSize: '14px', color: '#333' }}>
+              <div style={{ fontSize: '14px', color: '#333', marginBottom: 8 }}>
                 <ClockCircleOutlined style={{ marginRight: 8, color: '#1890ff' }} />
                 {latestTodoByCustomer[viewTodoCustomer.id].reminderDate 
                   ? dayjs(latestTodoByCustomer[viewTodoCustomer.id].reminderDate).format('YYYY-MM-DD') 
                   : ''} {latestTodoByCustomer[viewTodoCustomer.id].reminderTime || ''}
               </div>
+            </div>
+            <div style={{ fontSize: '14px', color: '#333', lineHeight: '1.6', marginBottom: 16 }}>
+              {latestTodoByCustomer[viewTodoCustomer.id].content}
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '8px', 
+              justifyContent: 'center',
+              paddingTop: 8, 
+              borderTop: '1px solid #f0f0f0' 
+            }}>
               <Button 
                 type="primary" 
                 size="small"
                 icon={<EditOutlined />}
                 onClick={() => handleSwitchToEditTodo(viewTodoCustomer)}
               >
-                编辑
+                编辑提醒
+              </Button>
+              <Button 
+                danger 
+                size="small"
+                icon={<DeleteOutlined />}
+                onClick={() => setShowCancelConfirm(true)}
+                disabled={showCancelConfirm}
+              >
+                取消提醒
               </Button>
             </div>
-            <div style={{ fontSize: '14px', color: '#333', lineHeight: '1.6' }}>
-              {latestTodoByCustomer[viewTodoCustomer.id].content}
-            </div>
+            
+            {showCancelConfirm && (
+              <div style={{ 
+                marginTop: 12,
+                padding: '12px',
+                backgroundColor: '#fff7e6',
+                borderRadius: '4px',
+                border: '1px solid #ffc069'
+              }}>
+                <div style={{ 
+                  marginBottom: 12, 
+                  fontSize: '14px', 
+                  color: '#d46b08',
+                  textAlign: 'center'
+                }}>
+                  确认取消提醒？取消后将删除此待办提醒
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <Button 
+                    size="small"
+                    onClick={() => setShowCancelConfirm(false)}
+                  >
+                    取消
+                  </Button>
+                  <Button 
+                    type="primary"
+                    danger
+                    size="small"
+                    onClick={() => {
+                      handleCancelReminder(viewTodoCustomer);
+                      setShowCancelConfirm(false);
+                    }}
+                  >
+                    确认
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

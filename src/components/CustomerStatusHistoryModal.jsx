@@ -189,8 +189,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const handleSubmit = async (values) => {
     if (!customer) return;
 
-    // 如果是待体验状态，验证是否选择了时间
-    if (values.toStatus === 'SCHEDULED') {
+    // 如果是待体验或待再体验状态，验证是否选择了时间
+    if (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') {
       if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
         message.warning('请选择体验日期和时间');
         return;
@@ -199,95 +199,14 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
 
     setLoading(true);
     try {
-      // 如果选择的状态和当前状态一样，编辑最近一条历史记录
-      if (values.toStatus === customer.status) {
-        // 找到最近一条历史记录（第一条，因为按时间倒序）
-        if (histories.length > 0) {
-          const latestHistory = histories[0];
-          const updateResponse = await updateCustomerStatusHistory(latestHistory.id, {
-            notes: values.notes
-          });
-          
-          if (updateResponse && updateResponse.success) {
-            message.success('备注更新成功');
-            fetchHistory(); // 刷新历史记录
-            
-            // 通知父组件刷新客户卡片
-            if (onSuccess) {
-              onSuccess(customer.status, values.notes);
-            }
-            
-            // 如果设置了待办提醒，创建或更新待办
-            if (showTodoReminder && reminderDate && reminderTime) {
-              try {
-                const todoData = {
-                  customerId: customer.id,
-                  customerName: customer.childName,
-                  content: reminderContent || `跟进客户 ${customer.childName} - ${values.notes || '状态变更提醒'}`,
-                  reminderDate: reminderDate.format('YYYY-MM-DD'),
-                  reminderTime: reminderTime.format('HH:mm:ss'),
-                  type: 'CUSTOMER_FOLLOW_UP',
-                  status: 'PENDING'
-                };
-
-                let todoResponse;
-                if (existingTodoId) {
-                  // 更新现有待办
-                  todoResponse = await updateTodo(existingTodoId, todoData);
-                  if (todoResponse && todoResponse.success) {
-                    message.success('待办提醒已更新');
-                  }
-                } else {
-                  // 创建新待办
-                  todoResponse = await createTodo(todoData);
-                  if (todoResponse && todoResponse.success) {
-                    message.success('待办提醒已创建');
-                  }
-                }
-                
-                if (todoResponse && todoResponse.success && onTodoCreated) {
-                  onTodoCreated({
-                    id: customer.id,
-                    childName: customer.childName,
-                    parentPhone: customer.parentPhone
-                  });
-                }
-              } catch (error) {
-                console.error('保存待办提醒失败:', error);
-              }
-            }
-            
-            form.resetFields();
-            setShowTodoReminder(false);
-            setReminderDate(null);
-            setReminderTime(null);
-            setReminderContent('');
-            setShowExperienceSchedule(false);
-            setExperienceDate(null);
-            setExperienceTimeRange(null);
-            setAvailableCoaches([]);
-            setSelectedCoach(null);
-            if (onSuccess) {
-              onSuccess(values.toStatus, values.notes);
-            }
-            onCancel();
-          } else {
-            message.error(updateResponse?.message || '更新失败');
-          }
-        } else {
-          message.warning('没有可编辑的历史记录');
-        }
-        return;
-      }
-
-      // 正常的状态变更
+      // 所有状态变更都创建新的历史记录
       const statusChangeData = {
         toStatus: values.toStatus,
         notes: values.notes
       };
       
-      // 如果是待体验状态且设置了体验时间，一并保存
-      if (values.toStatus === 'SCHEDULED' && experienceDate && experienceTimeRange && experienceTimeRange.length === 2) {
+      // 如果是待体验或待再体验状态且设置了体验时间，一并保存
+      if ((values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') && experienceDate && experienceTimeRange && experienceTimeRange.length === 2) {
         statusChangeData.trialScheduleDate = experienceDate.format('YYYY-MM-DD');
         statusChangeData.trialStartTime = experienceTimeRange[0].format('HH:mm:ss');
         statusChangeData.trialEndTime = experienceTimeRange[1].format('HH:mm:ss');
@@ -299,8 +218,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       if (response && response.success) {
         message.success('状态变更成功');
         
-        // 如果是待体验状态，创建体验课程
-        if (values.toStatus === 'SCHEDULED' && experienceDate && experienceTimeRange && selectedCoach) {
+        // 如果是待体验或待再体验状态，创建体验课程
+        if ((values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') && experienceDate && experienceTimeRange && selectedCoach) {
           try {
             const scheduleResponse = await fetch(`${getApiBaseUrl()}/schedules/trial`, {
               method: 'POST',
@@ -407,8 +326,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       });
     }
     
-    // 如果选择"待体验"状态，显示体验安排选项
-    if (selectedStatus === 'SCHEDULED') {
+    // 如果选择"待体验"或"待再体验"状态，显示体验安排选项
+    if (selectedStatus === 'SCHEDULED' || selectedStatus === 'RE_EXPERIENCE') {
       setShowExperienceSchedule(true);
       
       // 查询是否已有体验课程，如果有则回显
@@ -515,6 +434,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       { value: 'SCHEDULED', label: '待体验' },
       { value: 'VISITED', label: '已体验' },
       { value: 'RE_EXPERIENCE', label: '待再体验' },
+      { value: 'PENDING_SOLD', label: '待成交' },
       { value: 'SOLD', label: '已成交' },
       { value: 'CLOSED', label: '已结束' }
     ];
@@ -578,7 +498,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
             />
           </Form.Item>
 
-          {/* 待体验安排 */}
+          {/* 待体验/待再体验安排 */}
           {showExperienceSchedule && (
             <div style={{ 
               marginBottom: 24, 
@@ -588,7 +508,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
               border: '1px solid #91caff'
             }}>
               <div style={{ marginBottom: 12, fontSize: '15px', fontWeight: '500', color: '#1890ff' }}>
-                体验课安排
+                {form.getFieldValue('toStatus') === 'RE_EXPERIENCE' ? '再体验课安排' : '体验课安排'}
               </div>
               
               <div style={{ display: 'flex', gap: '12px', marginBottom: 16 }}>
@@ -707,9 +627,11 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
               <div style={{ 
                 marginBottom: 12, 
                 padding: '12px',
+                paddingBottom: '16px',
                 backgroundColor: existingTodoId && !isEditingReminder ? '#f5f5f5' : '#e6f7ff',
                 borderRadius: '4px',
-                border: existingTodoId && !isEditingReminder ? '1px solid #d9d9d9' : '1px dashed #1890ff'
+                border: existingTodoId && !isEditingReminder ? '1px solid #d9d9d9' : '1px dashed #1890ff',
+                overflow: 'hidden'
               }}>
                 {existingTodoId && !isEditingReminder ? (
                   // 已有提醒且未编辑状态：显示只读信息 + 编辑按钮
@@ -766,6 +688,18 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                         style={{ flex: 1 }}
                         placeholder="请选择时间"
                         format="HH:mm"
+                        minuteStep={10}
+                        disabledTime={() => ({
+                          disabledHours: () => {
+                            // 只允许10-20点
+                            return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
+                          }
+                        })}
+                        showTime={{
+                          hideDisabledOptions: true
+                        }}
+                        showNow={false}
+                        popupClassName="custom-time-picker"
                       />
                     </div>
                     <div style={{ marginBottom: isEditingReminder ? 8 : 0 }}>

@@ -185,12 +185,20 @@ const AppHeader = ({ user, onLogout }) => {
                   padding: '0 4px'
                 }}
               >
-                <Avatar
-                  size="small"
-                  style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
-                >
-                  {(user?.nickname || user?.username)?.[0]?.toUpperCase()}
-                </Avatar>
+                {user?.avatar ? (
+                  <Avatar
+                    size="small"
+                    src={user.avatar}
+                    alt={user?.nickname || user?.username}
+                  />
+                ) : (
+                  <Avatar
+                    size="small"
+                    style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+                  >
+                    {(user?.nickname || user?.username)?.[0]?.toUpperCase()}
+                  </Avatar>
+                )}
               </Badge>
             </Button>
           </Dropdown>
