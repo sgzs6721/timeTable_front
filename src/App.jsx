@@ -35,13 +35,16 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
 
     const handleTokenValidation = async () => {
       if (tokenFromUrl) {
+        console.log('检测到 token，开始验证...', { tokenFromUrl, avatarFromUrl, nicknameFromUrl });
         setIsValidatingToken(true);
         // 保存 token 到 localStorage
         localStorage.setItem('token', tokenFromUrl);
         
         try {
           // 验证 token 并获取用户信息
+          console.log('调用 validateToken API...');
           const response = await validateToken();
+          console.log('validateToken 响应:', response);
           
           if (response.success && response.data) {
             // 合并用户信息，优先使用 URL 参数中的头像和昵称
@@ -51,20 +54,25 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
               nickname: nicknameFromUrl || response.data.nickname
             };
             
+            console.log('验证成功，用户数据:', userData);
+            
             // 保存用户信息
             localStorage.setItem('user', JSON.stringify(userData));
             setUser(userData);
+            setIsValidatingToken(false);
             message.success('微信登录成功');
             
             // 清除 URL 中的参数并跳转到 dashboard
+            console.log('准备跳转到 dashboard');
             navigate('/dashboard', { replace: true });
           } else {
+            console.error('Token 验证失败，响应:', response);
             message.error('Token 验证失败');
             localStorage.removeItem('token');
             setIsValidatingToken(false);
           }
         } catch (error) {
-          console.error('Token 验证失败:', error);
+          console.error('Token 验证异常:', error);
           message.error('登录验证失败');
           localStorage.removeItem('token');
           setIsValidatingToken(false);
