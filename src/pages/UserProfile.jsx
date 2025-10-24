@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, message, Modal } from 'antd';
+import { Card, Form, Input, Button, message, Modal, Spin } from 'antd';
 import { UserOutlined, LockOutlined, SaveOutlined, ArrowLeftOutlined, LogoutOutlined, ExclamationCircleOutlined, LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { updateProfile, updatePassword, deactivateAccount, bindWechatToAccount } from '../services/auth';
+import { updateProfile, updatePassword, deactivateAccount, bindWechatToAccount, validateToken } from '../services/auth';
 import Footer from '../components/Footer';
 import './UserProfile.css';
 
@@ -21,20 +21,63 @@ const UserProfile = ({ user }) => {
   const [bindAccountModalVisible, setBindAccountModalVisible] = useState(false);
   const [bindAccountForm] = Form.useForm();
   const [bindAccountLoading, setBindAccountLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
+  // 页面加载时获取最新用户信息
   useEffect(() => {
-    if (user) {
-      // 如果是微信临时用户（wx_开头），用户名显示为空让用户自己设置
-      const isWechatTemp = user.username && user.username.startsWith('wx_');
-      const values = {
-        username: isWechatTemp ? '' : user.username,
-        nickname: user.nickname || '',
-      };
-      setInitialValues(values);
-      setCurrentUser(user);
-      setCurrentFormValues(values);
-      profileForm.setFieldsValue(values);
-    }
+    const fetchUserInfo = async () => {
+      try {
+        setPageLoading(true);
+        const response = await validateToken();
+        
+        if (response.success && response.data) {
+          const userData = response.data.user || response.data;
+          
+          // 如果是微信临时用户（wx_开头），用户名显示为空让用户自己设置
+          const isWechatTemp = userData.username && userData.username.startsWith('wx_');
+          const values = {
+            username: isWechatTemp ? '' : userData.username,
+            nickname: userData.nickname || '',
+          };
+          
+          setInitialValues(values);
+          setCurrentUser(userData);
+          setCurrentFormValues(values);
+          profileForm.setFieldsValue(values);
+        } else {
+          // 如果验证失败，使用传入的 user
+          if (user) {
+            const isWechatTemp = user.username && user.username.startsWith('wx_');
+            const values = {
+              username: isWechatTemp ? '' : user.username,
+              nickname: user.nickname || '',
+            };
+            setInitialValues(values);
+            setCurrentUser(user);
+            setCurrentFormValues(values);
+            profileForm.setFieldsValue(values);
+          }
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        // 失败时使用传入的 user
+        if (user) {
+          const isWechatTemp = user.username && user.username.startsWith('wx_');
+          const values = {
+            username: isWechatTemp ? '' : user.username,
+            nickname: user.nickname || '',
+          };
+          setInitialValues(values);
+          setCurrentUser(user);
+          setCurrentFormValues(values);
+          profileForm.setFieldsValue(values);
+        }
+      } finally {
+        setPageLoading(false);
+      }
+    };
+
+    fetchUserInfo();
   }, [user, profileForm]);
 
   const handleUpdateProfile = async (values) => {
@@ -160,26 +203,26 @@ const UserProfile = ({ user }) => {
 
   // 判断是否是微信登录用户（临时账号）- 用户名是 wx_ 开头
   const isWechatTempUser = () => {
-    return user && user.username && user.username.startsWith('wx_');
+    return currentUser && currentUser.username && currentUser.username.startsWith('wx_');
   };
 
   // 判断是否是已绑定微信的正式账号 - 有微信头像但用户名不是 wx_ 开头
   const isWechatBoundUser = () => {
-    return user && user.wechatAvatar && user.username && !user.username.startsWith('wx_');
+    return currentUser && currentUser.wechatAvatar && currentUser.username && !currentUser.username.startsWith('wx_');
   };
 
   // 判断昵称是否应该禁用 - 所有有微信信息的用户
   const shouldDisableNickname = () => {
-    if (!user) return false;
+    if (!currentUser) return false;
     // 有微信头像 或 用户名是 wx_ 开头
-    return Boolean(user.wechatAvatar) || (user.username && user.username.startsWith('wx_'));
+    return Boolean(currentUser.wechatAvatar) || (currentUser.username && currentUser.username.startsWith('wx_'));
   };
 
   // 判断用户名是否应该禁用 - 只有已绑定的微信用户
   const shouldDisableUsername = () => {
-    if (!user) return false;
+    if (!currentUser) return false;
     // 有微信头像且用户名不是 wx_ 开头
-    return Boolean(user.wechatAvatar) && user.username && !user.username.startsWith('wx_');
+    return Boolean(currentUser.wechatAvatar) && currentUser.username && !currentUser.username.startsWith('wx_');
   };
 
   // 处理绑定账号
@@ -220,6 +263,22 @@ const UserProfile = ({ user }) => {
       setBindAccountLoading(false);
     }
   };
+
+  // 如果正在加载用户信息，显示加载状态
+  if (pageLoading) {
+    return (
+      <div className="user-profile-container">
+        <div className="user-profile-content" style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '400px' 
+        }}>
+          <Spin size="large" tip="加载中..." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="user-profile-container">
