@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Layout, message } from 'antd';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -16,9 +16,131 @@ import ArchivedTimetables from './pages/ArchivedTimetables';
 import ConvertPreview from './pages/ConvertPreview';
 import WechatTest from './pages/WechatTest';
 import UserGuide from './pages/UserGuide';
+import { validateToken } from './services/auth';
 import './App.css';
 
 const { Content } = Layout;
+
+function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputValue }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // 检查 URL 参数中是否有 token（微信登录跳转）
+    const urlParams = new URLSearchParams(location.search);
+    const tokenFromUrl = urlParams.get('token');
+
+    const handleTokenValidation = async () => {
+      if (tokenFromUrl) {
+        // 保存 token 到 localStorage
+        localStorage.setItem('token', tokenFromUrl);
+        
+        try {
+          // 验证 token 并获取用户信息
+          const response = await validateToken();
+          
+          if (response.success && response.data) {
+            // 保存用户信息
+            localStorage.setItem('user', JSON.stringify(response.data));
+            setUser(response.data);
+            message.success('微信登录成功');
+          } else {
+            message.error('Token 验证失败');
+            localStorage.removeItem('token');
+          }
+        } catch (error) {
+          console.error('Token 验证失败:', error);
+          message.error('登录验证失败');
+          localStorage.removeItem('token');
+        }
+        
+        // 清除 URL 中的 token 参数
+        urlParams.delete('token');
+        const newSearch = urlParams.toString();
+        const newUrl = location.pathname + (newSearch ? `?${newSearch}` : '');
+        navigate(newUrl, { replace: true });
+      }
+    };
+
+    handleTokenValidation();
+  }, [location, navigate, setUser]);
+
+  return (
+    <>
+      {user && <AppHeader user={user} onLogout={handleLogout} />}
+      <Content>
+        <Routes>
+          <Route
+            path="/login"
+            element={!user ? <Login onLogin={(userData) => {
+              setUser(userData);
+              localStorage.setItem('user', JSON.stringify(userData));
+            }} /> : <Navigate to="/dashboard" />}
+          />
+          <Route
+            path="/register"
+            element={!user ? <Register onLogin={(userData) => {
+              setUser(userData);
+              localStorage.setItem('user', JSON.stringify(userData));
+            }} /> : <Navigate to="/dashboard" />}
+          />
+          <Route
+            path="/dashboard"
+            element={user ? <Dashboard user={user} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/create-timetable"
+            element={user ? <CreateTimetable user={user} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/input-timetable/:timetableId"
+            element={user ? <InputTimetable user={user} textInputValue={textInputValue} setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/view-timetable/:timetableId"
+            element={user ? <ViewTimetable user={user} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/timetables/:timetableId/confirm-schedule"
+            element={user ? <ConfirmSchedulePage setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/admin"
+            element={user && user.role?.toUpperCase() === 'ADMIN' ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />}
+          />
+          <Route
+            path="/preview-merge"
+            element={user ? <MergePreview user={user} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/profile"
+            element={user ? <UserProfile user={user} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/archived-timetables"
+            element={user ? <ArchivedTimetables /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/guide"
+            element={user ? <UserGuide /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/convert-preview"
+            element={user ? <ConvertPreview /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/wechat-test"
+            element={<WechatTest />}
+          />
+          <Route
+            path="/"
+            element={<Navigate to={user ? "/dashboard" : "/login"} />}
+          />
+        </Routes>
+      </Content>
+    </>
+  );
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -50,11 +172,6 @@ function App() {
       window.removeEventListener('userUpdated', handleUserUpdate);
     };
   }, []);
-
-  const handleLogin = (userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-  };
 
   const handleLogout = () => {
     setUser(null);
@@ -99,71 +216,13 @@ function App() {
   return (
     <Router>
       <Layout className="app-container">
-        {user && <AppHeader user={user} onLogout={handleLogout} />}
-        <Content>
-          <Routes>
-            <Route
-              path="/login"
-              element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard" />}
-            />
-            <Route
-              path="/register"
-              element={!user ? <Register onLogin={handleLogin} /> : <Navigate to="/dashboard" />}
-            />
-            <Route
-              path="/dashboard"
-              element={user ? <Dashboard user={user} /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/create-timetable"
-              element={user ? <CreateTimetable user={user} /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/input-timetable/:timetableId"
-              element={user ? <InputTimetable user={user} textInputValue={textInputValue} setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/view-timetable/:timetableId"
-              element={user ? <ViewTimetable user={user} /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/timetables/:timetableId/confirm-schedule"
-              element={user ? <ConfirmSchedulePage setTextInputValue={setTextInputValue} /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/admin"
-              element={user && user.role?.toUpperCase() === 'ADMIN' ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />}
-            />
-            <Route
-              path="/preview-merge"
-              element={user ? <MergePreview user={user} /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/profile"
-              element={user ? <UserProfile user={user} /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/archived-timetables"
-              element={user ? <ArchivedTimetables /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/guide"
-              element={user ? <UserGuide /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/convert-preview"
-              element={user ? <ConvertPreview /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/wechat-test"
-              element={<WechatTest />}
-            />
-            <Route
-              path="/"
-              element={<Navigate to={user ? "/dashboard" : "/login"} />}
-            />
-          </Routes>
-        </Content>
+        <AppContent 
+          user={user} 
+          setUser={setUser} 
+          handleLogout={handleLogout}
+          textInputValue={textInputValue}
+          setTextInputValue={setTextInputValue}
+        />
       </Layout>
     </Router>
   );
