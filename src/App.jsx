@@ -24,6 +24,7 @@ const { Content } = Layout;
 function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputValue }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isValidatingToken, setIsValidatingToken] = useState(false);
 
   useEffect(() => {
     // 检查 URL 参数中是否有 token（微信登录跳转）
@@ -34,6 +35,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
 
     const handleTokenValidation = async () => {
       if (tokenFromUrl) {
+        setIsValidatingToken(true);
         // 保存 token 到 localStorage
         localStorage.setItem('token', tokenFromUrl);
         
@@ -53,28 +55,59 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
             localStorage.setItem('user', JSON.stringify(userData));
             setUser(userData);
             message.success('微信登录成功');
+            
+            // 清除 URL 中的参数并跳转到 dashboard
+            navigate('/dashboard', { replace: true });
           } else {
             message.error('Token 验证失败');
             localStorage.removeItem('token');
+            setIsValidatingToken(false);
           }
         } catch (error) {
           console.error('Token 验证失败:', error);
           message.error('登录验证失败');
           localStorage.removeItem('token');
+          setIsValidatingToken(false);
         }
-        
-        // 清除 URL 中的参数
-        urlParams.delete('token');
-        urlParams.delete('avatar');
-        urlParams.delete('nickname');
-        const newSearch = urlParams.toString();
-        const newUrl = location.pathname + (newSearch ? `?${newSearch}` : '');
-        navigate(newUrl, { replace: true });
       }
     };
 
     handleTokenValidation();
   }, [location, navigate, setUser]);
+
+  // 如果正在验证 token，显示加载界面
+  if (isValidatingToken) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: '4px solid #f3f3f3',
+          borderTop: '4px solid #07c160',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}></div>
+        <div style={{ marginTop: '16px', color: '#666', fontSize: '14px' }}>
+          微信登录中...
+        </div>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `
+        }} />
+      </div>
+    );
+  }
 
   return (
     <>
