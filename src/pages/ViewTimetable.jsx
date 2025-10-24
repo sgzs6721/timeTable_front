@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Table, message, Space, Tag, Popover, Spin, Input, Modal, Checkbox, Collapse, Dropdown, Switch, AutoComplete } from 'antd';
 import { LeftOutlined, CalendarOutlined, RightOutlined, CopyOutlined, CloseOutlined, CheckOutlined, DownOutlined, UpOutlined, DeleteOutlined, UndoOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules, swapSchedules } from '../services/timetable';
+import { getTimetable, getTimetableSchedules, getTimetableSchedulesByStudent, deleteSchedule, updateSchedule, createSchedule, createSchedulesBatch, getActiveSchedulesByDate, deleteSchedulesBatch, getTodaySchedulesOnce, getTomorrowSchedulesOnce, invalidateTimetableCache, getActiveSchedulesByDateMerged, getTemplateSchedules, getThisWeekSchedules, swapSchedules, clearActiveSchedulesCache } from '../services/timetable';
 import { swapInstanceSchedules } from '../services/weeklyInstance';
-import { invalidateWeeklyTemplatesCache, getInstanceSchedulesByDate } from '../services/admin';
+import { invalidateWeeklyTemplatesCache, getInstanceSchedulesByDate, clearByDateCache } from '../services/admin';
 import { getThisWeekSchedulesSessionOnce } from '../services/timetable';
 import {
   getCurrentWeekInstance,
@@ -1609,6 +1609,10 @@ const ViewTimetable = ({ user }) => {
       setLoadingOtherCoachesInModal(true);
       const targetDateStr = targetDate.format('YYYY-MM-DD');
       
+      // 清除该日期的缓存，确保获取最新数据（包含ownerRole字段）
+      clearByDateCache(targetDateStr);
+      clearActiveSchedulesCache(targetDateStr);
+      
       // 优先使用普通用户可访问的API
       getInstanceSchedulesByDate(targetDateStr)
         .then(response => {
@@ -1789,6 +1793,11 @@ const ViewTimetable = ({ user }) => {
       otherCoachesData.timetables.forEach(timetableInfo => {
         // 跳过当前教练的课表
         if (timetableInfo.timetableId.toString() === timetableId) {
+          return;
+        }
+        
+        // 始终跳过管理员的课程（不管谁登录）
+        if (timetableInfo.ownerRole === 'ADMIN') {
           return;
         }
 
@@ -6761,7 +6770,17 @@ const ViewTimetable = ({ user }) => {
               >
                 <div style={{ padding: '12px', maxHeight: '200px', overflowY: 'auto' }}>
                   {otherCoachesDataInModal.timetables
-                    .filter(timetableInfo => timetableInfo.timetableId.toString() !== timetableId)
+                    .filter(timetableInfo => {
+                      const notCurrentTimetable = timetableInfo.timetableId.toString() !== timetableId;
+                      console.log(`过滤1 - ${timetableInfo.ownerName}: timetableId=${timetableInfo.timetableId}, 当前ID=${timetableId}, 通过=${notCurrentTimetable}`);
+                      return notCurrentTimetable;
+                    })
+                    .filter(timetableInfo => {
+                      const isOwnerAdmin = timetableInfo.ownerRole === 'ADMIN';
+                      const shouldShow = !isOwnerAdmin;
+                      console.log(`过滤2 - ${timetableInfo.ownerName}: 教练是管理员=${isOwnerAdmin}, 显示=${shouldShow}`);
+                      return shouldShow;
+                    })
                     .map((timetableInfo, index) => (
                       <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
                         <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1890ff', marginBottom: '4px' }}>

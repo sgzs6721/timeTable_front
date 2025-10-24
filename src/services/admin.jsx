@@ -241,6 +241,15 @@ const byDateCache = new Map(); // date -> {time, promise, data}
 const BYDATE_MERGE_MS = 800;
 const BYDATE_TTL_MS = 60_000;
 
+// 清除指定日期的缓存
+export const clearByDateCache = (date) => {
+  if (date) {
+    byDateCache.delete(date);
+  } else {
+    byDateCache.clear();
+  }
+};
+
 export const getInstanceSchedulesByDate = async (date) => {
   const now = Date.now();
   const hit = byDateCache.get(date);

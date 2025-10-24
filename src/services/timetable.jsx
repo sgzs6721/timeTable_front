@@ -306,6 +306,15 @@ export const getActiveSchedulesByDate = async (date) => {
 const activeSchedulesCache = new Map(); // date -> { time, promise, data }
 const MERGE_WINDOW_MS = 800; // 合并窗口
 
+// 清除指定日期的缓存
+export const clearActiveSchedulesCache = (date) => {
+  if (date) {
+    activeSchedulesCache.delete(date);
+  } else {
+    activeSchedulesCache.clear();
+  }
+};
+
 export const getActiveSchedulesByDateMerged = async (date) => {
   const now = Date.now();
   const cached = activeSchedulesCache.get(date);
