@@ -120,4 +120,17 @@ export const deactivateAccount = async () => {
   }
 };
 
+// 绑定微信到已有账号
+export const bindWechatToAccount = async (username, password) => {
+  try {
+    const response = await api.post('/auth/wechat/bind-account', { 
+      username, 
+      password 
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export default api; 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, message, Modal } from 'antd';
-import { UserOutlined, LockOutlined, SaveOutlined, ArrowLeftOutlined, LogoutOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, SaveOutlined, ArrowLeftOutlined, LogoutOutlined, ExclamationCircleOutlined, LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { updateProfile, updatePassword, deactivateAccount } from '../services/auth';
+import { updateProfile, updatePassword, deactivateAccount, bindWechatToAccount } from '../services/auth';
 import Footer from '../components/Footer';
 import './UserProfile.css';
 
@@ -18,6 +18,9 @@ const UserProfile = ({ user }) => {
   const [currentUser, setCurrentUser] = useState(user);
   const [initialValues, setInitialValues] = useState({});
   const [currentFormValues, setCurrentFormValues] = useState({});
+  const [bindAccountModalVisible, setBindAccountModalVisible] = useState(false);
+  const [bindAccountForm] = Form.useForm();
+  const [bindAccountLoading, setBindAccountLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -153,6 +156,65 @@ const UserProfile = ({ user }) => {
     );
   };
 
+  // 判断是否是微信登录用户（临时账号）
+  const isWechatTempUser = () => {
+    return currentUser?.username && currentUser.username.startsWith('wx_');
+  };
+
+  // 判断是否是已绑定微信的正式账号
+  const isWechatBoundUser = () => {
+    return currentUser?.wechatAvatar && !currentUser?.username?.startsWith('wx_');
+  };
+
+  // 判断昵称是否应该禁用（所有微信用户）
+  const shouldDisableNickname = () => {
+    return currentUser?.wechatAvatar || currentUser?.username?.startsWith('wx_');
+  };
+
+  // 判断用户名是否应该禁用（只有已绑定的微信用户）
+  const shouldDisableUsername = () => {
+    return isWechatBoundUser();
+  };
+
+  // 处理绑定账号
+  const handleBindAccount = async (values) => {
+    setBindAccountLoading(true);
+    try {
+      const response = await bindWechatToAccount(values.username, values.password);
+      if (response.success) {
+        message.success('账号绑定成功！');
+        
+        // 更新token和用户信息
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+        }
+        if (response.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          setCurrentUser(response.data.user);
+          
+          // 触发全局用户信息更新事件
+          window.dispatchEvent(new CustomEvent('userUpdated', { detail: response.data.user }));
+        }
+        
+        // 关闭模态框
+        setBindAccountModalVisible(false);
+        bindAccountForm.resetFields();
+        
+        // 刷新页面以更新所有信息
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      } else {
+        message.error(response.message || '绑定失败');
+      }
+    } catch (error) {
+      console.error('绑定账号失败:', error);
+      message.error('绑定失败，请稍后重试');
+    } finally {
+      setBindAccountLoading(false);
+    }
+  };
+
   return (
     <div className="user-profile-container">
       <div className="user-profile-content">
@@ -171,11 +233,18 @@ const UserProfile = ({ user }) => {
                 { min: 3, message: '用户名至少3个字符' },
                 { max: 20, message: '用户名最多20个字符' },
               ]}
+              tooltip={shouldDisableUsername() ? "已绑定微信的账号用户名不可修改" : ""}
             >
               <Input
                 prefix={<UserOutlined />}
                 placeholder="请输入用户名"
                 size="large"
+                disabled={shouldDisableUsername()}
+                style={shouldDisableUsername() ? { 
+                  backgroundColor: '#f5f5f5',
+                  color: '#999',
+                  cursor: 'not-allowed'
+                } : {}}
               />
             </Form.Item>
 
@@ -185,26 +254,49 @@ const UserProfile = ({ user }) => {
               rules={[
                 { max: 50, message: '昵称最多50个字符' },
               ]}
+              tooltip={shouldDisableNickname() ? "微信登录用户的昵称来自微信，不可修改" : ""}
             >
               <Input
                 prefix={<UserOutlined />}
                 placeholder="请输入昵称（可选）"
                 size="large"
+                disabled={shouldDisableNickname()}
+                style={shouldDisableNickname() ? { 
+                  backgroundColor: '#f5f5f5',
+                  color: '#999',
+                  cursor: 'not-allowed'
+                } : {}}
               />
             </Form.Item>
 
             <Form.Item style={{ textAlign: 'center', marginBottom: 0 }}>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={loading}
-                disabled={!hasFormChanged()}
-                icon={<SaveOutlined />}
-                size="large"
-                className="action-button"
-              >
-                更新资料
-              </Button>
+              {isWechatTempUser() ? (
+                <Button
+                  type="primary"
+                  onClick={() => setBindAccountModalVisible(true)}
+                  icon={<LinkOutlined />}
+                  size="large"
+                  className="action-button"
+                  style={{ 
+                    background: 'linear-gradient(135deg, #07c160 0%, #05a850 100%)',
+                    borderColor: '#07c160'
+                  }}
+                >
+                  绑定账号
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                  disabled={!hasFormChanged()}
+                  icon={<SaveOutlined />}
+                  size="large"
+                  className="action-button"
+                >
+                  更新资料
+                </Button>
+              )}
             </Form.Item>
           </Form>
         </Card>
@@ -321,6 +413,73 @@ const UserProfile = ({ user }) => {
       
       {/* 版权信息 */}
       <Footer />
+
+      {/* 绑定账号模态框 */}
+      <Modal
+        title="绑定到已有账号"
+        open={bindAccountModalVisible}
+        onCancel={() => {
+          setBindAccountModalVisible(false);
+          bindAccountForm.resetFields();
+        }}
+        footer={null}
+        width={400}
+      >
+        <div style={{ marginBottom: '20px', color: '#666', fontSize: '14px' }}>
+          <p>将当前微信账号绑定到已有的课表账号</p>
+          <p style={{ color: '#faad14' }}>⚠️ 绑定后将使用已有账号的所有数据</p>
+        </div>
+        <Form
+          form={bindAccountForm}
+          layout="vertical"
+          onFinish={handleBindAccount}
+        >
+          <Form.Item
+            label="已有账号用户名"
+            name="username"
+            rules={[
+              { required: true, message: '请输入用户名' },
+            ]}
+          >
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="请输入已有账号的用户名"
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="账号密码"
+            name="password"
+            rules={[
+              { required: true, message: '请输入密码' },
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="请输入账号密码"
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={bindAccountLoading}
+              icon={<LinkOutlined />}
+              size="large"
+              style={{ 
+                width: '100%',
+                background: 'linear-gradient(135deg, #07c160 0%, #05a850 100%)',
+                borderColor: '#07c160'
+              }}
+            >
+              确认绑定
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
