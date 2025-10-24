@@ -338,7 +338,13 @@ const UserProfile = ({ user }) => {
               {isWechatTempUser() ? (
                 <Button
                   type="primary"
-                  onClick={() => setBindAccountModalVisible(true)}
+                  onClick={() => {
+                    // 获取当前表单中的用户名
+                    const currentUsername = profileForm.getFieldValue('username');
+                    // 设置到绑定表单中
+                    bindAccountForm.setFieldsValue({ username: currentUsername || '' });
+                    setBindAccountModalVisible(true);
+                  }}
                   icon={<LinkOutlined />}
                   size="large"
                   className="action-button"
@@ -510,6 +516,12 @@ const UserProfile = ({ user }) => {
               prefix={<UserOutlined />}
               placeholder="请输入已有账号的用户名"
               size="large"
+              disabled
+              style={{
+                backgroundColor: '#f5f5f5',
+                color: '#333',
+                cursor: 'not-allowed'
+              }}
             />
           </Form.Item>
 
