@@ -24,8 +24,10 @@ const UserProfile = ({ user }) => {
 
   useEffect(() => {
     if (user) {
+      // 如果是微信临时用户（wx_开头），用户名显示为空让用户自己设置
+      const isWechatTemp = user.username && user.username.startsWith('wx_');
       const values = {
-        username: user.username,
+        username: isWechatTemp ? '' : user.username,
         nickname: user.nickname || '',
       };
       setInitialValues(values);
@@ -156,24 +158,28 @@ const UserProfile = ({ user }) => {
     );
   };
 
-  // 判断是否是微信登录用户（临时账号）
+  // 判断是否是微信登录用户（临时账号）- 用户名是 wx_ 开头
   const isWechatTempUser = () => {
-    return user?.username && user.username.startsWith('wx_');
+    return user && user.username && user.username.startsWith('wx_');
   };
 
-  // 判断是否是已绑定微信的正式账号
+  // 判断是否是已绑定微信的正式账号 - 有微信头像但用户名不是 wx_ 开头
   const isWechatBoundUser = () => {
-    return user?.wechatAvatar && user?.username && !user.username.startsWith('wx_');
+    return user && user.wechatAvatar && user.username && !user.username.startsWith('wx_');
   };
 
-  // 判断昵称是否应该禁用（所有微信用户）
+  // 判断昵称是否应该禁用 - 所有有微信信息的用户
   const shouldDisableNickname = () => {
-    return (user?.wechatAvatar || (user?.username && user.username.startsWith('wx_')));
+    if (!user) return false;
+    // 有微信头像 或 用户名是 wx_ 开头
+    return Boolean(user.wechatAvatar) || (user.username && user.username.startsWith('wx_'));
   };
 
-  // 判断用户名是否应该禁用（只有已绑定的微信用户）
+  // 判断用户名是否应该禁用 - 只有已绑定的微信用户
   const shouldDisableUsername = () => {
-    return isWechatBoundUser();
+    if (!user) return false;
+    // 有微信头像且用户名不是 wx_ 开头
+    return Boolean(user.wechatAvatar) && user.username && !user.username.startsWith('wx_');
   };
 
   // 处理绑定账号
