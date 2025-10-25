@@ -175,8 +175,8 @@ const AppHeader = ({ user, onLogout }) => {
             placement="bottomRight"
             trigger={['click']}
           >
-            <Button type="text" className="user-dropdown" style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ marginRight: '8px' }}>
+            <Button type="text" className="user-dropdown" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>
                 {user?.nickname || user?.username}
               </span>
               <Badge 
