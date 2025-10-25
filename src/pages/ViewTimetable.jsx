@@ -5702,7 +5702,7 @@ const ViewTimetable = ({ user }) => {
     }
   }, [timetable, weeklyInstances]);
   return (
-    <div className="page-container" onTouchStart={isInitialLoading ? undefined : handleTouchStart} onTouchEnd={isInitialLoading ? undefined : handleTouchEnd} style={{ overflowX: 'hidden', maxWidth: '100vw' }}>
+    <div className="page-container" onTouchStart={isInitialLoading ? undefined : handleTouchStart} onTouchEnd={isInitialLoading ? undefined : handleTouchEnd} style={{ overflowX: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <Button
           type="text"
