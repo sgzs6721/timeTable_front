@@ -11,6 +11,12 @@ const AppHeader = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [pendingCount, setPendingCount] = useState(0);
+  const [avatarError, setAvatarError] = useState(false);
+  
+  // 重置头像错误状态
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user]);
 
   // 获取待审批用户数量
   const fetchPendingCount = async () => {
@@ -185,11 +191,15 @@ const AppHeader = ({ user, onLogout }) => {
                   padding: '0 4px'
                 }}
               >
-                {user?.avatar ? (
+                {user?.wechatAvatar && !avatarError ? (
                   <Avatar
                     size="small"
-                    src={user.avatar}
+                    src={user.wechatAvatar}
                     alt={user?.nickname || user?.username}
+                    onError={() => {
+                      setAvatarError(true);
+                      return true;
+                    }}
                   />
                 ) : (
                   <Avatar

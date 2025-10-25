@@ -211,11 +211,11 @@ const UserProfile = ({ user }) => {
     return currentUser && currentUser.wechatAvatar && currentUser.username && !currentUser.username.startsWith('wx_');
   };
 
-  // 判断昵称是否应该禁用 - 所有有微信信息的用户
+  // 判断昵称是否应该禁用 - 只有临时微信账号
   const shouldDisableNickname = () => {
     if (!currentUser) return false;
-    // 有微信头像 或 用户名是 wx_ 开头
-    return Boolean(currentUser.wechatAvatar) || (currentUser.username && currentUser.username.startsWith('wx_'));
+    // 只有用户名是 wx_ 开头的临时账号才禁用昵称
+    return currentUser.username && currentUser.username.startsWith('wx_');
   };
 
   // 判断用户名是否应该禁用 - 只有已绑定的微信用户
@@ -319,7 +319,7 @@ const UserProfile = ({ user }) => {
               rules={[
                 { max: 50, message: '昵称最多50个字符' },
               ]}
-              tooltip={shouldDisableNickname() ? "微信登录用户的昵称来自微信，不可修改" : ""}
+              tooltip={shouldDisableNickname() ? "微信临时账号的昵称来自微信，请先绑定账号后修改" : ""}
             >
               <Input
                 prefix={<UserOutlined />}

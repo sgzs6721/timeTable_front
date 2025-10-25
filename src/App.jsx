@@ -35,26 +35,24 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
 
     const handleTokenValidation = async () => {
       if (tokenFromUrl) {
-        console.log('检测到 token，开始验证...', { tokenFromUrl, avatarFromUrl, nicknameFromUrl });
         setIsValidatingToken(true);
         // 保存 token 到 localStorage
         localStorage.setItem('token', tokenFromUrl);
         
         try {
           // 验证 token 并获取用户信息
-          console.log('调用 validateToken API...');
           const response = await validateToken();
-          console.log('validateToken 响应:', response);
           
           if (response.success && response.data) {
+            // 获取用户数据
+            const baseUserData = response.data.user || response.data;
+            
             // 合并用户信息，优先使用 URL 参数中的头像和昵称
             const userData = {
-              ...response.data,
-              avatar: avatarFromUrl || response.data.avatar,
-              nickname: nicknameFromUrl || response.data.nickname
+              ...baseUserData,
+              wechatAvatar: avatarFromUrl || baseUserData.wechatAvatar,
+              nickname: nicknameFromUrl || baseUserData.nickname
             };
-            
-            console.log('验证成功，用户数据:', userData);
             
             // 保存用户信息
             localStorage.setItem('user', JSON.stringify(userData));
@@ -63,16 +61,13 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
             message.success('微信登录成功');
             
             // 清除 URL 中的参数并跳转到 dashboard
-            console.log('准备跳转到 dashboard');
             navigate('/dashboard', { replace: true });
           } else {
-            console.error('Token 验证失败，响应:', response);
             message.error('Token 验证失败');
             localStorage.removeItem('token');
             setIsValidatingToken(false);
           }
         } catch (error) {
-          console.error('Token 验证异常:', error);
           message.error('登录验证失败');
           localStorage.removeItem('token');
           setIsValidatingToken(false);
@@ -200,18 +195,41 @@ function App() {
   const [textInputValue, setTextInputValue] = useState('');
 
   useEffect(() => {
-    // 检查本地存储中是否有用户信息
+    // 检查本地存储中是否有token，如果有则验证并获取最新用户信息
     const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    
+    const initializeUser = async () => {
+      if (token) {
+        try {
+          // 验证token并获取最新用户信息
+          const response = await validateToken();
+          if (response.success && response.data) {
+            const userData = response.data.user || response.data;
+            localStorage.setItem('user', JSON.stringify(userData));
+            setUser(userData);
+          } else {
+            // Token无效，清除本地存储
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
+        } catch (error) {
+          // 如果验证失败，尝试使用本地缓存
+          const userData = localStorage.getItem('user');
+          if (userData) {
+            try {
+              const parsedUser = JSON.parse(userData);
+              setUser(parsedUser);
+            } catch (e) {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+            }
+          }
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    initializeUser();
 
     // 监听用户更新事件
     const handleUserUpdate = (event) => {
