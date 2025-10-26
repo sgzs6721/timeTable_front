@@ -7,7 +7,7 @@ import { getCoachesWithTimetables } from '../services/admin';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule, getLeaveRecords, deleteLeaveRecordsBatch } from '../services/weeklyInstance';
 import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getActiveTrialSchedules, getAllTimetables as getAllTimetablesAdmin, getCoachLastMonthRecords } from '../services/admin';
 import { getAllStudents } from '../services/weeklyInstance';
-import { renameStudent, hideStudent } from '../services/studentOperationRecords';
+import { renameStudent, hideStudent, getStudentOperationRecords } from '../services/studentOperationRecords';
 import { mergeStudents } from '../services/studentMerge';
 import { getAllSalaryCalculations, getAvailableMonths } from '../services/salaryCalculation';
 import dayjs from 'dayjs';
@@ -3177,6 +3177,7 @@ const Dashboard = ({ user }) => {
     const [coachBgColorMap, setCoachBgColorMap] = useState(new Map());
     const [coachCourseCount, setCoachCourseCount] = useState(new Map());
     const [studentBgColorMap, setStudentBgColorMap] = useState(new Map());
+    const [studentOperationRules, setStudentOperationRules] = useState([]); // 学员操作规则
     
     // 半透明马卡龙调色板（更柔和）
     const colorPalette = [
@@ -3234,11 +3235,85 @@ const Dashboard = ({ user }) => {
       return best;
     };
     
+    // 加载学员操作规则（返回规则数据，避免 setState 异步问题）
+    const fetchStudentOperationRules = async () => {
+      try {
+        const response = await getStudentOperationRecords(true);
+        if (response && response.success) {
+          const rules = response.data || [];
+          setStudentOperationRules(rules);
+          return rules; // 返回规则数据
+        }
+        return [];
+      } catch (error) {
+        console.error('加载学员操作规则失败:', error);
+        return [];
+      }
+    };
+    
+    // 应用学员规则：判断是否应该隐藏学员（接受规则数组参数）
+    const shouldHideStudent = (studentName, coachName, coachId, rules) => {
+      if (!studentName || !rules || rules.length === 0) return false;
+      
+      // 标准化学员名字：去除所有空格
+      const normalizedStudentName = studentName.replace(/\s+/g, '');
+      
+      const shouldHide = rules.some(rule => {
+        const isHideRule = rule.operationType === 'HIDE';
+        
+        // 支持逗号分隔的多个名字（如 MERGE 规则），并标准化每个名字
+        const oldNames = rule.oldName 
+          ? rule.oldName.split(',').map(n => n.trim().replace(/\s+/g, '')) 
+          : [];
+        
+        // 匹配时使用标准化后的名字
+        const nameMatch = oldNames.includes(normalizedStudentName);
+        
+        // 教练匹配：如果规则没有指定coachId，则匹配所有教练；否则需要coachId相等
+        const coachMatch = !rule.coachId || rule.coachId === coachId;
+        
+        return isHideRule && nameMatch && coachMatch;
+      });
+      
+      return shouldHide;
+    };
+    
+    // 应用学员规则：获取学员显示名称（处理重命名和合并，接受规则数组参数）
+    const getStudentDisplayName = (studentName, rules) => {
+      if (!studentName || !rules || rules.length === 0) return studentName;
+      
+      // 标准化学员名字：去除所有空格
+      const normalizedStudentName = studentName.replace(/\s+/g, '');
+      
+      // 优先查找 RENAME 和 MERGE 规则
+      const rule = rules.find(rule => {
+        if (rule.operationType !== 'RENAME' && rule.operationType !== 'MERGE') {
+          return false;
+        }
+        
+        // 支持逗号分隔的多个名字（如 MERGE 规则），并标准化每个名字
+        const oldNames = rule.oldName 
+          ? rule.oldName.split(',').map(n => n.trim().replace(/\s+/g, '')) 
+          : [];
+        return oldNames.includes(normalizedStudentName);
+      });
+      
+      return rule ? rule.newName : studentName;
+    };
+    
     useEffect(() => {
-      fetchWeeklyScheduleData('instance'); // 明确指定初始加载为本周模式
+      // 先加载规则，再加载课表数据
+      const initData = async () => {
+        const rules = await fetchStudentOperationRules(); // 先加载学员操作规则并获取返回值
+        await fetchWeeklyScheduleData('instance', rules); // 传递规则数据
+      };
+      initData();
     }, []); // 移除viewMode依赖，改为手动调用
     
-    const fetchWeeklyScheduleData = async (targetMode = viewMode) => {
+    const fetchWeeklyScheduleData = async (targetMode = viewMode, rulesParam = null) => {
+      // 使用传入的规则参数，如果没有则使用 state（避免 setState 异步问题）
+      const rules = rulesParam || studentOperationRules;
+      
       setWeeklyScheduleLoading(true);
       try {
         // 根据目标视图模式获取不同的数据
@@ -3282,12 +3357,29 @@ const Dashboard = ({ user }) => {
         }
         const weekDayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-        // 统计每位教练的课程数量（兼容不同返回字段）
+        // 统计每位教练的课程数量（兼容不同返回字段，过滤掉管理员和隐藏的学员）
         const countMap = new Map();
         (schedules || []).forEach(s => {
-          const name = s.ownerNickname || s.ownerUsername || s.ownerName || s.username || s.nickname;
-          if (!name) return;
-          countMap.set(name, (countMap.get(name) || 0) + 1);
+          // 过滤掉管理员的课程（检查多个可能的字段名）
+          const isAdmin = s.ownerPosition === 'ADMIN' || 
+                         s.ownerRole === 'ADMIN' ||
+                         s.position === 'ADMIN' ||
+                         s.role === 'ADMIN';
+          
+          if (isAdmin) {
+            return;
+          }
+          
+          const coachName = s.ownerNickname || s.ownerUsername || s.ownerName || s.username || s.nickname;
+          const coachId = s.ownerId;
+          
+          // 过滤掉隐藏的学员
+          if (shouldHideStudent(s.studentName, coachName, coachId, rules)) {
+            return;
+          }
+          
+          if (!coachName) return;
+          countMap.set(coachName, (countMap.get(coachName) || 0) + 1);
         });
         setCoachCourseCount(countMap);
         
@@ -3299,6 +3391,23 @@ const Dashboard = ({ user }) => {
         // 统一处理：现在本周数据和模板数据都是扁平化的课程数组
         
         schedules.forEach((schedule, index) => {
+          // 过滤掉管理员的课程（检查多个可能的字段名）
+          const isAdmin = schedule.ownerPosition === 'ADMIN' || 
+                         schedule.ownerRole === 'ADMIN' ||
+                         schedule.position === 'ADMIN' ||
+                         schedule.role === 'ADMIN';
+          
+          if (isAdmin) {
+            return;
+          }
+          
+          const coachName = schedule.ownerNickname || schedule.ownerUsername;
+          const coachId = schedule.ownerId;
+          
+          // 过滤掉隐藏的学员
+          if (shouldHideStudent(schedule.studentName, coachName, coachId, rules)) {
+            return;
+          }
           
           // 先跳过所有验证，看看数据本身有什么问题
           const dayOfWeek = schedule.dayOfWeek?.toLowerCase();
@@ -3326,10 +3435,13 @@ const Dashboard = ({ user }) => {
             });
           }
           
-          const coachName = schedule.ownerNickname || schedule.ownerUsername;
+          // 应用重命名规则
+          const displayName = getStudentDisplayName(schedule.studentName, rules);
+          
           const scheduleItem = {
             coach: coachName,
-            student: schedule.studentName,
+            student: displayName, // 使用显示名称
+            originalStudent: schedule.studentName, // 保留原始名称
             type: targetMode === 'instance' ? 'instance' : (targetMode === 'trial' ? 'trial' : 'template'),
             timetableName: schedule.timetableName,
             sourceIsWeekly: schedule.isWeekly === 1
@@ -3337,8 +3449,8 @@ const Dashboard = ({ user }) => {
           
           timeSlotMap.get(timeKey)[safeDayOfWeek].push(scheduleItem);
           
-          // 收集所有学员和教练
-          allStudents.add(schedule.studentName);
+          // 收集所有学员和教练（使用显示名称）
+          allStudents.add(displayName);
           allCoaches.add(coachName);
         });
         
@@ -3574,7 +3686,7 @@ const Dashboard = ({ user }) => {
         const todayIndex = (dayjs().day() + 6) % 7;
         const isTodayCol = idx === todayIndex;
         // 计算本周每一天的具体日期（以周一为一周开始）
-        const monday = dayjs().day(1).startOf('day');
+        const monday = dayjs().startOf('week');
         const dateForCol = monday.add(idx, 'day').format('MM/DD');
         return {
           title: (
@@ -3736,11 +3848,8 @@ const Dashboard = ({ user }) => {
     const calculateActualHours = (coachDetails) => {
       if (!coachDetails || coachDetails.length === 0) return 0;
       
-      console.log('计算课时数，输入数据:', coachDetails);
-      
       let totalHours = 0;
       coachDetails.forEach(item => {
-        console.log('处理课程项:', item);
         // 解析时间段，支持分钟，如 "10:00-12:00 学员名" 或 "10:00-10:30 学员名"
         const timeMatch = item.match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})/);
         if (timeMatch) {
@@ -3754,7 +3863,6 @@ const Dashboard = ({ user }) => {
           const durationMinutes = endTotalMinutes - startTotalMinutes;
           const hours = durationMinutes / 60;
           
-          console.log(`时间段 ${startHour}:${startMinute.toString().padStart(2, '0')}-${endHour}:${endMinute.toString().padStart(2, '0')} = ${hours} 课时`);
           totalHours += hours;
         } else {
           // 尝试简化格式（只有小时）
@@ -3763,17 +3871,14 @@ const Dashboard = ({ user }) => {
             const startHour = parseInt(simpleMatch[1]);
             const endHour = parseInt(simpleMatch[2]);
             const hours = endHour - startHour;
-            console.log(`时间段 ${startHour}-${endHour} = ${hours} 课时`);
             totalHours += hours;
           } else {
             // 如果没有匹配到时间段，默认为1课时
-            console.log('未匹配到时间段，默认1课时');
             totalHours += 1;
           }
         }
       });
       
-      console.log('总课时数:', totalHours);
       return totalHours;
     };
     
@@ -3981,7 +4086,6 @@ const Dashboard = ({ user }) => {
       
       // 合并连续时间段的函数
       const mergeConsecutiveTimeSlots = (schedules) => {
-        console.log('合并前的原始课程数据:', schedules);
         if (!schedules || schedules.length === 0) return [];
         
         // 按学员名称分组
@@ -4034,7 +4138,6 @@ const Dashboard = ({ user }) => {
           }
         });
         
-        console.log('合并后的课程数据:', mergedSchedules);
         return mergedSchedules;
       };
 
@@ -5553,7 +5656,7 @@ const MyHours = ({ user }) => {
           // 如果没有具体日期但有星期几，根据当前周推算具体日期
           const dayMap = {
             'MONDAY': 1,
-            'TUESDAY': 2, 
+            'TUESDAY': 2,
             'WEDNESDAY': 3,
             'THURSDAY': 4,
             'FRIDAY': 5,
@@ -5562,11 +5665,12 @@ const MyHours = ({ user }) => {
           };
           const targetDay = dayMap[record.dayOfWeek];
           if (targetDay !== undefined) {
-            // 获取当前周的周一
+            // 获取当前周的周一（weekStart已配置为1，startOf('week')直接返回周一）
             const today = dayjs();
-            const currentWeekMonday = today.startOf('week').add(1, 'day'); // 周一是第一天
-            // 计算目标日期
-            const targetDate = currentWeekMonday.add(targetDay - 1, 'day');
+            const currentWeekMonday = today.startOf('week'); // 周一是第一天
+            // 计算目标日期：周日(0)需要+6天，其他天数按原逻辑-1
+            const daysToAdd = targetDay === 0 ? 6 : targetDay - 1;
+            const targetDate = currentWeekMonday.add(daysToAdd, 'day');
             
             // 后端已经过滤了未来记录，所以这里直接显示推算的日期
             dateStr = targetDate.format('YYYY-MM-DD');

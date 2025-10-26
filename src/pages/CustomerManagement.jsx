@@ -15,7 +15,6 @@ import {
   Col,
   Spin,
   Radio,
-  Pagination,
   DatePicker,
   TimePicker
 } from 'antd';
@@ -26,8 +25,6 @@ import {
   HistoryOutlined,
   CalendarOutlined,
   CopyOutlined,
-  LeftOutlined,
-  RightOutlined,
   BellOutlined,
   PhoneOutlined,
   ClockCircleOutlined
@@ -66,13 +63,10 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const [todoContent, setTodoContent] = useState('');
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [salesFilter, setSalesFilter] = useState('all');
-  const [timeFilterType, setTimeFilterType] = useState('all');
-  const [selectedDate, setSelectedDate] = useState('');
   const [currentDatePage, setCurrentDatePage] = useState(0);
   const [salesList, setSalesList] = useState([]);
-  const [availableDates, setAvailableDates] = useState([]);
-  const [availableWeeks, setAvailableWeeks] = useState([]);
-  const [availableMonths, setAvailableMonths] = useState([]);
+  const [selectedFilterDate, setSelectedFilterDate] = useState(null);
+  const [displayedCount, setDisplayedCount] = useState(10); // 初始显示10条数据
   const [customerTodoStatus, setCustomerTodoStatus] = useState({});
   const [latestTodoByCustomer, setLatestTodoByCustomer] = useState({});
   const [todoInfoLoadingId, setTodoInfoLoadingId] = useState(null);
@@ -107,13 +101,14 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   }, []);
 
   useEffect(() => {
-    extractAvailableDates();
     checkAllCustomerTodos();
   }, [customers]);
 
   useEffect(() => {
     filterCustomers();
-  }, [customers, activeTab, salesFilter, timeFilterType, selectedDate]);
+    // 筛选条件变化时，重置显示的数据条数
+    setDisplayedCount(10);
+  }, [customers, activeTab, salesFilter, selectedFilterDate]);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -140,7 +135,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     if (!customers || customers.length === 0) return;
     
     const todoStatus = {};
-    // 先批量获取所有待办，构建映射，避免逐个请求
+    // 批量获取所有待办，只需一次请求
     let allTodos = [];
     try {
       const todosResp = await getTodos();
@@ -162,16 +157,8 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       }
     });
 
+    // 直接从已获取的待办数据中判断，不再逐个调用接口
     for (const customer of customers) {
-      try {
-        const response = await checkCustomerHasTodo(customer.id);
-        if (response && response.success) {
-          todoStatus[customer.id] = response.data;
-        }
-      } catch (error) {
-        console.error(`检查客户${customer.id}待办失败:`, error);
-      }
-
       // 匹配该客户最近一条待办（兼容缺失customerId的数据）
       let candidates = byCustomerId.get(String(customer.id)) || [];
       if (candidates.length === 0) {
@@ -181,6 +168,10 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
           return nameMatch || phoneMatch;
         });
       }
+      
+      // 根据是否有待办设置状态
+      todoStatus[customer.id] = candidates.length > 0;
+      
       if (candidates.length > 0) {
         candidates.sort((a, b) => {
           const aKey = `${a.reminderDate || a.createdAt || ''} ${a.reminderTime || ''}`;
@@ -214,46 +205,6 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     }
   };
 
-  const extractAvailableDates = () => {
-    const dates = new Set();
-    const weeks = new Set();
-    const months = new Set();
-
-    customers.forEach(customer => {
-      if (customer.createdAt) {
-        const date = dayjs(customer.createdAt);
-        
-        // 提取日期 (YYYY-MM-DD)
-        dates.add(date.format('YYYY-MM-DD'));
-        
-        // 提取周 (YYYY-WW)
-        const weekStr = `${date.year()}-W${String(date.week()).padStart(2, '0')}`;
-        weeks.add(weekStr);
-        
-        // 提取月份 (YYYY-MM)
-        months.add(date.format('YYYY-MM'));
-      }
-    });
-
-    // 转换为数组并排序（倒序，最新的在前面）
-    const sortedDates = Array.from(dates).sort((a, b) => b.localeCompare(a));
-    const sortedWeeks = Array.from(weeks).sort((a, b) => b.localeCompare(a));
-    const sortedMonths = Array.from(months).sort((a, b) => b.localeCompare(a));
-
-    setAvailableDates(sortedDates);
-    setAvailableWeeks(sortedWeeks);
-    setAvailableMonths(sortedMonths);
-
-    // 设置默认选中第一个
-    if (timeFilterType === 'day' && sortedDates.length > 0 && !selectedDate) {
-      setSelectedDate(sortedDates[0]);
-    } else if (timeFilterType === 'week' && sortedWeeks.length > 0 && !selectedDate) {
-      setSelectedDate(sortedWeeks[0]);
-    } else if (timeFilterType === 'month' && sortedMonths.length > 0 && !selectedDate) {
-      setSelectedDate(sortedMonths[0]);
-    }
-  };
-
   const filterCustomers = () => {
     let filtered = customers;
 
@@ -270,20 +221,12 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       );
     }
 
-    // 按时间过滤
-    if (timeFilterType !== 'all' && selectedDate) {
+    // 按日期过滤
+    if (selectedFilterDate) {
+      const filterDateStr = dayjs(selectedFilterDate).format('YYYY-MM-DD');
       filtered = filtered.filter(customer => {
-        const createdDate = dayjs(customer.createdAt);
-        
-        if (timeFilterType === 'day') {
-          return createdDate.format('YYYY-MM-DD') === selectedDate;
-        } else if (timeFilterType === 'week') {
-          const weekStr = `${createdDate.year()}-W${String(createdDate.week()).padStart(2, '0')}`;
-          return weekStr === selectedDate;
-        } else if (timeFilterType === 'month') {
-          return createdDate.format('YYYY-MM') === selectedDate;
-        }
-        return true;
+        const customerDateStr = dayjs(customer.createdAt).format('YYYY-MM-DD');
+        return customerDateStr === filterDateStr;
       });
     }
 
@@ -553,50 +496,22 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
 
   const handleResetFilters = () => {
     setSalesFilter('all');
-    setTimeFilterType('all');
-    setSelectedDate('');
     setActiveTab('all');
+    setSelectedFilterDate(null);
     setCurrentDatePage(0);
-  };
-
-  const handleTimeFilterTypeChange = (type) => {
-    setTimeFilterType(type);
-    setCurrentDatePage(0);
-    // 切换时间类型时，自动选择第一个可用日期
-    if (type === 'day' && availableDates.length > 0) {
-      setSelectedDate(availableDates[0]);
-    } else if (type === 'week' && availableWeeks.length > 0) {
-      setSelectedDate(availableWeeks[0]);
-    } else if (type === 'month' && availableMonths.length > 0) {
-      setSelectedDate(availableMonths[0]);
-    } else {
-      setSelectedDate('');
-    }
+    setDisplayedCount(10);
   };
 
   const handleSalesFilterChange = (value) => {
     setSalesFilter(value);
     setCurrentDatePage(0);
+    setDisplayedCount(10);
   };
 
   const handleActiveTabChange = (value) => {
     setActiveTab(value);
     setCurrentDatePage(0);
-  };
-
-  const handleDateChange = (value) => {
-    setSelectedDate(value);
-    setCurrentDatePage(0);
-  };
-
-  const getMonthDisplayText = (monthStr) => {
-    const [year, month] = monthStr.split('-');
-    return `${year}年${parseInt(month)}月`;
-  };
-
-  const getWeekDisplayText = (weekStr) => {
-    const [year, week] = weekStr.split('-W');
-    return `${year}年第${week}周`;
+    setDisplayedCount(10);
   };
 
   // 智能解析客户信息
@@ -714,8 +629,6 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
         // 创建成功后，清除过滤条件并重新获取数据
         if (!editingCustomer) {
           // 新建客户：切换到"全部"视图并重新获取数据
-          setTimeFilterType('all');
-          setSelectedDate('');
           setCurrentDatePage(0);
           await fetchCustomers();
         } else {
@@ -921,6 +834,72 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     return statusMap[status] || status;
   };
 
+  // 获取有数据的日期集合（用于日历禁用）
+  const getAvailableDates = () => {
+    const dateSet = new Set();
+    let filtered = customers;
+
+    // 应用销售人员过滤
+    if (salesFilter !== 'all') {
+      filtered = filtered.filter(customer => 
+        customer.createdBy === parseInt(salesFilter) || 
+        customer.assignedSalesId === parseInt(salesFilter)
+      );
+    }
+
+    // 应用状态过滤
+    if (activeTab !== 'all') {
+      filtered = filtered.filter(customer => customer.status === activeTab);
+    }
+
+    filtered.forEach(customer => {
+      if (customer.createdAt) {
+        const dateStr = dayjs(customer.createdAt).format('YYYY-MM-DD');
+        dateSet.add(dateStr);
+      }
+    });
+
+    return dateSet;
+  };
+
+  // 禁用没有数据的日期
+  const disabledDate = (current) => {
+    if (!current) return false;
+    const availableDates = getAvailableDates();
+    const dateStr = current.format('YYYY-MM-DD');
+    return !availableDates.has(dateStr);
+  };
+
+
+  // 计算每个状态的客户数量
+  const getStatusCount = (status) => {
+    let filtered = customers;
+
+    // 按销售人员过滤
+    if (salesFilter !== 'all') {
+      filtered = filtered.filter(customer => 
+        customer.createdBy === parseInt(salesFilter) || 
+        customer.assignedSalesId === parseInt(salesFilter)
+      );
+    }
+
+    // 按日期过滤
+    if (selectedFilterDate) {
+      const filterDateStr = dayjs(selectedFilterDate).format('YYYY-MM-DD');
+      filtered = filtered.filter(customer => {
+        const customerDateStr = dayjs(customer.createdAt).format('YYYY-MM-DD');
+        return customerDateStr === filterDateStr;
+      });
+    }
+
+    // 按状态过滤
+    if (status !== 'all') {
+      filtered = filtered.filter(customer => customer.status === status);
+    }
+
+    return filtered.length;
+  };
+
   // 按日期分组客户
   const groupCustomersByDate = (customers) => {
     const groups = {};
@@ -944,14 +923,25 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     return sortedGroups;
   };
 
-  const groupedCustomers = groupCustomersByDate(filteredCustomers);
-  const totalPages = Object.keys(groupedCustomers).length;
-
-  // 格式化日期显示
+  // 格式化日期标题
   const formatDateTitle = (dateStr) => {
     const date = dayjs(dateStr);
     const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.day()];
     return `${dateStr} 星期${weekday}`;
+  };
+
+  // 获取要显示的客户数据（按条数切片）
+  const displayedCustomers = filteredCustomers.slice(0, displayedCount);
+  
+  // 按日期分组显示的客户
+  const groupedCustomers = groupCustomersByDate(displayedCustomers);
+  const allDateKeys = Object.keys(groupedCustomers);
+
+  // 加载更多数据
+  const loadMoreData = () => {
+    if (displayedCount < filteredCustomers.length) {
+      setDisplayedCount(prev => Math.min(prev + 10, filteredCustomers.length));
+    }
   };
 
   const renderCustomerCard = (customer) => (
@@ -1267,89 +1257,85 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                 placeholder="全部状态"
                 size="large"
               >
-                <Option value="all">全部状态</Option>
-                <Option value="NEW">新建</Option>
-                <Option value="CONTACTED">已联系</Option>
-                <Option value="PENDING_CONFIRM">待确认</Option>
-                <Option value="SCHEDULED">待体验</Option>
-                <Option value="VISITED">已体验</Option>
-                <Option value="RE_EXPERIENCE">待再体验</Option>
-                <Option value="PENDING_SOLD">待成交</Option>
-                <Option value="SOLD">已成交</Option>
-                <Option value="CLOSED">已结束</Option>
+                <Option value="all">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>全部状态</span>
+                    <span style={{ color: '#1890ff', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('all')}</span>
+                  </div>
+                </Option>
+                <Option value="NEW">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>新建</span>
+                    <span style={{ color: '#52c41a', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('NEW')}</span>
+                  </div>
+                </Option>
+                <Option value="CONTACTED">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>已联系</span>
+                    <span style={{ color: '#13c2c2', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('CONTACTED')}</span>
+                  </div>
+                </Option>
+                <Option value="PENDING_CONFIRM">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>待确认</span>
+                    <span style={{ color: '#722ed1', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('PENDING_CONFIRM')}</span>
+                  </div>
+                </Option>
+                <Option value="SCHEDULED">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>待体验</span>
+                    <span style={{ color: '#fa8c16', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('SCHEDULED')}</span>
+                  </div>
+                </Option>
+                <Option value="VISITED">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>已体验</span>
+                    <span style={{ color: '#eb2f96', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('VISITED')}</span>
+                  </div>
+                </Option>
+                <Option value="RE_EXPERIENCE">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>待再体验</span>
+                    <span style={{ color: '#faad14', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('RE_EXPERIENCE')}</span>
+                  </div>
+                </Option>
+                <Option value="PENDING_SOLD">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>待成交</span>
+                    <span style={{ color: '#f5222d', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('PENDING_SOLD')}</span>
+                  </div>
+                </Option>
+                <Option value="SOLD">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>已成交</span>
+                    <span style={{ color: '#52c41a', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('SOLD')}</span>
+                  </div>
+                </Option>
+                <Option value="CLOSED">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>已结束</span>
+                    <span style={{ color: '#8c8c8c', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('CLOSED')}</span>
+                  </div>
+                </Option>
               </Select>
             </Col>
-            
-            
-            <Col xs={24} sm={24} md={24} lg={24}>
-              <Radio.Group 
-                value={timeFilterType} 
-                onChange={(e) => handleTimeFilterTypeChange(e.target.value)}
+
+            <Col span={24} style={{ marginBottom: 12 }}>
+              <DatePicker
+                value={selectedFilterDate}
+                onChange={(date) => {
+                  setSelectedFilterDate(date);
+                  setCurrentDatePage(0);
+                  setDisplayedCount(10);
+                }}
+                placeholder="选择日期过滤"
                 style={{ width: '100%' }}
                 size="large"
-              >
-                <Radio.Button value="all" style={{ width: '25%', textAlign: 'center' }}>
-                  全部
-                </Radio.Button>
-                <Radio.Button value="day" style={{ width: '25%', textAlign: 'center' }}>
-                  按日
-                </Radio.Button>
-                <Radio.Button value="week" style={{ width: '25%', textAlign: 'center' }}>
-                  按周
-                </Radio.Button>
-                <Radio.Button value="month" style={{ width: '25%', textAlign: 'center' }}>
-                  按月
-                </Radio.Button>
-              </Radio.Group>
+                allowClear
+                format="YYYY-MM-DD"
+                disabledDate={disabledDate}
+              />
             </Col>
-            
-            {timeFilterType !== 'all' && (
-              <Col xs={24} sm={24} md={24} lg={24} style={{ marginTop: 12 }}>
-                {timeFilterType === 'day' && (
-                  <Select
-                    value={selectedDate}
-                    onChange={handleDateChange}
-                    style={{ width: '100%' }}
-                    placeholder="选择日期"
-                    size="large"
-                  >
-                    {availableDates.map(date => (
-                      <Option key={date} value={date}>{date}</Option>
-                    ))}
-                  </Select>
-                )}
-                {timeFilterType === 'week' && (
-                  <Select
-                    value={selectedDate}
-                    onChange={handleDateChange}
-                    style={{ width: '100%' }}
-                    placeholder="选择周"
-                    size="large"
-                  >
-                    {availableWeeks.map(week => (
-                      <Option key={week} value={week}>
-                        {getWeekDisplayText(week)}
-                      </Option>
-                    ))}
-                  </Select>
-                )}
-                {timeFilterType === 'month' && (
-                  <Select
-                    value={selectedDate}
-                    onChange={handleDateChange}
-                    style={{ width: '100%' }}
-                    placeholder="选择月份"
-                    size="large"
-                  >
-                    {availableMonths.map(month => (
-                      <Option key={month} value={month}>
-                        {getMonthDisplayText(month)}
-                      </Option>
-                    ))}
-                  </Select>
-                )}
-              </Col>
-            )}
             </Row>
           </div>
 
@@ -1363,132 +1349,76 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
             <p>暂无客户数据</p>
           </div>
         ) : (
-          <div className="customer-card-list" style={{ overflow: 'hidden', width: '100%' }}>
-            {(() => {
-              const dateGroups = Object.entries(groupedCustomers);
-              const totalPages = dateGroups.length;
-              
-              if (totalPages === 0) {
-                return (
-                  <div style={{ textAlign: 'center', padding: '50px', color: '#999' }}>
-                    当前筛选条件下暂无数据
-                  </div>
-                );
+          <div 
+            className="customer-card-list" 
+            style={{ overflow: 'auto', width: '100%', maxHeight: 'calc(100vh - 400px)' }}
+            onScroll={(e) => {
+              const { scrollTop, scrollHeight, clientHeight } = e.target;
+              // 当滚动到底部附近100px时，加载更多
+              if (scrollHeight - scrollTop - clientHeight < 100) {
+                loadMoreData();
               }
-
-              // 确保当前页在有效范围内
-              const validPage = Math.min(currentDatePage, totalPages - 1);
-              const [currentDate, currentCustomers] = dateGroups[validPage] || ['', []];
-              
+            }}
+          >
+            {allDateKeys.map((dateKey) => {
+              const customers = groupedCustomers[dateKey];
               return (
-                <>
-                  <div style={{ marginBottom: 12, overflow: 'hidden', width: '100%', padding: '0 8px' }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      marginBottom: 12,
-                      padding: '8px 20px',
-                      background: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
-                      borderRadius: '8px',
-                      boxShadow: '0 2px 8px rgba(67, 206, 162, 0.25)',
-                      flexWrap: 'nowrap'
+                <div key={dateKey} style={{ marginBottom: 24 }}>
+                  {/* 日期标题栏 */}
+                  <div style={{
+                    padding: '12px 20px',
+                    background: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(67, 206, 162, 0.25)',
+                    marginBottom: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div style={{
+                      color: '#fff',
+                      fontSize: '15px',
+                      fontWeight: '500',
+                      letterSpacing: '0.5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}>
-                      {/* 左侧上一页按钮 */}
-                      <div style={{ width: '32px', textAlign: 'left', flexShrink: 0 }}>
-                        {validPage > 0 && (
-                          <LeftOutlined 
-                            style={{ 
-                              color: '#fff', 
-                              fontSize: '16px', 
-                              cursor: 'pointer',
-                              padding: '4px'
-                            }}
-                            onClick={() => setCurrentDatePage(validPage - 1)}
-                          />
-                        )}
-                      </div>
-                      
-                      {/* 中间日期和数据 */}
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '2em',
-                        flex: 1,
-                        justifyContent: 'center',
-                        flexWrap: 'nowrap'
-                      }}>
-                        <h3 style={{ 
-                          margin: 0,
-                          color: '#fff',
-                          fontSize: '15px',
-                          fontWeight: '500',
-                          letterSpacing: '0.5px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          <CalendarOutlined />
-                          {formatDateTitle(currentDate)}
-                        </h3>
-                        <span style={{ 
-                          color: 'rgba(255, 255, 255, 0.9)', 
-                          fontSize: '13px',
-                          fontWeight: '400',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          共 {currentCustomers.length} 条数据
-                        </span>
-                      </div>
-                      
-                      {/* 右侧下一页按钮 */}
-                      <div style={{ width: '32px', textAlign: 'right', flexShrink: 0 }}>
-                        {validPage < totalPages - 1 && (
-                          <RightOutlined 
-                            style={{ 
-                              color: '#fff', 
-                              fontSize: '16px', 
-                              cursor: 'pointer',
-                              padding: '4px'
-                            }}
-                            onClick={() => setCurrentDatePage(validPage + 1)}
-                          />
-                        )}
-                      </div>
+                      <CalendarOutlined />
+                      {formatDateTitle(dateKey)}
                     </div>
-                    <Row gutter={[4, 8]} style={{ margin: 0, width: '100%' }}>
-                      {currentCustomers.map(customer => renderCustomerCard(customer))}
-                    </Row>
+                    <span style={{
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '13px',
+                      fontWeight: '400'
+                    }}>
+                      共 {customers.length} 条数据
+                    </span>
                   </div>
                   
-                  {/* 分页已移到卡片外部显示 */}
-                </>
+                  {/* 客户卡片列表 */}
+                  <Row gutter={[4, 8]} style={{ margin: 0, width: '100%' }}>
+                    {customers.map(customer => renderCustomerCard(customer))}
+                  </Row>
+                </div>
               );
-            })()}
+            })}
+            
+            {/* 加载更多提示 */}
+            {displayedCount < filteredCustomers.length && (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                <Spin size="small" /> 加载中...
+              </div>
+            )}
+            
+            {displayedCount >= filteredCustomers.length && filteredCustomers.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                已加载全部 {filteredCustomers.length} 条数据
+              </div>
+            )}
           </div>
         )}
       </Card>
-
-      {/* 外部分页区域 - 固定在底部 */}
-      {totalPages > 1 && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          padding: '12px 0',
-          backgroundColor: '#fff',
-          borderTop: '1px solid #f0f0f0',
-          flexShrink: 0
-        }}>
-          <Pagination
-            current={Math.min(currentDatePage + 1, totalPages)}
-            total={totalPages}
-            pageSize={1}
-            onChange={(page) => setCurrentDatePage(page - 1)}
-            showSizeChanger={false}
-          />
-        </div>
-      )}
 
       {/* 客户表单模态框 */}
       <Modal

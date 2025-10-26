@@ -8,7 +8,9 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import './styles/common.css'
 
+// 配置dayjs：设置周一为一周的开始
 dayjs.locale('zh-cn')
+dayjs.Ls['zh-cn'].weekStart = 1
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
