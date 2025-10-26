@@ -81,6 +81,9 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const [viewTodoModalVisible, setViewTodoModalVisible] = useState(false);
   const [viewTodoCustomer, setViewTodoCustomer] = useState(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showSmartParse, setShowSmartParse] = useState(false);
+  const [parseText, setParseText] = useState('');
+  const [parsing, setParsing] = useState(false);
   // 供外部调用：当其它地方创建了待办后，局部刷新某个客户的铃铛和数据
   React.useImperativeHandle(ref, () => ({
     onTodoCreatedExternally: ({ id, childName, parentPhone }) => {
@@ -596,6 +599,97 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     return `${year}年第${week}周`;
   };
 
+  // 智能解析客户信息
+  const handleSmartParse = () => {
+    if (!parseText.trim()) {
+      message.warning('请输入要解析的文本');
+      return;
+    }
+
+    setParsing(true);
+    
+    try {
+      // 解析逻辑：智能提取姓名、电话、年龄、性别等信息
+      let text = parseText.trim();
+      
+      // 1. 提取手机号（11位数字）
+      const phoneMatch = text.match(/1[3-9]\d{9}/);
+      const phone = phoneMatch ? phoneMatch[0] : '';
+      
+      // 2. 去除开头的序号（如：1、1，1. 等）
+      // 只有当开头不是手机号时才去除序号，限制为1-3位数字
+      if (!text.match(/^1[3-9]\d{9}/)) {
+        text = text.replace(/^\d{1,3}[，,、.\s]+/, '');
+      }
+      
+      // 3. 按逗号、顿号或句号分割信息
+      const parts = text.split(/[，,、。.]+/).map(p => p.trim()).filter(p => p && p.length > 0);
+      
+      // 4. 智能提取姓名：找2-4个连续中文字符，且不包含数字、不是电话号码、不是常见描述词
+      let name = '';
+      const excludeWords = ['男', '女', '岁', '周', '月', '日', '点', '分', '早', '晚', '上午', '下午', '时间', '有空', '方便'];
+      for (const part of parts) {
+        // 匹配2-4个中文字符
+        const nameMatch = part.match(/^([一-龥]{2,4})$/);
+        if (nameMatch && 
+            !excludeWords.includes(nameMatch[1]) && 
+            !/\d/.test(nameMatch[1]) && 
+            !/1[3-9]\d{9}/.test(part)) {
+          name = nameMatch[1];
+          break;
+        }
+      }
+      
+      // 5. 如果没找到独立的姓名，尝试从复合文本中提取
+      if (!name) {
+        for (const part of parts) {
+          // 匹配开头的2-4个中文字符（如"安安，5岁"中的"安安"）
+          const nameMatch = part.match(/^([一-龥]{2,4})[，,\s]/);
+          if (nameMatch && !excludeWords.includes(nameMatch[1])) {
+            name = nameMatch[1];
+            break;
+          }
+        }
+      }
+      
+      // 6. 组合详细信息（保留所有信息）
+      let details = text
+        .replace(phoneMatch ? phoneMatch[0] : '', '') // 去除电话
+        .replace(/^[，,、.。\s]+/, '') // 去除开头的标点和空格
+        .replace(/[，,、.。\s]+$/, '') // 去除结尾的标点和空格
+        .trim();
+      
+      // 7. 清理details中多余的逗号和空格
+      details = details
+        .replace(/[，,、]+/g, '，')
+        .replace(/\s+/g, ' ')
+        .replace(/^，+/, '')
+        .replace(/，+$/, '')
+        .trim();
+      
+      // 填充表单
+      form.setFieldsValue({
+        childName: name,
+        parentPhone: phone,
+        notes: details
+      });
+      
+      if (name || phone) {
+        message.success('解析成功！请检查并完善信息');
+      } else {
+        message.warning('未能识别姓名或电话，请手动填写');
+      }
+      
+      setShowSmartParse(false);
+      setParseText('');
+    } catch (error) {
+      console.error('解析失败:', error);
+      message.error('解析失败，请检查输入格式');
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const handleSubmit = async (values) => {
     try {
       const customerData = {
@@ -617,15 +711,18 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
         message.success(editingCustomer ? '更新成功' : '创建成功');
         setModalVisible(false);
         
-        // 局部刷新：只更新或添加当前客户数据
-        if (editingCustomer) {
-          // 更新现有客户
+        // 创建成功后，清除过滤条件并重新获取数据
+        if (!editingCustomer) {
+          // 新建客户：切换到"全部"视图并重新获取数据
+          setTimeFilterType('all');
+          setSelectedDate('');
+          setCurrentDatePage(0);
+          await fetchCustomers();
+        } else {
+          // 更新客户：局部刷新
           setCustomers(prevCustomers => 
             prevCustomers.map(c => c.id === response.data.id ? response.data : c)
           );
-        } else {
-          // 添加新客户
-          setCustomers(prevCustomers => [response.data, ...prevCustomers]);
         }
       } else {
         message.error(response?.message || '操作失败');
@@ -1397,7 +1494,11 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       <Modal
         title={editingCustomer ? '编辑客户' : '新建客户'}
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          setModalVisible(false);
+          setShowSmartParse(false);
+          setParseText('');
+        }}
         footer={null}
         width={600}
       >
@@ -1406,6 +1507,64 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
           layout="vertical"
           onFinish={handleSubmit}
         >
+          {/* 智能解析区域 */}
+          {!editingCustomer && (
+            <div style={{ marginBottom: 16 }}>
+              <Button
+                type="dashed"
+                icon={<CopyOutlined />}
+                onClick={() => setShowSmartParse(!showSmartParse)}
+                style={{ 
+                  width: '100%',
+                  borderColor: showSmartParse ? '#1890ff' : undefined,
+                  color: showSmartParse ? '#1890ff' : undefined
+                }}
+              >
+                {showSmartParse ? '收起智能解析' : '智能解析（快速录入）'}
+              </Button>
+              
+              {showSmartParse && (
+                <div style={{ 
+                  marginTop: 12, 
+                  padding: '12px',
+                  backgroundColor: '#e6f7ff',
+                  borderRadius: '4px',
+                  border: '1px dashed #1890ff'
+                }}>
+                  <div style={{ marginBottom: 8, fontSize: '13px', color: '#1890ff', fontWeight: 500 }}>
+                    粘贴客户信息（支持格式：姓名、电话、详细信息）
+                  </div>
+                  <TextArea
+                    value={parseText}
+                    onChange={(e) => setParseText(e.target.value)}
+                    placeholder="例如：东东，男，7岁，15810695923，下周末有时间"
+                    rows={3}
+                    maxLength={500}
+                  />
+                  <div style={{ marginTop: 8, display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <Button 
+                      size="small"
+                      onClick={() => {
+                        setShowSmartParse(false);
+                        setParseText('');
+                      }}
+                    >
+                      取消
+                    </Button>
+                    <Button 
+                      size="small"
+                      type="primary"
+                      loading={parsing}
+                      onClick={handleSmartParse}
+                    >
+                      解析并填充
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
