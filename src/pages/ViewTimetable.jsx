@@ -110,7 +110,7 @@ const CancelledOrLeavePopoverContent = ({ info, onClose, onRestore, restoreLoadi
   );
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCopy, onSwap, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateField, onMove, onCopy, onSwap, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule, hasOtherHalf = false }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const [showAllInfo, setShowAllInfo] = React.useState(false);
   const [showLeaveForm, setShowLeaveForm] = React.useState(false);
@@ -118,6 +118,63 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
   const [leaveSubmitting, setLeaveSubmitting] = React.useState(false);
   const isNameChanged = name !== schedule.studentName;
   const isBlocked = schedule.studentName === '【占用】'; // 判断是否为占用时间段
+  
+  // 根据开始和结束时间判断是否为半小时课程
+  const isActuallyHalfHour = React.useMemo(() => {
+    if (!schedule.startTime || !schedule.endTime) return false;
+    const start = dayjs(schedule.startTime, 'HH:mm:ss');
+    const end = dayjs(schedule.endTime, 'HH:mm:ss');
+    const duration = end.diff(start, 'minute');
+    return duration === 30;
+  }, [schedule.startTime, schedule.endTime]);
+  
+  // 判断当前是前半小时还是后半小时（如果是半小时课程）
+  const currentHalfPosition = React.useMemo(() => {
+    if (!isActuallyHalfHour || !schedule.startTime) return null;
+    const startTime = dayjs(schedule.startTime, 'HH:mm:ss');
+    const minute = startTime.minute();
+    // 如果分钟是0或整点，说明是前半小时，如果是30分，说明是后半小时
+    return minute === 0 || minute === 30 ? (minute === 0 ? 'first' : 'second') : 'first';
+  }, [isActuallyHalfHour, schedule.startTime]);
+  
+  // 用于控制开关显示的状态（当用户点击开关时立即更新）
+  const [tempHalfHourChecked, setTempHalfHourChecked] = React.useState(isActuallyHalfHour);
+  
+  // 当实际的半小时状态改变时，同步临时状态
+  React.useEffect(() => {
+    setTempHalfHourChecked(isActuallyHalfHour);
+  }, [isActuallyHalfHour]);
+  
+  // 获取半小时的时间段显示
+  const halfHourTimeRange = React.useMemo(() => {
+    if (!isActuallyHalfHour) return '';
+    const start = dayjs(schedule.startTime, 'HH:mm:ss');
+    const end = dayjs(schedule.endTime, 'HH:mm:ss');
+    return `${start.format('HH:mm')}-${end.format('HH:mm')}`;
+  }, [isActuallyHalfHour, schedule.startTime, schedule.endTime]);
+  
+  // 处理半小时开关切换
+  const handleHalfHourChange = (checked) => {
+    if (checked) {
+      // 立即更新临时状态，让开关视觉上打开，并显示时间段选择按钮
+      setTempHalfHourChecked(true);
+    } else {
+      // 关闭半小时开关，直接调用更新
+      setTempHalfHourChecked(false);
+      onUpdateField('isHalfHour', false);
+    }
+  };
+  
+  // 确认选择前半或后半小时
+  const handleConfirmHalfHourPosition = (position) => {
+    // 如果点击的是当前已选中的位置，不需要调用接口
+    if (currentHalfPosition === position) {
+      return;
+    }
+    
+    // 调用更新，时间段选择按钮会继续显示
+    onUpdateField('isHalfHour', true, position);
+  };
 
   // 获取对应的固定课表模板内容
   const getTemplateSchedule = () => {
@@ -192,34 +249,176 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onMove, onCo
           【占用】
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
-          <strong style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>学员:</strong>
-          <Input
-            size="small"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="学员姓名"
-            disabled={isArchived}
-            style={{ flex: 1 }}
-          />
-          {!isArchived && (
-            <Button
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
+            <strong style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>学员:</strong>
+            <Input
               size="small"
-              onClick={() => onUpdateName(name)}
-              disabled={!isNameChanged || updateLoading}
-              loading={updateLoading}
-              style={{
-                backgroundColor: isNameChanged ? '#faad14' : '#d9d9d9',
-                borderColor: isNameChanged ? '#faad14' : '#d9d9d9',
-                color: 'white',
-                padding: '0 8px',
-                height: '22px',
-                fontSize: '12px',
-                flexShrink: 0
-              }}
-            >
-              修改
-            </Button>
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="学员姓名"
+              disabled={isArchived}
+              style={{ flex: 1 }}
+            />
+            {!isArchived && (
+              <Button
+                size="small"
+                onClick={() => onUpdateName(name)}
+                disabled={!isNameChanged || updateLoading}
+                loading={updateLoading}
+                style={{
+                  backgroundColor: isNameChanged ? '#faad14' : '#d9d9d9',
+                  borderColor: isNameChanged ? '#faad14' : '#d9d9d9',
+                  color: 'white',
+                  padding: '0 8px',
+                  height: '22px',
+                  fontSize: '12px',
+                  flexShrink: 0
+                }}
+              >
+                修改
+              </Button>
+            )}
+          </div>
+          
+          {/* 半小时和体验开关 */}
+          {!isArchived && onUpdateField && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13px', color: hasOtherHalf ? '#999' : '#666' }}>半小时:</span>
+                  <Switch 
+                    size="small"
+                    checked={tempHalfHourChecked}
+                    disabled={hasOtherHalf}
+                    onChange={handleHalfHourChange}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13px', color: '#666' }}>体验:</span>
+                  <Switch 
+                    size="small"
+                    checked={schedule.isTrial === 1 || schedule.isTrial === true}
+                    onChange={(checked) => onUpdateField('isTrial', checked)}
+                  />
+                </div>
+              </div>
+              
+              {/* 半小时位置选择按钮 - 当开关打开时显示 */}
+              {tempHalfHourChecked && (() => {
+                // 计算整小时时间槽的基准时间
+                const startTime = dayjs(schedule.startTime, 'HH:mm:ss');
+                const minute = startTime.minute();
+                // 如果当前是后半小时（分钟=30），需要减去30分钟得到基准时间
+                const baseTime = minute === 30 ? startTime.subtract(30, 'minute') : startTime;
+                
+                return (
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '8px', 
+                    paddingTop: '4px',
+                    paddingBottom: '4px',
+                    position: 'relative',
+                    zIndex: 10
+                  }}>
+                    <div
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!hasOtherHalf) {
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!hasOtherHalf) {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }
+                      }}
+                      onClick={(e) => {
+                        if (hasOtherHalf) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleConfirmHalfHourPosition('first');
+                      }}
+                      style={{ 
+                        flex: 1, 
+                        fontSize: '12px',
+                        padding: '4px 15px',
+                        textAlign: 'center',
+                        borderRadius: '6px',
+                        background: currentHalfPosition === 'first' 
+                          ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%)'
+                          : 'rgba(230, 230, 230, 0.6)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        color: currentHalfPosition === 'first' ? '#fff' : '#666',
+                        border: currentHalfPosition === 'first' ? 'none' : '1px solid rgba(217, 217, 217, 0.6)',
+                        fontWeight: currentHalfPosition === 'first' ? '500' : 'normal',
+                        cursor: hasOtherHalf ? 'not-allowed' : 'pointer',
+                        pointerEvents: hasOtherHalf ? 'none' : 'auto',
+                        position: 'relative',
+                        zIndex: 11,
+                        userSelect: 'none',
+                        transition: 'all 0.3s ease',
+                        opacity: hasOtherHalf ? 0.6 : 1
+                      }}
+                    >
+                      {baseTime.format('HH:mm')}-{baseTime.add(30, 'minute').format('HH:mm')}
+                    </div>
+                    <div
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!hasOtherHalf) {
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!hasOtherHalf) {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }
+                      }}
+                      onClick={(e) => {
+                        if (hasOtherHalf) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleConfirmHalfHourPosition('second');
+                      }}
+                      style={{ 
+                        flex: 1, 
+                        fontSize: '12px',
+                        padding: '4px 15px',
+                        textAlign: 'center',
+                        borderRadius: '6px',
+                        background: currentHalfPosition === 'second' 
+                          ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%)'
+                          : 'rgba(230, 230, 230, 0.6)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        color: currentHalfPosition === 'second' ? '#fff' : '#666',
+                        border: currentHalfPosition === 'second' ? 'none' : '1px solid rgba(217, 217, 217, 0.6)',
+                        fontWeight: currentHalfPosition === 'second' ? '500' : 'normal',
+                        cursor: hasOtherHalf ? 'not-allowed' : 'pointer',
+                        pointerEvents: hasOtherHalf ? 'none' : 'auto',
+                        position: 'relative',
+                        zIndex: 11,
+                        userSelect: 'none',
+                        transition: 'all 0.3s ease',
+                        opacity: hasOtherHalf ? 0.6 : 1
+                      }}
+                    >
+                      {baseTime.add(30, 'minute').format('HH:mm')}-{baseTime.add(60, 'minute').format('HH:mm')}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           )}
         </div>
       )}
@@ -688,6 +887,7 @@ const ViewTimetable = ({ user }) => {
   const [currentInstanceIndex, setCurrentInstanceIndex] = useState(0);
   const [instancesLoading, setInstancesLoading] = useState(false);
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
+  const [openScheduleId, setOpenScheduleId] = useState(null); // 用于跟踪打开的课程ID，保持Popover在课程移动后仍然打开
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [availableTimeModalVisible, setAvailableTimeModalVisible] = useState(false);
   
@@ -3092,6 +3292,106 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
+  // 更新schedule的单个字段（如isHalfHour, isTrial等）
+  const handleUpdateScheduleField = async (scheduleObj, fieldName, fieldValue, halfHourPosition = 'first') => {
+    let payload = {
+      [fieldName]: fieldValue,
+    };
+    
+    // 如果是修改半小时字段，需要同时更新开始和结束时间
+    if (fieldName === 'isHalfHour') {
+      if (fieldValue) {
+        // 打开半小时开关：需要根据 halfHourPosition 设置时间
+        const currentStart = dayjs(scheduleObj.startTime, 'HH:mm:ss');
+        const currentEnd = dayjs(scheduleObj.endTime, 'HH:mm:ss');
+        const duration = currentEnd.diff(currentStart, 'minute');
+        
+        // 找到原始的整小时时间作为基准
+        let baseStart;
+        if (duration === 30) {
+          // 如果当前已经是半小时，需要找到原始的整点时间
+          if (currentStart.minute() === 30) {
+            // 当前是后半小时（如15:30-16:00），基准时间是15:00
+            baseStart = currentStart.subtract(30, 'minute');
+          } else {
+            // 当前是前半小时（如15:00-15:30），基准时间就是当前开始时间
+            baseStart = currentStart;
+          }
+        } else {
+          // 如果当前是整小时，基准就是当前开始时间
+          baseStart = currentStart;
+        }
+        
+        if (halfHourPosition === 'first') {
+          // 前半小时：基准时间到基准时间+30分钟
+          payload.startTime = baseStart.format('HH:mm:ss');
+          payload.endTime = baseStart.add(30, 'minute').format('HH:mm:ss');
+        } else {
+          // 后半小时：基准时间+30分钟到基准时间+60分钟
+          payload.startTime = baseStart.add(30, 'minute').format('HH:mm:ss');
+          payload.endTime = baseStart.add(60, 'minute').format('HH:mm:ss');
+        }
+      } else {
+        // 关闭半小时开关：恢复为整小时
+        const currentStart = dayjs(scheduleObj.startTime, 'HH:mm:ss');
+        const currentEnd = dayjs(scheduleObj.endTime, 'HH:mm:ss');
+        const duration = currentEnd.diff(currentStart, 'minute');
+        
+        // 如果当前是后半小时（如15:30-16:00），需要调整开始时间到整点
+        if (duration === 30 && currentStart.minute() === 30) {
+          payload.startTime = currentStart.subtract(30, 'minute').format('HH:mm:ss');
+          payload.endTime = currentEnd.format('HH:mm:ss');
+        } else {
+          // 如果是前半小时（如15:00-15:30），只需要延长结束时间
+          payload.endTime = currentStart.add(60, 'minute').format('HH:mm:ss');
+        }
+      }
+    }
+    
+    setUpdateLoading(true);
+    try {
+      let response;
+      if (viewMode === 'instance') {
+        // 实例视图：使用实例更新API
+        response = await updateInstanceSchedule(scheduleObj.id, payload);
+        if (response.success) {
+          // 直接更新本地状态
+          setAllSchedules(prev => prev.map(schedule => 
+            schedule.id === scheduleObj.id 
+              ? { ...schedule, ...payload }
+              : schedule
+          ));
+          // 同时更新currentWeekInstance中的schedules数据
+          setCurrentWeekInstance(prev => ({
+            ...prev,
+            schedules: (prev.schedules || []).map(schedule => 
+              schedule.id === scheduleObj.id 
+                ? { ...schedule, ...payload }
+                : schedule
+            )
+          }));
+          message.success('修改成功');
+        } else {
+          message.error(response.message || '修改失败');
+        }
+      } else {
+        // 模板视图：使用原有更新API
+        response = await updateSchedule(timetableId, scheduleObj.id, payload);
+        if (response.success) {
+          // 模板视图需要刷新数据
+          await refreshSchedulesQuietly();
+          message.success('修改成功');
+        } else {
+          message.error(response.message || '修改失败');
+        }
+      }
+    } catch (error) {
+      message.error('操作失败，请重试');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
   // 完整编辑课程
   const handleEditSchedule = async (scheduleObj, updatedData) => {
     try {
@@ -4712,7 +5012,7 @@ const ViewTimetable = ({ user }) => {
                   )
                 }
                 trigger={multiSelectMode ? "contextMenu" : (deleteMode ? "none" : "click")}
-                open={!timetable?.isArchived && !deleteMode && openPopoverKey === cellKey}
+                open={!timetable?.isArchived && !deleteMode && (openPopoverKey === cellKey || (schedules.length > 0 && schedules.some(s => s.id === openScheduleId)))}
                 onOpenChange={handleOpenChange}
                 overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
                 overlayStyle={{ maxWidth: '90vw' }}
@@ -4730,6 +5030,12 @@ const ViewTimetable = ({ user }) => {
           const cellKey = `${day.key}-${record.key}`;
           const handleOpenChange = (newOpen) => {
             setOpenPopoverKey(newOpen ? cellKey : null);
+            // 如果有课程，设置 openScheduleId
+            if (newOpen && schedules.length > 0) {
+              setOpenScheduleId(schedules[0].id);
+            } else if (!newOpen) {
+              setOpenScheduleId(null);
+            }
           };
 
           const popoverContent = (
@@ -4740,17 +5046,22 @@ const ViewTimetable = ({ user }) => {
                     schedule={student}
                     onDelete={() => handleDeleteSchedule(student.id)}
                     onUpdateName={(newName) => handleSaveStudentName(student, newName)}
+                    onUpdateField={(fieldName, fieldValue, halfHourPosition) => handleUpdateScheduleField(student, fieldName, fieldValue, halfHourPosition)}
                     onMove={handleStartMove}
                     onCopy={handleStartCopy}
                     onSwap={handleStartSwap}
                     timetable={timetable}
                     isArchived={timetable?.isArchived}
-                    onClose={() => setOpenPopoverKey(null)}
+                    onClose={() => {
+                      setOpenPopoverKey(null);
+                      setOpenScheduleId(null);
+                    }}
                     deleteLoading={deleteLoading}
                     updateLoading={updateLoading}
                     templateSchedules={templateSchedules}
                     viewMode={viewMode}
                     allSchedules={allSchedules}
+                    hasOtherHalf={false}
                     onRemoveSchedule={(id)=>{
                       // 内嵌请假成功后，从当前列表移除
                       setAllSchedules(prev=>prev.filter(s=>s.id!==id));
@@ -5296,7 +5607,7 @@ const ViewTimetable = ({ user }) => {
               <div className="schedule-cell-content" style={{ position: 'relative', height: '48px' }}>
                 {/* 前半小时区域 */}
                 <div style={{ height: '50%', position: 'relative' }}>
-                  {firstHalfCourse && (
+                  {firstHalfCourse ? (
                     (() => {
                       const isBlocked = firstHalfCourse.studentName === '【占用】';
                       const isManualAdded = viewMode === 'instance' && firstHalfCourse.isManualAdded;
@@ -5330,17 +5641,22 @@ const ViewTimetable = ({ user }) => {
                                 schedule={firstHalfCourse}
                                 onDelete={() => handleDeleteSchedule(firstHalfCourse.id)}
                                 onUpdateName={(newName) => handleSaveStudentName(firstHalfCourse, newName)}
+                                onUpdateField={(fieldName, fieldValue, halfHourPosition) => handleUpdateScheduleField(firstHalfCourse, fieldName, fieldValue, halfHourPosition)}
                                 onMove={handleStartMove}
                                 onCopy={handleStartCopy}
                                 onSwap={handleStartSwap}
                                 timetable={timetable}
                                 isArchived={timetable?.isArchived}
-                                onClose={() => setOpenPopoverKey(null)}
+                                onClose={() => {
+                      setOpenPopoverKey(null);
+                      setOpenScheduleId(null);
+                    }}
                                 deleteLoading={deleteLoading}
                                 updateLoading={updateLoading}
                                 templateSchedules={templateSchedules}
                                 viewMode={viewMode}
                                 allSchedules={allSchedules}
+                                hasOtherHalf={!!secondHalfCourse}
                                 onRemoveSchedule={(id) => {
                                   setAllSchedules(prev => prev.filter(s => s.id !== id));
                                 }}
@@ -5348,8 +5664,13 @@ const ViewTimetable = ({ user }) => {
                             </div>
                           }
                           trigger="click"
-                          open={!swapMode && openPopoverKey === `${cellKey}-first-half`}
-                          onOpenChange={(newOpen) => !swapMode && setOpenPopoverKey(newOpen ? `${cellKey}-first-half` : null)}
+                          open={!swapMode && (openPopoverKey === `${cellKey}-first-half` || openScheduleId === firstHalfCourse.id)}
+                          onOpenChange={(newOpen) => {
+                            if (!swapMode) {
+                              setOpenPopoverKey(newOpen ? `${cellKey}-first-half` : null);
+                              setOpenScheduleId(newOpen ? firstHalfCourse.id : null);
+                            }
+                          }}
                           overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
                           overlayStyle={{ maxWidth: '90vw' }}
                     >
@@ -5391,12 +5712,43 @@ const ViewTimetable = ({ user }) => {
                     </Popover>
                   );
                 })()
+                  ) : (
+                    // 前半小时区域为空，添加可点击的空白区域
+                    <Popover
+                      placement={getSmartPlacement(index, record.key)}
+                      title={null}
+                      content={
+                        <NewSchedulePopoverContent 
+                          onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'first' })} 
+                          onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'first' })}
+                          onCancel={() => setOpenPopoverKey(null)} 
+                          addLoading={addLoading} 
+                          timeInfo={`${record.time} 前半小时`}
+                          hasHalfHourCourse={false}
+                          defaultIsHalfHour={true}
+                          defaultHalfHourPosition="first"
+                          fixedTimeSlot={`${record.time} 前半`}
+                          studentOptions={studentOptions}
+                          disableHalfHourSwitch={true}
+                        />
+                      }
+                      trigger="click"
+                      open={!timetable?.isArchived && openPopoverKey === `${cellKey}-first-half-empty`}
+                      onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-first-half-empty` : null)}
+                      overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                      overlayStyle={{ maxWidth: '90vw' }}
+                    >
+                      <div style={{
+                        height: '100%',
+                        cursor: 'pointer'
+                      }} />
+                    </Popover>
                   )}
                 </div>
                 
                 {/* 后半小时区域 */}
                 <div style={{ height: '50%', position: 'relative' }}>
-                  {secondHalfCourse && (
+                  {secondHalfCourse ? (
                     (() => {
                       const isBlocked = secondHalfCourse.studentName === '【占用】';
                       const isManualAdded = viewMode === 'instance' && secondHalfCourse.isManualAdded;
@@ -5430,17 +5782,22 @@ const ViewTimetable = ({ user }) => {
                                 schedule={secondHalfCourse}
                                 onDelete={() => handleDeleteSchedule(secondHalfCourse.id)}
                                 onUpdateName={(newName) => handleSaveStudentName(secondHalfCourse, newName)}
+                                onUpdateField={(fieldName, fieldValue, halfHourPosition) => handleUpdateScheduleField(secondHalfCourse, fieldName, fieldValue, halfHourPosition)}
                                 onMove={handleStartMove}
                                 onCopy={handleStartCopy}
                                 onSwap={handleStartSwap}
                                 timetable={timetable}
                                 isArchived={timetable?.isArchived}
-                                onClose={() => setOpenPopoverKey(null)}
+                                onClose={() => {
+                      setOpenPopoverKey(null);
+                      setOpenScheduleId(null);
+                    }}
                                 deleteLoading={deleteLoading}
                                 updateLoading={updateLoading}
                                 templateSchedules={templateSchedules}
                                 viewMode={viewMode}
                                 allSchedules={allSchedules}
+                                hasOtherHalf={!!firstHalfCourse}
                                 onRemoveSchedule={(id) => {
                                   setAllSchedules(prev => prev.filter(s => s.id !== id));
                                 }}
@@ -5448,8 +5805,13 @@ const ViewTimetable = ({ user }) => {
                             </div>
                           }
                           trigger="click"
-                          open={!swapMode && openPopoverKey === `${cellKey}-second-half`}
-                          onOpenChange={(newOpen) => !swapMode && setOpenPopoverKey(newOpen ? `${cellKey}-second-half` : null)}
+                          open={!swapMode && (openPopoverKey === `${cellKey}-second-half` || openScheduleId === secondHalfCourse.id)}
+                          onOpenChange={(newOpen) => {
+                            if (!swapMode) {
+                              setOpenPopoverKey(newOpen ? `${cellKey}-second-half` : null);
+                              setOpenScheduleId(newOpen ? secondHalfCourse.id : null);
+                            }
+                          }}
                           overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
                           overlayStyle={{ maxWidth: '90vw' }}
                     >
@@ -5491,6 +5853,37 @@ const ViewTimetable = ({ user }) => {
                     </Popover>
                   );
                 })()
+                  ) : (
+                    // 后半小时区域为空，添加可点击的空白区域
+                    <Popover
+                      placement={getSmartPlacement(index, record.key)}
+                      title={null}
+                      content={
+                        <NewSchedulePopoverContent 
+                          onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'second' })} 
+                          onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'second' })}
+                          onCancel={() => setOpenPopoverKey(null)} 
+                          addLoading={addLoading} 
+                          timeInfo={`${record.time} 后半小时`}
+                          hasHalfHourCourse={false}
+                          defaultIsHalfHour={true}
+                          defaultHalfHourPosition="second"
+                          fixedTimeSlot={`${record.time} 后半`}
+                          studentOptions={studentOptions}
+                          disableHalfHourSwitch={true}
+                        />
+                      }
+                      trigger="click"
+                      open={!timetable?.isArchived && openPopoverKey === `${cellKey}-second-half-empty`}
+                      onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-second-half-empty` : null)}
+                      overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                      overlayStyle={{ maxWidth: '90vw' }}
+                    >
+                      <div style={{
+                        height: '100%',
+                        cursor: 'pointer'
+                      }} />
+                    </Popover>
                   )}
                 </div>
               </div>

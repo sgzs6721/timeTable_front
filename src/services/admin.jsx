@@ -485,6 +485,51 @@ export const getActiveWeeklyTemplates = async () => {
   }
 };
 
+// 全局缓存，避免重复调用
+let trialSchedulesCache = null;
+let trialSchedulesCacheTime = 0;
+export const invalidateTrialSchedulesCache = () => {
+  trialSchedulesCache = null;
+  trialSchedulesCacheTime = 0;
+};
+const TRIAL_CACHE_TTL = 30000; // 30秒缓存
+
+// 获取活动课表体验课程信息
+export const getActiveTrialSchedules = async () => {
+  try {
+    const now = Date.now();
+    // 检查缓存
+    if (trialSchedulesCache && now - trialSchedulesCacheTime < TRIAL_CACHE_TTL) {
+      return { success: true, data: trialSchedulesCache };
+    }
+    
+    // 使用新的优化接口，一次性获取所有活动课表的体验课程
+    const response = await api.get('/admin/active-timetables/trial');
+    
+    if (!response.success) {
+      throw new Error('获取体验课程失败');
+    }
+    
+    const trialSchedules = response.data || [];
+    
+    // 更新缓存
+    trialSchedulesCache = trialSchedules;
+    trialSchedulesCacheTime = now;
+    
+    return {
+      success: true,
+      data: trialSchedulesCache
+    };
+  } catch (error) {
+    console.error('获取体验课程失败:', error);
+    return {
+      success: false,
+      data: [],
+      error: error.message
+    };
+  }
+};
+
 // 基于聚合接口：按课表ID过滤模板课程（单接口、前端过滤）
 export const getTemplateSchedulesForTimetable = async (timetableId) => {
   try {

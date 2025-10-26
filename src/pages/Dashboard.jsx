@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce, getAllTimetables as getAllTimetablesSvc, getMyHoursPaged } from '../services/timetable';
 import { getCoachesWithTimetables } from '../services/admin';
 import { checkCurrentWeekInstance, generateCurrentWeekInstance, getCurrentWeekInstance, deleteInstanceSchedule, updateInstanceSchedule, createInstanceSchedule, getLeaveRecords, deleteLeaveRecordsBatch } from '../services/weeklyInstance';
-import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getAllTimetables as getAllTimetablesAdmin, getCoachLastMonthRecords } from '../services/admin';
+import { getCoachesStatistics, getInstanceSchedulesByDate, getActiveWeeklySchedules, getActiveWeeklyTemplates, getActiveTrialSchedules, getAllTimetables as getAllTimetablesAdmin, getCoachLastMonthRecords } from '../services/admin';
 import { getAllStudents } from '../services/weeklyInstance';
 import { renameStudent, hideStudent } from '../services/studentOperationRecords';
 import { mergeStudents } from '../services/studentMerge';
@@ -3171,7 +3171,7 @@ const Dashboard = ({ user }) => {
   const WeeklyScheduleBlock = ({ coachColorMap }) => {
     const [weeklyScheduleData, setWeeklyScheduleData] = useState([]);
     const [weeklyScheduleLoading, setWeeklyScheduleLoading] = useState(false);
-    const [viewMode, setViewMode] = useState('instance'); // 'instance' | 'template'
+    const [viewMode, setViewMode] = useState('instance'); // 'instance' | 'template' | 'trial'
     const [allCoaches, setAllCoaches] = useState(new Set());
     const [selectedCoach, setSelectedCoach] = useState(null);
     const [coachBgColorMap, setCoachBgColorMap] = useState(new Map());
@@ -3242,11 +3242,21 @@ const Dashboard = ({ user }) => {
       setWeeklyScheduleLoading(true);
       try {
         // 根据目标视图模式获取不同的数据
-        const response = targetMode === 'instance' 
-          ? await getActiveWeeklySchedules()
-          : await getActiveWeeklyTemplates();
+        let response;
+        if (targetMode === 'instance') {
+          response = await getActiveWeeklySchedules();
+        } else if (targetMode === 'template') {
+          response = await getActiveWeeklyTemplates();
+        } else if (targetMode === 'trial') {
+          response = await getActiveTrialSchedules();
+        }
+        
         if (!response || !response.success) {
-          const errorMsg = targetMode === 'instance' ? '获取本周排课数据失败' : '获取固定课表模板失败';
+          const errorMsg = targetMode === 'instance' 
+            ? '获取本周排课数据失败' 
+            : targetMode === 'template' 
+              ? '获取固定课表模板失败' 
+              : '获取体验课程失败';
           console.error('API调用失败:', response);
           message.error(errorMsg);
           
@@ -3320,7 +3330,7 @@ const Dashboard = ({ user }) => {
           const scheduleItem = {
             coach: coachName,
             student: schedule.studentName,
-            type: targetMode === 'instance' ? 'instance' : 'template',
+            type: targetMode === 'instance' ? 'instance' : (targetMode === 'trial' ? 'trial' : 'template'),
             timetableName: schedule.timetableName,
             sourceIsWeekly: schedule.isWeekly === 1
           };
@@ -3400,11 +3410,19 @@ const Dashboard = ({ user }) => {
       await fetchWeeklyScheduleData('template');
     };
     
+    // 切换到体验课程视图
+    const switchToTrialView = async () => {
+      await fetchWeeklyScheduleData('trial');
+    };
+    
     const renderScheduleCell = (schedules, day) => {
       const filteredByView = (schedules || []).filter(s => {
         if (viewMode === 'template') {
           // 固定：包含周固定来源 + 日期范围
           return (!!s.sourceIsWeekly) || s.type === 'dateRange' || s.type === 'template';
+        } else if (viewMode === 'trial') {
+          // 体验：显示所有体验课程
+          return true;
         }
         // 本周：包含实例 + 日期范围
         return s.type === 'instance' || s.type === 'dateRange';
@@ -3602,10 +3620,19 @@ const Dashboard = ({ user }) => {
     }, [allCoaches, coachCourseCount]);
 
     return (
-      <Card title={viewMode === 'instance' ? '本周排课信息' : '固定课表模板'} size="small" style={{ marginTop: '24px' }}
+      <Card title={viewMode === 'instance' ? '本周排课信息' : viewMode === 'template' ? '固定课表模板' : '体验课程'} size="small" style={{ marginTop: '24px' }}
         extra={
           <div>
             <Button.Group>
+              <Button 
+                size="small" 
+                type={viewMode==='trial' ? 'primary' : 'default'} 
+                loading={weeklyScheduleLoading && viewMode !== 'trial'}
+                disabled={weeklyScheduleLoading}
+                onClick={switchToTrialView}
+              >
+                体验
+              </Button>
               <Button 
                 size="small" 
                 type={viewMode==='instance' ? 'primary' : 'default'} 

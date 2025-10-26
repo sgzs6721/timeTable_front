@@ -378,14 +378,20 @@ const TodoList = ({ onUnreadCountChange }) => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: '12px' }}>
             {!isCompleted && (
-              <Button 
-                type="text" 
-                size="small"
-                icon={<CheckCircleOutlined />}
-                onClick={() => handleMarkAsCompleted(todo.id)}
-                title="标记为完成"
-                style={{ color: '#52c41a' }}
-              />
+              <Popconfirm
+                title="确定要标记为已处理吗？"
+                onConfirm={() => handleMarkAsCompleted(todo.id)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <Button 
+                  type="text" 
+                  size="small"
+                  icon={<CheckCircleOutlined />}
+                  title="标记为完成"
+                  style={{ color: '#52c41a' }}
+                />
+              </Popconfirm>
             )}
             <Popconfirm
               title="确定要删除这条待办吗？"

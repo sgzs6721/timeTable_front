@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
-import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons';
+import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
 import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
 import { createTodo, getLatestTodoByCustomer, updateTodo } from '../services/todo';
 import { getTrialSchedule } from '../services/timetable';
@@ -46,12 +46,17 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       setEditingHistoryId(null);
       setEditingNotes('');
       
-      // 重置体验安排状态
-      setShowExperienceSchedule(false);
-      setExperienceDate(null);
-      setExperienceTimeRange(null);
-      setAvailableCoaches([]);
-      setSelectedCoach(null);
+      // 如果当前状态是"待体验"或"待再体验"，回显上次的体验时间
+      if (customer.status === 'SCHEDULED' || customer.status === 'RE_EXPERIENCE') {
+        fetchTrialScheduleFromHistory();
+      } else {
+        // 重置体验安排状态
+        setShowExperienceSchedule(false);
+        setExperienceDate(null);
+        setExperienceTimeRange(null);
+        setAvailableCoaches([]);
+        setSelectedCoach(null);
+      }
     } else if (!visible) {
       // 关闭模态框时重置状态
       setShowExperienceSchedule(false);
@@ -95,6 +100,66 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       setReminderDate(null);
       setReminderTime(null);
       setReminderContent('');
+    }
+  };
+
+  // 从历史记录中获取体验时间信息
+  const fetchTrialScheduleFromHistory = async () => {
+    if (!customer) return;
+    
+    // 如果客户当前状态是待体验或待再体验，始终显示体验安排区域
+    setShowExperienceSchedule(true);
+    
+    try {
+      const response = await getCustomerStatusHistory(customer.id);
+      if (response && response.success && response.data) {
+        const historyList = response.data || [];
+        // 查找最近一条包含体验时间的记录
+        const trialHistory = historyList.find(h => 
+          (h.toStatus === 'SCHEDULED' || h.toStatus === 'RE_EXPERIENCE') && 
+          h.trialScheduleDate && h.trialStartTime && h.trialEndTime
+        );
+        
+        if (trialHistory) {
+          // 回显体验安排信息
+          setExperienceDate(dayjs(trialHistory.trialScheduleDate));
+          setExperienceTimeRange([
+            dayjs(trialHistory.trialStartTime, 'HH:mm:ss'),
+            dayjs(trialHistory.trialEndTime, 'HH:mm:ss')
+          ]);
+          
+          // 如果有教练信息，也回显
+          if (trialHistory.trialCoachId) {
+            setSelectedCoach(trialHistory.trialCoachId);
+          }
+          
+          // 回显备注
+          if (trialHistory.notes) {
+            form.setFieldsValue({
+              notes: trialHistory.notes
+            });
+          }
+        } else {
+          // 没有找到体验时间记录，显示空的输入框
+          setExperienceDate(null);
+          setExperienceTimeRange(null);
+          setAvailableCoaches([]);
+          setSelectedCoach(null);
+        }
+      } else {
+        // API调用失败，也显示空的输入框
+        setExperienceDate(null);
+        setExperienceTimeRange(null);
+        setAvailableCoaches([]);
+        setSelectedCoach(null);
+      }
+    } catch (error) {
+      console.error('获取体验时间信息失败:', error);
+      // 即使出错，也显示空的输入框
+      setExperienceDate(null);
+      setExperienceTimeRange(null);
+      setAvailableCoaches([]);
+      setSelectedCoach(null);
     }
   };
 
@@ -425,28 +490,21 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     return colors[status] || 'default';
   };
 
-  // 获取所有状态选项，并标记哪些应该被禁用（当前状态之前的所有状态）
+  // 获取所有状态选项，只禁用"新建"状态
   const getAllStatusOptions = () => {
     const allOptions = [
-      { value: 'NEW', label: '新建' },
-      { value: 'CONTACTED', label: '已联系' },
-      { value: 'PENDING_CONFIRM', label: '待确认' },
-      { value: 'SCHEDULED', label: '待体验' },
-      { value: 'VISITED', label: '已体验' },
-      { value: 'RE_EXPERIENCE', label: '待再体验' },
-      { value: 'PENDING_SOLD', label: '待成交' },
-      { value: 'SOLD', label: '已成交' },
-      { value: 'CLOSED', label: '已结束' }
+      { value: 'NEW', label: '新建', disabled: true },
+      { value: 'CONTACTED', label: '已联系', disabled: false },
+      { value: 'PENDING_CONFIRM', label: '待确认', disabled: false },
+      { value: 'SCHEDULED', label: '待体验', disabled: false },
+      { value: 'VISITED', label: '已体验', disabled: false },
+      { value: 'RE_EXPERIENCE', label: '待再体验', disabled: false },
+      { value: 'PENDING_SOLD', label: '待成交', disabled: false },
+      { value: 'SOLD', label: '已成交', disabled: false },
+      { value: 'CLOSED', label: '已结束', disabled: false }
     ];
 
-    // 找到当前状态在列表中的索引
-    const currentStatusIndex = allOptions.findIndex(opt => opt.value === customer?.status);
-
-    // 当前状态之前的所有状态都禁用，当前状态及之后的可选
-    return allOptions.map((option, index) => ({
-      ...option,
-      disabled: index < currentStatusIndex
-    }));
+    return allOptions;
   };
 
   return (
@@ -868,6 +926,27 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                       </div>
                     ) : (
                       <>
+                        {/* 如果是待体验状态且有体验时间，显示体验安排信息 */}
+                        {(history.toStatus === 'SCHEDULED' || history.toStatus === 'RE_EXPERIENCE') && 
+                         history.trialScheduleDate && history.trialStartTime && history.trialEndTime && (
+                          <div style={{ 
+                            marginBottom: 8, 
+                            padding: '8px',
+                            backgroundColor: '#f0f5ff',
+                            borderRadius: '4px',
+                            border: '1px solid #91caff'
+                          }}>
+                            <div style={{ fontSize: '13px', color: '#1890ff', marginBottom: 4 }}>
+                              <CalendarOutlined style={{ marginRight: 4 }} />
+                              体验安排：
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>
+                              {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                              {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                              {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                            </div>
+                          </div>
+                        )}
                         {history.notes && (
                           <div style={{ color: '#666', marginBottom: 4 }}>
                             {history.notes}
