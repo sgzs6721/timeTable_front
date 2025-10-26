@@ -50,7 +50,7 @@ const proxyConfig = {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // 使用相对路径，支持直接打开index.html
+  base: '/', // 使用绝对路径，避免路由刷新时资源路径错误
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
