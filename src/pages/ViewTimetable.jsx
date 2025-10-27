@@ -263,7 +263,10 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
             {!isArchived && (
               <Button
                 size="small"
-                onClick={() => onUpdateName(name)}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  onUpdateName(name); 
+                }}
                 disabled={!isNameChanged || updateLoading}
                 loading={updateLoading}
                 style={{
@@ -283,23 +286,38 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
           
           {/* 半小时和体验开关 */}
           {!isArchived && onUpdateField && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', marginBottom: '4px' }}>
+            <div 
+              style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', marginBottom: '4px' }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div 
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <span style={{ fontSize: '13px', color: hasOtherHalf ? '#999' : '#666' }}>半小时:</span>
                   <Switch 
                     size="small"
                     checked={tempHalfHourChecked}
                     disabled={hasOtherHalf}
-                    onChange={handleHalfHourChange}
+                    onChange={(checked, e) => {
+                      if (e) e.stopPropagation();
+                      handleHalfHourChange(checked);
+                    }}
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div 
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <span style={{ fontSize: '13px', color: '#666' }}>体验:</span>
                   <Switch 
                     size="small"
                     checked={schedule.isTrial === 1 || schedule.isTrial === true}
-                    onChange={(checked) => onUpdateField('isTrial', checked)}
+                    onChange={(checked, e) => {
+                      if (e) e.stopPropagation();
+                      onUpdateField('isTrial', checked);
+                    }}
                   />
                 </div>
               </div>
@@ -434,7 +452,11 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
           <Button
             type="primary"
             size="small"
-            onClick={() => { setShowAllInfo(!showAllInfo); setShowLeaveForm(false); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              setShowAllInfo(!showAllInfo); 
+              setShowLeaveForm(false); 
+            }}
             style={{ 
               flex: 1,
               backgroundColor: '#52c41a',
@@ -449,7 +471,10 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
             <Button
               type="default"
               size="small"
-              onClick={() => onMove(schedule)}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onMove(schedule); 
+              }}
               style={{
                 flex: 1,
                 backgroundColor: '#1890ff',
@@ -462,7 +487,10 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
             <Button
               type="default"
               size="small"
-              onClick={() => onCopy(schedule, null)}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onCopy(schedule, null); 
+              }}
               style={{
                 flex: 1,
                 backgroundColor: '#722ed1',
@@ -483,7 +511,11 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
           <Button
             type="default"
             size="small"
-            onClick={() => { setShowLeaveForm(!showLeaveForm); setShowAllInfo(false); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              setShowLeaveForm(!showLeaveForm); 
+              setShowAllInfo(false); 
+            }}
             style={{
               flex: 1,
               backgroundColor: '#fa8c16',
@@ -499,7 +531,10 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
             <Button
               type="default"
               size="small"
-              onClick={() => onSwap(schedule)}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onSwap(schedule); 
+              }}
               style={{
                 flex: 1,
                 backgroundColor: '#13c2c2',
@@ -513,7 +548,10 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
               type="primary"
               danger
               loading={deleteLoading}
-              onClick={onDelete}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onDelete(); 
+              }}
               size="small"
               disabled={deleteLoading}
               style={{ 

@@ -78,6 +78,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const [showSmartParse, setShowSmartParse] = useState(false);
   const [parseText, setParseText] = useState('');
   const [parsing, setParsing] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
   // 供外部调用：当其它地方创建了待办后，局部刷新某个客户的铃铛和数据
   React.useImperativeHandle(ref, () => ({
     onTodoCreatedExternally: ({ id, childName, parentPhone }) => {
@@ -108,7 +109,7 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
     filterCustomers();
     // 筛选条件变化时，重置显示的数据条数
     setDisplayedCount(10);
-  }, [customers, activeTab, salesFilter, selectedFilterDate]);
+  }, [customers, activeTab, salesFilter, selectedFilterDate, searchKeyword]);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -227,6 +228,16 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       filtered = filtered.filter(customer => {
         const customerDateStr = dayjs(customer.createdAt).format('YYYY-MM-DD');
         return customerDateStr === filterDateStr;
+      });
+    }
+
+    // 按姓名或电话搜索
+    if (searchKeyword && searchKeyword.trim()) {
+      const keyword = searchKeyword.trim().toLowerCase();
+      filtered = filtered.filter(customer => {
+        const childName = (customer.childName || '').toLowerCase();
+        const parentPhone = (customer.parentPhone || '').toLowerCase();
+        return childName.includes(keyword) || parentPhone.includes(keyword);
       });
     }
 
@@ -852,6 +863,16 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       filtered = filtered.filter(customer => customer.status === activeTab);
     }
 
+    // 按姓名或电话搜索
+    if (searchKeyword && searchKeyword.trim()) {
+      const keyword = searchKeyword.trim().toLowerCase();
+      filtered = filtered.filter(customer => {
+        const childName = (customer.childName || '').toLowerCase();
+        const parentPhone = (customer.parentPhone || '').toLowerCase();
+        return childName.includes(keyword) || parentPhone.includes(keyword);
+      });
+    }
+
     filtered.forEach(customer => {
       if (customer.createdAt) {
         const dateStr = dayjs(customer.createdAt).format('YYYY-MM-DD');
@@ -889,6 +910,16 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
       filtered = filtered.filter(customer => {
         const customerDateStr = dayjs(customer.createdAt).format('YYYY-MM-DD');
         return customerDateStr === filterDateStr;
+      });
+    }
+
+    // 按姓名或电话搜索
+    if (searchKeyword && searchKeyword.trim()) {
+      const keyword = searchKeyword.trim().toLowerCase();
+      filtered = filtered.filter(customer => {
+        const childName = (customer.childName || '').toLowerCase();
+        const parentPhone = (customer.parentPhone || '').toLowerCase();
+        return childName.includes(keyword) || parentPhone.includes(keyword);
       });
     }
 
@@ -1334,6 +1365,21 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
                 allowClear
                 format="YYYY-MM-DD"
                 disabledDate={disabledDate}
+              />
+            </Col>
+
+            <Col span={24} style={{ marginBottom: 12 }}>
+              <Input
+                placeholder="搜索姓名或电话"
+                value={searchKeyword}
+                onChange={(e) => {
+                  setSearchKeyword(e.target.value);
+                  setCurrentDatePage(0);
+                  setDisplayedCount(10);
+                }}
+                allowClear
+                size="large"
+                prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
               />
             </Col>
             </Row>

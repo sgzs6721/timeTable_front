@@ -257,9 +257,18 @@ const TodoList = ({ onUnreadCountChange }) => {
                     </span>
                     {todo.customerPhone && (
                       <span style={{ fontSize: '14px', color: '#666', fontWeight: 400, marginLeft: '2em' }}>
-                        {todo.customerPhone}
+                        <a 
+                          href={`tel:${todo.customerPhone}`}
+                          style={{ color: '#1890ff', textDecoration: 'none' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {todo.customerPhone}
+                        </a>
                         <CopyOutlined
-                          onClick={() => handleCopyPhone(todo.customerPhone)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyPhone(todo.customerPhone);
+                          }}
                           style={{ marginLeft: 6, color: '#999', cursor: 'pointer', verticalAlign: 'middle' }}
                           title="复制手机号"
                         />

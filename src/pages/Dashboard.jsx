@@ -24,7 +24,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import './Dashboard.css';
 
 // 我的学员组件 - 提取到Dashboard组件外部
-const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
+const MyStudents = ({ onStudentClick, showAllCheckbox = true, currentUser }) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAllStudents, setShowAllStudents] = useState(false);
@@ -44,6 +44,7 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [singleMergeModalVisible, setSingleMergeModalVisible] = useState(false);
   const [mergeStudentsModalVisible, setMergeStudentsModalVisible] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
 
   // 使用 ref 来防止重复请求
   const isLoadingRef = React.useRef(false);
@@ -105,8 +106,10 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
   }, [showAllStudents]);
 
   const handleStudentClick = React.useCallback((studentName) => {
-    onStudentClick(studentName);
-  }, [onStudentClick]);
+    // 获取当前用户的昵称或用户名作为教练名称
+    const coachName = currentUser?.nickname || currentUser?.username || null;
+    onStudentClick(studentName, coachName);
+  }, [onStudentClick, currentUser]);
 
   const handleCheckboxChange = React.useCallback((e) => {
     // 无论当前状态如何，只要点击"全部"复选框，就退出操作状态
@@ -274,7 +277,11 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
             color: '#0050b3',
             whiteSpace: 'nowrap'
           }}>
-            {getSourceStudentHours()}课时分配{selectedStudents.length}学员
+            {(() => {
+              const halfHours = getSourceStudentHours();
+              const hours = halfHours / 2;
+              return hours % 1 === 0 ? `${hours}小时` : `${hours}小时`;
+            })()}分配{selectedStudents.length}学员
           </div>
           <div style={{
             display: 'flex',
@@ -478,7 +485,13 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
           >
             {student.studentName}
           </span>
-          <span style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '4px' }}>{student.attendedCount || 0} 课时</span>
+          <span style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '4px' }}>
+            {(() => {
+              const halfHours = student.attendedCount || 0;
+              const hours = halfHours / 2;
+              return hours % 1 === 0 ? `${hours}小时` : `${hours}小时`;
+            })()}
+          </span>
         </div>
         );
       })}
@@ -487,6 +500,51 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
 
   // 判断是分组结构：只有在"全部"模式下且数据是分组结构时才显示分组
   const isGrouped = showAllStudents && Array.isArray(students) && students.length > 0 && students[0] && typeof students[0] === 'object' && students[0].coachName && Array.isArray(students[0].students);
+  
+  // 过滤学员数据（根据搜索关键词）
+  const getFilteredStudents = () => {
+    // 先统一数据格式
+    let studentList;
+    if (isGrouped) {
+      // 分组模式：保持分组结构
+      studentList = students;
+    } else {
+      // 非分组模式：如果数据是分组结构，需要展平
+      if (Array.isArray(students) && students.length > 0 && students[0] && students[0].students) {
+        studentList = students.flatMap(group => group.students || []);
+      } else {
+        studentList = students;
+      }
+    }
+
+    // 如果没有搜索关键词，直接返回
+    if (!searchKeyword || !searchKeyword.trim()) {
+      return studentList;
+    }
+
+    const keyword = searchKeyword.trim().toLowerCase();
+
+    if (isGrouped) {
+      // 分组模式：过滤每个组内的学员
+      return studentList.map(group => ({
+        ...group,
+        students: (group.students || []).filter(student => 
+          (student.studentName || '').toLowerCase().includes(keyword)
+        ),
+        totalCount: (group.students || [])
+          .filter(student => (student.studentName || '').toLowerCase().includes(keyword))
+          .reduce((sum, s) => sum + (s.attendedCount || 0), 0)
+      })).filter(group => group.students.length > 0);
+    } else {
+      // 非分组模式：过滤学员列表
+      return studentList.filter(student => 
+        (student.studentName || '').toLowerCase().includes(keyword)
+      );
+    }
+  };
+
+  // 获取过滤后的学员数据
+  const filteredStudents = getFilteredStudents();
   
   // 获取所有学员名称用于合并/别名选择
   const getAllStudentNames = () => {
@@ -576,39 +634,30 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     setOperationRecordsVisible(true);
   };
 
-  // 计算总课时数
+  // 计算总课时数（使用过滤后的数据）
   const getTotalHours = () => {
     if (isGrouped) {
       // 分组模式：计算所有组的totalCount总和
-      return students.reduce((sum, grp) => sum + (grp.totalCount || 0), 0);
+      return filteredStudents.reduce((sum, grp) => sum + (grp.totalCount || 0), 0);
     } else {
       // 非分组模式：需要检查数据结构
-      if (Array.isArray(students) && students.length > 0 && students[0] && students[0].students) {
-        // 数据是分组结构但不显示分组，提取所有学员计算课时
-        return students.reduce((sum, group) => {
-          return sum + (group.students || []).reduce((groupSum, student) => groupSum + (student.attendedCount || 0), 0);
-        }, 0);
-      } else {
+      if (Array.isArray(filteredStudents) && filteredStudents.length > 0) {
         // 数据是平铺结构，直接计算
-        return students.reduce((sum, student) => sum + (student.attendedCount || 0), 0);
+        return filteredStudents.reduce((sum, student) => sum + (student.attendedCount || 0), 0);
+      } else {
+        return 0;
       }
     }
   };
 
-  // 计算实际学员数量
+  // 计算实际学员数量（使用过滤后的数据）
   const getActualStudentCount = () => {
     if (isGrouped) {
       // 分组模式：计算所有组的学员数量总和
-      return students.reduce((sum, grp) => sum + (grp.students?.length || 0), 0);
+      return filteredStudents.reduce((sum, grp) => sum + (grp.students?.length || 0), 0);
     } else {
-      // 非分组模式：需要检查数据结构
-      if (Array.isArray(students) && students.length > 0 && students[0] && students[0].students) {
-        // 数据是分组结构但不显示分组，提取所有学员计算数量
-        return students.reduce((sum, group) => sum + (group.students?.length || 0), 0);
-      } else {
-        // 数据是平铺结构，直接计算
-        return students.length;
-      }
+      // 非分组模式：直接返回数组长度
+      return Array.isArray(filteredStudents) ? filteredStudents.length : 0;
     }
   };
 
@@ -851,7 +900,11 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
         title={
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>
-              {showAllStudents ? '所有学员' : '我的学员'}（{getActualStudentCount()}），共{getTotalHours()}课时
+              {showAllStudents ? '所有学员' : '我的学员'}（{getActualStudentCount()}），共{(() => {
+                const halfHours = getTotalHours();
+                const hours = halfHours / 2;
+                return hours % 1 === 0 ? `${hours}小时` : `${hours}小时`;
+              })()}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {showAllCheckbox && (
@@ -890,6 +943,17 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
         }
         size="small"
       >
+      
+      {/* 搜索框 */}
+      <div style={{ marginBottom: 16 }}>
+        <Input
+          placeholder="搜索学员姓名"
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          allowClear
+          prefix={<UserOutlined style={{ color: '#bfbfbf' }} />}
+        />
+      </div>
       
       {/* 在非分组模式下显示全局管理面板 */}
       {!isGrouped && showManagementPanel && (
@@ -945,13 +1009,17 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
       <Spin spinning={loading}>
         {/* 分组模式 */}
         {isGrouped ? (
-          students.length === 0 ? <Empty description="暂无学员" /> :
+          filteredStudents.length === 0 ? <Empty description="暂无学员" /> :
           <div style={{display:'flex',flexDirection:'column',gap:'24px'}}>
-            {students.map((group)=>(
+            {filteredStudents.map((group)=>(
               <div key={group.coachId} style={{background:'#f9f9fc',borderRadius:'6px',padding:'12px',boxShadow:'0 1px 2px #00000008'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                   <div style={{fontWeight:'bold',fontSize:'16px',color:'#1d39c4'}}>
-                    {group.coachName}（{group.totalCount}课时｜{(group.students||[]).length}学员）
+                    {group.coachName}（{(() => {
+                      const halfHours = group.totalCount;
+                      const hours = halfHours / 2;
+                      return hours % 1 === 0 ? `${hours}小时` : `${hours}小时`;
+                    })()}｜{(group.students||[]).length}学员）
                   </div>
                   <div>
                     <Button
@@ -972,17 +1040,12 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
             ))}
           </div>
         ) : (
-          students.length === 0 ? <Empty description="暂无学员" /> : 
+          filteredStudents.length === 0 ? <Empty description="暂无学员" /> : 
           <div>
             {/* 非分组模式下的操作面板 */}
             {(mergeMode || assignHoursMode) && operationCoachId && renderOperationPanel(operationCoachId)}
             
-            {renderStudentCards(
-              // 如果数据是分组结构但不显示分组，则提取所有学员
-              Array.isArray(students) && students.length > 0 && students[0] && students[0].students
-                ? students.flatMap(group => group.students || [])
-                : students
-            )}
+            {renderStudentCards(filteredStudents)}
           </div>
         )}
       </Spin>
@@ -5206,9 +5269,10 @@ const Dashboard = ({ user }) => {
           key: 'students',
           label: '我的学员',
           children: <MyStudents 
-            onStudentClick={(studentName) => {
+            currentUser={user}
+            onStudentClick={(studentName, coachName) => {
               setSelectedStudent(studentName);
-              setSelectedCoach(user?.role?.toUpperCase() === 'ADMIN' ? null : user?.nickname || user?.username); // 普通用户传递自己的名称
+              setSelectedCoach(coachName); // 使用传递过来的教练名称
               setStudentDetailVisible(true);
             }}
             showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
@@ -5312,7 +5376,8 @@ const MergeStudentsModal = ({ visible, selectedStudents, students, onClose, onOp
   };
 
   const studentDetails = getSelectedStudentDetails();
-  const totalHours = studentDetails.reduce((sum, student) => sum + (student.attendedCount || 0), 0);
+  const totalHalfHours = studentDetails.reduce((sum, student) => sum + (student.attendedCount || 0), 0);
+  const totalHours = totalHalfHours / 2;
 
   const handleMerge = async (values) => {
     setLoading(true);
@@ -5322,7 +5387,7 @@ const MergeStudentsModal = ({ visible, selectedStudents, students, onClose, onOp
         studentNames: selectedStudents
       });
       
-      message.success(`已成功合并 ${selectedStudents.length} 个学员为 "${values.mergedName}"，总课时：${totalHours}`);
+      message.success(`已成功合并 ${selectedStudents.length} 个学员为 "${values.mergedName}"，总课时：${totalHours}小时`);
       onOperationComplete();
       onClose();
       form.resetFields();
@@ -5387,7 +5452,11 @@ const MergeStudentsModal = ({ visible, selectedStudents, students, onClose, onOp
                   fontWeight: 'bold',
                   fontSize: '14px'
                 }}>
-                  {student.attendedCount || 0} 课时
+                  {(() => {
+                    const halfHours = student.attendedCount || 0;
+                    const hours = halfHours / 2;
+                    return hours % 1 === 0 ? `${hours}小时` : `${hours}小时`;
+                  })()}
                 </div>
               </div>
             ))}
@@ -5406,7 +5475,7 @@ const MergeStudentsModal = ({ visible, selectedStudents, students, onClose, onOp
                 fontWeight: 'bold', 
                 fontSize: '16px' 
               }}>
-                {totalHours} 课时
+                {totalHours % 1 === 0 ? `${totalHours}小时` : `${totalHours}小时`}
               </span>
             </div>
           </div>
