@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Space, Timeline, Pagination, DatePicker, TimePicker } from 'antd';
+import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Space, Timeline, DatePicker, TimePicker } from 'antd';
 import { 
   CheckCircleOutlined, 
   ClockCircleOutlined, 
@@ -26,8 +26,6 @@ const TodoList = ({ onUnreadCountChange }) => {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('today'); // today, all, pending, completed
   const [expandedHistory, setExpandedHistory] = useState({}); // 控制流转记录展开状态
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10); // 每页10个
   const [editingTimeId, setEditingTimeId] = useState(null); // 正在编辑时间的待办ID
   const [editingDate, setEditingDate] = useState(null); // 编辑中的日期
   const [editingTime, setEditingTime] = useState(null); // 编辑中的时间
@@ -130,15 +128,6 @@ const TodoList = ({ onUnreadCountChange }) => {
             todo.id === todoId ? { ...todo, status: 'COMPLETED', completedAt: new Date().toISOString() } : todo
           );
           
-          // 如果当前在"待办"筛选，标记完成后可能导致当前页数据减少
-          if (filter === 'pending') {
-            const newFilteredTodos = newTodos.filter(t => t.status !== 'COMPLETED');
-            const maxPage = Math.ceil(newFilteredTodos.length / pageSize);
-            if (currentPage > maxPage && maxPage > 0) {
-              setCurrentPage(maxPage);
-            }
-          }
-          
           // 更新今日待办数量
           if (onUnreadCountChange) {
             const todayCount = getTodayTodoCount(newTodos);
@@ -163,18 +152,6 @@ const TodoList = ({ onUnreadCountChange }) => {
       if (response && response.success) {
         setTodos(prevTodos => {
           const newTodos = prevTodos.filter(todo => todo.id !== todoId);
-          
-          // 如果删除后当前页没有数据了，跳转到上一页
-          const newFilteredTodos = filter === 'pending' 
-            ? newTodos.filter(t => t.status !== 'COMPLETED')
-            : filter === 'completed' 
-            ? newTodos.filter(t => t.status === 'COMPLETED')
-            : newTodos;
-          
-          const maxPage = Math.ceil(newFilteredTodos.length / pageSize);
-          if (currentPage > maxPage && maxPage > 0) {
-            setCurrentPage(maxPage);
-          }
           
           // 更新今日待办数量
           if (onUnreadCountChange) {
@@ -269,17 +246,6 @@ const TodoList = ({ onUnreadCountChange }) => {
   };
 
   const filteredTodos = getFilteredTodos();
-
-  // 计算分页数据
-  const totalTodos = filteredTodos.length;
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedTodos = filteredTodos.slice(startIndex, endIndex);
-
-  // 当筛选条件变化时，重置到第一页
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
 
   const toggleHistoryExpand = (todoId) => {
     setExpandedHistory(prev => ({
@@ -637,7 +603,7 @@ const TodoList = ({ onUnreadCountChange }) => {
       </div>
 
       {/* 待办列表 */}
-      <div style={{ flex: 1, marginBottom: 16 }}>
+      <div style={{ flex: 1 }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <Spin size="large" />
@@ -654,28 +620,10 @@ const TodoList = ({ onUnreadCountChange }) => {
           />
         ) : (
           <div>
-            {paginatedTodos.map(todo => renderTodoCard(todo))}
+            {filteredTodos.map(todo => renderTodoCard(todo))}
           </div>
         )}
       </div>
-
-      {/* 分页 */}
-      {filteredTodos.length > 0 && (
-        <div style={{ paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
-          <div style={{ textAlign: 'center', marginBottom: 6, fontSize: '13px', color: '#666' }}>
-            共 {totalTodos} 条，当前页 {startIndex + 1}-{Math.min(endIndex, totalTodos)} 条记录
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Pagination
-              current={currentPage}
-              pageSize={pageSize}
-              total={totalTodos}
-              onChange={(page) => setCurrentPage(page)}
-              showSizeChanger={false}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };
