@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Form, Input, Button, message, Tag, Space, Divider, Typography, Card, List } from 'antd';
 import { renameStudent, hideStudent, assignStudentAlias, updateStudentOperationRecord, deleteStudentOperationRecord } from '../services/studentOperationRecords';
 import { mergeStudents } from '../services/studentMerge';
@@ -23,26 +23,8 @@ const StudentBatchOperationModal = ({
     return colors[index % colors.length];
   };
 
-  // 获取现有操作记录
-  useEffect(() => {
-    if (visible) {
-      fetchExistingRules();
-      // 重置状态
-      setEditingRule(null);
-      setOperationType(null);
-      form.resetFields();
-    }
-  }, [visible]);
-
-  // 当选中学员变化时，检查是否有现有规则并自动展开
-  useEffect(() => {
-    if (visible && selectedStudents.length > 0) {
-      const hasRules = getSelectedStudentsRules().length > 0;
-      setShowExistingRules(hasRules);
-    }
-  }, [selectedStudents, visible, existingRules]);
-
-  const fetchExistingRules = async () => {
+  // 使用 useCallback 记忆函数，避免依赖变化
+  const fetchExistingRules = useCallback(async () => {
     try {
       const response = await getStudentOperationRecords();
       if (response && response.success) {
@@ -51,7 +33,32 @@ const StudentBatchOperationModal = ({
     } catch (error) {
       console.error('获取操作记录失败:', error);
     }
-  };
+  }, []);
+
+  // 获取现有操作记录
+  useEffect(() => {
+    if (visible) {
+      fetchExistingRules();
+      setEditingRule(null);
+      setOperationType(null);
+      form.resetFields();
+    } else {
+      // 模态框关闭时重置展开状态
+      setShowExistingRules(false);
+    }
+  }, [visible, form, fetchExistingRules]);
+
+  // 当模态框打开且规则加载完成时，自动展开现有规则
+  useEffect(() => {
+    if (visible && existingRules.length > 0 && selectedStudents.length > 0) {
+      const hasRules = existingRules.some(rule => selectedStudents.includes(rule.oldName));
+      if (hasRules) {
+        setShowExistingRules(true);
+      }
+    }
+    // 只依赖长度而不是整个数组引用，避免无限循环
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, existingRules.length, selectedStudents.length]);
 
   // 检查是否已存在规则
   const hasExistingRule = (studentName, operationType) => {

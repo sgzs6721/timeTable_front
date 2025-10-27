@@ -33,36 +33,47 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [batchOperationModalVisible, setBatchOperationModalVisible] = useState(false);
   const [operationRecordsVisible, setOperationRecordsVisible] = useState(false);
-  const [activeCoachId, setActiveCoachId] = useState(null); // 记录当前操作的教练ID
-  const [mergeMode, setMergeMode] = useState(false); // 合并模式
-  const [assignHoursMode, setAssignHoursMode] = useState(false); // 分配课时模式
-  const [operationCoachId, setOperationCoachId] = useState(null); // 当前操作学员所属的教练ID
-  const [assignHoursSourceStudent, setAssignHoursSourceStudent] = useState(null); // 分配课时的源学员（大课）
-  const [assignHoursModalVisible, setAssignHoursModalVisible] = useState(false); // 分配课时模态框
-  const [singleOperationStudent, setSingleOperationStudent] = useState(null); // 单个学员操作
-  const [renameModalVisible, setRenameModalVisible] = useState(false); // 重命名模态框
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false); // 删除模态框
-  const [singleMergeModalVisible, setSingleMergeModalVisible] = useState(false); // 单个学员合并模态框
-  const [mergeStudentsModalVisible, setMergeStudentsModalVisible] = useState(false); // 合并学员模态框
+  const [activeCoachId, setActiveCoachId] = useState(null);
+  const [mergeMode, setMergeMode] = useState(false);
+  const [assignHoursMode, setAssignHoursMode] = useState(false);
+  const [operationCoachId, setOperationCoachId] = useState(null);
+  const [assignHoursSourceStudent, setAssignHoursSourceStudent] = useState(null);
+  const [assignHoursModalVisible, setAssignHoursModalVisible] = useState(false);
+  const [singleOperationStudent, setSingleOperationStudent] = useState(null);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [singleMergeModalVisible, setSingleMergeModalVisible] = useState(false);
+  const [mergeStudentsModalVisible, setMergeStudentsModalVisible] = useState(false);
+
+  // 使用 ref 来防止重复请求
+  const isLoadingRef = React.useRef(false);
+  const lastFetchTimeRef = React.useRef(0);
+  const FETCH_THROTTLE_MS = 1000; // 1秒内不重复请求
 
   const fetchStudents = React.useCallback(async (showAll = false, timestamp) => {
+    // 防止重复请求
+    const now = Date.now();
+    if (isLoadingRef.current || (now - lastFetchTimeRef.current < FETCH_THROTTLE_MS && !timestamp)) {
+      return;
+    }
+
+    isLoadingRef.current = true;
+    lastFetchTimeRef.current = now;
     setLoading(true);
+    
     try {
-      // 添加时间戳参数避免缓存
       const response = await getAllStudents(showAll, timestamp);
       if (response && response.success) {
         const raw = response.data || [];
         
-        // 检查数据结构，如果是学员数组而不是教练分组数组
         if (raw.length > 0 && raw[0].studentName) {
-          // 这是学员数组，需要按教练分组
           const coachMap = new Map();
           raw.forEach(student => {
             const coachId = student.coachId;
             if (!coachMap.has(coachId)) {
               coachMap.set(coachId, {
                 coachId: coachId,
-                coachName: `教练${coachId}`, // 临时名称，实际应该从后端获取
+                coachName: `教练${coachId}`,
                 totalCount: 0,
                 students: []
               });
@@ -75,7 +86,6 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
           const groupedData = Array.from(coachMap.values());
           setStudents(groupedData);
         } else {
-          // 这是教练分组数组，直接使用
           setStudents(raw);
         }
       } else {
@@ -86,12 +96,13 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
       message.error('获取学员列表失败');
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, []);
 
   useEffect(() => {
     fetchStudents(showAllStudents);
-  }, [showAllStudents, fetchStudents]);
+  }, [showAllStudents]);
 
   const handleStudentClick = React.useCallback((studentName) => {
     onStudentClick(studentName);
@@ -601,11 +612,11 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     }
   };
 
-  const handleOperationComplete = () => {
+  const handleOperationComplete = async () => {
     // 先退出管理模式和合并模式，清空所有状态
     setSelectedStudents([]);
     setActiveCoachId(null);
-    setOperationCoachId(null); // 清空操作教练ID
+    setOperationCoachId(null);
     setShowManagementPanel(false);
     setMergeMode(false);
     setAssignHoursMode(false);
@@ -618,11 +629,11 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true }) => {
     setMergeStudentsModalVisible(false);
     setSingleOperationStudent(null);
     
-    // 延迟刷新数据，确保状态先更新
-    setTimeout(() => {
-      const timestamp = new Date().getTime();
-      fetchStudents(showAllStudents, timestamp);
-    }, 100);
+    // 使用时间戳强制刷新数据，避免并发请求
+    const timestamp = new Date().getTime();
+    await Promise.all([
+      fetchStudents(showAllStudents, timestamp)
+    ]);
   };
 
   // 处理教练批量操作
@@ -3171,13 +3182,20 @@ const Dashboard = ({ user }) => {
   const WeeklyScheduleBlock = ({ coachColorMap }) => {
     const [weeklyScheduleData, setWeeklyScheduleData] = useState([]);
     const [weeklyScheduleLoading, setWeeklyScheduleLoading] = useState(false);
-    const [viewMode, setViewMode] = useState('instance'); // 'instance' | 'template' | 'trial'
+    const [viewMode, setViewMode] = useState('instance');
     const [allCoaches, setAllCoaches] = useState(new Set());
     const [selectedCoach, setSelectedCoach] = useState(null);
     const [coachBgColorMap, setCoachBgColorMap] = useState(new Map());
     const [coachCourseCount, setCoachCourseCount] = useState(new Map());
     const [studentBgColorMap, setStudentBgColorMap] = useState(new Map());
-    const [studentOperationRules, setStudentOperationRules] = useState([]); // 学员操作规则
+    const [studentOperationRules, setStudentOperationRules] = useState([]);
+    
+    // 使用 ref 来防止重复请求
+    const isLoadingRulesRef = React.useRef(false);
+    const rulesLoadedRef = React.useRef(false);
+    const isLoadingScheduleRef = React.useRef(false);
+    const lastScheduleFetchTimeRef = React.useRef(0);
+    const SCHEDULE_FETCH_THROTTLE_MS = 500;
     
     // 半透明马卡龙调色板（更柔和）
     const colorPalette = [
@@ -3237,17 +3255,33 @@ const Dashboard = ({ user }) => {
     
     // 加载学员操作规则（返回规则数据，避免 setState 异步问题）
     const fetchStudentOperationRules = async () => {
+      // 防止重复请求
+      if (isLoadingRulesRef.current) {
+        // 如果正在加载，返回当前的规则
+        return studentOperationRules;
+      }
+      
+      // 如果已经加载过，直接返回缓存的规则
+      if (rulesLoadedRef.current && studentOperationRules.length > 0) {
+        return studentOperationRules;
+      }
+      
+      isLoadingRulesRef.current = true;
+      
       try {
         const response = await getStudentOperationRecords(true);
         if (response && response.success) {
           const rules = response.data || [];
           setStudentOperationRules(rules);
-          return rules; // 返回规则数据
+          rulesLoadedRef.current = true;
+          return rules;
         }
         return [];
       } catch (error) {
         console.error('加载学员操作规则失败:', error);
         return [];
+      } finally {
+        isLoadingRulesRef.current = false;
       }
     };
     
@@ -3311,6 +3345,15 @@ const Dashboard = ({ user }) => {
     }, []); // 移除viewMode依赖，改为手动调用
     
     const fetchWeeklyScheduleData = async (targetMode = viewMode, rulesParam = null) => {
+      // 防止重复请求
+      const now = Date.now();
+      if (isLoadingScheduleRef.current || (now - lastScheduleFetchTimeRef.current < SCHEDULE_FETCH_THROTTLE_MS)) {
+        return;
+      }
+      
+      isLoadingScheduleRef.current = true;
+      lastScheduleFetchTimeRef.current = now;
+      
       // 使用传入的规则参数，如果没有则使用 state（避免 setState 异步问题）
       const rules = rulesParam || studentOperationRules;
       
@@ -3360,14 +3403,16 @@ const Dashboard = ({ user }) => {
         // 统计每位教练的课程数量（兼容不同返回字段，过滤掉管理员和隐藏的学员）
         const countMap = new Map();
         (schedules || []).forEach(s => {
-          // 过滤掉管理员的课程（检查多个可能的字段名）
-          const isAdmin = s.ownerPosition === 'ADMIN' || 
-                         s.ownerRole === 'ADMIN' ||
-                         s.position === 'ADMIN' ||
-                         s.role === 'ADMIN';
-          
-          if (isAdmin) {
-            return;
+          // 体验课程模式下不过滤管理员，本周和固定模式下过滤管理员
+          if (targetMode !== 'trial') {
+            const isAdmin = s.ownerPosition === 'ADMIN' || 
+                           s.ownerRole === 'ADMIN' ||
+                           s.position === 'ADMIN' ||
+                           s.role === 'ADMIN';
+            
+            if (isAdmin) {
+              return;
+            }
           }
           
           const coachName = s.ownerNickname || s.ownerUsername || s.ownerName || s.username || s.nickname;
@@ -3391,14 +3436,16 @@ const Dashboard = ({ user }) => {
         // 统一处理：现在本周数据和模板数据都是扁平化的课程数组
         
         schedules.forEach((schedule, index) => {
-          // 过滤掉管理员的课程（检查多个可能的字段名）
-          const isAdmin = schedule.ownerPosition === 'ADMIN' || 
-                         schedule.ownerRole === 'ADMIN' ||
-                         schedule.position === 'ADMIN' ||
-                         schedule.role === 'ADMIN';
-          
-          if (isAdmin) {
-            return;
+          // 体验课程模式下不过滤管理员，本周和固定模式下过滤管理员
+          if (targetMode !== 'trial') {
+            const isAdmin = schedule.ownerPosition === 'ADMIN' || 
+                           schedule.ownerRole === 'ADMIN' ||
+                           schedule.position === 'ADMIN' ||
+                           schedule.role === 'ADMIN';
+            
+            if (isAdmin) {
+              return;
+            }
           }
           
           const coachName = schedule.ownerNickname || schedule.ownerUsername;
@@ -3509,22 +3556,23 @@ const Dashboard = ({ user }) => {
         setAllCoaches(new Set());
       } finally {
         setWeeklyScheduleLoading(false);
+        isLoadingScheduleRef.current = false;
       }
     };
     
     // 切换到本周视图
     const switchToInstanceView = async () => {
-      await fetchWeeklyScheduleData('instance');
+      await fetchWeeklyScheduleData('instance', studentOperationRules);
     };
     
     // 切换到固定课表视图
     const switchToTemplateView = async () => {
-      await fetchWeeklyScheduleData('template');
+      await fetchWeeklyScheduleData('template', studentOperationRules);
     };
     
     // 切换到体验课程视图
     const switchToTrialView = async () => {
-      await fetchWeeklyScheduleData('trial');
+      await fetchWeeklyScheduleData('trial', studentOperationRules);
     };
     
     const renderScheduleCell = (schedules, day) => {
@@ -4073,9 +4121,14 @@ const Dashboard = ({ user }) => {
     
     // 计算上周课时总数 (暂时设为0，可以根据需要从后端获取)
     // const totalLastWeekCourses = 0;
+    
+    // 使用 ref 标记是否已加载，避免重复调用
+    const hasLoadedRef = React.useRef(false);
+    
     useEffect(() => {
-      if (!coachesStatistics) return;
+      if (!coachesStatistics || hasLoadedRef.current) return;
       
+      hasLoadedRef.current = true;
       setCoachDetailsLoading(true);
       const todayStr = dayjs().format('YYYY-MM-DD');
       const tomorrowStr = dayjs().add(1, 'day').format('YYYY-MM-DD');
