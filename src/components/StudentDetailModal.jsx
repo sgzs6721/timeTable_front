@@ -20,31 +20,18 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
 
   const fetchStudentRecords = async () => {
     setLoading(true);
-    console.log('====== 开始获取学员记录 ======');
-    console.log('学员名称:', studentName);
-    console.log('教练名称:', coachName);
     try {
       const response = await getStudentRecords(studentName, coachName);
-      console.log('API响应:', response);
       if (response && response.success) {
-        console.log('API返回的数据:', response.data);
         // 过滤掉未来的课程记录
         const today = new Date();
         today.setHours(0, 0, 0, 0); // 设置为今天开始时间
         
-        console.log('原始课程记录数量:', (response.data.schedules || []).length);
-        console.log('原始课程记录:', response.data.schedules);
-        
         const filteredSchedules = (response.data.schedules || []).filter(record => {
           const recordDate = new Date(record.scheduleDate);
           recordDate.setHours(0, 0, 0, 0);
-          const isBeforeOrToday = recordDate <= today;
-          console.log(`记录日期: ${record.scheduleDate}, 是否保留: ${isBeforeOrToday}`);
-          return isBeforeOrToday; // 只保留今天及以前的课程
+          return recordDate <= today; // 只保留今天及以前的课程
         });
-        
-        console.log('过滤后课程记录数量:', filteredSchedules.length);
-        console.log('过滤后课程记录:', filteredSchedules);
         
         // 前端排序：按日期和时间倒序排列
         const sortedSchedules = filteredSchedules.sort((a, b) => {
@@ -128,54 +115,31 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
   // 使用 useMemo 计算总课时数，确保在 scheduleRecords 变化时重新计算
   const totalHours = useMemo(() => {
     let total = 0;
-    console.log('========== 开始计算总课时数 ==========');
-    console.log('记录数量:', scheduleRecords.length);
-    console.log('所有记录:', scheduleRecords);
     
-    scheduleRecords.forEach((record, index) => {
-      console.log(`\n----- 记录 ${index + 1} -----`);
-      console.log('完整记录:', record);
-      console.log('时间范围字段:', record.timeRange);
-      
+    scheduleRecords.forEach((record) => {
       if (record.timeRange) {
         const [startTime, endTime] = record.timeRange.split('-');
-        console.log(`分割后 - 开始: "${startTime}", 结束: "${endTime}"`);
         
         if (startTime && endTime) {
           try {
-            // 解析时间格式 HH:mm:ss 或 HH:mm
             const start = startTime.trim();
             const end = endTime.trim();
-            console.log(`去空格后 - 开始: "${start}", 结束: "${end}"`);
             
-            // 转换为分钟进行计算
             const startMinutes = timeToMinutes(start);
             const endMinutes = timeToMinutes(end);
-            console.log(`分钟数 - 开始: ${startMinutes}, 结束: ${endMinutes}`);
             
             if (startMinutes !== null && endMinutes !== null) {
               const durationMinutes = endMinutes - startMinutes;
               const durationHours = durationMinutes / 60;
-              console.log(`✓ 该节课时长: ${durationMinutes}分钟 = ${durationHours}小时`);
               total += durationHours;
-              console.log(`当前累计: ${total}小时`);
-            } else {
-              console.error('× 时间转换失败！');
             }
           } catch (error) {
-            console.error('× 解析时间失败:', record.timeRange, error);
+            console.warn('解析时间失败:', record.timeRange, error);
           }
-        } else {
-          console.error('× 时间分割后为空！');
         }
-      } else {
-        console.error('× 没有timeRange字段！');
       }
     });
     
-    console.log('\n========== 计算完成 ==========');
-    console.log('最终总课时数:', total, '小时');
-    console.log('==============================\n');
     return total;
   }, [scheduleRecords]);
 

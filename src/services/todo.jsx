@@ -154,3 +154,18 @@ export const updateTodo = async (todoId, todoData) => {
   }
 };
 
+// 更新待办提醒时间
+export const updateTodoReminderTime = async (todoId, reminderDateTime) => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/todos/${todoId}/reminder-time`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ reminderDateTime })
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('更新提醒时间失败:', error);
+    throw error;
+  }
+};
+

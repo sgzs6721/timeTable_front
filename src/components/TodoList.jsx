@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Space, Timeline, Pagination } from 'antd';
+import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Space, Timeline, Pagination, DatePicker, TimePicker } from 'antd';
 import { 
   CheckCircleOutlined, 
   ClockCircleOutlined, 
@@ -8,13 +8,15 @@ import {
   UpOutlined,
   CopyOutlined,
   ExclamationCircleOutlined,
-  BellOutlined
+  BellOutlined,
+  EditOutlined
 } from '@ant-design/icons';
 import { 
   getTodos, 
   markTodoAsRead, 
   markTodoAsCompleted, 
-  deleteTodo
+  deleteTodo,
+  updateTodoReminderTime
 } from '../services/todo';
 import dayjs from 'dayjs';
 import './TodoList.css';
@@ -26,6 +28,9 @@ const TodoList = ({ onUnreadCountChange }) => {
   const [expandedHistory, setExpandedHistory] = useState({}); // 控制流转记录展开状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10); // 每页10个
+  const [editingTimeId, setEditingTimeId] = useState(null); // 正在编辑时间的待办ID
+  const [editingDate, setEditingDate] = useState(null); // 编辑中的日期
+  const [editingTime, setEditingTime] = useState(null); // 编辑中的时间
 
   const handleCopyPhone = (phone) => {
     if (!phone) return;
@@ -189,6 +194,62 @@ const TodoList = ({ onUnreadCountChange }) => {
     }
   };
 
+  const handleStartEditTime = (todo) => {
+    setEditingTimeId(todo.id);
+    setEditingDate(todo.reminderDate);
+    setEditingTime(todo.reminderTime || '09:00:00');
+  };
+
+  const handleCancelEditTime = () => {
+    setEditingTimeId(null);
+    setEditingDate(null);
+    setEditingTime(null);
+  };
+
+  const handleConfirmEditTime = async (todoId) => {
+    if (!editingDate) {
+      message.warning('请选择日期');
+      return;
+    }
+    
+    const dateStr = dayjs(editingDate).format('YYYY-MM-DD');
+    const timeStr = editingTime || '09:00:00';
+    const newDateTime = `${dateStr} ${timeStr}`;
+    
+    try {
+      const response = await updateTodoReminderTime(todoId, newDateTime);
+      if (response && response.success) {
+        setTodos(prevTodos => {
+          const newTodos = prevTodos.map(todo => {
+            if (todo.id === todoId) {
+              return { 
+                ...todo, 
+                reminderDate: dateStr,
+                reminderTime: timeStr
+              };
+            }
+            return todo;
+          });
+          
+          // 更新今日待办数量
+          if (onUnreadCountChange) {
+            const todayCount = getTodayTodoCount(newTodos);
+            onUnreadCountChange(todayCount);
+          }
+          
+          return newTodos;
+        });
+        handleCancelEditTime();
+        message.success('提醒时间已更新');
+      } else {
+        message.error('更新失败');
+      }
+    } catch (error) {
+      console.error('更新提醒时间失败:', error);
+      message.error('更新失败');
+    }
+  };
+
   const getFilteredTodos = () => {
     if (filter === 'today') {
       // 今日待办：提醒日期是今天的未完成待办
@@ -306,11 +367,61 @@ const TodoList = ({ onUnreadCountChange }) => {
                 color: isPast && !isCompleted ? '#ff4d4f' : '#999',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '8px'
               }}>
                 <ClockCircleOutlined />
-                提醒时间：{dayjs(todo.reminderDate).format('YYYY-MM-DD')}
-                {todo.reminderTime && ` ${todo.reminderTime.substring(0, 5)}`}
+                {editingTimeId === todo.id ? (
+                  <Space size="small">
+                    <DatePicker
+                      value={editingDate ? dayjs(editingDate) : null}
+                      format="YYYY-MM-DD"
+                      size="small"
+                      style={{ width: 130 }}
+                      onChange={(date) => {
+                        setEditingDate(date ? date.format('YYYY-MM-DD') : null);
+                      }}
+                    />
+                    <TimePicker
+                      value={editingTime ? dayjs(editingTime, 'HH:mm:ss') : null}
+                      format="HH:mm"
+                      size="small"
+                      style={{ width: 80 }}
+                      onChange={(time) => {
+                        setEditingTime(time ? `${time.format('HH:mm')}:00` : null);
+                      }}
+                    />
+                    <Button 
+                      type="primary"
+                      size="small" 
+                      onClick={() => handleConfirmEditTime(todo.id)}
+                    >
+                      确定
+                    </Button>
+                    <Button 
+                      size="small" 
+                      onClick={handleCancelEditTime}
+                    >
+                      取消
+                    </Button>
+                  </Space>
+                ) : (
+                  <>
+                    <span>
+                      提醒时间：{dayjs(todo.reminderDate).format('YYYY-MM-DD')}
+                      {todo.reminderTime && ` ${todo.reminderTime.substring(0, 5)}`}
+                    </span>
+                    {!isCompleted && (
+                      <EditOutlined 
+                        style={{ cursor: 'pointer', color: '#1890ff' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartEditTime(todo);
+                        }}
+                        title="编辑时间"
+                      />
+                    )}
+                  </>
+                )}
               </div>
             )}
 
