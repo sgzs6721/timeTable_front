@@ -440,16 +440,20 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   };
   
   // 查询有空的教练
-  const fetchAvailableCoaches = async () => {
-    if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
+  const fetchAvailableCoaches = async (dateValue, timeRange) => {
+    // 如果没有传参数，使用当前状态
+    const dateToUse = dateValue || experienceDate;
+    const timeRangeToUse = timeRange || experienceTimeRange;
+    
+    if (!dateToUse || !timeRangeToUse || timeRangeToUse.length !== 2 || !timeRangeToUse[0] || !timeRangeToUse[1]) {
       return;
     }
     
     setLoadingCoaches(true);
     try {
-      const dateStr = experienceDate.format('YYYY-MM-DD');
-      const startTime = experienceTimeRange[0].format('HH:mm');
-      const endTime = experienceTimeRange[1].format('HH:mm');
+      const dateStr = dateToUse.format('YYYY-MM-DD');
+      const startTime = timeRangeToUse[0].format('HH:mm');
+      const endTime = timeRangeToUse[1].format('HH:mm');
       
       const token = localStorage.getItem('token');
       const response = await fetch(`${getApiBaseUrl()}/schedules/available-coaches?date=${dateStr}&startTime=${startTime}&endTime=${endTime}`, {
@@ -475,15 +479,13 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     }
   };
   
-  // 当时间选择完成后自动查询教练
+  // 当日期改变时，清空教练列表（需要重新选择时间后再查询）
   useEffect(() => {
-    if (experienceDate && experienceTimeRange && experienceTimeRange.length === 2) {
-      fetchAvailableCoaches();
-    } else {
+    if (!experienceDate) {
       setAvailableCoaches([]);
       setSelectedCoach(null);
     }
-  }, [experienceDate, experienceTimeRange]);
+  }, [experienceDate]);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -619,19 +621,14 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                   <TimePicker.RangePicker
                     value={experienceTimeRange}
                     onChange={(times) => {
-                      if (times && times.length === 2 && times[0] && !times[1]) {
-                        // 如果只选择了开始时间，自动设置结束时间为开始时间+30分钟
-                        const endTime = times[0].add(30, 'minute');
-                        setExperienceTimeRange([times[0], endTime]);
+                      setExperienceTimeRange(times);
+                      // 当用户选择完开始和结束时间后，查询有空的教练
+                      if (times && times.length === 2 && times[0] && times[1] && experienceDate) {
+                        fetchAvailableCoaches(experienceDate, times);
                       } else {
-                        setExperienceTimeRange(times);
-                      }
-                    }}
-                    onCalendarChange={(times) => {
-                      // 当选择完第一个时间时触发
-                      if (times && times[0] && !times[1]) {
-                        const endTime = times[0].add(30, 'minute');
-                        setExperienceTimeRange([times[0], endTime]);
+                        // 如果时间不完整，清空教练列表
+                        setAvailableCoaches([]);
+                        setSelectedCoach(null);
                       }
                     }}
                     format="HH:mm"
