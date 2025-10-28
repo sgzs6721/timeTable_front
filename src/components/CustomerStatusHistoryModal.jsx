@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
+import { Modal, Form, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
 import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
 import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
 import { createTodo, getLatestTodoByCustomer, updateTodo, updateTodoReminderTime } from '../services/todo';
@@ -7,7 +7,6 @@ import { getTrialSchedule } from '../services/timetable';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 
-const { Option } = Select;
 const { TextArea } = Input;
 
 const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, onTodoCreated, onTodoUpdated }) => {
@@ -657,22 +656,47 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                 </div>
               ) : availableCoaches.length > 0 ? (
                 <div>
-                  <div style={{ marginBottom: 4, color: 'rgba(0, 0, 0, 0.85)' }}>
-                    选择教练
+                  <div style={{ marginBottom: 8, color: 'rgba(0, 0, 0, 0.85)' }}>
+                    选择教练（可选）
                   </div>
-                  <Select
-                    value={selectedCoach}
-                    onChange={setSelectedCoach}
-                    placeholder="请选择教练（可选）"
-                    style={{ width: '100%' }}
-                    allowClear
-                  >
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gap: '8px'
+                  }}>
                     {availableCoaches.map(coach => (
-                      <Option key={coach.id} value={coach.id}>
+                      <div
+                        key={coach.id}
+                        onClick={() => setSelectedCoach(coach.id === selectedCoach ? null : coach.id)}
+                        style={{
+                          padding: '10px 12px',
+                          border: coach.id === selectedCoach ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          backgroundColor: coach.id === selectedCoach ? '#e6f7ff' : '#ffffff',
+                          color: coach.id === selectedCoach ? '#1890ff' : 'rgba(0, 0, 0, 0.85)',
+                          fontWeight: coach.id === selectedCoach ? '500' : 'normal',
+                          transition: 'all 0.3s',
+                          userSelect: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (coach.id !== selectedCoach) {
+                            e.currentTarget.style.borderColor = '#40a9ff';
+                            e.currentTarget.style.backgroundColor = '#f0f9ff';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (coach.id !== selectedCoach) {
+                            e.currentTarget.style.borderColor = '#d9d9d9';
+                            e.currentTarget.style.backgroundColor = '#ffffff';
+                          }
+                        }}
+                      >
                         {coach.nickname || coach.username}
-                      </Option>
+                      </div>
                     ))}
-                  </Select>
+                  </div>
                 </div>
               ) : (experienceDate && experienceTimeRange && experienceTimeRange.length === 2) ? (
                 <div style={{ 
