@@ -3278,6 +3278,23 @@ const Dashboard = ({ user }) => {
         return 'instance';
       }
     });
+    // 使用ref来跟踪viewMode，防止组件重新渲染时丢失状态
+    const viewModeRef = React.useRef(viewMode);
+    
+    // 包装setViewMode，同时更新ref
+    const setViewModeAndRef = React.useCallback((mode) => {
+      viewModeRef.current = mode;
+      setViewMode(mode);
+      try {
+        sessionStorage.setItem('dashboard_viewMode', mode);
+      } catch {}
+    }, []);
+    
+    // 同步viewMode到ref
+    React.useEffect(() => {
+      viewModeRef.current = viewMode;
+    }, [viewMode]);
+    
     const [allCoaches, setAllCoaches] = useState(new Set());
     const [selectedCoach, setSelectedCoach] = useState(null);
     const [coachBgColorMap, setCoachBgColorMap] = useState(new Map());
@@ -3479,10 +3496,7 @@ const Dashboard = ({ user }) => {
           message.error(errorMsg);
           
           // 即使API失败，也要更新viewMode并设置空数据，确保UI状态正确
-          setViewMode(targetMode);
-          try {
-            sessionStorage.setItem('dashboard_viewMode', targetMode);
-          } catch {}
+          setViewModeAndRef(targetMode);
           setWeeklyScheduleData([]);
           setAllCoaches(new Set());
           return;
@@ -3652,10 +3666,7 @@ const Dashboard = ({ user }) => {
         setAllCoaches(allCoaches);
         
         // 数据获取成功后更新viewMode
-        setViewMode(targetMode);
-        try {
-          sessionStorage.setItem('dashboard_viewMode', targetMode);
-        } catch {}
+        setViewModeAndRef(targetMode);
         
       } catch (error) {
         console.error('获取排课数据失败:', error);
