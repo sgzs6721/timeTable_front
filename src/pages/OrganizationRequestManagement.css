@@ -1,0 +1,48 @@
+.organization-request-management {
+  padding: 24px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.applicant-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.applicant-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.applicant-name {
+  font-weight: 500;
+  color: #1890ff;
+}
+
+.applicant-sex {
+  font-size: 12px;
+  color: #999;
+}
+
+@media (max-width: 768px) {
+  .organization-request-management {
+    padding: 16px;
+  }
+
+  .page-header h2 {
+    font-size: 20px;
+  }
+}
+

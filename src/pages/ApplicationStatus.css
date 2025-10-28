@@ -1,0 +1,68 @@
+.application-status-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 40px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-content {
+  width: 100%;
+  max-width: 800px;
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.status-info-card {
+  margin: 24px 0;
+  border-radius: 8px;
+}
+
+.status-tag {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-pending {
+  background: #fff7e6;
+  color: #faad14;
+  border: 1px solid #ffd591;
+}
+
+.reject-reason {
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+.action-buttons {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.action-buttons button {
+  min-width: 120px;
+  height: 40px;
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .status-content {
+    padding: 24px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons button {
+    width: 100%;
+  }
+}
+
