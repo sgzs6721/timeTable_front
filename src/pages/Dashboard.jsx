@@ -1337,15 +1337,6 @@ const Dashboard = ({ user }) => {
   };
   // 管理员概览内 今日/明日 tab 状态上移，避免子组件因重挂而重置
   const [adminDayTab, setAdminDayTab] = useState('today');
-  
-  // 周排课的viewMode状态上移到Dashboard级别，避免Modal打开时状态丢失
-  const [weeklyViewMode, setWeeklyViewMode] = useState(() => {
-    try {
-      return sessionStorage.getItem('dashboard_viewMode') || 'instance';
-    } catch {
-      return 'instance';
-    }
-  });
   const [studentColorMap, setStudentColorMap] = useState({});
 
   // 新增状态用于管理弹窗功能
@@ -3279,16 +3270,30 @@ const Dashboard = ({ user }) => {
   const WeeklyScheduleBlock = ({ coachColorMap }) => {
     const [weeklyScheduleData, setWeeklyScheduleData] = useState([]);
     const [weeklyScheduleLoading, setWeeklyScheduleLoading] = useState(false);
-    // 使用父组件传递的viewMode状态
-    const viewMode = weeklyViewMode;
+    // 从sessionStorage读取上次的viewMode，默认为'instance'
+    const [viewMode, setViewMode] = useState(() => {
+      try {
+        return sessionStorage.getItem('dashboard_viewMode') || 'instance';
+      } catch {
+        return 'instance';
+      }
+    });
+    // 使用ref来跟踪viewMode，防止组件重新渲染时丢失状态
+    const viewModeRef = React.useRef(viewMode);
     
-    // 包装setViewMode，同时更新sessionStorage
+    // 包装setViewMode，同时更新ref
     const setViewModeAndRef = React.useCallback((mode) => {
-      setWeeklyViewMode(mode);
+      viewModeRef.current = mode;
+      setViewMode(mode);
       try {
         sessionStorage.setItem('dashboard_viewMode', mode);
       } catch {}
     }, []);
+    
+    // 同步viewMode到ref
+    React.useEffect(() => {
+      viewModeRef.current = viewMode;
+    }, [viewMode]);
     
     const [allCoaches, setAllCoaches] = useState(new Set());
     const [selectedCoach, setSelectedCoach] = useState(null);
