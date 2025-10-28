@@ -3270,7 +3270,14 @@ const Dashboard = ({ user }) => {
   const WeeklyScheduleBlock = ({ coachColorMap }) => {
     const [weeklyScheduleData, setWeeklyScheduleData] = useState([]);
     const [weeklyScheduleLoading, setWeeklyScheduleLoading] = useState(false);
-    const [viewMode, setViewMode] = useState('instance');
+    // 从sessionStorage读取上次的viewMode，默认为'instance'
+    const [viewMode, setViewMode] = useState(() => {
+      try {
+        return sessionStorage.getItem('dashboard_viewMode') || 'instance';
+      } catch {
+        return 'instance';
+      }
+    });
     const [allCoaches, setAllCoaches] = useState(new Set());
     const [selectedCoach, setSelectedCoach] = useState(null);
     const [coachBgColorMap, setCoachBgColorMap] = useState(new Map());
@@ -3473,6 +3480,9 @@ const Dashboard = ({ user }) => {
           
           // 即使API失败，也要更新viewMode并设置空数据，确保UI状态正确
           setViewMode(targetMode);
+          try {
+            sessionStorage.setItem('dashboard_viewMode', targetMode);
+          } catch {}
           setWeeklyScheduleData([]);
           setAllCoaches(new Set());
           return;
@@ -3643,6 +3653,9 @@ const Dashboard = ({ user }) => {
         
         // 数据获取成功后更新viewMode
         setViewMode(targetMode);
+        try {
+          sessionStorage.setItem('dashboard_viewMode', targetMode);
+        } catch {}
         
       } catch (error) {
         console.error('获取排课数据失败:', error);
