@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
+import { Modal, Form, Select, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
 import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
 import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
 import { createTodo, getLatestTodoByCustomer, updateTodo, updateTodoReminderTime } from '../services/todo';
@@ -7,6 +7,7 @@ import { getTrialSchedule } from '../services/timetable';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 
+const { Option } = Select;
 const { TextArea } = Input;
 
 const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, onTodoCreated, onTodoUpdated }) => {
