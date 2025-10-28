@@ -9,7 +9,8 @@ import {
   CopyOutlined,
   ExclamationCircleOutlined,
   BellOutlined,
-  EditOutlined
+  EditOutlined,
+  HistoryOutlined
 } from '@ant-design/icons';
 import { 
   getTodos, 
@@ -18,6 +19,7 @@ import {
   deleteTodo,
   updateTodoReminderTime
 } from '../services/todo';
+import CustomerStatusHistoryModal from './CustomerStatusHistoryModal';
 import dayjs from 'dayjs';
 import './TodoList.css';
 
@@ -29,6 +31,8 @@ const TodoList = ({ onUnreadCountChange }) => {
   const [editingTimeId, setEditingTimeId] = useState(null); // 正在编辑时间的待办ID
   const [editingDate, setEditingDate] = useState(null); // 编辑中的日期
   const [editingTime, setEditingTime] = useState(null); // 编辑中的时间
+  const [historyModalVisible, setHistoryModalVisible] = useState(false); // 状态流转模态框
+  const [selectedCustomer, setSelectedCustomer] = useState(null); // 选中的客户
 
   const handleCopyPhone = (phone) => {
     if (!phone) return;
@@ -227,6 +231,71 @@ const TodoList = ({ onUnreadCountChange }) => {
     }
   };
 
+  const handleOpenHistory = (todo, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    // 将todo转换为customer格式供CustomerStatusHistoryModal使用
+    setSelectedCustomer({
+      id: todo.customerId,
+      childName: todo.customerName,
+      parentPhone: todo.customerPhone,
+      status: todo.customerStatus,
+      source: todo.customerSource
+    });
+    setHistoryModalVisible(true);
+  };
+
+  const handleHistorySuccess = async (newStatus, lastChangeNote) => {
+    // 状态流转成功后，更新待办列表中对应客户的状态
+    if (selectedCustomer) {
+      setTodos(prevTodos => 
+        prevTodos.map(todo => {
+          if (todo.customerId === selectedCustomer.id) {
+            return {
+              ...todo,
+              customerStatus: newStatus || todo.customerStatus,
+              customerStatusText: newStatus ? getStatusText(newStatus) : todo.customerStatusText
+            };
+          }
+          return todo;
+        })
+      );
+    }
+  };
+
+  const handleTodoUpdated = ({ todoId, reminderDate, reminderTime }) => {
+    // 更新待办列表中的提醒时间
+    setTodos(prevTodos => 
+      prevTodos.map(todo => {
+        if (todo.id === todoId) {
+          return {
+            ...todo,
+            reminderDate,
+            reminderTime
+          };
+        }
+        return todo;
+      })
+    );
+  };
+
+  const getStatusText = (status) => {
+    if (!status) return '未知';
+    const statusMap = {
+      'NEW': '新客户',
+      'POTENTIAL': '潜在客户',
+      'VISITED': '已到访',
+      'TRIAL': '试课',
+      'RE_EXPERIENCE': '待再体验',
+      'SIGNED': '已签约',
+      'DEFERRED': '延期',
+      'LOST': '已流失',
+      'PENDING_SOLD': '待售'
+    };
+    return statusMap[status] || status;
+  };
+
   const getFilteredTodos = () => {
     if (filter === 'today') {
       // 今日待办：提醒日期是今天的未完成待办
@@ -275,34 +344,49 @@ const TodoList = ({ onUnreadCountChange }) => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {todo.customerName && (
-                  <>
-                    <span style={{ fontSize: '16px', color: '#000', fontWeight: 600 }}>
-                      {todo.customerName}
-                    </span>
-                    {todo.customerPhone && (
-                      <span style={{ fontSize: '14px', color: '#666', fontWeight: 400, marginLeft: '2em' }}>
-                        <a 
-                          href={`tel:${todo.customerPhone}`}
-                          style={{ color: '#1890ff', textDecoration: 'none' }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {todo.customerPhone}
-                        </a>
-                        <CopyOutlined
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyPhone(todo.customerPhone);
-                          }}
-                          style={{ marginLeft: 6, color: '#999', cursor: 'pointer', verticalAlign: 'middle' }}
-                          title="复制手机号"
-                        />
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: 4 }}>
+                  {todo.customerName && (
+                    <>
+                      <span style={{ fontSize: '16px', color: '#000', fontWeight: 600 }}>
+                        {todo.customerName}
                       </span>
-                    )}
-                  </>
-                )}
+                      {todo.customerPhone && (
+                        <span style={{ fontSize: '14px', color: '#666', fontWeight: 400 }}>
+                          <a 
+                            href={`tel:${todo.customerPhone}`}
+                            style={{ color: '#1890ff', textDecoration: 'none' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {todo.customerPhone}
+                          </a>
+                          <CopyOutlined
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyPhone(todo.customerPhone);
+                            }}
+                            style={{ marginLeft: 6, color: '#999', cursor: 'pointer', verticalAlign: 'middle' }}
+                            title="复制手机号"
+                          />
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* 状态和地点 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  {todo.customerStatusText && (
+                    <Tag color="blue" style={{ margin: 0, fontSize: '12px' }}>
+                      {todo.customerStatusText}
+                    </Tag>
+                  )}
+                  {todo.customerSource && (
+                    <span style={{ fontSize: '12px', color: '#666' }}>
+                      📍 {todo.customerSource}
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
                 {isUnread && (
@@ -438,9 +522,9 @@ const TodoList = ({ onUnreadCountChange }) => {
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                               <div>
-                                <Tag color="default" style={{ marginRight: 4 }}>{history.fromStatusText || history.fromStatus || '无'}</Tag>
+                                <Tag color="default" style={{ marginRight: 4 }}>{history.fromStatusText || '无'}</Tag>
                                 <span style={{ margin: '0 4px' }}>→</span>
-                                <Tag color="blue">{history.toStatusText || history.toStatus}</Tag>
+                                <Tag color="blue">{history.toStatusText}</Tag>
                               </div>
                               <div style={{ color: '#999', fontSize: '11px', marginLeft: '8px', whiteSpace: 'nowrap' }}>
                                 {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
@@ -463,6 +547,16 @@ const TodoList = ({ onUnreadCountChange }) => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: '12px' }}>
+            {todo.customerId && (
+              <Button 
+                type="text" 
+                size="small"
+                icon={<HistoryOutlined />}
+                title="状态流转"
+                onClick={(e) => handleOpenHistory(todo, e)}
+                style={{ color: '#1890ff' }}
+              />
+            )}
             {!isCompleted && (
               <Popconfirm
                 title="确定要标记为已处理吗？"
@@ -624,6 +718,19 @@ const TodoList = ({ onUnreadCountChange }) => {
           </div>
         )}
       </div>
+
+      {/* 状态流转模态框 */}
+      <CustomerStatusHistoryModal
+        visible={historyModalVisible}
+        onCancel={() => {
+          setHistoryModalVisible(false);
+          setSelectedCustomer(null);
+        }}
+        customer={selectedCustomer}
+        onSuccess={handleHistorySuccess}
+        onTodoCreated={null}
+        onTodoUpdated={handleTodoUpdated}
+      />
     </div>
   );
 };

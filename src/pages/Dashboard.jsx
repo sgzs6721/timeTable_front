@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, InputNumber, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination, Form } from 'antd';
+import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, InputNumber, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination, Form, Timeline } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined, EllipsisOutlined, MoneyCollectOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce, getAllTimetables as getAllTimetablesSvc, getMyHoursPaged } from '../services/timetable';
@@ -10,12 +10,14 @@ import { getAllStudents } from '../services/weeklyInstance';
 import { renameStudent, hideStudent, getStudentOperationRecords } from '../services/studentOperationRecords';
 import { mergeStudents } from '../services/studentMerge';
 import { getAllSalaryCalculations, getAvailableMonths } from '../services/salaryCalculation';
+import { getCustomerStatusHistory } from '../services/customerStatusHistory';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
 import StudentManagementModal from '../components/StudentManagementModal';
 import StudentBatchOperationModal from '../components/StudentBatchOperationModal';
 import StudentOperationRecordsModal from '../components/StudentOperationRecordsModal';
+import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import Footer from '../components/Footer';
 import MySalary from './MySalary';
 import CustomerManagement from './CustomerManagement';
@@ -1309,7 +1311,30 @@ const Dashboard = ({ user }) => {
   const [studentDetailVisible, setStudentDetailVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedCoach, setSelectedCoach] = useState(null);
+  
+  // 客源信息展示框相关状态（用于体验课程）
+  const [customerInfoVisible, setCustomerInfoVisible] = useState(false);
+  const [selectedCustomerInfo, setSelectedCustomerInfo] = useState(null);
+  const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
+  const [customerHistory, setCustomerHistory] = useState([]);
   const [modalSubTitleTomorrow, setModalSubTitleTomorrow] = useState('');
+  
+  // 状态码转换为中文的辅助函数
+  const getStatusText = (status) => {
+    if (!status) return '未知';
+    const statusMap = {
+      'NEW': '新建',
+      'CONTACTED': '已联系',
+      'SCHEDULED': '待体验',
+      'PENDING_CONFIRM': '待确认',
+      'VISITED': '已体验',
+      'RE_EXPERIENCE': '待再体验',
+      'PENDING_SOLD': '待成交',
+      'SOLD': '已成交',
+      'CLOSED': '已结束'
+    };
+    return statusMap[status] || status;
+  };
   // 管理员概览内 今日/明日 tab 状态上移，避免子组件因重挂而重置
   const [adminDayTab, setAdminDayTab] = useState('today');
   const [studentColorMap, setStudentColorMap] = useState({});
@@ -3320,12 +3345,15 @@ const Dashboard = ({ user }) => {
     const fetchStudentOperationRules = async () => {
       // 防止重复请求
       if (isLoadingRulesRef.current) {
-        // 如果正在加载，返回当前的规则
+        // 如果正在加载，等待加载完成
+        while (isLoadingRulesRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
         return studentOperationRules;
       }
       
       // 如果已经加载过，直接返回缓存的规则
-      if (rulesLoadedRef.current && studentOperationRules.length > 0) {
+      if (rulesLoadedRef.current) {
         return studentOperationRules;
       }
       
@@ -3339,9 +3367,11 @@ const Dashboard = ({ user }) => {
           rulesLoadedRef.current = true;
           return rules;
         }
+        rulesLoadedRef.current = true;
         return [];
       } catch (error) {
         console.error('加载学员操作规则失败:', error);
+        rulesLoadedRef.current = true;
         return [];
       } finally {
         isLoadingRulesRef.current = false;
@@ -3554,7 +3584,12 @@ const Dashboard = ({ user }) => {
             originalStudent: schedule.studentName, // 保留原始名称
             type: targetMode === 'instance' ? 'instance' : (targetMode === 'trial' ? 'trial' : 'template'),
             timetableName: schedule.timetableName,
-            sourceIsWeekly: schedule.isWeekly === 1
+            sourceIsWeekly: schedule.isWeekly === 1,
+            // 体验课程的客户信息
+            customerId: schedule.customerId,
+            customerPhone: schedule.customerPhone,
+            customerStatus: schedule.customerStatus,
+            customerSource: schedule.customerSource
           };
           
           timeSlotMap.get(timeKey)[safeDayOfWeek].push(scheduleItem);
@@ -3723,8 +3758,42 @@ const Dashboard = ({ user }) => {
                   border: diffBorder,
                   position: 'relative',
                   padding: 0,
+                  cursor: viewMode === 'trial' && schedule.customerId ? 'pointer' : 'default',
                 }}
                 title={`教练: ${schedule.coach} | 学员: ${schedule.student}`}
+                onClick={async (e) => {
+                  // 在体验模式下，总是阻止事件冒泡
+                  if (viewMode === 'trial') {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    if (schedule.customerId) {
+                      // 点击体验课程单元格，打开客源信息展示框
+                      setSelectedCustomerInfo({
+                        customerId: schedule.customerId,
+                        childName: schedule.student,
+                        parentPhone: schedule.customerPhone,
+                        status: schedule.customerStatus,
+                        source: schedule.customerSource
+                      });
+                      setCustomerInfoVisible(true);
+                      
+                      // 获取客户流转记录
+                      setCustomerHistoryLoading(true);
+                      setCustomerHistory([]);
+                      try {
+                        const response = await getCustomerStatusHistory(schedule.customerId);
+                        if (response && response.success) {
+                          setCustomerHistory(response.data || []);
+                        }
+                      } catch (error) {
+                        console.error('获取客户流转记录失败:', error);
+                      } finally {
+                        setCustomerHistoryLoading(false);
+                      }
+                    }
+                  }
+                }}
               >
                 {(() => {
                   const isTruncated = schedule.student.length > 4;
@@ -5016,6 +5085,106 @@ const Dashboard = ({ user }) => {
         studentName={selectedStudent}
         coachName={selectedCoach}
       />
+      
+      {/* 客源信息展示框（用于体验课程） */}
+      <Modal
+        title="体验课程客源信息"
+        open={customerInfoVisible}
+        onCancel={() => {
+          setCustomerInfoVisible(false);
+          setSelectedCustomerInfo(null);
+          setCustomerHistory([]);
+        }}
+        footer={[
+          <Button key="close" type="primary" onClick={() => {
+            setCustomerInfoVisible(false);
+            setSelectedCustomerInfo(null);
+            setCustomerHistory([]);
+          }}>
+            关闭
+          </Button>
+        ]}
+        width={600}
+      >
+        {selectedCustomerInfo && (
+          <div style={{ fontSize: '14px' }}>
+            {/* 基本信息 */}
+            <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontWeight: 'bold', width: '100px', color: '#666' }}>学员姓名：</span>
+                <span style={{ fontSize: '16px', fontWeight: '500' }}>{selectedCustomerInfo.childName}</span>
+              </div>
+              {selectedCustomerInfo.parentPhone && (
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontWeight: 'bold', width: '100px', color: '#666' }}>家长电话：</span>
+                  <span>{selectedCustomerInfo.parentPhone}</span>
+                </div>
+              )}
+              {selectedCustomerInfo.status && (
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontWeight: 'bold', width: '100px', color: '#666' }}>当前状态：</span>
+                  <Tag color="blue">{getStatusText(selectedCustomerInfo.status)}</Tag>
+                </div>
+              )}
+              {selectedCustomerInfo.source && (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 'bold', width: '100px', color: '#666' }}>客户来源：</span>
+                  <span>📍 {selectedCustomerInfo.source}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 流转记录 */}
+            <div>
+              <h4 style={{ marginBottom: '16px', fontSize: '15px', fontWeight: 'bold' }}>流转记录</h4>
+              {customerHistoryLoading ? (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <Spin />
+                </div>
+              ) : customerHistory.length === 0 ? (
+                <Empty description="暂无流转记录" style={{ padding: '20px 0' }} />
+              ) : (
+                <Timeline
+                  style={{ marginTop: '16px' }}
+                  items={customerHistory.map((history, index) => ({
+                    color: index === 0 ? 'blue' : 'gray',
+                    children: (
+                      <div style={{ fontSize: '13px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <div>
+                            <Tag color="default" style={{ marginRight: '4px' }}>
+                              {history.fromStatusText || '无'}
+                            </Tag>
+                            <span style={{ margin: '0 4px' }}>→</span>
+                            <Tag color="blue">{history.toStatusText}</Tag>
+                          </div>
+                          <div style={{ color: '#999', fontSize: '11px', marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                            {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
+                            {history.createdByName && ` · ${history.createdByName}`}
+                          </div>
+                        </div>
+                        {history.notes && (
+                          <div style={{ 
+                            color: '#666', 
+                            fontSize: '12px',
+                            marginTop: '4px',
+                            padding: '8px',
+                            backgroundColor: '#fafafa',
+                            borderRadius: '4px',
+                            border: '1px solid #e8e8e8'
+                          }}>
+                            {history.notes}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }))}
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
       
       {/* 版权信息 */}
       <Footer />

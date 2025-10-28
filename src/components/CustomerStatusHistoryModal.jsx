@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
 import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
 import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
-import { createTodo, getLatestTodoByCustomer, updateTodo } from '../services/todo';
+import { createTodo, getLatestTodoByCustomer, updateTodo, updateTodoReminderTime } from '../services/todo';
 import { getTrialSchedule } from '../services/timetable';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
@@ -10,7 +10,7 @@ import dayjs from 'dayjs';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, onTodoCreated }) => {
+const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, onTodoCreated, onTodoUpdated }) => {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -35,6 +35,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const [availableCoaches, setAvailableCoaches] = useState([]);
   const [selectedCoach, setSelectedCoach] = useState(null);
   const [loadingCoaches, setLoadingCoaches] = useState(false);
+  const [trialStudentName, setTrialStudentName] = useState('');
 
   useEffect(() => {
     if (visible && customer) {
@@ -45,6 +46,9 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       fetchExistingTodo();
       setEditingHistoryId(null);
       setEditingNotes('');
+      
+      // 初始化体验人员名字为客户的孩子名字
+      setTrialStudentName(customer.childName || '');
       
       // 如果当前状态是"待体验"或"待再体验"，回显上次的体验时间
       if (customer.status === 'SCHEDULED' || customer.status === 'RE_EXPERIENCE') {
@@ -254,8 +258,12 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const handleSubmit = async (values) => {
     if (!customer) return;
 
-    // 如果是待体验或待再体验状态，验证是否选择了时间
+    // 如果是待体验或待再体验状态，验证是否填写了体验人员和选择了时间
     if (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') {
+      if (!trialStudentName || !trialStudentName.trim()) {
+        message.warning('请输入体验人员姓名');
+        return;
+      }
       if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
         message.warning('请选择体验日期和时间');
         return;
@@ -294,13 +302,14 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
               },
               body: JSON.stringify({
                 coachId: selectedCoach,
-                studentName: customer.childName,
+                studentName: trialStudentName.trim(),
                 scheduleDate: experienceDate.format('YYYY-MM-DD'),
                 startTime: experienceTimeRange[0].format('HH:mm'),
                 endTime: experienceTimeRange[1].format('HH:mm'),
                 isTrial: true,
                 isHalfHour: true,
-                customerPhone: customer.parentPhone
+                customerPhone: customer.parentPhone,
+                customerId: customer.id
               })
             });
             
@@ -490,10 +499,10 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     return colors[status] || 'default';
   };
 
-  // 获取所有状态选项，只禁用"新建"状态
+  // 获取所有状态选项
   const getAllStatusOptions = () => {
     const allOptions = [
-      { value: 'NEW', label: '新建', disabled: true },
+      { value: 'NEW', label: '新建', disabled: false },
       { value: 'CONTACTED', label: '已联系', disabled: false },
       { value: 'PENDING_CONFIRM', label: '待确认', disabled: false },
       { value: 'SCHEDULED', label: '待体验', disabled: false },
@@ -567,6 +576,20 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
             }}>
               <div style={{ marginBottom: 12, fontSize: '15px', fontWeight: '500', color: '#1890ff' }}>
                 {form.getFieldValue('toStatus') === 'RE_EXPERIENCE' ? '再体验课安排' : '体验课安排'}
+              </div>
+              
+              {/* 体验人员输入框 */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 4, color: 'rgba(0, 0, 0, 0.85)' }}>
+                  <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+                  体验人员
+                </div>
+                <Input 
+                  value={trialStudentName}
+                  onChange={(e) => setTrialStudentName(e.target.value)}
+                  placeholder="请输入体验人员姓名"
+                  style={{ width: '100%' }}
+                />
               </div>
               
               <div style={{ display: 'flex', gap: '12px', marginBottom: 16 }}>
@@ -791,12 +814,36 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                           size="small" 
                           type="primary"
                           icon={<SaveOutlined />}
-                          onClick={() => {
-                            setReminderDate(tempReminderDate);
-                            setReminderTime(tempReminderTime);
-                            setReminderContent(tempReminderContent);
-                            setIsEditingReminder(false);
-                            message.success('提醒信息已更新');
+                          onClick={async () => {
+                            if (!tempReminderDate || !tempReminderTime) {
+                              message.warning('请选择提醒日期和时间');
+                              return;
+                            }
+                            
+                            try {
+                              const reminderDateTime = `${tempReminderDate.format('YYYY-MM-DD')} ${tempReminderTime.format('HH:mm:ss')}`;
+                              await updateTodoReminderTime(existingTodoId, reminderDateTime);
+                              
+                              // 更新本地状态
+                              setReminderDate(tempReminderDate);
+                              setReminderTime(tempReminderTime);
+                              setReminderContent(tempReminderContent);
+                              setIsEditingReminder(false);
+                              
+                              message.success('提醒信息已更新');
+                              
+                              // 通知父组件刷新待办列表中的提醒时间
+                              if (onTodoUpdated) {
+                                onTodoUpdated({
+                                  todoId: existingTodoId,
+                                  reminderDate: tempReminderDate.format('YYYY-MM-DD'),
+                                  reminderTime: tempReminderTime.format('HH:mm:ss')
+                                });
+                              }
+                            } catch (error) {
+                              console.error('更新提醒时间失败:', error);
+                              message.error('更新提醒时间失败');
+                            }
                           }}
                         >
                           确认
