@@ -70,17 +70,16 @@ const SelectOrganization = () => {
       });
 
       if (response.data.success) {
-        message.success('加入机构成功！');
-        
         const { token, user } = response.data.data;
         
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
-        
         sessionStorage.removeItem('wechatUserInfo');
         
+        message.success('加入机构成功！');
+        
         setTimeout(() => {
-          navigate('/dashboard');
+          window.location.href = '/dashboard';
         }, 500);
       } else {
         message.error(response.data.message || '加入机构失败');
