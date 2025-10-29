@@ -16,13 +16,10 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-.status-back-button {
-  margin-bottom: 20px;
-}
-
-.status-info-card {
-  margin: 24px 0;
-  border-radius: 8px;
+.status-descriptions {
+  width: 100%;
+  max-width: 600px;
+  margin: 24px auto;
 }
 
 .status-tag {
@@ -46,27 +43,31 @@
 .action-buttons {
   margin-top: 24px;
   display: flex;
+  flex-direction: column;
   gap: 12px;
   justify-content: center;
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .action-buttons button {
-  min-width: 120px;
-  height: 40px;
+  height: 44px;
   font-size: 16px;
 }
 
 @media (max-width: 768px) {
   .status-content {
-    padding: 24px;
+    padding: 20px 12px;
+  }
+
+  .status-descriptions {
+    max-width: 100%;
   }
 
   .action-buttons {
-    flex-direction: column;
-  }
-
-  .action-buttons button {
-    width: 100%;
+    max-width: 100%;
   }
 }
 

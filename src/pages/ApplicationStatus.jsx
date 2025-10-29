@@ -7,7 +7,8 @@ import {
   CloseCircleOutlined,
   HomeOutlined,
   ReloadOutlined,
-  ArrowLeftOutlined
+  ArrowLeftOutlined,
+  PlusOutlined
 } from '@ant-design/icons';
 import './ApplicationStatus.css';
 
@@ -68,29 +69,44 @@ const ApplicationStatus = () => {
             title="申请审核中"
             subTitle={`您已成功提交加入 ${requestInfo?.organizationName || '机构'} 的申请，请耐心等待管理员审批`}
             extra={[
-              <Card key="info" className="status-info-card">
-                <Descriptions column={1} bordered>
-                  <Descriptions.Item label="申请机构">
-                    {requestInfo?.organizationName}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="机构地址">
-                    {requestInfo?.organizationAddress || '暂无'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="申请时间">
-                    {new Date(requestInfo?.createdAt).toLocaleString('zh-CN')}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="当前状态">
-                    <span className="status-tag status-pending">待审批</span>
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>,
+              <Descriptions key="info" column={1} bordered className="status-descriptions">
+                <Descriptions.Item label="申请机构">
+                  {requestInfo?.organizationName}
+                </Descriptions.Item>
+                <Descriptions.Item label="机构地址">
+                  {requestInfo?.organizationAddress || '暂无'}
+                </Descriptions.Item>
+                <Descriptions.Item label="申请时间">
+                  {new Date(requestInfo?.createdAt).toLocaleString('zh-CN')}
+                </Descriptions.Item>
+                <Descriptions.Item label="当前状态">
+                  <span className="status-tag status-pending">待审批</span>
+                </Descriptions.Item>
+              </Descriptions>,
               <div key="actions" className="action-buttons">
                 <Button 
                   type="primary" 
                   icon={<ReloadOutlined />}
                   onClick={() => window.location.reload()}
+                  block
                 >
                   刷新状态
+                </Button>
+                <Button 
+                  icon={<PlusOutlined />}
+                  onClick={() => navigate('/select-organization', {
+                    state: { wechatUserInfo }
+                  })}
+                  block
+                >
+                  申请其他机构
+                </Button>
+                <Button 
+                  icon={<ArrowLeftOutlined />}
+                  onClick={() => navigate('/login')}
+                  block
+                >
+                  返回登录
                 </Button>
               </div>
             ]}
@@ -104,27 +120,33 @@ const ApplicationStatus = () => {
             title="申请已通过"
             subTitle={`恭喜！您已成功加入 ${requestInfo?.organizationName || '机构'}，现在可以开始使用系统了`}
             extra={[
-              <Card key="info" className="status-info-card">
-                <Descriptions column={1} bordered>
-                  <Descriptions.Item label="所属机构">
-                    {requestInfo?.organizationName}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="审批时间">
-                    {new Date(requestInfo?.approvedAt).toLocaleString('zh-CN')}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="审批人">
-                    {requestInfo?.approvedByUsername || '管理员'}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>,
+              <Descriptions key="info" column={1} bordered className="status-descriptions">
+                <Descriptions.Item label="所属机构">
+                  {requestInfo?.organizationName}
+                </Descriptions.Item>
+                <Descriptions.Item label="审批时间">
+                  {new Date(requestInfo?.approvedAt).toLocaleString('zh-CN')}
+                </Descriptions.Item>
+                <Descriptions.Item label="审批人">
+                  {requestInfo?.approvedByUsername || '管理员'}
+                </Descriptions.Item>
+              </Descriptions>,
               <div key="actions" className="action-buttons">
                 <Button 
                   type="primary" 
                   size="large"
                   icon={<HomeOutlined />}
                   onClick={() => navigate('/dashboard')}
+                  block
                 >
                   进入系统
+                </Button>
+                <Button 
+                  icon={<ArrowLeftOutlined />}
+                  onClick={() => navigate('/login')}
+                  block
+                >
+                  返回登录
                 </Button>
               </div>
             ]}
@@ -138,24 +160,22 @@ const ApplicationStatus = () => {
             title="申请被拒绝"
             subTitle={`很抱歉，您加入 ${requestInfo?.organizationName || '机构'} 的申请未通过审核`}
             extra={[
-              <Card key="info" className="status-info-card">
-                <Descriptions column={1} bordered>
-                  <Descriptions.Item label="申请机构">
-                    {requestInfo?.organizationName}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="拒绝理由">
-                    <span className="reject-reason">
-                      {requestInfo?.rejectReason || '未提供拒绝理由'}
-                    </span>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="审批时间">
-                    {new Date(requestInfo?.approvedAt).toLocaleString('zh-CN')}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="审批人">
-                    {requestInfo?.approvedByUsername || '管理员'}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>,
+              <Descriptions key="info" column={1} bordered className="status-descriptions">
+                <Descriptions.Item label="申请机构">
+                  {requestInfo?.organizationName}
+                </Descriptions.Item>
+                <Descriptions.Item label="拒绝理由">
+                  <span className="reject-reason">
+                    {requestInfo?.rejectReason || '未提供拒绝理由'}
+                  </span>
+                </Descriptions.Item>
+                <Descriptions.Item label="审批时间">
+                  {new Date(requestInfo?.approvedAt).toLocaleString('zh-CN')}
+                </Descriptions.Item>
+                <Descriptions.Item label="审批人">
+                  {requestInfo?.approvedByUsername || '管理员'}
+                </Descriptions.Item>
+              </Descriptions>,
               <div key="actions" className="action-buttons">
                 <Button 
                   type="primary" 
@@ -163,8 +183,16 @@ const ApplicationStatus = () => {
                   onClick={() => navigate('/select-organization', {
                     state: { wechatUserInfo }
                   })}
+                  block
                 >
                   重新申请
+                </Button>
+                <Button 
+                  icon={<ArrowLeftOutlined />}
+                  onClick={() => navigate('/login')}
+                  block
+                >
+                  返回登录
                 </Button>
               </div>
             ]}
@@ -194,13 +222,6 @@ const ApplicationStatus = () => {
   return (
     <div className="application-status-container">
       <div className="status-content">
-        <Button 
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/login')}
-          className="status-back-button"
-        >
-          返回登录
-        </Button>
         {renderStatusContent()}
       </div>
     </div>
