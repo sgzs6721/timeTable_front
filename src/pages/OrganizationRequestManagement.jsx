@@ -141,118 +141,81 @@ const OrganizationRequestManagement = () => {
     }
   };
 
-  const columns = [
-    {
-      title: '申请人',
-      dataIndex: 'wechatNickname',
-      key: 'wechatNickname',
-      render: (text, record) => (
-        <div className="applicant-info">
+  const renderRequestCard = (request) => (
+    <Card 
+      key={request.id}
+      className="request-card"
+      hoverable
+    >
+      <div className="request-card-content">
+        <div className="request-info">
           <Avatar 
-            src={record.wechatAvatar} 
+            src={request.wechatAvatar} 
             icon={<UserOutlined />}
-            size={40}
+            size={48}
           />
-          <div className="applicant-details">
-            <div className="applicant-name">{text || '未知用户'}</div>
-            <div className="applicant-sex">
-              {record.wechatSex === 1 ? '男' : record.wechatSex === 2 ? '女' : '未知'}
+          <div className="request-details">
+            <div className="request-name">{request.wechatNickname || '未知用户'}</div>
+            <div className="request-meta">
+              <span className="request-time">
+                {new Date(request.createdAt).toLocaleString('zh-CN')}
+              </span>
             </div>
+            <div className="request-org">{request.organizationName}</div>
           </div>
         </div>
-      ),
-    },
-    {
-      title: '申请机构',
-      dataIndex: 'organizationName',
-      key: 'organizationName',
-    },
-    {
-      title: '机构地址',
-      dataIndex: 'organizationAddress',
-      key: 'organizationAddress',
-      ellipsis: true,
-    },
-    {
-      title: '申请时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (text) => new Date(text).toLocaleString('zh-CN'),
-      sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => {
-        const statusMap = {
-          'PENDING': { color: 'gold', text: '待审批' },
-          'APPROVED': { color: 'green', text: '已批准' },
-          'REJECTED': { color: 'red', text: '已拒绝' },
-        };
-        const statusInfo = statusMap[status] || { color: 'default', text: status };
-        return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
-      },
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewDetail(record)}
-          >
-            查看
-          </Button>
-          <Button
-            type="link"
-            icon={<CheckOutlined />}
-            onClick={() => handleApprove(record)}
-            style={{ color: '#52c41a' }}
-          >
-            通过
-          </Button>
-          <Button
-            type="link"
-            danger
-            icon={<CloseOutlined />}
-            onClick={() => handleReject(record)}
-          >
-            拒绝
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+        
+        <div className="request-actions">
+          <Tag color="gold">待审批</Tag>
+          <Space size="small">
+            <Button
+              size="small"
+              icon={<CheckOutlined />}
+              type="primary"
+              onClick={() => handleApprove(request)}
+            >
+              通过
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<CloseOutlined />}
+              onClick={() => handleReject(request)}
+            >
+              拒绝
+            </Button>
+          </Space>
+        </div>
+      </div>
+    </Card>
+  );
 
   return (
     <div className="organization-request-management">
-      <Card>
-        <div className="page-header">
-          <h2>机构申请管理</h2>
-          <Button 
-            icon={<ReloadOutlined />}
-            onClick={fetchPendingRequests}
-            loading={loading}
-          >
-            刷新
-          </Button>
+      {loading ? (
+        <div className="loading-container">
+          <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
+            <ReloadOutlined spin style={{ fontSize: 32, color: '#1890ff' }} />
+            <div>加载中...</div>
+          </Space>
         </div>
-
-        <Table
-          columns={columns}
-          dataSource={requests}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条申请`,
-          }}
-        />
-      </Card>
+      ) : requests.length === 0 ? (
+        <div className="empty-container">
+          <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
+            <div style={{ fontSize: 48, color: '#d9d9d9' }}>📋</div>
+            <div style={{ color: '#999' }}>暂无待审批申请</div>
+          </Space>
+        </div>
+      ) : (
+        <>
+          <div className="requests-grid">
+            {requests.map(request => renderRequestCard(request))}
+          </div>
+          <div className="requests-footer">
+            共 {requests.length} 条申请
+          </div>
+        </>
+      )}
 
       {/* 查看详情Modal */}
       <Modal

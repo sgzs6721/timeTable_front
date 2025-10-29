@@ -6,7 +6,8 @@ import {
   CheckCircleOutlined, 
   CloseCircleOutlined,
   HomeOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  ArrowLeftOutlined
 } from '@ant-design/icons';
 import './ApplicationStatus.css';
 
@@ -193,6 +194,13 @@ const ApplicationStatus = () => {
   return (
     <div className="application-status-container">
       <div className="status-content">
+        <Button 
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate('/login')}
+          className="status-back-button"
+        >
+          返回登录
+        </Button>
         {renderStatusContent()}
       </div>
     </div>
