@@ -64,28 +64,30 @@ const SelectOrganization = () => {
     try {
       setSubmitting(true);
       
-      const response = await axios.post(`${API_BASE_URL}/auth/apply-organization`, {
+      const response = await axios.post(`${API_BASE_URL}/auth/wechat/select-organization`, {
         organizationId,
-        wechatUserInfo,
-        applyReason: '申请加入'
+        wechatUserInfo
       });
 
       if (response.data.success) {
-        message.success('申请已提交，请等待管理员审批');
+        message.success('加入机构成功！');
         
-        // 跳转到申请状态页面
-        navigate('/application-status', {
-          state: {
-            requestInfo: response.data.data,
-            wechatUserInfo
-          }
-        });
+        const { token, user } = response.data.data;
+        
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        sessionStorage.removeItem('wechatUserInfo');
+        
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 500);
       } else {
-        message.error(response.data.message || '申请提交失败');
+        message.error(response.data.message || '加入机构失败');
       }
     } catch (error) {
-      console.error('提交申请失败:', error);
-      message.error(error.response?.data?.message || '申请提交失败');
+      console.error('加入机构失败:', error);
+      message.error(error.response?.data?.message || '加入机构失败');
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +106,7 @@ const SelectOrganization = () => {
       <div className="select-organization-header">
         <h1>选择机构</h1>
         <p className="welcome-text">
-          欢迎，{wechatUserInfo?.nickname}！请选择您要申请加入的机构
+          欢迎，{wechatUserInfo?.nickname}！请选择您的机构
         </p>
       </div>
 
@@ -151,7 +153,7 @@ const SelectOrganization = () => {
                 onClick={() => handleSelectOrganization(org.id)}
                 className="apply-button"
               >
-                申请加入
+                确定
               </Button>
             </Card>
           ))
