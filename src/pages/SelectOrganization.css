@@ -1,15 +1,11 @@
-.select-organization-loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
 .select-organization-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .select-organization-header {
@@ -31,75 +27,56 @@
   margin: 0;
 }
 
-.organizations-list {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 24px;
-}
-
-.organization-card {
+.organization-form-wrapper {
+  background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.organization-card:hover {
-  transform: translateY(-4px);
+  padding: 40px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 450px;
 }
 
-.org-info {
-  margin-bottom: 20px;
+.organization-form {
+  width: 100%;
 }
 
-.org-name {
-  font-size: 20px;
-  font-weight: bold;
-  color: #1890ff;
-  margin-bottom: 16px;
-}
-
-.org-detail {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  color: #666;
-  font-size: 14px;
-}
-
-.org-icon {
-  margin-right: 8px;
+.organization-form .ant-form-item-label > label {
   font-size: 16px;
-  color: #1890ff;
+  font-weight: 500;
+  color: #333;
 }
 
-.apply-button {
+.organization-form .ant-input {
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.submit-button {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
-  height: 44px;
+  height: 48px;
   font-size: 16px;
   font-weight: 500;
   border-radius: 8px;
+  margin-top: 10px;
 }
 
-.apply-button:hover {
+.submit-button:hover {
   opacity: 0.9;
   transform: scale(1.02);
 }
 
 @media (max-width: 768px) {
-  .organizations-list {
-    grid-template-columns: 1fr;
-  }
-
   .select-organization-header h1 {
     font-size: 24px;
   }
 
   .welcome-text {
     font-size: 14px;
+  }
+
+  .organization-form-wrapper {
+    padding: 30px 20px;
   }
 }
 

@@ -6,8 +6,6 @@ import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
 import TimetableManagement from './TimetableManagement';
 import SalaryMaster from './SalaryMaster';
-import OrganizationManagement from './OrganizationManagement';
-import OrganizationRequestManagement from './OrganizationRequestManagement';
 import Footer from '../components/Footer';
 import './AdminPanel.css';
 import { getAllRegistrationRequests, emergencyFixWeeklyInstances, autoFixWeeklyInstances, cleanDuplicateSchedules, getAllUsers, createTimetableForUser } from '../services/admin';
@@ -339,16 +337,6 @@ const AdminPanel = ({ user }) => {
         </span>
       ),
       children: <UserManagement activeTab="pending" />,
-    },
-    {
-      key: 'organizations',
-      label: '机构管理',
-      children: <OrganizationManagement />,
-    },
-    {
-      key: 'org-requests',
-      label: '机构申请',
-      children: <OrganizationRequestManagement />,
     },
   ];
 

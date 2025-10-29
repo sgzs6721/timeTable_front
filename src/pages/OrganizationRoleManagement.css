@@ -1,0 +1,138 @@
+.org-role-management {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: #f5f7fa;
+  min-height: calc(100vh - 64px);
+}
+
+.role-header {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.back-btn-circle {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s;
+  color: #333;
+}
+
+.back-btn-circle .anticon {
+  font-size: 20px;
+}
+
+.back-btn-circle:hover {
+  background: #e6e6e6;
+  border-color: #999;
+  color: #1890ff;
+}
+
+.header-center {
+  flex: 1;
+  text-align: center;
+}
+
+.header-center h2 {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px;
+}
+
+.roles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.role-item-card {
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.role-item-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.role-card-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.role-info {
+  flex: 1;
+}
+
+.role-header-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.role-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.role-code {
+  font-size: 12px;
+  color: #999;
+}
+
+.role-desc {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.role-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+@media (max-width: 768px) {
+  .org-role-management {
+    padding: 12px;
+  }
+
+  .role-header {
+    padding: 16px;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .header-content {
+    width: 100%;
+  }
+
+  .roles-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -19,7 +19,8 @@ import UserGuide from './pages/UserGuide';
 import SelectOrganization from './pages/SelectOrganization';
 import ApplicationStatus from './pages/ApplicationStatus';
 import OrganizationManagementAuth from './pages/OrganizationManagementAuth';
-import OrganizationRequestManagement from './pages/OrganizationRequestManagement';
+import RolePermissionSettings from './pages/RolePermissionSettings';
+import OrganizationRoleManagement from './pages/OrganizationRoleManagement';
 import { validateToken } from './services/auth';
 import './App.css';
 
@@ -193,13 +194,25 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           />
           <Route
             path="/organization-management"
-            element={<OrganizationManagementAuth />}
-          />
-          <Route
-            path="/organization-requests"
             element={
               !user ? <Navigate to="/login" /> : 
-              user.role?.toUpperCase() === 'ADMIN' ? <OrganizationRequestManagement /> : 
+              user.role?.toUpperCase() === 'ADMIN' ? <OrganizationManagementAuth /> : 
+              <Navigate to="/dashboard" />
+            }
+          />
+          <Route
+            path="/organizations/:organizationId/permissions"
+            element={
+              !user ? <Navigate to="/login" /> : 
+              user.role?.toUpperCase() === 'ADMIN' ? <RolePermissionSettings /> : 
+              <Navigate to="/dashboard" />
+            }
+          />
+          <Route
+            path="/organizations/:organizationId/roles"
+            element={
+              !user ? <Navigate to="/login" /> : 
+              user.role?.toUpperCase() === 'ADMIN' ? <OrganizationRoleManagement /> : 
               <Navigate to="/dashboard" />
             }
           />

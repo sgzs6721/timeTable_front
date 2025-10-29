@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Input, message, Space, Tag, 
-  Popconfirm, Card, Select, Divider, Avatar, List
+  Popconfirm, Card, Select, Divider, Avatar, List, Tabs
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, 
   TeamOutlined, UserAddOutlined, UserDeleteOutlined,
   ReloadOutlined, EnvironmentOutlined, PhoneOutlined,
-  EyeOutlined
+  EyeOutlined, SettingOutlined, UsergroupAddOutlined
 } from '@ant-design/icons';
 import {
   getAllOrganizations,
@@ -19,11 +20,14 @@ import {
   removeOrganizationAdmin
 } from '../services/organization';
 import { getAllUsers } from '../services/admin';
+import OrganizationRequestManagement from './OrganizationRequestManagement';
 import './OrganizationManagement.css';
 
 const { Option } = Select;
 
 const OrganizationManagement = () => {
+  const [activeTab, setActiveTab] = useState('list');
+  const navigate = useNavigate();
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -147,6 +151,10 @@ const OrganizationManagement = () => {
       console.error('删除机构失败:', error);
       message.error(error.response?.data?.message || '删除机构失败');
     }
+  };
+
+  const handleSettings = (record) => {
+    navigate(`/organizations/${record.id}/permissions`);
   };
 
   const handleManageAdmins = async (record) => {
@@ -299,6 +307,26 @@ const OrganizationManagement = () => {
           详情
         </Button>
         <Button
+          icon={<SettingOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSettings(org);
+          }}
+          className="action-btn settings-btn"
+        >
+          权限设置
+        </Button>
+        <Button
+          icon={<UsergroupAddOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/organizations/${org.id}/roles`);
+          }}
+          className="action-btn role-btn"
+        >
+          角色管理
+        </Button>
+        <Button
           icon={<TeamOutlined />}
           onClick={(e) => {
             e.stopPropagation();
@@ -357,23 +385,8 @@ const OrganizationManagement = () => {
     );
   };
 
-  return (
-    <div className="organization-management">
-      <div className="page-header">
-        <div className="header-left">
-          <h2>机构管理</h2>
-          <span className="org-count">共 {organizations.length} 个机构</span>
-        </div>
-        <Button
-          type="primary"
-          shape="circle"
-          icon={<PlusOutlined />}
-          onClick={handleCreate}
-          className="create-icon-btn"
-          size="large"
-        />
-      </div>
-
+  const renderOrganizationList = () => (
+    <>
       {loading ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
@@ -398,6 +411,47 @@ const OrganizationManagement = () => {
           {organizations.map(org => renderOrganizationCard(org))}
         </div>
       )}
+    </>
+  );
+
+  const tabItems = [
+    {
+      key: 'list',
+      label: '机构列表',
+      children: renderOrganizationList(),
+    },
+    {
+      key: 'requests',
+      label: '机构申请',
+      children: <OrganizationRequestManagement />,
+    },
+  ];
+
+  return (
+    <div className="organization-management">
+      <div className="org-tabs">
+        <div className="page-header">
+          <div className="header-left">
+            <h2>机构管理</h2>
+            <span className="org-count">共 {organizations.length} 个机构</span>
+          </div>
+          <Button
+            type="primary"
+            shape="circle"
+            icon={<PlusOutlined />}
+            onClick={handleCreate}
+            className="create-icon-btn"
+            size="large"
+          />
+        </div>
+
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
+          size="large"
+        />
+      </div>
 
       {/* 查看详情Modal */}
       <Modal

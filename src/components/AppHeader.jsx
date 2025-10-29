@@ -132,13 +132,21 @@ const AppHeader = ({ user, onLogout }) => {
       ),
       onClick: () => navigate('/admin'),
     };
-    // 目标顺序：刷新 -> 分隔线 -> 管理员 -> 归档课表 ...
+    
+    const organizationItem = {
+      key: 'organization-management',
+      icon: <InboxOutlined />,
+      label: '机构管理',
+      onClick: () => navigate('/organization-management'),
+    };
+    
+    // 目标顺序：刷新 -> 分隔线 -> 管理员 -> 机构管理 -> 归档课表 ...
     if (userMenuItems[1]?.type === 'divider') {
-      // 分隔线已存在在刷新后，将管理员插入到分隔线之后，并在其后再加一条分隔线
-      userMenuItems.splice(2, 0, adminItem, { type: 'divider' });
+      // 分隔线已存在在刷新后，将管理员和机构管理插入到分隔线之后，并在其后再加一条分隔线
+      userMenuItems.splice(2, 0, adminItem, organizationItem, { type: 'divider' });
     } else {
-      // 没有分隔线，则先插入分隔线，再插入管理员和分隔线
-      userMenuItems.splice(1, 0, { type: 'divider' }, adminItem, { type: 'divider' });
+      // 没有分隔线，则先插入分隔线，再插入管理员、机构管理和分隔线
+      userMenuItems.splice(1, 0, { type: 'divider' }, adminItem, organizationItem, { type: 'divider' });
     }
   }
 

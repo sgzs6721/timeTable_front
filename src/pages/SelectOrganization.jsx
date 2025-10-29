@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, Button, message, Spin, Empty } from 'antd';
-import { EnvironmentOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons';
+import { Input, Button, message, Form } from 'antd';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import './SelectOrganization.css';
 
 /**
- * 机构选择页面
- * 用于微信登录后新用户选择要申请加入的机构
+ * 机构代码输入页面
+ * 用于微信登录后新用户输入机构代码申请加入
  */
 const SelectOrganization = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [organizations, setOrganizations] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [wechatUserInfo, setWechatUserInfo] = useState(null);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     // 优先从location.state获取，否则从sessionStorage获取
@@ -39,124 +37,99 @@ const SelectOrganization = () => {
     }
 
     setWechatUserInfo(userInfo);
-    fetchOrganizations();
   }, [location.state, navigate]);
 
-  const fetchOrganizations = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/organizations/active`);
-      
-      if (response.data.success) {
-        setOrganizations(response.data.data || []);
-      } else {
-        message.error('获取机构列表失败');
-      }
-    } catch (error) {
-      console.error('获取机构列表失败:', error);
-      message.error('获取机构列表失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSelectOrganization = async (organizationId) => {
+  const handleSubmitCode = async (values) => {
     try {
       setSubmitting(true);
       
-      const response = await axios.post(`${API_BASE_URL}/auth/wechat/select-organization`, {
-        organizationId,
+      const response = await axios.post(`${API_BASE_URL}/auth/wechat/apply-by-code`, {
+        organizationCode: values.organizationCode.trim(),
         wechatUserInfo
       });
 
       if (response.data.success) {
-        const { token, user } = response.data.data;
+        const data = response.data.data;
         
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        sessionStorage.removeItem('wechatUserInfo');
-        
-        message.success('加入机构成功！');
-        
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 500);
+        // 如果直接加入成功（没有管理员，成为管理员）
+        if (data.token && data.user) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          sessionStorage.removeItem('wechatUserInfo');
+          
+          message.success(response.data.message || '加入机构成功！');
+          
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 500);
+        } else {
+          // 提交申请成功，跳转到申请状态页面
+          message.success(response.data.message || '申请已提交！');
+          
+          setTimeout(() => {
+            navigate('/application-status', {
+              state: {
+                requestInfo: data,
+                wechatUserInfo
+              }
+            });
+          }, 1000);
+        }
       } else {
-        message.error(response.data.message || '加入机构失败');
+        message.error(response.data.message || '操作失败');
       }
     } catch (error) {
-      console.error('加入机构失败:', error);
-      message.error(error.response?.data?.message || '加入机构失败');
+      console.error('提交失败:', error);
+      message.error(error.response?.data?.message || '提交失败，请检查机构代码是否正确');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="select-organization-loading">
-        <Spin size="large" tip="加载中..." />
-      </div>
-    );
-  }
-
   return (
     <div className="select-organization-container">
       <div className="select-organization-header">
-        <h1>选择机构</h1>
+        <h1>欢迎进入课表管理系统</h1>
         <p className="welcome-text">
-          欢迎，{wechatUserInfo?.nickname}！请选择您的机构
+          请输入要申请的机构代码
         </p>
       </div>
 
-      <div className="organizations-list">
-        {organizations.length === 0 ? (
-          <Empty description="暂无可选机构" />
-        ) : (
-          organizations.map(org => (
-            <Card
-              key={org.id}
-              className="organization-card"
-              hoverable
-            >
-              <div className="org-info">
-                <h2 className="org-name">{org.name}</h2>
-                
-                {org.address && (
-                  <div className="org-detail">
-                    <EnvironmentOutlined className="org-icon" />
-                    <span>{org.address}</span>
-                  </div>
-                )}
-                
-                {org.contactPhone && (
-                  <div className="org-detail">
-                    <PhoneOutlined className="org-icon" />
-                    <span>{org.contactPhone}</span>
-                  </div>
-                )}
-                
-                {org.contactPerson && (
-                  <div className="org-detail">
-                    <UserOutlined className="org-icon" />
-                    <span>负责人：{org.contactPerson}</span>
-                  </div>
-                )}
-              </div>
+      <div className="organization-form-wrapper">
+        <Form
+          form={form}
+          onFinish={handleSubmitCode}
+          layout="vertical"
+          className="organization-form"
+        >
+          <Form.Item
+            name="organizationCode"
+            label="机构代码"
+            rules={[
+              { required: true, message: '请输入机构代码' },
+              { pattern: /^[A-Za-z0-9_-]+$/, message: '机构代码只能包含字母、数字、下划线和横线' }
+            ]}
+          >
+            <Input
+              size="large"
+              placeholder="请输入机构代码"
+              maxLength={50}
+            />
+          </Form.Item>
 
-              <Button
-                type="primary"
-                size="large"
-                block
-                loading={submitting}
-                onClick={() => handleSelectOrganization(org.id)}
-                className="apply-button"
-              >
-                确定
-              </Button>
-            </Card>
-          ))
-        )}
+          <Form.Item>
+            <Button
+              type="primary"
+              size="large"
+              block
+              htmlType="submit"
+              loading={submitting}
+              className="submit-button"
+            >
+              提交
+            </Button>
+          </Form.Item>
+        </Form>
       </div>
     </div>
   );

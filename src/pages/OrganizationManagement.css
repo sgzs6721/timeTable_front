@@ -8,14 +8,12 @@
 }
 
 .page-header {
-  margin-bottom: 24px;
-  padding: 24px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 0;
+  padding: 20px 24px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .header-left {
@@ -61,12 +59,36 @@
   font-size: 20px;
 }
 
+/* Tabs样式 */
+.org-tabs {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.org-tabs > .ant-tabs {
+  margin-top: 0;
+}
+
+.org-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-top: 10px;
+}
+
+.org-tabs .ant-tabs-content-holder {
+  padding: 0 24px 24px;
+}
+
 /* 卡片容器 */
 .org-cards-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 20px;
   animation: fadeIn 0.4s ease-out;
+  margin-top: 20px;
 }
 
 @keyframes fadeIn {
@@ -138,6 +160,42 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
+}
+
+.settings-btn {
+  background: #f9f0ff;
+  border: 1px solid #d3adf7;
+  color: #722ed1;
+}
+
+.settings-btn:hover {
+  background: #efdbff;
+  border-color: #9254de;
+  color: #531dab;
+}
+
+.settings-btn:active {
+  background: #d3adf7;
+  border-color: #9254de;
+  color: #531dab;
+}
+
+.role-btn {
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  color: #fa8c16;
+}
+
+.role-btn:hover {
+  background: #ffe7ba;
+  border-color: #fa8c16;
+  color: #d46b08;
+}
+
+.role-btn:active {
+  background: #ffd591;
+  border-color: #fa8c16;
+  color: #d46b08;
 }
 
 .action-btn {
@@ -229,8 +287,7 @@
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  background: white;
-  border-radius: 12px;
+  margin-top: 20px;
 }
 
 .loading-spinner {
@@ -261,8 +318,7 @@
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  background: white;
-  border-radius: 12px;
+  margin-top: 20px;
 }
 
 .empty-icon {
@@ -348,7 +404,7 @@
   }
 
   .page-header {
-    padding: 16px;
+    padding: 16px 16px 8px;
   }
 
   .header-left {
@@ -370,6 +426,16 @@
 
   .create-icon-btn .anticon {
     font-size: 18px;
+  }
+
+  .org-tabs .ant-tabs-nav {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 8px;
+  }
+
+  .org-tabs .ant-tabs-content-holder {
+    padding: 0 16px 16px;
   }
 
   .org-cards-container {

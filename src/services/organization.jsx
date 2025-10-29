@@ -95,3 +95,6 @@ export const removeOrganizationAdmin = async (organizationId, userId) => {
   return response.data;
 };
 
+// 导出别名，供其他模块使用
+export const getOrganization = getOrganizationById;
+
