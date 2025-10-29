@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Result, Button, Card, Descriptions } from 'antd';
 import { 
@@ -163,7 +163,7 @@ const ApplicationStatus = () => {
                     state: { wechatUserInfo }
                   })}
                 >
-                  重新选择机构
+                  重新申请
                 </Button>
               </div>
             ]}
