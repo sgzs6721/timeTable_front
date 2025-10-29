@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Space, Timeline, DatePicker, TimePicker } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircleOutlined, 
   ClockCircleOutlined, 
@@ -10,7 +11,8 @@ import {
   ExclamationCircleOutlined,
   BellOutlined,
   EditOutlined,
-  HistoryOutlined
+  HistoryOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 import { 
   getTodos, 
@@ -24,6 +26,7 @@ import dayjs from 'dayjs';
 import './TodoList.css';
 
 const TodoList = ({ onUnreadCountChange }) => {
+  const navigate = useNavigate();
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('today'); // today, all, pending, completed
@@ -51,6 +54,22 @@ const TodoList = ({ onUnreadCountChange }) => {
     } catch (e) {
       console.error(e);
       message.error('复制失败');
+    }
+  };
+
+  const handleGoToCustomer = (todo, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    // 跳转到Dashboard的客源tab，并传递客户ID和客户名称
+    const customerId = todo.customerId;
+    const customerName = todo.customerName;
+    if (customerId && customerName) {
+      navigate(`/dashboard?tab=customers&customerId=${customerId}&customerName=${encodeURIComponent(customerName)}`);
+    } else if (customerId) {
+      navigate(`/dashboard?tab=customers&customerId=${customerId}`);
+    } else {
+      navigate('/dashboard?tab=customers');
     }
   };
 
@@ -513,32 +532,77 @@ const TodoList = ({ onUnreadCountChange }) => {
                   <div className="history-scroll-container">
                     <Timeline
                       style={{ marginTop: 8, marginBottom: -12 }}
-                      items={todo.statusHistory.map((history, index, array) => ({
-                        color: 'blue',
-                        children: (
-                          <div style={{ 
-                            fontSize: '12px', 
-                            paddingBottom: index === array.length - 1 ? '0px' : '4px'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                              <div>
-                                <Tag color="default" style={{ marginRight: 4 }}>{history.fromStatusText || '无'}</Tag>
-                                <span style={{ margin: '0 4px' }}>→</span>
-                                <Tag color="blue">{history.toStatusText}</Tag>
+                      items={[
+                        // 所有流转记录
+                        ...todo.statusHistory.map((history, index, array) => {
+                          const fromLabel = (!history.fromStatus || history.fromStatus === 'null' || history.fromStatus === 'NEW') ? '新建' : history.fromStatusText || '无';
+                          
+                          return {
+                            color: 'blue',
+                            children: (
+                              <div style={{ 
+                                fontSize: '12px', 
+                                paddingBottom: 0
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                  <div>
+                                    <Tag color={fromLabel === '新建' ? "green" : "default"} style={{ marginRight: 4 }}>
+                                      {fromLabel}
+                                    </Tag>
+                                    <span style={{ margin: '0 4px' }}>→</span>
+                                    <Tag color="blue">{history.toStatusText}</Tag>
+                                  </div>
+                                  <div style={{ color: '#999', fontSize: '11px', marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                                    {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
+                                    {history.createdByName && ` · ${history.createdByName}`}
+                                  </div>
+                                </div>
+                                {history.notes && history.notes.trim() && (
+                                  <div style={{ 
+                                    color: '#666', 
+                                    marginTop: 4,
+                                    fontSize: '12px',
+                                    lineHeight: '1.5'
+                                  }}>
+                                    {history.notes.trim()}
+                                  </div>
+                                )}
                               </div>
-                              <div style={{ color: '#999', fontSize: '11px', marginLeft: '8px', whiteSpace: 'nowrap' }}>
-                                {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
-                                {history.createdByName && ` · ${history.createdByName}`}
+                            )
+                          };
+                        }),
+                        // 最底部：手动添加"新建"记录，显示客户notes
+                        {
+                          color: 'blue',
+                          children: (
+                            <div style={{ 
+                              fontSize: '12px', 
+                              paddingBottom: 0
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <div>
+                                  <Tag color="green" style={{ marginRight: 4 }}>新建</Tag>
+                                </div>
+                                <div style={{ color: '#999', fontSize: '11px', marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                                  {todo.statusHistory.length > 0 && todo.statusHistory[todo.statusHistory.length - 1].createdAt 
+                                    ? dayjs(todo.statusHistory[todo.statusHistory.length - 1].createdAt).format('YYYY-MM-DD HH:mm')
+                                    : ''}
+                                </div>
                               </div>
+                              {todo.customerNotes && todo.customerNotes.trim() && (
+                                <div style={{ 
+                                  color: '#666', 
+                                  marginTop: 4,
+                                  fontSize: '12px',
+                                  lineHeight: '1.5'
+                                }}>
+                                  {todo.customerNotes.trim()}
+                                </div>
+                              )}
                             </div>
-                            {history.notes && (
-                              <div style={{ color: '#666', marginBottom: 4 }}>
-                                备注：{history.notes}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      }))}
+                          )
+                        }
+                      ]}
                     />
                   </div>
                 )}
@@ -547,6 +611,14 @@ const TodoList = ({ onUnreadCountChange }) => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: '12px' }}>
+            <Button 
+              type="text" 
+              size="small"
+              icon={<UserOutlined />}
+              title="转到客源"
+              onClick={(e) => handleGoToCustomer(todo, e)}
+              style={{ color: '#722ed1' }}
+            />
             {todo.customerId && (
               <Button 
                 type="text" 

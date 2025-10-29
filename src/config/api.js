@@ -93,6 +93,7 @@ export const getApiBaseUrl = () => {
 // 导出常用配置
 export const REMOTE_HOST = getCurrentConfig().REMOTE_HOST;
 export const API_BASE_PATH = getCurrentConfig().API_BASE_PATH;
+export const API_BASE_URL = getApiBaseUrl(); // 添加API_BASE_URL导出
 export const TIMEOUT = API_CONFIG.TIMEOUT;
 export const HEADERS = API_CONFIG.HEADERS;
 export const PROXY = API_CONFIG.PROXY;
@@ -112,5 +113,5 @@ console.log('当前API配置:', {
   远程主机: REMOTE_HOST,
   API路径: API_BASE_PATH,
   使用代理: getCurrentConfig().USE_PROXY,
-  基础URL: getApiBaseUrl()
+  完整API地址: getApiBaseUrl()
 }); 

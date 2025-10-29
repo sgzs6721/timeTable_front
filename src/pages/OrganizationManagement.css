@@ -1,0 +1,402 @@
+.organization-management {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: #f5f7fa;
+  min-height: calc(100vh - 64px);
+  overflow-x: hidden;
+}
+
+.page-header {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.org-count {
+  font-size: 14px;
+  color: #999;
+  font-weight: normal;
+}
+
+.create-icon-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-icon-btn:hover {
+  transform: translateY(-3px) rotate(90deg);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.6);
+}
+
+.create-icon-btn .anticon {
+  font-size: 20px;
+}
+
+/* 卡片容器 */
+.org-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 机构卡片 */
+.org-card {
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+  transition: box-shadow 0.3s, border-color 0.3s;
+  background: white;
+  user-select: none;
+}
+
+.org-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #667eea;
+}
+
+.org-card .ant-card-body {
+  padding: 20px;
+}
+
+.org-card-header {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.org-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.org-card-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1890ff;
+  flex: 1;
+}
+
+.org-card-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #999;
+  font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.org-card-id {
+  color: #666;
+  font-weight: 500;
+}
+
+.org-card-code {
+  color: #999;
+}
+
+.org-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.action-btn {
+  border-radius: 6px;
+  font-size: 13px;
+  height: 36px;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  position: relative;
+  z-index: 1;
+}
+
+.detail-btn {
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+  color: #1890ff;
+}
+
+.detail-btn:hover {
+  background: #bae7ff;
+  border-color: #40a9ff;
+  color: #096dd9;
+}
+
+.detail-btn:active {
+  background: #91d5ff;
+  border-color: #40a9ff;
+  color: #096dd9;
+}
+
+.admin-btn {
+  background: #f0f5ff;
+  border: 1px solid #adc6ff;
+  color: #597ef7;
+}
+
+.admin-btn:hover {
+  background: #d6e4ff;
+  border-color: #597ef7;
+  color: #2f54eb;
+}
+
+.admin-btn:active {
+  background: #adc6ff;
+  border-color: #597ef7;
+  color: #2f54eb;
+}
+
+.edit-btn {
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  color: #fa8c16;
+}
+
+.edit-btn:hover {
+  background: #ffe7ba;
+  border-color: #fa8c16;
+  color: #d46b08;
+}
+
+.edit-btn:active {
+  background: #ffd591;
+  border-color: #fa8c16;
+  color: #d46b08;
+}
+
+.delete-btn {
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  color: #ff4d4f;
+}
+
+.delete-btn:hover {
+  background: #ffccc7;
+  border-color: #ff4d4f;
+  color: #cf1322;
+}
+
+.delete-btn:active {
+  background: #ffa39e;
+  border-color: #ff4d4f;
+  color: #cf1322;
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 12px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f0f0f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-container p {
+  margin: 0;
+  color: #999;
+  font-size: 14px;
+}
+
+/* 空状态 */
+.empty-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 12px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-container h3 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.empty-container p {
+  margin: 0 0 24px 0;
+  color: #999;
+  font-size: 14px;
+}
+
+/* 详情内容 */
+.org-detail-content {
+  padding: 16px 0;
+}
+
+.detail-item {
+  display: flex;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: #fafafa;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.detail-item:hover {
+  background: #f0f0f0;
+}
+
+.detail-item:last-child {
+  margin-bottom: 0;
+}
+
+.detail-item label {
+  font-weight: 600;
+  color: #666;
+  min-width: 100px;
+  margin-right: 16px;
+}
+
+.detail-item span {
+  color: #333;
+  flex: 1;
+}
+
+.detail-item .ant-tag {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 20px;
+  display: inline-block;
+  width: auto;
+}
+
+.admin-management {
+  padding: 16px 0;
+}
+
+.current-admins h3,
+.add-admin h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.current-admins .ant-list-item {
+  padding: 12px 0;
+}
+
+@media (max-width: 768px) {
+  .organization-management {
+    padding: 12px;
+  }
+
+  .page-header {
+    padding: 16px;
+  }
+
+  .header-left {
+    gap: 4px;
+  }
+
+  .page-header h2 {
+    font-size: 20px;
+  }
+
+  .org-count {
+    font-size: 13px;
+  }
+
+  .create-icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .create-icon-btn .anticon {
+    font-size: 18px;
+  }
+
+  .org-cards-container {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .org-card-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .action-btn {
+    font-size: 12px;
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  .detail-item {
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+  }
+
+  .detail-item label {
+    min-width: auto;
+    margin-right: 0;
+    margin-bottom: 4px;
+  }
+}
+

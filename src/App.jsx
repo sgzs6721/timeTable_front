@@ -16,6 +16,10 @@ import ArchivedTimetables from './pages/ArchivedTimetables';
 import ConvertPreview from './pages/ConvertPreview';
 import WechatTest from './pages/WechatTest';
 import UserGuide from './pages/UserGuide';
+import SelectOrganization from './pages/SelectOrganization';
+import ApplicationStatus from './pages/ApplicationStatus';
+import OrganizationManagementAuth from './pages/OrganizationManagementAuth';
+import OrganizationRequestManagement from './pages/OrganizationRequestManagement';
 import { validateToken } from './services/auth';
 import './App.css';
 
@@ -178,6 +182,26 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           <Route
             path="/wechat-test"
             element={<WechatTest />}
+          />
+          <Route
+            path="/select-organization"
+            element={<SelectOrganization />}
+          />
+          <Route
+            path="/application-status"
+            element={<ApplicationStatus />}
+          />
+          <Route
+            path="/organization-management"
+            element={<OrganizationManagementAuth />}
+          />
+          <Route
+            path="/organization-requests"
+            element={
+              !user ? <Navigate to="/login" /> : 
+              user.role?.toUpperCase() === 'ADMIN' ? <OrganizationRequestManagement /> : 
+              <Navigate to="/dashboard" />
+            }
           />
           <Route
             path="/"

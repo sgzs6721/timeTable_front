@@ -46,7 +46,7 @@ import './CustomerManagement.css';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const CustomerManagement = ({ user, onTodoCreated }, ref) => {
+const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCustomerName }, ref) => {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
@@ -79,6 +79,30 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const [parseText, setParseText] = useState('');
   const [parsing, setParsing] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
+
+  // 监听searchCustomerName参数，自动填入搜索框
+  useEffect(() => {
+    if (searchCustomerName) {
+      setSearchKeyword(decodeURIComponent(searchCustomerName));
+    }
+  }, [searchCustomerName]);
+
+  // 监听highlightCustomerId变化，滚动到对应客户
+  useEffect(() => {
+    if (highlightCustomerId && customers.length > 0) {
+      setTimeout(() => {
+        const customerCard = document.getElementById(`customer-card-${highlightCustomerId}`);
+        if (customerCard) {
+          customerCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // 高亮效果
+          customerCard.style.backgroundColor = '#e6f7ff';
+          setTimeout(() => {
+            customerCard.style.backgroundColor = '';
+          }, 2000);
+        }
+      }, 300);
+    }
+  }, [highlightCustomerId, customers]);
   // 供外部调用：当其它地方创建了待办后，局部刷新某个客户的铃铛和数据
   React.useImperativeHandle(ref, () => ({
     onTodoCreatedExternally: ({ id, childName, parentPhone }) => {
@@ -978,7 +1002,8 @@ const CustomerManagement = ({ user, onTodoCreated }, ref) => {
   const renderCustomerCard = (customer) => (
     <Col key={customer.id} xs={24} sm={12} md={12} lg={12} xl={12}>
       <Card
-        style={{ height: '100%' }}
+        id={`customer-card-${customer.id}`}
+        style={{ height: '100%', transition: 'background-color 0.5s ease' }}
         bodyStyle={{ padding: '12px' }}
       >
         <div style={{ marginBottom: 12 }}>

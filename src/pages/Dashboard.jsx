@@ -1296,6 +1296,21 @@ const Dashboard = ({ user }) => {
     }
     return 'timetables';
   });
+
+  // 监听URL参数变化，处理客户定位
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const customerIdParam = searchParams.get('customerId');
+    
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+    
+    // 如果有customerId参数，切换到客源tab并滚动到对应客户
+    if (customerIdParam && tabParam === 'customers') {
+      setActiveTab('customers');
+    }
+  }, [searchParams]);
   const [coachesStatistics, setCoachesStatistics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [allTimetables, setAllTimetables] = useState([]);
@@ -5017,7 +5032,12 @@ const Dashboard = ({ user }) => {
       tabItems.push({
         key: 'customers',
         label: '我的客户',
-        children: <CustomerManagement user={user} onTodoCreated={refreshTodoCount} />
+        children: <CustomerManagement 
+          user={user} 
+          onTodoCreated={refreshTodoCount} 
+          highlightCustomerId={searchParams.get('customerId')}
+          searchCustomerName={searchParams.get('customerName')}
+        />
       });
     } else {
       // 其他用户显示：我的课表、我的学员、客源、我的课时（客源在“我的课表”左侧，实际顺序：客源、我的课表、我的学员、我的课时）
@@ -5025,7 +5045,13 @@ const Dashboard = ({ user }) => {
         tabItems.push({
           key: 'customers',
           label: '客源',
-          children: <CustomerManagement ref={customersRef} user={user} onTodoCreated={refreshTodoCount} />
+          children: <CustomerManagement 
+            ref={customersRef} 
+            user={user} 
+            onTodoCreated={refreshTodoCount} 
+            highlightCustomerId={searchParams.get('customerId')}
+            searchCustomerName={searchParams.get('customerName')}
+          />
         });
       }
 
