@@ -133,4 +133,28 @@ export const bindWechatToAccount = async (username, password) => {
   }
 };
 
+// 微信用户创建新账号
+export const createAccountForWechat = async (username) => {
+  try {
+    const response = await api.post('/auth/wechat/create-account', { 
+      username 
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// 设置密码（首次设置，不需要原密码）
+export const setPassword = async (newPassword) => {
+  try {
+    const response = await api.post('/auth/set-password', { 
+      newPassword 
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export default api; 

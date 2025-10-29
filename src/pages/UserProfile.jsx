@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, message, Modal, Spin } from 'antd';
-import { UserOutlined, LockOutlined, SaveOutlined, ArrowLeftOutlined, LogoutOutlined, ExclamationCircleOutlined, LinkOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Button, message, Modal, Spin, Radio, Space } from 'antd';
+import { UserOutlined, LockOutlined, SaveOutlined, LinkOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { updateProfile, updatePassword, deactivateAccount, bindWechatToAccount, validateToken } from '../services/auth';
+import { updateProfile, updatePassword, deactivateAccount, bindWechatToAccount, createAccountForWechat, setPassword, validateToken } from '../services/auth';
 import Footer from '../components/Footer';
 import './UserProfile.css';
 
@@ -22,6 +22,7 @@ const UserProfile = ({ user }) => {
   const [bindAccountForm] = Form.useForm();
   const [bindAccountLoading, setBindAccountLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [bindMode, setBindMode] = useState('create'); // 'create' 或 'bind'
 
   // 页面加载时获取最新用户信息
   useEffect(() => {
@@ -45,7 +46,6 @@ const UserProfile = ({ user }) => {
           setCurrentFormValues(values);
           profileForm.setFieldsValue(values);
         } else {
-          // 如果验证失败，使用传入的 user
           if (user) {
             const isWechatTemp = user.username && user.username.startsWith('wx_');
             const values = {
@@ -60,7 +60,6 @@ const UserProfile = ({ user }) => {
         }
       } catch (error) {
         console.error('获取用户信息失败:', error);
-        // 失败时使用传入的 user
         if (user) {
           const isWechatTemp = user.username && user.username.startsWith('wx_');
           const values = {
@@ -87,11 +86,9 @@ const UserProfile = ({ user }) => {
       if (response.success) {
         message.success('资料更新成功');
         
-        // 更新当前组件的用户信息
         const updatedUser = response.data.user;
         setCurrentUser(updatedUser);
         
-        // 更新初始值
         const newInitialValues = {
           username: updatedUser.username,
           nickname: updatedUser.nickname || '',
@@ -99,15 +96,12 @@ const UserProfile = ({ user }) => {
         setInitialValues(newInitialValues);
         setCurrentFormValues(newInitialValues);
         
-        // 更新localStorage中的用户信息
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
-        // 如果有新token，更新token
         if (response.data.token) {
           localStorage.setItem('token', response.data.token);
         }
         
-        // 触发全局用户信息更新事件，让其他组件也能更新
         window.dispatchEvent(new CustomEvent('userUpdated', { detail: updatedUser }));
       } else {
         message.error(response.message || '更新失败');
@@ -131,6 +125,30 @@ const UserProfile = ({ user }) => {
       }
     } catch (error) {
       message.error('密码更新失败，请稍后重试');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleSetPassword = async (values) => {
+    setPasswordLoading(true);
+    try {
+      const response = await setPassword(values.newPassword);
+      if (response.success) {
+        message.success('密码设置成功');
+        passwordForm.resetFields();
+        // 刷新用户信息
+        const tokenResponse = await validateToken();
+        if (tokenResponse.success && tokenResponse.data) {
+          const userData = tokenResponse.data.user || tokenResponse.data;
+          setCurrentUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+        }
+      } else {
+        message.error(response.message || '密码设置失败');
+      }
+    } catch (error) {
+      message.error('密码设置失败，请稍后重试');
     } finally {
       setPasswordLoading(false);
     }
@@ -188,12 +206,10 @@ const UserProfile = ({ user }) => {
     });
   };
 
-  // 监听表单值变化
   const handleFormValuesChange = (changedValues, allValues) => {
     setCurrentFormValues(allValues);
   };
 
-  // 判断表单是否有变更
   const hasFormChanged = () => {
     return (
       currentFormValues.username !== initialValues.username ||
@@ -201,70 +217,74 @@ const UserProfile = ({ user }) => {
     );
   };
 
-  // 判断是否是微信登录用户（临时账号）- 用户名是 wx_ 开头
+  // 判断是否是微信临时用户（未绑定账号）
   const isWechatTempUser = () => {
     return currentUser && currentUser.username && currentUser.username.startsWith('wx_');
   };
 
-  // 判断是否是已绑定微信的正式账号 - 有微信头像但用户名不是 wx_ 开头
-  const isWechatBoundUser = () => {
-    return currentUser && currentUser.wechatAvatar && currentUser.username && !currentUser.username.startsWith('wx_');
+  // 判断是否有微信信息
+  const hasWechatInfo = () => {
+    return currentUser && currentUser.wechatOpenid;
   };
 
-  // 判断昵称是否应该禁用 - 只有临时微信账号
+  // 判断是否已设置密码
+  const hasPassword = () => {
+    return currentUser && currentUser.hasPassword;
+  };
+
   const shouldDisableNickname = () => {
     if (!currentUser) return false;
-    // 只有用户名是 wx_ 开头的临时账号才禁用昵称
     return currentUser.username && currentUser.username.startsWith('wx_');
   };
 
-  // 判断用户名是否应该禁用 - 只有已绑定的微信用户
   const shouldDisableUsername = () => {
     if (!currentUser) return false;
-    // 有微信头像且用户名不是 wx_ 开头
     return Boolean(currentUser.wechatAvatar) && currentUser.username && !currentUser.username.startsWith('wx_');
   };
 
-  // 处理绑定账号
+  // 处理绑定账号（创建新账号或绑定已有账号）
   const handleBindAccount = async (values) => {
     setBindAccountLoading(true);
     try {
-      const response = await bindWechatToAccount(values.username, values.password);
+      let response;
+      
+      if (bindMode === 'create') {
+        // 创建新账号
+        response = await createAccountForWechat(values.username);
+      } else {
+        // 绑定已有账号
+        response = await bindWechatToAccount(values.username, values.password);
+      }
+      
       if (response.success) {
-        message.success('账号绑定成功！');
+        message.success(bindMode === 'create' ? '账号创建成功！' : '账号绑定成功！');
         
-        // 更新token和用户信息
         if (response.data.token) {
           localStorage.setItem('token', response.data.token);
         }
         if (response.data.user) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
           setCurrentUser(response.data.user);
-          
-          // 触发全局用户信息更新事件
           window.dispatchEvent(new CustomEvent('userUpdated', { detail: response.data.user }));
         }
         
-        // 关闭模态框
         setBindAccountModalVisible(false);
         bindAccountForm.resetFields();
         
-        // 刷新页面以更新所有信息
         setTimeout(() => {
           window.location.reload();
         }, 500);
       } else {
-        message.error(response.message || '绑定失败');
+        message.error(response.message || '操作失败');
       }
     } catch (error) {
       console.error('绑定账号失败:', error);
-      message.error('绑定失败，请稍后重试');
+      message.error('操作失败，请稍后重试');
     } finally {
       setBindAccountLoading(false);
     }
   };
 
-  // 如果正在加载用户信息，显示加载状态
   if (pageLoading) {
     return (
       <div className="user-profile-container">
@@ -339,10 +359,9 @@ const UserProfile = ({ user }) => {
                 <Button
                   type="primary"
                   onClick={() => {
-                    // 获取当前表单中的用户名
                     const currentUsername = profileForm.getFieldValue('username');
-                    // 设置到绑定表单中
                     bindAccountForm.setFieldsValue({ username: currentUsername || '' });
+                    setBindMode('create');
                     setBindAccountModalVisible(true);
                   }}
                   icon={<LinkOutlined />}
@@ -372,77 +391,82 @@ const UserProfile = ({ user }) => {
           </Form>
         </Card>
 
-        <Card title="修改密码" className="profile-card">
-          <Form
-            form={passwordForm}
-            layout="vertical"
-            onFinish={handleUpdatePassword}
-          >
-            <Form.Item
-              label="当前密码"
-              name="oldPassword"
-              rules={[
-                { required: true, message: '请输入当前密码' },
-              ]}
+        {/* 密码设置/修改 */}
+        {!isWechatTempUser() && (
+          <Card title={hasPassword() ? "修改密码" : "设置密码"} className="profile-card">
+            <Form
+              form={passwordForm}
+              layout="vertical"
+              onFinish={hasPassword() ? handleUpdatePassword : handleSetPassword}
             >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder="请输入当前密码"
-                size="large"
-              />
-            </Form.Item>
+              {hasPassword() && (
+                <Form.Item
+                  label="当前密码"
+                  name="oldPassword"
+                  rules={[
+                    { required: true, message: '请输入当前密码' },
+                  ]}
+                >
+                  <Input.Password
+                    prefix={<LockOutlined />}
+                    placeholder="请输入当前密码"
+                    size="large"
+                  />
+                </Form.Item>
+              )}
 
-            <Form.Item
-              label="新密码"
-              name="newPassword"
-              rules={[
-                { required: true, message: '请输入新密码' },
-                { min: 6, message: '密码至少6个字符' },
-              ]}
-            >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder="请输入新密码"
-                size="large"
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="确认新密码"
-              name="confirmPassword"
-              rules={[
-                { required: true, message: '请确认新密码' },
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (!value || getFieldValue('newPassword') === value) {
-                      return Promise.resolve();
-                    }
-                    return Promise.reject(new Error('两次输入的密码不一致'));
-                  },
-                }),
-              ]}
-            >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder="请确认新密码"
-                size="large"
-              />
-            </Form.Item>
-
-            <Form.Item style={{ textAlign: 'center', marginBottom: 0 }}>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={passwordLoading}
-                icon={<SaveOutlined />}
-                size="large"
-                className="action-button password-update-button"
+              <Form.Item
+                label="新密码"
+                name="newPassword"
+                rules={[
+                  { required: true, message: '请输入新密码' },
+                  { min: 6, message: '密码至少6个字符' },
+                ]}
               >
-                更新密码
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder="请输入新密码"
+                  size="large"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="确认新密码"
+                name="confirmPassword"
+                rules={[
+                  { required: true, message: '请确认新密码' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('newPassword') === value) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('两次输入的密码不一致'));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder="请确认新密码"
+                  size="large"
+                />
+              </Form.Item>
+
+              <Form.Item style={{ textAlign: 'center', marginBottom: 0 }}>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={passwordLoading}
+                  icon={<SaveOutlined />}
+                  size="large"
+                  className="action-button password-update-button"
+                >
+                  {hasPassword() ? "更新密码" : "设置密码"}
+                </Button>
+              </Form.Item>
+            </Form>
+          </Card>
+        )}
 
         <Card title="账号信息" className="profile-card">
           <div className="account-info-compact">
@@ -461,7 +485,6 @@ const UserProfile = ({ user }) => {
           </div>
         </Card>
 
-        {/* 底部操作按钮 */}
         <div className="bottom-actions">
           <Button
             size="large"
@@ -482,62 +505,81 @@ const UserProfile = ({ user }) => {
         </div>
       </div>
       
-      {/* 版权信息 */}
       <Footer />
 
       {/* 绑定账号模态框 */}
       <Modal
-        title="绑定到已有账号"
+        title="绑定账号"
         open={bindAccountModalVisible}
         onCancel={() => {
           setBindAccountModalVisible(false);
           bindAccountForm.resetFields();
         }}
         footer={null}
-        width={400}
+        width={450}
       >
-        <div style={{ marginBottom: '20px', color: '#666', fontSize: '14px' }}>
-          <p>将当前微信账号绑定到已有的课表账号</p>
-          <p style={{ color: '#faad14' }}>⚠️ 绑定后将使用已有账号的所有数据</p>
+        <div style={{ marginBottom: '20px' }}>
+          <Radio.Group 
+            value={bindMode} 
+            onChange={(e) => {
+              setBindMode(e.target.value);
+              bindAccountForm.resetFields(['password']);
+            }}
+            style={{ width: '100%' }}
+          >
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Radio value="create" style={{ width: '100%', padding: '12px', border: '1px solid #d9d9d9', borderRadius: '4px', background: bindMode === 'create' ? '#f0f5ff' : 'white' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>创建新账号</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>使用输入的用户名创建新账号</div>
+                </div>
+              </Radio>
+              <Radio value="bind" style={{ width: '100%', padding: '12px', border: '1px solid #d9d9d9', borderRadius: '4px', background: bindMode === 'bind' ? '#f0f5ff' : 'white' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>绑定已有账号</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>将微信绑定到已有的课表账号</div>
+                </div>
+              </Radio>
+            </Space>
+          </Radio.Group>
         </div>
+
         <Form
           form={bindAccountForm}
           layout="vertical"
           onFinish={handleBindAccount}
         >
           <Form.Item
-            label="已有账号用户名"
+            label="用户名"
             name="username"
             rules={[
               { required: true, message: '请输入用户名' },
+              { min: 3, message: '用户名至少3个字符' },
+              { max: 20, message: '用户名最多20个字符' },
             ]}
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="请输入已有账号的用户名"
+              placeholder="请输入用户名"
               size="large"
-              disabled
-              style={{
-                backgroundColor: '#f5f5f5',
-                color: '#333',
-                cursor: 'not-allowed'
-              }}
             />
           </Form.Item>
 
-          <Form.Item
-            label="账号密码"
-            name="password"
-            rules={[
-              { required: true, message: '请输入密码' },
-            ]}
-          >
-            <Input.Password
-              prefix={<LockOutlined />}
-              placeholder="请输入账号密码"
-              size="large"
-            />
-          </Form.Item>
+          {bindMode === 'bind' && (
+            <Form.Item
+              label="账号密码"
+              name="password"
+              rules={[
+                { required: true, message: '请输入密码' },
+              ]}
+            >
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder="请输入账号密码"
+                size="large"
+              />
+            </Form.Item>
+          )}
 
           <Form.Item style={{ marginBottom: 0 }}>
             <Button
@@ -552,7 +594,7 @@ const UserProfile = ({ user }) => {
                 borderColor: '#07c160'
               }}
             >
-              确认绑定
+              确认{bindMode === 'create' ? '创建' : '绑定'}
             </Button>
           </Form.Item>
         </Form>
