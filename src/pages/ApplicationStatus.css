@@ -22,6 +22,10 @@
   margin: 24px auto;
 }
 
+.status-descriptions .ant-descriptions-item-label {
+  white-space: nowrap;
+}
+
 .status-tag {
   padding: 4px 12px;
   border-radius: 4px;
