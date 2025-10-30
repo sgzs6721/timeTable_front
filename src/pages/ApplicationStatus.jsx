@@ -21,6 +21,7 @@ const ApplicationStatus = () => {
   const location = useLocation();
   const [requestInfo, setRequestInfo] = useState(null);
   const [wechatUserInfo, setWechatUserInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // 优先从location.state获取，否则从sessionStorage获取
@@ -56,6 +57,7 @@ const ApplicationStatus = () => {
 
     setRequestInfo(reqInfo);
     setWechatUserInfo(userInfo);
+    setLoading(false);
   }, [location.state, navigate]);
 
   const renderStatusContent = () => {
@@ -86,14 +88,12 @@ const ApplicationStatus = () => {
               <div key="actions" className="action-buttons">
                 <Button 
                   type="primary" 
-                  icon={<ReloadOutlined />}
                   onClick={() => window.location.reload()}
                   block
                 >
                   刷新状态
                 </Button>
                 <Button 
-                  icon={<PlusOutlined />}
                   onClick={() => navigate('/select-organization', {
                     state: { wechatUserInfo }
                   })}
@@ -102,7 +102,6 @@ const ApplicationStatus = () => {
                   申请其他机构
                 </Button>
                 <Button 
-                  icon={<ArrowLeftOutlined />}
                   onClick={() => navigate('/login')}
                   block
                 >
@@ -135,14 +134,12 @@ const ApplicationStatus = () => {
                 <Button 
                   type="primary" 
                   size="large"
-                  icon={<HomeOutlined />}
                   onClick={() => navigate('/dashboard')}
                   block
                 >
                   进入系统
                 </Button>
                 <Button 
-                  icon={<ArrowLeftOutlined />}
                   onClick={() => navigate('/login')}
                   block
                 >
@@ -188,7 +185,6 @@ const ApplicationStatus = () => {
                   重新申请
                 </Button>
                 <Button 
-                  icon={<ArrowLeftOutlined />}
                   onClick={() => navigate('/login')}
                   block
                 >
@@ -218,6 +214,11 @@ const ApplicationStatus = () => {
         );
     }
   };
+
+  // 加载中时不渲染内容，避免闪现"状态未知"
+  if (loading) {
+    return null;
+  }
 
   return (
     <div className="application-status-container">

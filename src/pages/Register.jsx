@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, message, Divider, Result } from 'antd';
-import { UserOutlined, LockOutlined, SmileOutlined, CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, SmileOutlined, CheckCircleOutlined, ArrowLeftOutlined, BankOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../services/auth';
 import WechatLogin from '../components/WechatLogin';
@@ -22,7 +22,8 @@ const Register = ({ onLogin }) => {
       if (response.success) {
         setUserInfo({
           username: values.username,
-          nickname: values.nickname
+          nickname: values.nickname,
+          organizationCode: values.organizationCode
         });
         setRegistrationSuccess(true);
         message.success('注册申请已提交，请等待管理员确认');
@@ -74,6 +75,9 @@ const Register = ({ onLogin }) => {
                 </p>
                 <p style={{ marginBottom: '8px' }}>
                   <strong>昵称：</strong>{userInfo?.nickname}
+                </p>
+                <p style={{ marginBottom: '8px' }}>
+                  <strong>机构代码：</strong>{userInfo?.organizationCode}
                 </p>
                 <p style={{ marginBottom: '16px' }}>
                   <strong>申请时间：</strong>{new Date().toLocaleString()}
@@ -187,6 +191,19 @@ const Register = ({ onLogin }) => {
           </Form.Item>
 
           <Form.Item
+            name="organizationCode"
+            rules={[
+              { required: true, message: '请输入机构代码!' },
+              { pattern: /^[A-Za-z0-9]+$/, message: '机构代码只能包含字母和数字!' }
+            ]}
+          >
+            <Input 
+              prefix={<BankOutlined />} 
+              placeholder="机构代码" 
+            />
+          </Form.Item>
+
+          <Form.Item
             name="password"
             rules={[
               { required: true, message: '请输入密码!' },
@@ -252,10 +269,6 @@ const Register = ({ onLogin }) => {
               立即登录
             </Link>
           </div>
-
-          <Divider>其他登录方式</Divider>
-          
-          <WechatLogin onLogin={onLogin} disabled={true} />
 
           {/* 底部版权信息 */}
           <div style={{ height: '16px' }} />

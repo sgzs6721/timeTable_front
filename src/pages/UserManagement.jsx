@@ -673,7 +673,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
               暂无注册申请记录
             </div>
           ) : !requestsLoading && (
-            <div style={{ padding: '16px 0' }}>
+            <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               {registrationRequests.map((request) => {
                 const isPending = request.status === 'PENDING';
                 const isApproved = request.status === 'APPROVED';
@@ -689,69 +689,87 @@ const UserManagement = ({ activeTab = 'users' }) => {
                       backgroundColor: '#fff',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                       transition: 'all 0.3s ease',
-                      opacity: isPending ? 1 : 0.7
+                      opacity: isPending ? 1 : 0.7,
+                      position: 'relative',
+                      width: '100%',
+                      maxWidth: '600px'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
-                            {isPending && <ClockCircleOutlined style={{ color: '#faad14', fontSize: '16px', marginRight: '6px' }} />}
-                            {isApproved && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '6px' }} />}
-                            {isRejected && <StopOutlined style={{ color: '#ff4d4f', fontSize: '16px', marginRight: '6px' }} />}
-                            <span style={{ 
-                              fontWeight: 'bold', 
-                              fontSize: '15px',
-                              color: '#262626',
-                              marginRight: '12px',
-                              maxWidth: '120px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              display: 'inline-block'
-                            }}>
-                              {request.username}
-                            </span>
-                            <span style={{ 
-                              color: '#8c8c8c', 
-                              fontSize: '13px',
-                              maxWidth: '150px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              display: 'inline-block'
-                            }}>
-                              昵称：{request.nickname || '未设置'}
-                            </span>
-                          </div>
-                          <Tag 
-                            color={isPending ? 'orange' : isApproved ? 'green' : 'red'} 
-                            size="small"
-                          >
-                            {isPending ? '待审批' : isApproved ? '已批准' : '已拒绝'}
-                          </Tag>
-                        </div>
-                        <div style={{ 
-                          color: '#8c8c8c', 
-                          fontSize: '13px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          <span>申请时间：</span>
-                          <span style={{ color: '#262626' }}>
-                            {new Date(request.createdAt).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                      {isPending && (
-                        <div style={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: '4px',
-                          justifyContent: 'center',
-                          alignItems: 'center'
-                        }}>
+                    {/* 状态标签 - 右上角 */}
+                    <Tag 
+                      color={isPending ? 'orange' : isApproved ? 'green' : 'red'} 
+                      size="small"
+                      style={{
+                        position: 'absolute',
+                        top: '14px',
+                        right: '16px'
+                      }}
+                    >
+                      {isPending ? '待审批' : isApproved ? '已批准' : '已拒绝'}
+                    </Tag>
+                    
+                    {/* 用户名行 */}
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px', paddingRight: '80px' }}>
+                      {isPending && <ClockCircleOutlined style={{ color: '#faad14', fontSize: '16px', marginRight: '6px', flexShrink: 0 }} />}
+                      {isApproved && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: '6px', flexShrink: 0 }} />}
+                      {isRejected && <StopOutlined style={{ color: '#ff4d4f', fontSize: '16px', marginRight: '6px', flexShrink: 0 }} />}
+                      <span style={{ 
+                        fontWeight: 'bold', 
+                        fontSize: '15px',
+                        color: '#262626',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {request.username}
+                      </span>
+                    </div>
+                    
+                    {/* 昵称行 */}
+                    <div style={{ 
+                      color: '#8c8c8c', 
+                      fontSize: '13px',
+                      marginBottom: '6px',
+                      paddingLeft: '22px',
+                      paddingRight: '80px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      昵称：{request.nickname || '未设置'}
+                    </div>
+                    
+                    {/* 申请时间行 */}
+                    <div style={{ 
+                      color: '#8c8c8c', 
+                      fontSize: '13px',
+                      paddingLeft: '22px',
+                      paddingRight: '80px',
+                      marginBottom: isPending ? '12px' : '0',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <span>申请时间：</span>
+                      <span style={{ color: '#262626' }}>
+                        {new Date(request.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {/* 按钮区域 - 下方右对齐 */}
+                    {isPending && (
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '12px',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        paddingTop: '8px',
+                        borderTop: '1px solid #f0f0f0',
+                        marginLeft: '-16px',
+                        marginRight: '-16px',
+                        paddingLeft: '16px',
+                        paddingRight: '16px'
+                      }}>
                           <Button
                             type="primary"
                             icon={<CheckOutlined />}
@@ -764,10 +782,9 @@ const UserManagement = ({ activeTab = 'users' }) => {
                             style={{ 
                               backgroundColor: '#52c41a', 
                               borderColor: '#52c41a',
-                              width: '70px',
-                              height: '28px',
-                              fontSize: '12px',
-                              padding: '0 8px'
+                              width: '80px',
+                              height: '32px',
+                              fontSize: '13px'
                             }}
                             title="批准注册申请"
                           >
@@ -784,10 +801,9 @@ const UserManagement = ({ activeTab = 'users' }) => {
                             }}
                             size="small"
                             style={{
-                              width: '70px',
-                              height: '28px',
-                              fontSize: '12px',
-                              padding: '0 8px'
+                              width: '80px',
+                              height: '32px',
+                              fontSize: '13px'
                             }}
                             title="拒绝注册申请"
                           >
@@ -795,7 +811,6 @@ const UserManagement = ({ activeTab = 'users' }) => {
                           </Button>
                         </div>
                       )}
-                    </div>
                   </div>
                 );
               })}
