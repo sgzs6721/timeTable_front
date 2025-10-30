@@ -645,9 +645,11 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       const customerData = {
         childName: values.childName,
         parentPhone: values.parentPhone,
-        status: editingCustomer ? editingCustomer.status : 'NEW', // 新建时固定为NEW，编辑时保持原状态
+        status: editingCustomer ? editingCustomer.status : 'NEW',
         notes: values.notes,
-        source: values.source || null
+        source: values.source || null,
+        // 自动带入当前用户机构ID
+        organizationId: user?.organizationId,
       };
 
       let response;
