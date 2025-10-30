@@ -3,6 +3,7 @@ import { Layout, Menu, Button, Dropdown, Avatar, Badge, message } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getAllRegistrationRequests } from '../services/admin';
+import { getPendingRequestsCount } from '../services/organization';
 import logo from '../assets/logo.png';
 
 const { Header } = Layout;
@@ -11,6 +12,7 @@ const AppHeader = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [pendingCount, setPendingCount] = useState(0);
+  const [orgPendingCount, setOrgPendingCount] = useState(0);
   const [avatarError, setAvatarError] = useState(false);
   
   // 重置头像错误状态
@@ -34,15 +36,31 @@ const AppHeader = ({ user, onLogout }) => {
     }
   };
 
+  // 获取待审批机构申请数量
+  const fetchOrgPendingCount = async () => {
+    if (user?.role?.toUpperCase() === 'ADMIN') {
+      try {
+        const count = await getPendingRequestsCount();
+        setOrgPendingCount(count);
+      } catch (error) {
+        console.error('获取待审批机构申请数量失败:', error);
+      }
+    }
+  };
+
   // 组件挂载时获取数据
   useEffect(() => {
     fetchPendingCount();
+    fetchOrgPendingCount();
   }, [user]);
 
   // 定期检查待审批数量（每30秒检查一次）
   useEffect(() => {
     if (user?.role?.toUpperCase() === 'ADMIN') {
-      const interval = setInterval(fetchPendingCount, 30000);
+      const interval = setInterval(() => {
+        fetchPendingCount();
+        fetchOrgPendingCount();
+      }, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
@@ -136,7 +154,25 @@ const AppHeader = ({ user, onLogout }) => {
     const organizationItem = {
       key: 'organization-management',
       icon: <InboxOutlined />,
-      label: '机构管理',
+      label: (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>机构管理</span>
+          {orgPendingCount > 0 && (
+            <Badge 
+              count={orgPendingCount} 
+              size="small" 
+              style={{ 
+                backgroundColor: '#ff4d4f',
+                fontSize: '10px',
+                lineHeight: '14px',
+                minWidth: '16px',
+                height: '16px',
+                padding: '0 4px'
+              }}
+            />
+          )}
+        </div>
+      ),
       onClick: () => navigate('/organization-management'),
     };
     

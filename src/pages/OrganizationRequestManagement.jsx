@@ -17,7 +17,7 @@ const { Option } = Select;
 /**
  * 机构申请管理页面（管理员）
  */
-const OrganizationRequestManagement = () => {
+const OrganizationRequestManagement = ({ onUpdate }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [approveModalVisible, setApproveModalVisible] = useState(false);
@@ -44,6 +44,10 @@ const OrganizationRequestManagement = () => {
 
       if (response.data.success) {
         setRequests(response.data.data || []);
+        // 通知父组件更新数量
+        if (onUpdate) {
+          onUpdate();
+        }
       } else {
         message.error('获取申请列表失败');
       }

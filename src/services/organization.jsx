@@ -107,3 +107,14 @@ export const checkRequestStatus = async (wechatUserInfo) => {
   return response.data;
 };
 
+// 获取待审批的机构申请数量
+export const getPendingRequestsCount = async () => {
+  const response = await axios.get(`${API_BASE_URL}/organization-requests/pending`, {
+    headers: getAuthHeaders()
+  });
+  if (response.data.success) {
+    return response.data.data?.length || 0;
+  }
+  return 0;
+};
+

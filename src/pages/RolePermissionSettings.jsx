@@ -23,6 +23,7 @@ const RolePermissionSettings = () => {
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState({});
   const [originalPermissions, setOriginalPermissions] = useState({});
+  const [savingRole, setSavingRole] = useState(null);
 
   // 菜单配置
   const menuItems = [
@@ -39,6 +40,7 @@ const RolePermissionSettings = () => {
   const actionItems = [
     { key: 'refresh', label: '刷新', icon: '🔄' },
     { key: 'admin', label: '管理员', icon: '⚙️' },
+    { key: 'organization-management', label: '机构管理', icon: '🏢' },
     { key: 'archived', label: '归档课表', icon: '📦' },
     { key: 'profile', label: '个人账号', icon: '👤' },
     { key: 'guide', label: '使用说明', icon: '📖' },
@@ -96,12 +98,22 @@ const RolePermissionSettings = () => {
         loadedRoles.forEach(role => {
           menuItems.forEach(item => {
             if (permissionsMap[role.roleCode].menuPermissions[item.key] === undefined) {
-              permissionsMap[role.roleCode].menuPermissions[item.key] = true;
+              // 总览默认关闭
+              if (item.key === 'dashboard') {
+                permissionsMap[role.roleCode].menuPermissions[item.key] = false;
+              } else {
+                permissionsMap[role.roleCode].menuPermissions[item.key] = true;
+              }
             }
           });
           actionItems.forEach(item => {
             if (permissionsMap[role.roleCode].actionPermissions[item.key] === undefined) {
-              permissionsMap[role.roleCode].actionPermissions[item.key] = true;
+              // 管理员、机构管理默认关闭
+              if (item.key === 'admin' || item.key === 'organization-management') {
+                permissionsMap[role.roleCode].actionPermissions[item.key] = false;
+              } else {
+                permissionsMap[role.roleCode].actionPermissions[item.key] = true;
+              }
             }
           });
         });
@@ -157,6 +169,7 @@ const RolePermissionSettings = () => {
 
   const handleSavePermission = async (role) => {
     try {
+      setSavingRole(role);
       const permissionData = [{
         organizationId: parseInt(organizationId),
         role: role,
@@ -179,6 +192,8 @@ const RolePermissionSettings = () => {
     } catch (error) {
       console.error('保存权限失败:', error);
       message.error('保存权限失败');
+    } finally {
+      setSavingRole(null);
     }
   };
 
@@ -219,6 +234,8 @@ const RolePermissionSettings = () => {
               icon={<SaveOutlined />}
               onClick={() => handleSavePermission(role.roleCode)}
               disabled={!hasMenuPermissionChanged(role.roleCode)}
+              loading={savingRole === role.roleCode}
+              className="save-btn"
             >
               保存
             </Button>
@@ -252,6 +269,8 @@ const RolePermissionSettings = () => {
               icon={<SaveOutlined />}
               onClick={() => handleSavePermission(role.roleCode)}
               disabled={!hasActionPermissionChanged(role.roleCode)}
+              loading={savingRole === role.roleCode}
+              className="save-btn"
             >
               保存
             </Button>
@@ -275,14 +294,6 @@ const RolePermissionSettings = () => {
       </Card>
     );
   };
-
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
-        <Spin size="large" tip="加载中..." />
-      </div>
-    );
-  }
 
   return (
     <div className="role-permission-settings">
@@ -309,9 +320,28 @@ const RolePermissionSettings = () => {
         </div>
       </div>
 
-      <div className="roles-container">
-        {roles.map(role => renderRoleCard(role))}
-      </div>
+      {loading ? (
+        <div className="loading-state">
+          <Spin size="large" tip="加载中..." />
+        </div>
+      ) : roles.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">📋</div>
+          <h3>暂无角色权限设置</h3>
+          <p>该机构还没有配置任何角色，请先在角色管理中创建角色</p>
+          <Button
+            type="primary"
+            size="large"
+            onClick={() => navigate(`/organizations/${organizationId}/roles`)}
+          >
+            前往角色管理
+          </Button>
+        </div>
+      ) : (
+        <div className="roles-container">
+          {roles.map(role => renderRoleCard(role))}
+        </div>
+      )}
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Input, message, Space, Tag, 
-  Popconfirm, Card, Select, Divider, Avatar, List, Tabs
+  Popconfirm, Card, Select, Divider, Avatar, List, Tabs, Badge
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, 
@@ -17,7 +17,8 @@ import {
   deleteOrganization,
   getOrganizationAdmins,
   setOrganizationAdmin,
-  removeOrganizationAdmin
+  removeOrganizationAdmin,
+  getPendingRequestsCount
 } from '../services/organization';
 import { getAllUsers } from '../services/admin';
 import OrganizationRequestManagement from './OrganizationRequestManagement';
@@ -40,11 +41,29 @@ const OrganizationManagement = () => {
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [avatarErrors, setAvatarErrors] = useState({});
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [form] = Form.useForm();
 
   useEffect(() => {
     fetchOrganizations();
     fetchUsers();
+    fetchPendingRequestsCount();
+  }, []);
+
+  // 获取待审批的机构申请数量
+  const fetchPendingRequestsCount = async () => {
+    try {
+      const count = await getPendingRequestsCount();
+      setPendingRequestsCount(count);
+    } catch (error) {
+      console.error('获取待审批数量失败:', error);
+    }
+  };
+
+  // 定期检查待审批数量（每30秒检查一次）
+  useEffect(() => {
+    const interval = setInterval(fetchPendingRequestsCount, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchOrganizations = async (showLoading = true) => {
@@ -422,8 +441,18 @@ const OrganizationManagement = () => {
     },
     {
       key: 'requests',
-      label: '机构申请',
-      children: <OrganizationRequestManagement />,
+      label: (
+        <Badge 
+          count={pendingRequestsCount} 
+          offset={[10, 0]}
+          style={{ 
+            backgroundColor: '#ff4d4f',
+          }}
+        >
+          <span>机构申请</span>
+        </Badge>
+      ),
+      children: <OrganizationRequestManagement onUpdate={fetchPendingRequestsCount} />,
     },
   ];
 

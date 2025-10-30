@@ -190,14 +190,6 @@ const OrganizationRoleManagement = () => {
     </Card>
   );
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
-        <Spin size="large" tip="加载中..." />
-      </div>
-    );
-  }
-
   return (
     <div className="org-role-management">
       <div className="role-header">
@@ -225,20 +217,29 @@ const OrganizationRoleManagement = () => {
           type="primary"
           icon={<PlusOutlined />}
           onClick={handleCreate}
+          disabled={loading}
         >
           新建角色
         </Button>
       </div>
 
-      <div className="roles-grid">
-        {roles.length > 0 ? (
-          roles.map(role => renderRoleCard(role))
-        ) : (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <Text type="secondary">暂无角色</Text>
-          </div>
-        )}
-      </div>
+      {loading ? (
+        <div className="loading-state">
+          <Spin size="large" tip="加载中..." />
+        </div>
+      ) : (
+        <div className="roles-grid">
+          {roles.length > 0 ? (
+            roles.map(role => renderRoleCard(role))
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">👥</div>
+              <h3>暂无角色</h3>
+              <p>该机构还没有创建任何角色，点击上方"新建角色"按钮开始创建</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <Modal
         title={editingRole ? '编辑角色' : '新建角色'}
