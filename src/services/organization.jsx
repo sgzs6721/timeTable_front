@@ -98,3 +98,12 @@ export const removeOrganizationAdmin = async (organizationId, userId) => {
 // 导出别名，供其他模块使用
 export const getOrganization = getOrganizationById;
 
+// 查询微信用户的申请状态
+export const checkRequestStatus = async (wechatUserInfo) => {
+  const response = await axios.post(
+    `${API_BASE_URL}/auth/wechat/check-request-status`,
+    { wechatUserInfo }
+  );
+  return response.data;
+};
+

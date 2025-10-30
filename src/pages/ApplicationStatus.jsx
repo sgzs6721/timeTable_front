@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Result, Button, Card, Descriptions } from 'antd';
+import { Result, Button, Card, Descriptions, message } from 'antd';
 import { 
   ClockCircleOutlined, 
   CheckCircleOutlined, 
@@ -10,6 +10,7 @@ import {
   ArrowLeftOutlined,
   PlusOutlined
 } from '@ant-design/icons';
+import { checkRequestStatus } from '../services/organization';
 import './ApplicationStatus.css';
 
 /**
@@ -22,6 +23,33 @@ const ApplicationStatus = () => {
   const [requestInfo, setRequestInfo] = useState(null);
   const [wechatUserInfo, setWechatUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // 刷新申请状态
+  const handleRefreshStatus = async () => {
+    if (!wechatUserInfo) {
+      message.error('缺少用户信息');
+      return;
+    }
+
+    setRefreshing(true);
+    try {
+      const response = await checkRequestStatus(wechatUserInfo);
+      if (response.success) {
+        setRequestInfo(response.data);
+        // 更新sessionStorage
+        sessionStorage.setItem('requestInfo', JSON.stringify(response.data));
+        message.success('刷新成功');
+      } else {
+        message.error(response.message || '刷新失败');
+      }
+    } catch (error) {
+      console.error('刷新状态失败:', error);
+      message.error('刷新失败，请稍后重试');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     // 优先从location.state获取，否则从sessionStorage获取
@@ -88,7 +116,8 @@ const ApplicationStatus = () => {
               <div key="actions" className="action-buttons">
                 <Button 
                   type="primary" 
-                  onClick={() => window.location.reload()}
+                  onClick={handleRefreshStatus}
+                  loading={refreshing}
                   block
                 >
                   刷新状态
