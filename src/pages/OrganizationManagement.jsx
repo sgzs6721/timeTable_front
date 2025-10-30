@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Input, message, Space, Tag, 
-  Popconfirm, Card, Select, Divider, Avatar, List, Tabs, Badge
+  Popconfirm, Card, Select, Divider, Avatar, List, Tabs, Badge, Spin
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, 
@@ -40,6 +40,7 @@ const OrganizationManagement = () => {
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [addingAdmin, setAddingAdmin] = useState(false);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [avatarErrors, setAvatarErrors] = useState({});
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [form] = Form.useForm();
@@ -93,35 +94,15 @@ const OrganizationManagement = () => {
       if (response.success) {
         const userData = response.data || [];
         setUsers(userData);
-        
-        console.log('=====================================');
-        console.log('📊 已加载用户列表，总数:', userData.length);
-        console.log('前5个用户完整数据:', userData.slice(0, 5));
-        
-        // 统计每个机构的用户数量
-        const orgStats = {};
-        userData.forEach(user => {
-          const orgId = user.organizationId || 'null';
-          orgStats[orgId] = (orgStats[orgId] || 0) + 1;
-        });
-        console.log('📈 各机构用户统计:', orgStats);
-        
-        // 统计各角色数量
-        const roleStats = {};
-        userData.forEach(user => {
-          const role = user.role || 'null';
-          roleStats[role] = (roleStats[role] || 0) + 1;
-        });
-        console.log('👥 角色统计:', roleStats);
-        console.log('=====================================');
       }
     } catch (error) {
-      console.error('❌ 获取用户列表失败:', error);
+      console.error('获取用户列表失败:', error);
     }
   };
 
   const fetchAdmins = async (organizationId) => {
     try {
+      setLoadingAdmins(true);
       const response = await getOrganizationAdmins(organizationId);
       if (response.success) {
         setAdmins(response.data || []);
@@ -133,6 +114,8 @@ const OrganizationManagement = () => {
     } catch (error) {
       console.error('获取管理员列表失败:', error);
       message.error('获取管理员列表失败');
+    } finally {
+      setLoadingAdmins(false);
     }
   };
 
@@ -176,51 +159,13 @@ const OrganizationManagement = () => {
     navigate(`/organizations/${record.id}/permissions`);
   };
 
-  const handleManageAdmins = async (record) => {
+  const handleManageAdmins = (record) => {
     setSelectedOrganization(record);
     setSelectedUserId(null);
-    await fetchAdmins(record.id);
-    
-    // 调试信息：查看该机构的所有用户
-    console.log('=== 机构管理员调试信息 ===');
-    console.log('当前机构ID:', record.id, '类型:', typeof record.id);
-    console.log('所有用户总数:', users.length);
-    
-    // 检查用户的organizationId
-    users.forEach((user, index) => {
-      if (index < 5) { // 只打印前5个用户样例
-        console.log(`用户${index}:`, {
-          id: user.id,
-          name: user.nickname || user.username,
-          organizationId: user.organizationId,
-          organizationIdType: typeof user.organizationId,
-          role: user.role,
-          status: user.status
-        });
-      }
-    });
-    
-    const orgUsers = users.filter(u => {
-      // 使用 == 而不是 === 来比较，避免类型不匹配
-      return u.organizationId == record.id;
-    });
-    console.log('属于该机构的用户数量:', orgUsers.length);
-    console.log('属于该机构的用户:', orgUsers);
-    
-    setTimeout(() => {
-      const adminIds = admins.map(admin => admin.id);
-      console.log('当前管理员ID列表:', adminIds);
-      
-      const available = users.filter(user => 
-        user.organizationId == record.id && 
-        !adminIds.includes(user.id) &&
-        user.status === 'ACTIVE'
-      );
-      console.log('可添加的用户数量:', available.length);
-      console.log('可添加的用户:', available);
-    }, 500);
-    
+    setAdmins([]); // 清空旧数据
     setAdminModalVisible(true);
+    // 打开modal后再加载数据
+    fetchAdmins(record.id);
   };
 
   const handleSubmit = async () => {
@@ -625,7 +570,11 @@ const OrganizationManagement = () => {
         <div className="admin-management">
           <div className="current-admins">
             <h3>当前管理员</h3>
-            {admins.length === 0 ? (
+            {loadingAdmins ? (
+              <div style={{ padding: '40px', textAlign: 'center' }}>
+                <Spin tip="加载中..." />
+              </div>
+            ) : admins.length === 0 ? (
               <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
                 暂无管理员
               </div>
@@ -668,7 +617,6 @@ const OrganizationManagement = () => {
                             <Avatar 
                               src={admin.wechatAvatar}
                               onError={() => {
-                                console.log('头像加载失败，切换到首字母头像:', admin.wechatAvatar);
                                 setAvatarErrors(prev => ({ ...prev, [admin.id]: true }));
                                 return true;
                               }}
@@ -700,61 +648,17 @@ const OrganizationManagement = () => {
               }
               
               const availableUsers = getAvailableUsers();
-              console.log('🔍 当前可选用户列表:', availableUsers);
               
               if (availableUsers.length === 0) {
-                // 显示详细的调试信息
-                const orgUsers = users.filter(u => u.organizationId == selectedOrganization.id);
-                const adminIds = admins.map(a => a.id);
-                const nonAdminUsers = orgUsers.filter(u => !adminIds.includes(u.id));
-                
-                console.warn('⚠️ 无可添加用户！');
-                console.log('当前机构ID:', selectedOrganization.id);
-                console.log('该机构所有用户:', orgUsers);
-                console.log('该机构用户数:', orgUsers.length);
-                console.log('当前管理员IDs:', adminIds);
-                console.log('非管理员用户:', nonAdminUsers);
-                
-                // 检查非管理员用户被过滤的原因
-                console.log('🔍 分析非管理员用户状态:');
-                nonAdminUsers.forEach(user => {
-                  console.log(`用户 ${user.nickname || user.username}:`, {
-                    id: user.id,
-                    status: user.status,
-                    statusType: typeof user.status,
-                    isActive: user.status === 'ACTIVE',
-                    inAdminList: adminIds.includes(user.id)
-                  });
-                });
-                
                 return (
                   <div style={{ 
                     padding: '16px', 
-                    background: '#fff3cd', 
+                    background: '#f0f0f0', 
                     borderRadius: '8px',
-                    border: '1px solid #ffc107',
-                    color: '#856404'
+                    textAlign: 'center',
+                    color: '#999'
                   }}>
-                    <strong>⚠️ 调试信息：</strong><br/>
-                    该机构总用户数: {orgUsers.length}<br/>
-                    当前管理员数: {adminIds.length}<br/>
-                    非管理员用户数: {nonAdminUsers.length}<br/>
-                    可添加用户数: {availableUsers.length}<br/>
-                    <br/>
-                    {nonAdminUsers.length > 0 && (
-                      <div style={{ fontSize: '12px', marginTop: '8px' }}>
-                        非管理员用户状态:<br/>
-                        {nonAdminUsers.map(u => (
-                          <div key={u.id}>
-                            - {u.nickname || u.username}: status={u.status}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <br/>
-                    <span style={{ fontSize: '12px', color: '#999' }}>
-                      请查看浏览器控制台获取详细调试信息
-                    </span>
+                    暂无可添加的用户
                   </div>
                 );
               }
