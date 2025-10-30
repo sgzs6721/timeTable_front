@@ -909,30 +909,29 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
               return (
                 <Timeline.Item
                   key={history.id}
-                  dot={<ClockCircleOutlined style={{ fontSize: '16px' }} />}
+                  dot={<div style={{ display: 'flex', alignItems: 'center', height: '32px', paddingTop: '4px' }}><ClockCircleOutlined style={{ fontSize: '16px' }} /></div>}
+                  style={{
+                    paddingBottom: '16px'
+                  }}
                 >
                   <div
                     style={{
-                      cursor: isEditing ? 'default' : 'pointer',
                       padding: '8px',
                       borderRadius: '4px',
                       backgroundColor: isEditing ? '#f0f5ff' : 'transparent',
                       transition: 'background-color 0.3s',
                       border: isEditing ? '1px solid #d9d9d9' : '1px solid transparent'
                     }}
-                    onClick={() => !isEditing && handleEditHistory(history)}
                   >
                     <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Space>
-                        {history.fromStatusText ? (
+                        {history.fromStatusText && history.fromStatusText !== '无' && (
                           <>
                             <Tag color={getStatusColor(history.fromStatus)}>
                               {history.fromStatusText}
                             </Tag>
                             <span>→</span>
                           </>
-                        ) : (
-                          <span style={{ color: '#999' }}>初始状态 →</span>
                         )}
                         <Tag color={getStatusColor(history.toStatus)}>
                           {history.toStatusText}

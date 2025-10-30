@@ -89,3 +89,17 @@
 .custom-time-picker .ant-picker-footer-extra {
   display: none !important;
 }
+
+/* 修复移动端滚动问题 */
+.customer-card-list {
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}
+
+/* TodoList 滚动优化 */
+.todo-list-scroll-container {
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}

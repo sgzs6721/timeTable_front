@@ -466,3 +466,25 @@ html {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
+
+/* 优化Tab页面滚动性能 - 修复待办和客源页面滑动卡顿问题 */
+.ant-tabs-content {
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}
+
+.ant-tabs-tabpane-active {
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}
+
+/* 确保卡片不阻止滚动 */
+.ant-card {
+  touch-action: auto !important;
+}
+
+.ant-card-body {
+  touch-action: auto !important;
+}

@@ -1276,7 +1276,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
 
   return (
     <div style={{ padding: '2px', display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Card bodyStyle={{ padding: '8px', flex: 1, overflow: 'auto' }}>
+        <Card bodyStyle={{ padding: '8px', flex: 1, overflow: 'visible' }}>
           {/* 过滤器 */}
           <div className="customer-filter-area" style={{ marginBottom: 12 }}>
             <Row gutter={8}>

@@ -502,30 +502,30 @@ const TodoList = ({ onUnreadCountChange }) => {
                   )}
 
             {/* 流转记录 */}
-            {hasHistory && (
+            {(hasHistory || todo.customerNotes) && (
               <div style={{ 
                 marginTop: 16, 
                 paddingTop: 12, 
-                borderTop: '1px solid #f0f0f0'
+                borderTop: '1px solid #f0f0f0',
+                marginLeft: '-16px',
+                marginRight: '-60px',
+                paddingLeft: '16px',
+                paddingRight: '60px'
               }}>
                 <div 
                   style={{ 
                     display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'flex-start',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                     cursor: 'pointer',
                     fontSize: '13px',
                     color: '#666',
-                    marginBottom: isHistoryExpanded ? 10 : 0,
-                    position: 'relative',
-                    paddingRight: 32
+                    marginBottom: isHistoryExpanded ? 10 : 0
                   }}
                   onClick={() => toggleHistoryExpand(todo.id)}
                 >
-                  <span style={{ fontWeight: '500' }}>流转记录 ({todo.statusHistory.length})</span>
-                  <span style={{ position: 'absolute', right: '-12px', top: '50%', transform: 'translateY(-50%)' }}>
-                    {isHistoryExpanded ? <UpOutlined style={{ fontSize: '10px' }} /> : <DownOutlined style={{ fontSize: '10px' }} />}
-                  </span>
+                  <span style={{ fontWeight: '500' }}>流转记录 ({hasHistory ? todo.statusHistory.length : 0})</span>
+                  {isHistoryExpanded ? <UpOutlined style={{ fontSize: '10px' }} /> : <DownOutlined style={{ fontSize: '10px' }} />}
                 </div>
                 
                 {isHistoryExpanded && (
@@ -533,8 +533,12 @@ const TodoList = ({ onUnreadCountChange }) => {
                     <Timeline
                       style={{ marginTop: 8, marginBottom: -12 }}
                       items={[
-                        // 所有流转记录
-                        ...todo.statusHistory.map((history, index, array) => {
+                        // 所有流转记录（过滤掉fromStatus和toStatus都是NEW的记录，因为底部有专门的新建记录）
+                        ...(hasHistory ? todo.statusHistory.filter(history => {
+                          const isFromNew = !history.fromStatus || history.fromStatus === 'null' || history.fromStatus === 'NEW';
+                          const isToNew = history.toStatus === 'NEW';
+                          return !(isFromNew && isToNew);
+                        }).map((history, index, array) => {
                           const fromLabel = (!history.fromStatus || history.fromStatus === 'null' || history.fromStatus === 'NEW') ? '新建' : history.fromStatusText || '无';
                           
                           return {
@@ -557,6 +561,27 @@ const TodoList = ({ onUnreadCountChange }) => {
                                     {history.createdByName && ` · ${history.createdByName}`}
                                   </div>
                                 </div>
+                                {/* 如果是待体验状态且有体验时间，显示体验安排信息 */}
+                                {(history.toStatus === 'SCHEDULED' || history.toStatus === 'RE_EXPERIENCE') && 
+                                 history.trialScheduleDate && history.trialStartTime && history.trialEndTime && (
+                                  <div style={{ 
+                                    marginTop: 4,
+                                    marginBottom: 4,
+                                    padding: '6px 8px',
+                                    backgroundColor: '#f0f5ff',
+                                    borderRadius: '4px',
+                                    border: '1px solid #91caff'
+                                  }}>
+                                    <div style={{ fontSize: '11px', color: '#1890ff', marginBottom: 2 }}>
+                                      📅 体验安排：
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#666' }}>
+                                      {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                      {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                      {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                                    </div>
+                                  </div>
+                                )}
                                 {history.notes && history.notes.trim() && (
                                   <div style={{ 
                                     color: '#666', 
@@ -570,7 +595,7 @@ const TodoList = ({ onUnreadCountChange }) => {
                               </div>
                             )
                           };
-                        }),
+                        }) : []),
                         // 最底部：手动添加"新建"记录，显示客户notes
                         {
                           color: 'blue',

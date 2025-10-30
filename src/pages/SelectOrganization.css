@@ -66,6 +66,21 @@
   transform: scale(1.02);
 }
 
+.back-button {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+  margin-top: 10px;
+  border: 1px solid #d9d9d9;
+  color: #666;
+}
+
+.back-button:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
 @media (max-width: 768px) {
   .select-organization-header h1 {
     font-size: 24px;

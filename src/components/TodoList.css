@@ -43,3 +43,14 @@
   -ms-overflow-style: none !important;
 }
 
+/* 优化整个待办列表容器的滚动性能 */
+.ant-tabs-tabpane {
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+}
+
+/* 待办卡片内容不阻止触摸事件 */
+.todo-card .ant-card-body {
+  pointer-events: auto !important;
+}
+

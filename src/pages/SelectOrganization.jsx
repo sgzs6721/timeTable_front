@@ -80,7 +80,18 @@ const SelectOrganization = () => {
       }
     } catch (error) {
       console.error('提交失败:', error);
-      message.error(error.response?.data?.message || '提交失败，请检查机构代码是否正确');
+      const errorMessage = error.response?.data?.message || '提交失败，请检查机构代码是否正确';
+      
+      // 如果是已有待审批的申请，直接跳转到审核状态页面
+      if (errorMessage.includes('您已有待审批的申请') || errorMessage.includes('待审批')) {
+        navigate('/application-status', {
+          state: {
+            wechatUserInfo
+          }
+        });
+      } else {
+        message.error(errorMessage);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -127,6 +138,17 @@ const SelectOrganization = () => {
               className="submit-button"
             >
               提交
+            </Button>
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button
+              size="large"
+              block
+              onClick={() => navigate(-1)}
+              className="back-button"
+            >
+              返回
             </Button>
           </Form.Item>
         </Form>

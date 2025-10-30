@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, message, Modal, Spin, Radio, Space } from 'antd';
-import { UserOutlined, LockOutlined, SaveOutlined, LinkOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, SaveOutlined, LinkOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { updateProfile, updatePassword, deactivateAccount, bindWechatToAccount, createAccountForWechat, setPassword, validateToken } from '../services/auth';
 import Footer from '../components/Footer';
@@ -481,6 +481,46 @@ const UserProfile = ({ user }) => {
               <span className="info-value">
                 {user?.updatedAt ? new Date(user.updatedAt).toLocaleString() : '未知'}
               </span>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="机构管理" className="profile-card">
+          <div className="account-info-compact">
+            <div className="info-row">
+              <span className="info-label">当前机构:</span>
+              <span className="info-value">
+                {currentUser?.organizationName || user?.organizationName || '未绑定机构'}
+              </span>
+            </div>
+            <div style={{ marginTop: '16px' }}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  // 保存当前微信用户信息到sessionStorage
+                  if (user?.wechatOpenid) {
+                    const wechatUserInfo = {
+                      openid: user.wechatOpenid,
+                      unionid: user.wechatUnionid,
+                      nickname: user.nickname || user.wechatNickname,
+                      headimgurl: user.wechatAvatar,
+                      sex: user.wechatSex,
+                      province: user.wechatProvince,
+                      city: user.wechatCity,
+                      country: user.wechatCountry
+                    };
+                    sessionStorage.setItem('wechatUserInfo', JSON.stringify(wechatUserInfo));
+                  }
+                  navigate('/select-organization');
+                }}
+                block
+              >
+                申请加入其他机构
+              </Button>
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
+                申请加入其他机构后，下次登录可选择要进入的机构
+              </div>
             </div>
           </div>
         </Card>
