@@ -271,14 +271,14 @@ const OrganizationManagement = () => {
           详情
         </Button>
         <Button
-          icon={<SettingOutlined />}
+          icon={<TeamOutlined />}
           onClick={(e) => {
             e.stopPropagation();
-            handleSettings(org);
+            handleManageAdmins(org);
           }}
-          className="action-btn settings-btn"
+          className="action-btn admin-btn"
         >
-          权限设置
+          管理员
         </Button>
         <Button
           icon={<UsergroupAddOutlined />}
@@ -291,14 +291,14 @@ const OrganizationManagement = () => {
           角色管理
         </Button>
         <Button
-          icon={<TeamOutlined />}
+          icon={<SettingOutlined />}
           onClick={(e) => {
             e.stopPropagation();
-            handleManageAdmins(org);
+            handleSettings(org);
           }}
-          className="action-btn admin-btn"
+          className="action-btn settings-btn"
         >
-          管理员
+          权限设置
         </Button>
         <Button
           icon={<EditOutlined />}
@@ -321,7 +321,6 @@ const OrganizationManagement = () => {
           cancelText="取消"
         >
           <Button
-            danger
             icon={<DeleteOutlined />}
             className="action-btn delete-btn"
             onClick={(e) => e.stopPropagation()}

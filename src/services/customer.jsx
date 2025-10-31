@@ -29,3 +29,8 @@ export const deleteCustomer = (id) => {
 export const getCustomersByStatus = (status) => {
   return api.get(`/customers/status/${status}`);
 };
+
+// 获取待体验客户列表
+export const getTrialCustomers = () => {
+  return api.get('/customers/trials');
+};

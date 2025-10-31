@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
-import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
-import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
+import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, CalendarOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory, cancelTrialSchedule } from '../services/customerStatusHistory';
 import { createTodo, getLatestTodoByCustomer, updateTodo, updateTodoReminderTime } from '../services/todo';
-import { getTrialSchedule } from '../services/timetable';
 import { getApiBaseUrl } from '../config/api';
+import { getCurrentUserPermissions } from '../services/rolePermission';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -36,6 +36,32 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const [selectedCoach, setSelectedCoach] = useState(null);
   const [loadingCoaches, setLoadingCoaches] = useState(false);
   const [trialStudentName, setTrialStudentName] = useState('');
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [timePickerClickCount, setTimePickerClickCount] = useState(0);
+  
+  // 权限相关状态
+  const [hasSchedulePermission, setHasSchedulePermission] = useState(false);
+
+  // 获取用户权限
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      try {
+        const response = await getCurrentUserPermissions();
+        if (response && response.success && response.data) {
+          const permissions = response.data;
+          // 检查是否有"我的课表"权限
+          const hasMySchedule = permissions.menuPermissions?.mySchedule === true;
+          setHasSchedulePermission(hasMySchedule);
+          console.log('[CustomerStatusHistoryModal] 用户是否有课表权限:', hasMySchedule);
+        }
+      } catch (error) {
+        console.error('[CustomerStatusHistoryModal] 获取用户权限失败:', error);
+        setHasSchedulePermission(false);
+      }
+    };
+    
+    fetchUserPermissions();
+  }, []);
 
   useEffect(() => {
     if (visible && customer) {
@@ -174,7 +200,13 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     try {
       const response = await getCustomerStatusHistory(customer.id);
       if (response && response.success) {
-        setHistories(response.data || []);
+        const histories = response.data || [];
+        setHistories(histories);
+        console.log('历史记录已更新:', histories.map(h => ({ 
+          id: h.id, 
+          trialCancelled: h.trialCancelled,
+          trialScheduleDate: h.trialScheduleDate 
+        })));
       }
     } catch (error) {
       console.error('获取历史记录失败:', error);
@@ -191,6 +223,43 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const handleCancelEdit = () => {
     setEditingHistoryId(null);
     setEditingNotes('');
+  };
+
+  // 取消体验课程
+  const handleCancelTrialSchedule = async (history) => {
+    if (!customer) {
+      message.error('客户信息不存在');
+      return;
+    }
+
+    try {
+      message.loading({ content: '正在取消体验课程...', key: 'cancelTrial' });
+      
+      // 调用新的取消体验API（不需要传学员名字，直接从历史记录读取课表ID）
+      const response = await cancelTrialSchedule(
+        customer.id, 
+        history.id
+      );
+      
+      if (response && response.success) {
+        message.success({ content: '✓ 体验课程已取消', key: 'cancelTrial' });
+        
+        // 刷新历史记录
+        await fetchHistory();
+        
+        console.log('取消成功，历史记录已刷新');
+        
+        // 通知父组件刷新
+        if (onSuccess) {
+          onSuccess(customer.status, history.notes);
+        }
+      } else {
+        message.error({ content: response.message || '取消失败', key: 'cancelTrial' });
+      }
+    } catch (error) {
+      console.error('取消体验课程失败:', error);
+      message.error({ content: '取消体验课程失败', key: 'cancelTrial' });
+    }
   };
 
   const handleSaveEdit = async (historyId) => {
@@ -258,7 +327,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const handleSubmit = async (values) => {
     if (!customer) return;
 
-    // 如果是待体验或待再体验状态，验证是否填写了体验人员和选择了时间
+    // 如果是待体验或待再体验状态，验证必填项
     if (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') {
       if (!trialStudentName || !trialStudentName.trim()) {
         message.warning('请输入体验人员姓名');
@@ -266,6 +335,12 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       }
       if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
         message.warning('请选择体验日期和时间');
+        return;
+      }
+      
+      // 如果有课表权限，则需要选择教练
+      if (hasSchedulePermission && !selectedCoach) {
+        message.warning('请选择体验教练');
         return;
       }
     }
@@ -283,7 +358,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         statusChangeData.trialScheduleDate = experienceDate.format('YYYY-MM-DD');
         statusChangeData.trialStartTime = experienceTimeRange[0].format('HH:mm:ss');
         statusChangeData.trialEndTime = experienceTimeRange[1].format('HH:mm:ss');
-        statusChangeData.trialCoachId = selectedCoach || null;
+        // 只有有课表权限时才保存教练ID
+        statusChangeData.trialCoachId = hasSchedulePermission ? (selectedCoach || null) : null;
       }
       
       const response = await changeCustomerStatus(customer.id, statusChangeData);
@@ -291,8 +367,10 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       if (response && response.success) {
         message.success('状态变更成功');
         
-        // 如果是待体验或待再体验状态，创建体验课程
-        if ((values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') && experienceDate && experienceTimeRange && selectedCoach) {
+        // 只有当用户有课表权限且选择了教练时，才创建体验课程
+        if (hasSchedulePermission && 
+            (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') && 
+            experienceDate && experienceTimeRange && selectedCoach) {
           try {
             const scheduleResponse = await fetch(`${getApiBaseUrl()}/schedules/trial`, {
               method: 'POST',
@@ -620,93 +698,150 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                   </div>
                   <TimePicker.RangePicker
                     value={experienceTimeRange}
-                    onChange={(times) => {
+                    open={timePickerOpen}
+                    onOpenChange={(open) => {
+                      setTimePickerOpen(open);
+                      // 打开时重置计数器
+                      if (open) {
+                        setTimePickerClickCount(0);
+                      }
+                    }}
+                    onCalendarChange={(times) => {
+                      // 立即更新时间，无论是选第一个还是第二个
                       setExperienceTimeRange(times);
-                      // 当用户选择完开始和结束时间后，查询有空的教练
-                      if (times && times.length === 2 && times[0] && times[1] && experienceDate) {
-                        fetchAvailableCoaches(experienceDate, times);
-                      } else {
-                        // 如果时间不完整，清空教练列表
-                        setAvailableCoaches([]);
-                        setSelectedCoach(null);
+                      
+                      // 增加点击计数
+                      const newCount = timePickerClickCount + 1;
+                      setTimePickerClickCount(newCount);
+                      
+                      // 检查是否已经选择了完整的时间（小时和分钟都有）
+                      // 如果times[0]存在且包含完整的小时和分钟信息，就关闭
+                      if (times && times.length >= 1 && times[0]) {
+                        const firstTime = times[0];
+                        // 检查时间对象是否有效且包含小时和分钟
+                        if (firstTime && firstTime.isValid && firstTime.isValid()) {
+                          const hasHour = firstTime.hour() !== undefined;
+                          const hasMinute = firstTime.minute() !== undefined;
+                          
+                          // 如果已经点击了2次，或者时间已经完整（有小时和分钟），就关闭
+                          if (newCount >= 2 || (hasHour && hasMinute)) {
+                            setTimePickerOpen(false); // 关闭面板
+                            setTimePickerClickCount(0); // 重置计数器
+                          }
+                        }
+                      }
+                      
+                      // 当两个时间都选完后，查询教练
+                      if (times && times.length === 2 && times[0] && times[1]) {
+                        if (hasSchedulePermission && experienceDate) {
+                          fetchAvailableCoaches(experienceDate, times);
+                        }
+                      }
+                    }}
+                    onChange={(times) => {
+                      // onChange也立即触发
+                      setExperienceTimeRange(times);
+                      // 只有有课表权限时才查询教练
+                      if (hasSchedulePermission) {
+                        // 当用户选择完开始和结束时间后，查询有空的教练
+                        if (times && times.length === 2 && times[0] && times[1] && experienceDate) {
+                          fetchAvailableCoaches(experienceDate, times);
+                        } else {
+                          // 如果时间不完整，清空教练列表
+                          setAvailableCoaches([]);
+                          setSelectedCoach(null);
+                        }
                       }
                     }}
                     format="HH:mm"
                     style={{ width: '100%' }}
                     placeholder={['开始时间', '结束时间']}
                     minuteStep={30}
+                    showNow={false}
+                    inputReadOnly
+                    use12Hours={false}
+                    popupClassName="no-confirm-timepicker"
+                    changeOnBlur={false}
                     disabledTime={() => ({
                       disabledHours: () => {
                         // 禁用10点之前和20点之后的小时（保留10-20点）
                         return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
                       }
                     })}
+                    hideDisabledOptions={false}
                     showTime={{
-                      hideDisabledOptions: true
+                      hideDisabledOptions: false,
+                      minuteStep: 30
                     }}
                   />
                 </div>
               </div>
               
-              {loadingCoaches ? (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <Spin tip="正在查询有空的教练..." />
-                </div>
-              ) : availableCoaches.length > 0 ? (
-                <div>
-                  <div style={{ marginBottom: 8, color: 'rgba(0, 0, 0, 0.85)' }}>
-                    选择教练（可选）
-                  </div>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                    gap: '8px'
-                  }}>
-                    {availableCoaches.map(coach => (
-                      <div
-                        key={coach.id}
-                        onClick={() => setSelectedCoach(coach.id === selectedCoach ? null : coach.id)}
-                        style={{
-                          padding: '10px 12px',
-                          border: coach.id === selectedCoach ? '2px solid #1890ff' : '1px solid #d9d9d9',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          backgroundColor: coach.id === selectedCoach ? '#e6f7ff' : '#ffffff',
-                          color: coach.id === selectedCoach ? '#1890ff' : 'rgba(0, 0, 0, 0.85)',
-                          fontWeight: coach.id === selectedCoach ? '500' : 'normal',
-                          transition: 'all 0.3s',
-                          userSelect: 'none'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (coach.id !== selectedCoach) {
-                            e.currentTarget.style.borderColor = '#40a9ff';
-                            e.currentTarget.style.backgroundColor = '#f0f9ff';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (coach.id !== selectedCoach) {
-                            e.currentTarget.style.borderColor = '#d9d9d9';
-                            e.currentTarget.style.backgroundColor = '#ffffff';
-                          }
-                        }}
-                      >
-                        {coach.nickname || coach.username}
+              {/* 只有有课表权限的用户才能看到和选择教练 */}
+              {hasSchedulePermission && (
+                <>
+                  {loadingCoaches ? (
+                    <div style={{ textAlign: 'center', padding: '20px' }}>
+                      <Spin tip="正在查询有空的教练..." />
+                    </div>
+                  ) : availableCoaches.length > 0 ? (
+                    <div>
+                      <div style={{ marginBottom: 8, color: 'rgba(0, 0, 0, 0.85)' }}>
+                        <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+                        选择教练
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (experienceDate && experienceTimeRange && experienceTimeRange.length === 2) ? (
-                <div style={{ 
-                  padding: '12px', 
-                  backgroundColor: '#fff2e8', 
-                  borderRadius: '4px',
-                  color: '#d46b08',
-                  border: '1px solid #ffd591'
-                }}>
-                  该时间段暂无可用教练
-                </div>
-              ) : null}
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                        gap: '8px'
+                      }}>
+                        {availableCoaches.map(coach => (
+                          <div
+                            key={coach.id}
+                            onClick={() => setSelectedCoach(coach.id === selectedCoach ? null : coach.id)}
+                            style={{
+                              padding: '10px 12px',
+                              border: coach.id === selectedCoach ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              backgroundColor: coach.id === selectedCoach ? '#e6f7ff' : '#ffffff',
+                              color: coach.id === selectedCoach ? '#1890ff' : 'rgba(0, 0, 0, 0.85)',
+                              fontWeight: coach.id === selectedCoach ? '500' : 'normal',
+                              transition: 'all 0.3s',
+                              userSelect: 'none'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (coach.id !== selectedCoach) {
+                                e.currentTarget.style.borderColor = '#40a9ff';
+                                e.currentTarget.style.backgroundColor = '#f0f9ff';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (coach.id !== selectedCoach) {
+                                e.currentTarget.style.borderColor = '#d9d9d9';
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                              }
+                            }}
+                          >
+                            {coach.nickname || coach.username}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (experienceDate && experienceTimeRange && experienceTimeRange.length === 2) ? (
+                    <div style={{ 
+                      padding: '12px', 
+                      backgroundColor: '#fff2e8', 
+                      borderRadius: '4px',
+                      color: '#d46b08',
+                      border: '1px solid #ffd591'
+                    }}>
+                      该时间段暂无可用教练
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           )}
 
@@ -1000,19 +1135,50 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                           <div style={{ 
                             marginBottom: 8, 
                             padding: '8px',
-                            backgroundColor: '#f0f5ff',
+                            backgroundColor: history.trialCancelled ? '#f5f5f5' : '#f0f5ff',
                             borderRadius: '4px',
-                            border: '1px solid #91caff'
+                            border: history.trialCancelled ? '1px solid #d9d9d9' : '1px solid #91caff',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
                           }}>
-                            <div style={{ fontSize: '13px', color: '#1890ff', marginBottom: 4 }}>
-                              <CalendarOutlined style={{ marginRight: 4 }} />
-                              体验安排：
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '13px', color: history.trialCancelled ? '#999' : '#1890ff', marginBottom: 4 }}>
+                                <CalendarOutlined style={{ marginRight: 4 }} />
+                                体验时间：
+                                {history.trialCancelled && (
+                                  <Tag color="default" style={{ marginLeft: 8 }}>已取消</Tag>
+                                )}
+                              </div>
+                              <div style={{ 
+                                fontSize: '12px', 
+                                color: '#666',
+                                textDecoration: history.trialCancelled ? 'line-through' : 'none'
+                              }}>
+                                {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                              </div>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#666' }}>
-                              {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
-                              {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
-                              {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
-                            </div>
+                            {history.trialCancelled !== true && (
+                              <Popconfirm
+                                title="确定取消体验课程？"
+                                description="取消后将标记为已取消，如有权限也会从课表中删除"
+                                onConfirm={() => handleCancelTrialSchedule(history)}
+                                okText="确定"
+                                cancelText="取消"
+                              >
+                                <Button 
+                                  type="text" 
+                                  danger
+                                  size="small"
+                                  icon={<CloseCircleOutlined />}
+                                  style={{ marginLeft: 8 }}
+                                >
+                                  取消
+                                </Button>
+                              </Popconfirm>
+                            )}
                           </div>
                         )}
                         {history.notes && (

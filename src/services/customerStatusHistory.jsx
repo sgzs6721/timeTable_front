@@ -62,3 +62,19 @@ export const deleteCustomerStatusHistory = async (historyId) => {
   }
 };
 
+export const cancelTrialSchedule = async (customerId, historyId) => {
+  try {
+    const response = await fetch(
+      `${getApiBaseUrl()}/customers/${customerId}/status-history/${historyId}/cancel-trial`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders()
+      }
+    );
+    return await response.json();
+  } catch (error) {
+    console.error('取消体验课程失败:', error);
+    throw error;
+  }
+};
+

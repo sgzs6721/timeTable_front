@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { UserOutlined, LogoutOutlined, SettingOutlined, InboxOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getAllRegistrationRequests } from '../services/admin';
 import { getPendingRequestsCount } from '../services/organization';
+import { getCurrentUserPermissions } from '../services/rolePermission';
 import logo from '../assets/logo.png';
 
 const { Header } = Layout;
@@ -14,6 +15,7 @@ const AppHeader = ({ user, onLogout }) => {
   const [pendingCount, setPendingCount] = useState(0);
   const [orgPendingCount, setOrgPendingCount] = useState(0);
   const [avatarError, setAvatarError] = useState(false);
+  const [userPermissions, setUserPermissions] = useState(null);
   
   // 重置头像错误状态
   useEffect(() => {
@@ -48,22 +50,55 @@ const AppHeader = ({ user, onLogout }) => {
     }
   };
 
+  // 获取当前用户权限配置
+  const fetchUserPermissions = async () => {
+    try {
+      console.log('[AppHeader] 开始获取用户权限配置...');
+      const response = await getCurrentUserPermissions();
+      console.log('[AppHeader] 权限API返回:', response);
+      if (response && response.success) {
+        console.log('[AppHeader] 设置权限配置:', response.data);
+        setUserPermissions(response.data);
+      } else {
+        console.warn('[AppHeader] 权限API返回失败或无数据');
+      }
+    } catch (error) {
+      console.error('[AppHeader] 获取用户权限失败:', error);
+    }
+  };
+
   // 组件挂载时获取数据
   useEffect(() => {
     fetchPendingCount();
     fetchOrgPendingCount();
+    fetchUserPermissions();
   }, [user]);
+
+  // 监听权限更新事件
+  useEffect(() => {
+    const handlePermissionsUpdate = () => {
+      console.log('[AppHeader] 检测到权限更新，重新获取权限配置');
+      fetchUserPermissions();
+    };
+    
+    window.addEventListener('permissionsUpdated', handlePermissionsUpdate);
+    return () => window.removeEventListener('permissionsUpdated', handlePermissionsUpdate);
+  }, []);
 
   // 定期检查待审批数量（每30秒检查一次）
   useEffect(() => {
-    if (user?.role?.toUpperCase() === 'ADMIN') {
+    if (userPermissions?.actionPermissions?.admin || userPermissions?.actionPermissions?.['organization-management']) {
       const interval = setInterval(() => {
-        fetchPendingCount();
-        fetchOrgPendingCount();
+        if (userPermissions?.actionPermissions?.admin) {
+          fetchPendingCount();
+        }
+        if (userPermissions?.actionPermissions?.['organization-management']) {
+          fetchOrgPendingCount();
+        }
       }, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, userPermissions]);
 
   const menuItems = [
     // {
@@ -73,60 +108,36 @@ const AppHeader = ({ user, onLogout }) => {
     // },
   ];
 
-  const userMenuItems = [
-    {
+  // 根据权限配置动态构建菜单项
+  const userMenuItems = [];
+  
+  console.log('[AppHeader] userPermissions:', userPermissions);
+  console.log('[AppHeader] actionPermissions:', userPermissions?.actionPermissions);
+  
+  const permissions = userPermissions?.actionPermissions || {};
+  
+  // 刷新（默认显示，除非明确设置为false）
+  if (permissions.refresh !== false) {
+    userMenuItems.push({
       key: 'refresh',
       icon: <ReloadOutlined />,
       label: '刷新\u3000',
       onClick: () => {
-        // 轻提示+刷新当前页面数据
         message.loading({ content: '正在刷新...', key: 'refreshing', duration: 0 });
-        // 优先尝试软刷新：重新加载当前路由
         try {
           navigate(0);
         } catch (_) {
           window.location.reload();
         }
       }
-    },
-    { type: 'divider' },
-    {
-      key: 'archived',
-      icon: <InboxOutlined />,
-      label: '归档课表',
-      onClick: () => {
-        // 从当前页面获取非归档课表数量 - 使用更精确的选择器
-        const listItems = document.querySelectorAll('.timetable-list .ant-list-item');
-        const nonArchivedCount = listItems.length;
-        // 无论是否管理员，头像菜单都进入个人归档页
-        navigate('/archived-timetables', { state: { nonArchivedCount } });
-      },
-    },
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: '个人账号',
-      onClick: () => navigate('/profile'),
-    },
-    {
-      key: 'guide',
-      icon: <InboxOutlined />,
-      label: '使用说明',
-      onClick: () => navigate('/guide'),
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: '退出登录',
-      onClick: onLogout,
-    },
-  ];
-
-  if (user?.role?.toUpperCase() === 'ADMIN') {
-    const adminItem = {
+    });
+  }
+  
+  // 管理员相关菜单
+  const adminMenus = [];
+  
+  if (permissions.admin === true) {
+    adminMenus.push({
       key: 'admin',
       icon: <SettingOutlined />,
       label: (
@@ -149,9 +160,11 @@ const AppHeader = ({ user, onLogout }) => {
         </div>
       ),
       onClick: () => navigate('/admin'),
-    };
-    
-    const organizationItem = {
+    });
+  }
+  
+  if (permissions['organization-management'] === true) {
+    adminMenus.push({
       key: 'organization-management',
       icon: <InboxOutlined />,
       label: (
@@ -163,27 +176,74 @@ const AppHeader = ({ user, onLogout }) => {
               size="small" 
               style={{ 
                 backgroundColor: '#ff4d4f',
-                fontSize: '10px',
-                lineHeight: '14px',
-                minWidth: '16px',
-                height: '16px',
-                padding: '0 4px'
+                fontSize: '9px',
+                lineHeight: '12px',
+                minWidth: '14px',
+                height: '14px',
+                padding: '0 3px',
+                marginLeft: '8px'
               }}
             />
           )}
         </div>
       ),
       onClick: () => navigate('/organization-management'),
-    };
-    
-    // 目标顺序：刷新 -> 分隔线 -> 管理员 -> 机构管理 -> 归档课表 ...
-    if (userMenuItems[1]?.type === 'divider') {
-      // 分隔线已存在在刷新后，将管理员和机构管理插入到分隔线之后，并在其后再加一条分隔线
-      userMenuItems.splice(2, 0, adminItem, organizationItem, { type: 'divider' });
-    } else {
-      // 没有分隔线，则先插入分隔线，再插入管理员、机构管理和分隔线
-      userMenuItems.splice(1, 0, { type: 'divider' }, adminItem, organizationItem, { type: 'divider' });
-    }
+    });
+  }
+  
+  if (adminMenus.length > 0) {
+    userMenuItems.push({ type: 'divider' });
+    userMenuItems.push(...adminMenus);
+  }
+  
+  // 其他功能菜单
+  const otherMenus = [];
+  
+  if (permissions.archived === true) {
+    otherMenus.push({
+      key: 'archived',
+      icon: <InboxOutlined />,
+      label: '归档课表',
+      onClick: () => {
+        const listItems = document.querySelectorAll('.timetable-list .ant-list-item');
+        const nonArchivedCount = listItems.length;
+        navigate('/archived-timetables', { state: { nonArchivedCount } });
+      },
+    });
+  }
+  
+  if (permissions.profile === true) {
+    otherMenus.push({
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: '个人账号',
+      onClick: () => navigate('/profile'),
+    });
+  }
+  
+  if (permissions.guide === true) {
+    otherMenus.push({
+      key: 'guide',
+      icon: <InboxOutlined />,
+      label: '使用说明',
+      onClick: () => navigate('/guide'),
+    });
+  }
+  
+  if (otherMenus.length > 0) {
+    userMenuItems.push({ type: 'divider' });
+    userMenuItems.push(...otherMenus);
+  }
+  
+  // 退出登录（默认显示，除非明确设置为false）
+  if (permissions.logout !== false) {
+    userMenuItems.push({ type: 'divider' });
+    userMenuItems.push({
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '退出登录',
+      onClick: onLogout,
+    });
   }
 
   return (
@@ -224,7 +284,7 @@ const AppHeader = ({ user, onLogout }) => {
                 {user?.nickname || user?.username}
               </span>
               <Badge 
-                count={user?.role?.toUpperCase() === 'ADMIN' && pendingCount > 0 ? pendingCount : 0}
+                count={userPermissions?.actionPermissions?.admin && pendingCount > 0 ? pendingCount : 0}
                 size="small"
                 style={{ 
                   backgroundColor: '#ff4d4f',

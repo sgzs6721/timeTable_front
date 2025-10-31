@@ -1470,3 +1470,40 @@ code {
   border-color: #05a050 !important;
   color: #ffffff !important;
 }
+
+/* 隐藏TimePicker的确定按钮，并确保00和30都显示 */
+.no-confirm-timepicker .ant-picker-footer {
+  display: none !important;
+}
+
+.no-confirm-timepicker .ant-picker-ok {
+  display: none !important;
+}
+
+.no-confirm-timepicker .ant-picker-ranges {
+  display: none !important;
+}
+
+/* 确保分钟列显示所有选项(00和30) */
+.no-confirm-timepicker .ant-picker-time-panel-column > li {
+  display: block !important;
+}
+
+/* 分钟列固定高度，不滚动，始终显示00和30 */
+.no-confirm-timepicker .ant-picker-time-panel-column:last-child {
+  overflow: visible !important;
+  overflow-y: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.no-confirm-timepicker .ant-picker-time-panel-column:last-child::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-confirm-timepicker .ant-picker-time-panel-column:last-child {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}

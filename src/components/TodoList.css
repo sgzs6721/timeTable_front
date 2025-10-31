@@ -27,9 +27,18 @@
   height: 0 !important;
 }
 
-/* 卡片容器彻底隐藏滚动条 */
+/* 卡片容器彻底隐藏滚动条并防止水平滚动 */
 .todo-card {
   overflow: hidden !important;
+  overflow-x: hidden !important;
+}
+
+.todo-card .ant-card-body {
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .todo-card *::-webkit-scrollbar {
@@ -41,6 +50,8 @@
 .todo-card * {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* 优化整个待办列表容器的滚动性能 */
@@ -54,3 +65,57 @@
   pointer-events: auto !important;
 }
 
+/* 强制文字换行，防止溢出 */
+.todo-card div,
+.todo-card span,
+.todo-card p {
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  max-width: 100% !important;
+}
+
+/* Timeline 内容区域宽度优化 - 保留圆点但缩小占用空间 */
+.todo-card .ant-timeline-item-content {
+  max-width: 100% !important;
+  overflow: visible !important;
+  word-wrap: normal !important;
+  margin-left: 18px !important;
+  padding-left: 0 !important;
+}
+
+/* Timeline 整体布局优化 */
+.todo-card .ant-timeline-item {
+  padding-bottom: 12px !important;
+}
+
+/* 缩小 Timeline 左侧圆点 */
+.todo-card .ant-timeline-item-tail {
+  left: 4px !important;
+}
+
+.todo-card .ant-timeline-item-head {
+  left: 0 !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+/* 流转记录内容不换行，确保Tag和时间完整显示 */
+.todo-card .ant-timeline-item-content > div {
+  overflow: visible !important;
+  white-space: nowrap !important;
+  max-width: none !important;
+}
+
+/* Tab容器滚动条样式 - 完全隐藏 */
+.tab-scroll-container {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE and Edge */
+}
+
+.tab-scroll-container::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+}

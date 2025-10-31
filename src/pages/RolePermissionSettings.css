@@ -113,21 +113,27 @@
   transition: all 0.3s;
 }
 
-.save-btn:hover:not(:disabled) {
+.save-btn:hover:not(:disabled):not(.ant-btn-loading) {
   background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   transform: translateY(-1px);
 }
 
-.save-btn:active:not(:disabled) {
+.save-btn:active:not(:disabled):not(.ant-btn-loading) {
   transform: translateY(0);
 }
 
-.save-btn:disabled {
-  background: #f0f0f0;
-  color: #bfbfbf;
-  box-shadow: none;
+.save-btn:disabled,
+.save-btn.ant-btn-loading {
+  background: #d9d9d9 !important;
+  color: rgba(0, 0, 0, 0.25) !important;
+  box-shadow: none !important;
   cursor: not-allowed;
+  border-color: #d9d9d9 !important;
+}
+
+.save-btn.ant-btn-loading .ant-btn-loading-icon {
+  color: rgba(0, 0, 0, 0.25);
 }
 
 .permission-grid {

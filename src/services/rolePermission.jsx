@@ -22,6 +22,19 @@ api.interceptors.request.use(
 );
 
 /**
+ * 获取当前用户的权限配置
+ */
+export const getCurrentUserPermissions = async () => {
+  try {
+    const response = await api.get('/api/role-permissions/current');
+    return response.data;
+  } catch (error) {
+    console.error('获取当前用户权限失败:', error);
+    throw error;
+  }
+};
+
+/**
  * 获取机构的所有角色权限
  */
 export const getOrganizationPermissions = async (organizationId) => {

@@ -245,39 +245,39 @@
 }
 
 .edit-btn {
-  background: #fff7e6;
-  border: 1px solid #ffd591;
-  color: #fa8c16;
+  background: #e6fffb;
+  border: 1px solid #87e8de;
+  color: #13c2c2;
 }
 
 .edit-btn:hover {
-  background: #ffe7ba;
-  border-color: #fa8c16;
-  color: #d46b08;
+  background: #b5f5ec;
+  border-color: #36cfc9;
+  color: #08979c;
 }
 
 .edit-btn:active {
-  background: #ffd591;
-  border-color: #fa8c16;
-  color: #d46b08;
+  background: #87e8de;
+  border-color: #36cfc9;
+  color: #08979c;
 }
 
 .delete-btn {
-  background: #fff1f0;
-  border: 1px solid #ffccc7;
-  color: #ff4d4f;
+  background: #fff1f0 !important;
+  border: 1px solid #ffccc7 !important;
+  color: #ff4d4f !important;
 }
 
 .delete-btn:hover {
-  background: #ffccc7;
-  border-color: #ff4d4f;
-  color: #cf1322;
+  background: #ffccc7 !important;
+  border-color: #ff4d4f !important;
+  color: #cf1322 !important;
 }
 
 .delete-btn:active {
-  background: #ffa39e;
-  border-color: #ff4d4f;
-  color: #cf1322;
+  background: #ffa39e !important;
+  border-color: #ff4d4f !important;
+  color: #cf1322 !important;
 }
 
 /* 加载状态 */

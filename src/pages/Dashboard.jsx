@@ -11,6 +11,7 @@ import { renameStudent, hideStudent, getStudentOperationRecords } from '../servi
 import { mergeStudents } from '../services/studentMerge';
 import { getAllSalaryCalculations, getAvailableMonths } from '../services/salaryCalculation';
 import { getCustomerStatusHistory } from '../services/customerStatusHistory';
+import { getCurrentUserPermissions } from '../services/rolePermission';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
@@ -1283,16 +1284,13 @@ const Dashboard = ({ user }) => {
   const [loadingScheduleCounts, setLoadingScheduleCounts] = useState(false);
   const [timetableScheduleCounts, setTimetableScheduleCounts] = useState({});
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
+  const [userPermissions, setUserPermissions] = useState(null);
   
   // 管理员概览相关状态
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam) {
       return tabParam;
-    }
-    // 销售和管理员默认打开待办tab
-    if (user?.position?.toUpperCase() === 'SALES' || user?.role?.toUpperCase() === 'ADMIN') {
-      return 'todos';
     }
     return 'timetables';
   });
@@ -1427,6 +1425,81 @@ const Dashboard = ({ user }) => {
 
   const navigate = useNavigate();
 
+  // 获取当前用户权限配置
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      try {
+        console.log('[Dashboard] 开始获取用户权限配置...');
+        const response = await getCurrentUserPermissions();
+        console.log('[Dashboard] 权限API返回:', response);
+        if (response && response.success) {
+          console.log('[Dashboard] 设置权限配置:', response.data);
+          setUserPermissions(response.data);
+        } else {
+          console.warn('[Dashboard] 权限API返回失败或无数据');
+        }
+      } catch (error) {
+        console.error('[Dashboard] 获取用户权限失败:', error);
+      }
+    };
+
+    if (user) {
+      fetchUserPermissions();
+    }
+  }, [user]);
+
+  // 监听权限更新事件
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      try {
+        console.log('[Dashboard] 检测到权限更新，重新获取权限配置');
+        const response = await getCurrentUserPermissions();
+        console.log('[Dashboard] 权限API返回:', response);
+        if (response && response.success) {
+          console.log('[Dashboard] 设置权限配置:', response.data);
+          setUserPermissions(response.data);
+        }
+      } catch (error) {
+        console.error('[Dashboard] 获取用户权限失败:', error);
+      }
+    };
+
+    const handlePermissionsUpdate = () => {
+      if (user) {
+        fetchUserPermissions();
+      }
+    };
+    
+    window.addEventListener('permissionsUpdated', handlePermissionsUpdate);
+    return () => window.removeEventListener('permissionsUpdated', handlePermissionsUpdate);
+  }, [user]);
+
+  // 当权限加载后，自动切换到第一个可见的tab
+  useEffect(() => {
+    if (!userPermissions || !userPermissions.menuPermissions) return;
+    
+    const menuPerms = userPermissions.menuPermissions;
+    
+    // 定义tab优先级顺序
+    const tabPriority = [
+      { key: 'overview', permission: 'dashboard' },
+      { key: 'todos', permission: 'todo' },
+      { key: 'customers', permission: 'customer' },
+      { key: 'timetables', permission: 'mySchedule' },
+      { key: 'students', permission: 'myStudents' },
+      { key: 'hours', permission: 'myHours' },
+      { key: 'salary', permission: 'mySalary' }
+    ];
+    
+    // 找到第一个有权限的tab
+    const firstVisibleTab = tabPriority.find(tab => menuPerms[tab.permission] === true);
+    
+    if (firstVisibleTab) {
+      console.log('[Dashboard] 自动切换到第一个可见tab:', firstVisibleTab.key);
+      setActiveTab(firstVisibleTab.key);
+    }
+  }, [userPermissions]);
+
   // 清除缓存数据
   const clearCache = () => {
     sessionStorage.removeItem('dashboard_timetables');
@@ -1471,8 +1544,6 @@ const Dashboard = ({ user }) => {
 
   // 获取教练统计信息
   const fetchCoachesStatistics = useCallback(async () => {
-    if (user?.role?.toUpperCase() !== 'ADMIN') return;
-    
     setStatisticsLoading(true);
     try {
       const response = await getCoachesStatistics();
@@ -4988,8 +5059,15 @@ const Dashboard = ({ user }) => {
     const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
     const isSales = user?.position?.toUpperCase() === 'SALES';
     
-    // 管理员显示总览
-    if (isAdmin) {
+    // 获取菜单权限配置，如果未加载则使用默认值
+    const menuPerms = userPermissions?.menuPermissions || {};
+    
+    console.log('[Dashboard buildTabItems] userPermissions:', userPermissions);
+    console.log('[Dashboard buildTabItems] menuPerms:', menuPerms);
+    console.log('[Dashboard buildTabItems] isAdmin:', isAdmin, 'isSales:', isSales);
+    
+    // 总览tab - 根据权限配置显示
+    if (menuPerms.dashboard === true) {
       tabItems.push({
         key: 'overview',
         label: '总览',
@@ -4997,8 +5075,8 @@ const Dashboard = ({ user }) => {
       });
     }
     
-    // 待办tab - 管理员和销售都可见（在总览或第一个位置）
-    if (isAdmin || isSales) {
+    // 待办tab - 根据权限配置显示
+    if (menuPerms.todo === true) {
       tabItems.push({
         key: 'todos',
         label: unreadTodoCount > 0 ? (
@@ -5026,61 +5104,59 @@ const Dashboard = ({ user }) => {
       });
     }
     
-    // 销售用户只显示我的客户，管理员显示所有tab包括数据管理，其他用户显示我的课表、我的学员、我的课时
-    if (isSales) {
-      // 销售用户只显示我的客户tab
+    // 客源tab - 根据权限配置显示
+    if (menuPerms.customer === true) {
+      // 根据用户职位确定标签名称
+      let tabLabel = '客源';
+      if (isSales) {
+        tabLabel = '我的客户';
+      }
+      
       tabItems.push({
         key: 'customers',
-        label: '我的客户',
+        label: tabLabel,
         children: <CustomerManagement 
+          ref={customersRef} 
           user={user} 
           onTodoCreated={refreshTodoCount} 
           highlightCustomerId={searchParams.get('customerId')}
           searchCustomerName={searchParams.get('customerName')}
         />
       });
-    } else {
-      // 其他用户显示：我的课表、我的学员、客源、我的课时（客源在“我的课表”左侧，实际顺序：客源、我的课表、我的学员、我的课时）
-      if (isAdmin) {
-        tabItems.push({
-          key: 'customers',
-          label: '客源',
-          children: <CustomerManagement 
-            ref={customersRef} 
-            user={user} 
-            onTodoCreated={refreshTodoCount} 
-            highlightCustomerId={searchParams.get('customerId')}
-            searchCustomerName={searchParams.get('customerName')}
-          />
-        });
-      }
-
-      tabItems.push(
-        {
-          key: 'timetables',
-          label: '我的课表',
-          children: (
-            <div>
-              {renderTimetableList()}
-            </div>
-          )
-        },
-        {
-          key: 'students',
-          label: '我的学员',
-          children: <MyStudents 
-            currentUser={user}
-            onStudentClick={(studentName, coachName) => {
-              setSelectedStudent(studentName);
-              setSelectedCoach(coachName); // 使用传递过来的教练名称
-              setStudentDetailVisible(true);
-            }}
-            showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
-          />
-        }
-      );
-      
-      // 我的课时tab
+    }
+    
+    // 我的课表tab - 根据权限配置显示
+    if (menuPerms.mySchedule === true) {
+      tabItems.push({
+        key: 'timetables',
+        label: '我的课表',
+        children: (
+          <div>
+            {renderTimetableList()}
+          </div>
+        )
+      });
+    }
+    
+    // 我的学员tab - 根据权限配置显示
+    if (menuPerms.myStudents === true) {
+      tabItems.push({
+        key: 'students',
+        label: '我的学员',
+        children: <MyStudents 
+          currentUser={user}
+          onStudentClick={(studentName, coachName) => {
+            setSelectedStudent(studentName);
+            setSelectedCoach(coachName); // 使用传递过来的教练名称
+            setStudentDetailVisible(true);
+          }}
+          showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
+        />
+      });
+    }
+    
+    // 我的课时tab - 根据权限配置显示
+    if (menuPerms.myHours === true) {
       tabItems.push({
         key: 'hours',
         label: '我的课时',
@@ -5092,8 +5168,8 @@ const Dashboard = ({ user }) => {
       });
     }
     
-    // 我的工资 - 只有管理员可见
-    if (isAdmin) {
+    // 我的工资tab - 根据权限配置显示
+    if (menuPerms.mySalary === true) {
       tabItems.push({
         key: 'salary',
         label: '我的工资',

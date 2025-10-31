@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Table, Button, message, Modal, Input, Tag, Card, 
-  Space, Avatar, Descriptions, Select, Form 
+  Space, Avatar, Descriptions, Select, Form, Spin 
 } from 'antd';
 import { 
-  CheckOutlined, CloseOutlined, EyeOutlined,
-  ReloadOutlined, UserOutlined
+  CheckOutlined, CloseOutlined, EyeOutlined, UserOutlined
 } from '@ant-design/icons';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
@@ -198,10 +197,7 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     <div className="organization-request-management">
       {loading ? (
         <div className="loading-container">
-          <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
-            <ReloadOutlined spin style={{ fontSize: 32, color: '#1890ff' }} />
-            <div>加载中...</div>
-          </Space>
+          <Spin tip="加载中..." />
         </div>
       ) : requests.length === 0 ? (
         <div className="empty-container">

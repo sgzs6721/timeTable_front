@@ -6,7 +6,8 @@ import {
 } from 'antd';
 import { 
   TeamOutlined, CheckCircleOutlined, SaveOutlined, LeftOutlined,
-  TrophyOutlined, ShoppingOutlined, CustomerServiceOutlined, ControlOutlined
+  TrophyOutlined, ShoppingOutlined, CustomerServiceOutlined, ControlOutlined,
+  DownOutlined, UpOutlined
 } from '@ant-design/icons';
 import { getOrganizationPermissions, saveRolePermissions } from '../services/rolePermission';
 import { getOrganization } from '../services/organization';
@@ -24,6 +25,7 @@ const RolePermissionSettings = () => {
   const [permissions, setPermissions] = useState({});
   const [originalPermissions, setOriginalPermissions] = useState({});
   const [savingRole, setSavingRole] = useState(null);
+  const [expandedRoles, setExpandedRoles] = useState({});
 
   // 菜单配置
   const menuItems = [
@@ -186,6 +188,11 @@ const RolePermissionSettings = () => {
           ...prev,
           [role]: JSON.parse(JSON.stringify(permissions[role]))
         }));
+        
+        // 触发全局权限刷新事件，让 AppHeader 和 Dashboard 重新获取权限
+        window.dispatchEvent(new CustomEvent('permissionsUpdated', { 
+          detail: { role, organizationId } 
+        }));
       } else {
         message.error(response.message || '保存失败');
       }
@@ -208,38 +215,65 @@ const RolePermissionSettings = () => {
     return iconMap[iconName] || <TeamOutlined {...iconProps} />;
   };
 
+  // 切换折叠状态
+  const toggleRoleExpanded = (roleCode) => {
+    setExpandedRoles(prev => ({
+      ...prev,
+      [roleCode]: !prev[roleCode]
+    }));
+  };
+
+  // 检查是否有任何权限改变
+  const hasAnyPermissionChanged = (roleCode) => {
+    return hasMenuPermissionChanged(roleCode) || hasActionPermissionChanged(roleCode);
+  };
+
   const renderRoleCard = (role) => {
     const currentPermissions = permissions[role.roleCode];
     if (!currentPermissions) return null;
+
+    const isExpanded = expandedRoles[role.roleCode] === true; // 默认收起
 
     return (
       <Card
         key={role.id}
         className="role-card"
         title={
-          <Space>
-            {getIconComponent(role.icon, role.color)}
-            <span>{role.roleName} ({role.roleCode})</span>
-          </Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <Space>
+              {getIconComponent(role.icon, role.color)}
+              <span>{role.roleName} ({role.roleCode})</span>
+            </Space>
+            <Space>
+              <Button
+                type="primary"
+                size="small"
+                className="save-btn"
+                icon={<SaveOutlined />}
+                onClick={() => handleSavePermission(role.roleCode)}
+                disabled={!hasAnyPermissionChanged(role.roleCode)}
+                loading={savingRole === role.roleCode}
+              >
+                保存
+              </Button>
+              <Button
+                type="text"
+                size="small"
+                icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
+                onClick={() => toggleRoleExpanded(role.roleCode)}
+              />
+            </Space>
+          </div>
         }
       >
-        <div className="permission-section">
-          <div className="permission-section-header">
-            <Title level={5}>
-              <CheckCircleOutlined /> 顶部菜单权限
-            </Title>
-            <Button
-              type="primary"
-              size="small"
-              icon={<SaveOutlined />}
-              onClick={() => handleSavePermission(role.roleCode)}
-              disabled={!hasMenuPermissionChanged(role.roleCode)}
-              loading={savingRole === role.roleCode}
-              className="save-btn"
-            >
-              保存
-            </Button>
-          </div>
+        {isExpanded && (
+          <>
+            <div className="permission-section">
+              <div className="permission-section-header">
+                <Title level={5}>
+                  <CheckCircleOutlined /> 顶部菜单权限
+                </Title>
+              </div>
           <div className="permission-grid">
             {menuItems.map(item => (
               <div key={item.key} className="permission-item">
@@ -256,41 +290,32 @@ const RolePermissionSettings = () => {
           </div>
         </div>
 
-        <Divider />
+            <Divider />
 
-        <div className="permission-section">
-          <div className="permission-section-header">
-            <Title level={5}>
-              <CheckCircleOutlined /> 右上角功能菜单权限
-            </Title>
-            <Button
-              type="primary"
-              size="small"
-              icon={<SaveOutlined />}
-              onClick={() => handleSavePermission(role.roleCode)}
-              disabled={!hasActionPermissionChanged(role.roleCode)}
-              loading={savingRole === role.roleCode}
-              className="save-btn"
-            >
-              保存
-            </Button>
-          </div>
-          <div className="permission-grid">
-            {actionItems.map(item => (
-                <div key={item.key} className="permission-item">
-                  <Space>
-                    <span className="permission-icon">{item.icon}</span>
-                    <Text>{item.label}</Text>
-                  </Space>
-                  <Switch
-                    checked={currentPermissions.actionPermissions[item.key]}
-                    onChange={(checked) => handleActionPermissionChange(role.roleCode, item.key, checked)}
-                    disabled={item.disabled}
-                  />
-                </div>
-              ))}
-          </div>
-        </div>
+            <div className="permission-section">
+              <div className="permission-section-header">
+                <Title level={5}>
+                  <CheckCircleOutlined /> 右上角功能菜单权限
+                </Title>
+              </div>
+              <div className="permission-grid">
+                {actionItems.map(item => (
+                  <div key={item.key} className="permission-item">
+                    <Space>
+                      <span className="permission-icon">{item.icon}</span>
+                      <Text>{item.label}</Text>
+                    </Space>
+                    <Switch
+                      checked={currentPermissions.actionPermissions[item.key]}
+                      onChange={(checked) => handleActionPermissionChange(role.roleCode, item.key, checked)}
+                      disabled={item.disabled}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </Card>
     );
   };
