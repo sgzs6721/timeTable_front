@@ -25,7 +25,7 @@ import {
   updateTodoReminderTime
 } from '../services/todo';
 import { getTrialCustomers } from '../services/customer';
-import { cancelTrialSchedule } from '../services/customerStatusHistory';
+import { cancelTrialSchedule, changeCustomerStatus } from '../services/customerStatusHistory';
 import CustomerStatusHistoryModal from './CustomerStatusHistoryModal';
 import dayjs from 'dayjs';
 import './TodoList.css';
@@ -203,6 +203,38 @@ const TodoList = ({ onUnreadCountChange }) => {
     } catch (error) {
       console.error('取消体验课程失败:', error);
       message.error({ content: '取消体验课程失败', key: 'cancelTrial' });
+    }
+  };
+
+  // 完成体验课程（标记为已体验）
+  const handleCompleteTrialFromList = async (trial) => {
+    try {
+      message.loading({ content: '正在标记为已体验...', key: 'completeTrial' });
+      
+      // 调用状态变更接口，将状态改为 VISITED
+      const response = await changeCustomerStatus(trial.customerId, {
+        toStatus: 'VISITED',
+        notes: '体验课程已完成'
+      });
+      
+      if (response && response.success) {
+        message.success({ content: '✓ 已标记为已体验', key: 'completeTrial' });
+        // 刷新待体验列表
+        await fetchTrialCustomers();
+        // 刷新待办计数
+        if (onUnreadCountChange) {
+          const updatedTodos = await getTodos();
+          if (updatedTodos && updatedTodos.success) {
+            const todayCount = getTodayTodoCount(updatedTodos.data || []);
+            onUnreadCountChange(todayCount);
+          }
+        }
+      } else {
+        message.error({ content: response.message || '标记失败', key: 'completeTrial' });
+      }
+    } catch (error) {
+      console.error('完成体验课程失败:', error);
+      message.error({ content: '标记为已体验失败', key: 'completeTrial' });
     }
   };
 
@@ -461,18 +493,18 @@ const TodoList = ({ onUnreadCountChange }) => {
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           overflow: 'hidden'
         }}
-        bodyStyle={{ padding: '16px' }}
+        styles={{ body: { padding: '16px' } }}
         className="todo-card"
       >
         {/* 顶部：标题行 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: '16px', fontWeight: '500' }}>
-              {trial.childName || '未命名'}
-            </span>
             <Tag color={trial.status === 'SCHEDULED' ? 'purple' : 'cyan'}>
               {trial.statusText}
             </Tag>
+            <span style={{ fontSize: '16px', fontWeight: '500' }}>
+              {trial.childName || '未命名'}
+            </span>
           </div>
           {/* 联系方式 */}
           <div style={{ display: 'flex', alignItems: 'center', color: '#666', flexShrink: 0 }}>
@@ -575,24 +607,22 @@ const TodoList = ({ onUnreadCountChange }) => {
                     取消
                   </Button>
                 </Popconfirm>
-                <Button 
-                  type="text" 
-                  size="small"
-                  icon={<CheckCircleOutlined />}
-                  style={{ color: '#52c41a' }}
-                  onClick={() => {
-                    setSelectedCustomer({
-                      id: trial.customerId,
-                      childName: trial.childName,
-                      parentPhone: trial.parentPhone,
-                      status: trial.status,
-                      source: trial.source
-                    });
-                    setHistoryModalVisible(true);
-                  }}
+                <Popconfirm
+                  title="确定标记为已体验？"
+                  description="标记后客户状态将变更为已体验"
+                  onConfirm={() => handleCompleteTrialFromList(trial)}
+                  okText="确定"
+                  cancelText="取消"
                 >
-                  完成
-                </Button>
+                  <Button 
+                    type="text" 
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    style={{ color: '#52c41a' }}
+                  >
+                    完成
+                  </Button>
+                </Popconfirm>
               </div>
             )}
           </div>
@@ -638,7 +668,7 @@ const TodoList = ({ onUnreadCountChange }) => {
           backgroundColor: isUnread ? '#f0f5ff' : 'white',
           overflow: 'hidden'
         }}
-        bodyStyle={{ padding: '12px 16px 10px 16px', overflow: 'hidden' }}
+        styles={{ body: { padding: '12px 16px 10px 16px', overflow: 'hidden' } }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ flex: 1 }}>
@@ -1085,26 +1115,6 @@ const TodoList = ({ onUnreadCountChange }) => {
             }}
           >
             全部
-          </div>
-          <div 
-            onClick={() => setFilter('trials')}
-            style={{
-              minWidth: '80px',
-              padding: '8px 16px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500',
-              transition: 'all 0.3s',
-              backgroundColor: filter === 'trials' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
-              color: filter === 'trials' ? '#1890ff' : '#666',
-              backdropFilter: filter === 'trials' ? 'blur(10px)' : 'none',
-              border: filter === 'trials' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            体验 (<span style={{ color: '#722ed1' }}>{trials.length}</span>)
           </div>
           <div 
             onClick={() => setFilter('today')}

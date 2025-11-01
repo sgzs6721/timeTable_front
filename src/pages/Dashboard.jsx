@@ -23,6 +23,7 @@ import Footer from '../components/Footer';
 import MySalary from './MySalary';
 import CustomerManagement from './CustomerManagement';
 import TodoList from '../components/TodoList';
+import TrialsList from './TrialsList';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './Dashboard.css';
 
@@ -1285,6 +1286,7 @@ const Dashboard = ({ user }) => {
   const [timetableScheduleCounts, setTimetableScheduleCounts] = useState({});
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
   const [userPermissions, setUserPermissions] = useState(null);
+  const [showTrialsList, setShowTrialsList] = useState(false);
   
   // 管理员概览相关状态
   const [activeTab, setActiveTab] = useState(() => {
@@ -1494,11 +1496,13 @@ const Dashboard = ({ user }) => {
     // 找到第一个有权限的tab
     const firstVisibleTab = tabPriority.find(tab => menuPerms[tab.permission] === true);
     
-    if (firstVisibleTab) {
+    // 只有在URL参数中没有指定tab时，才自动切换到第一个可见tab
+    const tabParam = searchParams.get('tab');
+    if (firstVisibleTab && !tabParam) {
       console.log('[Dashboard] 自动切换到第一个可见tab:', firstVisibleTab.key);
       setActiveTab(firstVisibleTab.key);
     }
-  }, [userPermissions]);
+  }, [userPermissions, searchParams]);
 
   // 清除缓存数据
   const clearCache = () => {
@@ -5121,6 +5125,7 @@ const Dashboard = ({ user }) => {
           onTodoCreated={refreshTodoCount} 
           highlightCustomerId={searchParams.get('customerId')}
           searchCustomerName={searchParams.get('customerName')}
+          onShowTrialsList={() => setShowTrialsList(true)}
         />
       });
     }
@@ -5314,6 +5319,21 @@ const Dashboard = ({ user }) => {
       
       {/* 版权信息 */}
       <Footer />
+      
+      {/* 体验列表覆盖层 */}
+      {showTrialsList && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1000,
+          backgroundColor: '#fff'
+        }}>
+          <TrialsList onClose={() => setShowTrialsList(false)} />
+        </div>
+      )}
     </div>
   );
 };

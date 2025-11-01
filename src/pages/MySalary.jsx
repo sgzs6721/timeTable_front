@@ -358,7 +358,7 @@ const MySalary = ({ user }) => {
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
           border: '1px solid #e8e8e8'
         }}
-        bodyStyle={{ padding: isMobile ? '16px' : '24px' }}
+        styles={{ body: { padding: isMobile ? '16px' : '24px' } }}
       >
         {/* 月份选择 - 只对管理员显示 */}
         {isAdmin && (

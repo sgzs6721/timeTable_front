@@ -175,7 +175,7 @@ const UserGuide = ({ user }) => {
   }, [demo]);
   return (
     <div style={{ maxWidth: 960, margin: '24px auto', padding: '0 16px' }}>
-      <Card bodyStyle={{ position: 'relative', padding: 0 }}>
+      <Card styles={{ body: { position: 'relative', padding: 0 } }}>
         <div
           style={{
             position: 'sticky',

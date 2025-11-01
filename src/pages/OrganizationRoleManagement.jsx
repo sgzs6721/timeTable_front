@@ -149,7 +149,7 @@ const OrganizationRoleManagement = () => {
       key={role.id}
       className="role-item-card"
       hoverable
-      bodyStyle={{ padding: '16px' }}
+      styles={{ body: { padding: '16px' } }}
     >
       <div className="role-card-content">
         <Space size={10} align="start">

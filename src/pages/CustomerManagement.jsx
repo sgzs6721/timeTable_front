@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Card, 
   Button, 
@@ -27,7 +28,8 @@ import {
   CopyOutlined,
   BellOutlined,
   PhoneOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  UnorderedListOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { 
@@ -46,7 +48,8 @@ import './CustomerManagement.css';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCustomerName }, ref) => {
+const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCustomerName, onShowTrialsList }, ref) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -77,14 +80,18 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [parseText, setParseText] = useState('');
   const [parsing, setParsing] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchInputValue, setSearchInputValue] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const searchDebounceTimer = useRef(null);
 
   // 监听searchCustomerName参数，自动填入搜索框
   useEffect(() => {
     if (searchCustomerName) {
-      setSearchKeyword(decodeURIComponent(searchCustomerName));
+      const decodedName = decodeURIComponent(searchCustomerName);
+      setSearchKeyword(decodedName);
+      setSearchInputValue(decodedName);
     }
   }, [searchCustomerName]);
 
@@ -137,6 +144,37 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     setHasMore(true);
     fetchCustomers(0, true);
   }, [activeTab, salesFilter, selectedFilterDate, searchKeyword]);
+
+  // 清理防抖定时器
+  useEffect(() => {
+    return () => {
+      if (searchDebounceTimer.current) {
+        clearTimeout(searchDebounceTimer.current);
+      }
+    };
+  }, []);
+
+  // 处理搜索输入变化（带防抖）
+  const handleSearchInputChange = (e) => {
+    const value = e.target.value;
+    setSearchInputValue(value);
+    
+    // 清除之前的定时器
+    if (searchDebounceTimer.current) {
+      clearTimeout(searchDebounceTimer.current);
+    }
+    
+    // 如果输入为空，立即更新searchKeyword以触发搜索
+    if (value === '') {
+      setSearchKeyword('');
+      return;
+    }
+    
+    // 设置新的定时器，500ms后更新searchKeyword触发搜索
+    searchDebounceTimer.current = setTimeout(() => {
+      setSearchKeyword(value);
+    }, 500);
+  };
 
   const fetchCustomers = async (page = currentPage, reset = false) => {
     if (!hasMore && !reset) return;
@@ -1001,7 +1039,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       <Card
         id={`customer-card-${customer.id}`}
         style={{ height: '100%', transition: 'background-color 0.5s ease' }}
-        bodyStyle={{ padding: '12px' }}
+        styles={{ body: { padding: '12px' } }}
       >
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -1273,13 +1311,18 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
 
   return (
     <div style={{ padding: '2px', display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Card bodyStyle={{ padding: '8px', flex: 1, overflow: 'visible' }}>
+        <Card styles={{ body: { padding: '8px', flex: 1, overflow: 'visible' } }}>
           {/* 过滤器 */}
           <div className="customer-filter-area" style={{ marginBottom: 12 }}>
             <Row gutter={8}>
-            <Col span={24} style={{ marginBottom: 12 }}>
+            <Col span={12} style={{ marginBottom: 12 }}>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate} size="large" style={{ width: '100%' }}>
                 新建客户
+              </Button>
+            </Col>
+            <Col span={12} style={{ marginBottom: 12 }}>
+              <Button icon={<UnorderedListOutlined />} onClick={onShowTrialsList} size="large" style={{ width: '100%' }}>
+                体验列表
               </Button>
             </Col>
             
@@ -1376,10 +1419,8 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
             <Col span={12} style={{ marginBottom: 12, paddingRight: 6 }}>
               <Input
                 placeholder="搜索姓名或电话"
-                value={searchKeyword}
-                onChange={(e) => {
-                  setSearchKeyword(e.target.value);
-                }}
+                value={searchInputValue}
+                onChange={handleSearchInputChange}
                 allowClear
                 size="large"
                 prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
@@ -1533,7 +1574,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                   <TextArea
                     value={parseText}
                     onChange={(e) => setParseText(e.target.value)}
-                    placeholder="例如：东东，男，7岁，15810695923，下周末有时间"
+                    placeholder="例如：小明，男，7岁，13800138000，下周末有时间"
                     rows={3}
                     maxLength={500}
                   />

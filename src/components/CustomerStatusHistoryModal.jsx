@@ -360,6 +360,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         statusChangeData.trialEndTime = experienceTimeRange[1].format('HH:mm:ss');
         // 只有有课表权限时才保存教练ID
         statusChangeData.trialCoachId = hasSchedulePermission ? (selectedCoach || null) : null;
+        // 保存体验人员姓名
+        statusChangeData.trialStudentName = trialStudentName.trim();
       }
       
       const response = await changeCustomerStatus(customer.id, statusChangeData);
