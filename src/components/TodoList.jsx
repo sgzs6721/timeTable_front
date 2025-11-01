@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Space, Timeline, DatePicker, TimePicker, Modal, Descriptions } from 'antd';
+import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Timeline, DatePicker, TimePicker, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircleOutlined, 
@@ -14,7 +14,6 @@ import {
   HistoryOutlined,
   UserOutlined,
   CalendarOutlined,
-  EyeOutlined,
   PhoneOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons';
@@ -44,8 +43,9 @@ const TodoList = ({ onUnreadCountChange }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null); // 选中的客户
   const [trials, setTrials] = useState([]); // 待体验客户列表
   const [loadingTrials, setLoadingTrials] = useState(false); // 加载待体验客户
-  const [trialDetailVisible, setTrialDetailVisible] = useState(false); // 体验详情模态框
-  const [selectedTrial, setSelectedTrial] = useState(null); // 选中的待体验客户
+  const [selectedCreator, setSelectedCreator] = useState(null); // 选中的录入人员ID
+  const [trialDateFilter, setTrialDateFilter] = useState(null); // 体验日期过滤
+  const [creatorsMap, setCreatorsMap] = useState({}); // 录入人员映射 {id: name}
 
   const handleCopyPhone = (phone) => {
     if (!phone) return;
@@ -128,9 +128,30 @@ const TodoList = ({ onUnreadCountChange }) => {
   const fetchTrialCustomers = async () => {
     setLoadingTrials(true);
     try {
-      const response = await getTrialCustomers();
+      // 构建查询参数
+      const params = {};
+      if (selectedCreator) {
+        params.createdById = selectedCreator;
+      }
+      if (trialDateFilter) {
+        params.trialDate = dayjs(trialDateFilter).format('YYYY-MM-DD');
+      }
+      
+      const response = await getTrialCustomers(params);
       if (response && response.success) {
-        setTrials(response.data || []);
+        const data = response.data || [];
+        setTrials(data);
+        
+        // 如果是首次加载（没有过滤条件），提取所有录入人员映射
+        if (!selectedCreator && !trialDateFilter && data.length > 0) {
+          const map = {};
+          data.forEach(t => {
+            if (t.createdById && t.createdByName && !map[t.createdById]) {
+              map[t.createdById] = t.createdByName;
+            }
+          });
+          setCreatorsMap(map);
+        }
       } else {
         setTrials([]);
         message.error(response.message || '获取待体验客户失败');
@@ -147,8 +168,20 @@ const TodoList = ({ onUnreadCountChange }) => {
   useEffect(() => {
     if (filter === 'trials') {
       fetchTrialCustomers();
+    } else {
+      // 切换到其他tab时清空体验过滤条件
+      setSelectedCreator(null);
+      setTrialDateFilter(null);
+      setCreatorsMap({});
     }
   }, [filter]);
+
+  // 当过滤条件改变时重新获取数据
+  useEffect(() => {
+    if (filter === 'trials') {
+      fetchTrialCustomers();
+    }
+  }, [selectedCreator, trialDateFilter]);
 
   // 从待体验列表中取消体验
   const handleCancelTrialFromList = async (trial) => {
@@ -163,7 +196,7 @@ const TodoList = ({ onUnreadCountChange }) => {
       if (response && response.success) {
         message.success({ content: '✓ 体验课程已取消', key: 'cancelTrial' });
         // 刷新待体验列表
-        fetchTrialCustomers();
+        await fetchTrialCustomers();
       } else {
         message.error({ content: response.message || '取消失败', key: 'cancelTrial' });
       }
@@ -186,7 +219,7 @@ const TodoList = ({ onUnreadCountChange }) => {
       if (response && response.success) {
         message.success({ content: '✓ 体验课程已取消', key: 'cancelTrial' });
         // 刷新待办列表
-        fetchTodos();
+        await fetchTodos();
       } else {
         message.error({ content: response.message || '取消失败', key: 'cancelTrial' });
       }
@@ -417,15 +450,10 @@ const TodoList = ({ onUnreadCountChange }) => {
     }));
   };
 
-  const handleViewTrialDetail = (trial) => {
-    setSelectedTrial(trial);
-    setTrialDetailVisible(true);
-  };
-
   const renderTrialCard = (trial) => {
     return (
       <Card
-        key={trial.customerId}
+        key={trial.historyId}
         style={{
           marginBottom: '16px',
           borderRadius: '8px',
@@ -436,7 +464,7 @@ const TodoList = ({ onUnreadCountChange }) => {
         bodyStyle={{ padding: '16px' }}
         className="todo-card"
       >
-        {/* 顶部：标题行和查看详情按钮 */}
+        {/* 顶部：标题行 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: '16px', fontWeight: '500' }}>
@@ -469,37 +497,36 @@ const TodoList = ({ onUnreadCountChange }) => {
               style={{ marginLeft: '4px', padding: '0 4px' }}
             />
           </div>
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => handleViewTrialDetail(trial)}
-            style={{ flexShrink: 0 }}
-          >
-            详情
-          </Button>
         </div>
 
-        {/* 体验时间 */}
+        {/* 体验时间和教练信息框 */}
         <div style={{ 
           marginBottom: '8px',
           padding: '8px',
           backgroundColor: trial.trialCancelled ? '#f5f5f5' : '#f0f5ff',
           borderRadius: '4px',
-          border: trial.trialCancelled ? '1px solid #d9d9d9' : '1px solid #91caff',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          border: trial.trialCancelled ? '1px solid #d9d9d9' : '1px solid #91caff'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-            <CalendarOutlined style={{ color: trial.trialCancelled ? '#999' : '#1890ff', fontSize: '14px' }} />
-            <span style={{ fontSize: '13px', color: '#666' }}>
+          {/* 第一行：体验时间信息（不换行） */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            marginBottom: '8px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden'
+          }}>
+            <CalendarOutlined style={{ color: trial.trialCancelled ? '#999' : '#1890ff', fontSize: '14px', flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', color: '#666', flexShrink: 0 }}>
               体验时间：
             </span>
             <span style={{ 
               fontSize: '13px', 
               fontWeight: 'bold', 
               color: trial.trialCancelled ? '#999' : '#1890ff',
-              textDecoration: trial.trialCancelled ? 'line-through' : 'none'
+              textDecoration: trial.trialCancelled ? 'line-through' : 'none',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
             }}>
               {dayjs(trial.trialScheduleDate).format('YYYY-MM-DD')}
               {trial.trialStartTime && trial.trialEndTime && 
@@ -512,35 +539,82 @@ const TodoList = ({ onUnreadCountChange }) => {
               })()}
             </span>
             {trial.trialCancelled && (
-              <Tag color="default" style={{ marginLeft: 8 }}>已取消</Tag>
+              <Tag color="default" style={{ marginLeft: 8, flexShrink: 0 }}>已取消</Tag>
             )}
           </div>
-          {trial.trialCancelled !== true && (
-            <Popconfirm
-              title="确定取消体验课程？"
-              description="取消后将标记为已取消，如有权限也会从课表中删除"
-              onConfirm={() => handleCancelTrialFromList(trial)}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Button 
-                type="text" 
-                danger
-                size="small"
-                icon={<CloseCircleOutlined />}
-                style={{ marginLeft: 8 }}
-              >
-                取消
-              </Button>
-            </Popconfirm>
-          )}
+
+          {/* 第二行：教练信息和操作按钮 */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            fontSize: '13px', 
+            color: '#666'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <UserOutlined style={{ marginRight: '6px' }} />
+              教练：{trial.trialCoachName || '未指定'}
+            </div>
+            
+            {/* 操作按钮（右对齐） */}
+            {trial.trialCancelled !== true && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Popconfirm
+                  title="确定取消体验课程？"
+                  description="取消后将标记为已取消，如有权限也会从课表中删除"
+                  onConfirm={() => handleCancelTrialFromList(trial)}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button 
+                    type="text" 
+                    danger
+                    size="small"
+                    icon={<CloseCircleOutlined />}
+                  >
+                    取消
+                  </Button>
+                </Popconfirm>
+                <Button 
+                  type="text" 
+                  size="small"
+                  icon={<CheckCircleOutlined />}
+                  style={{ color: '#52c41a' }}
+                  onClick={() => {
+                    setSelectedCustomer({
+                      id: trial.customerId,
+                      childName: trial.childName,
+                      parentPhone: trial.parentPhone,
+                      status: trial.status,
+                      source: trial.source
+                    });
+                    setHistoryModalVisible(true);
+                  }}
+                >
+                  完成
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* 教练信息 */}
-        {trial.trialCoachName && (
-          <div style={{ fontSize: '13px', color: '#666' }}>
-            <UserOutlined style={{ marginRight: '6px' }} />
-            教练：{trial.trialCoachName}
+        {/* 录入信息 */}
+        {(trial.createdByName || trial.createdAt) && (
+          <div style={{ 
+            fontSize: '12px', 
+            color: '#999',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            {trial.createdByName && (
+              <span>{trial.createdByName}</span>
+            )}
+            {trial.createdAt && (
+              <span>
+                录入于 {dayjs(trial.createdAt).format('YYYY-MM-DD HH:mm')}
+              </span>
+            )}
           </div>
         )}
       </Card>
@@ -1103,6 +1177,36 @@ const TodoList = ({ onUnreadCountChange }) => {
         </div>
       </div>
 
+      {/* 体验过滤器 */}
+      {filter === 'trials' && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Select
+              value={selectedCreator}
+              onChange={(value) => setSelectedCreator(value)}
+              placeholder="全部录入人员"
+              style={{ flex: 1 }}
+              size="large"
+              allowClear
+            >
+              {Object.entries(creatorsMap).map(([id, name]) => (
+                <Select.Option key={id} value={parseInt(id)}>{name}</Select.Option>
+              ))}
+            </Select>
+            
+            <DatePicker
+              value={trialDateFilter}
+              onChange={(date) => setTrialDateFilter(date)}
+              placeholder="选择体验日期"
+              style={{ flex: 1 }}
+              size="large"
+              allowClear
+              format="YYYY-MM-DD"
+            />
+          </div>
+        </div>
+      )}
+
       {/* 待办列表 */}
       <div style={{ flex: 1 }}>
         {filter === 'trials' ? (
@@ -1154,99 +1258,6 @@ const TodoList = ({ onUnreadCountChange }) => {
         onTodoCreated={null}
         onTodoUpdated={handleTodoUpdated}
       />
-
-      {/* 体验详情模态框 */}
-      <Modal
-        title="体验详情"
-        open={trialDetailVisible}
-        onCancel={() => {
-          setTrialDetailVisible(false);
-          setSelectedTrial(null);
-        }}
-        footer={[
-          <Button key="close" onClick={() => {
-            setTrialDetailVisible(false);
-            setSelectedTrial(null);
-          }}>
-            关闭
-          </Button>,
-          selectedTrial && selectedTrial.trialCancelled !== true && (
-            <Popconfirm
-              key="cancel"
-              title="确定取消体验课程？"
-              description="取消后将标记为已取消，如有权限也会从课表中删除"
-              onConfirm={() => {
-                handleCancelTrialFromList(selectedTrial);
-                setTrialDetailVisible(false);
-                setSelectedTrial(null);
-              }}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Button danger icon={<CloseCircleOutlined />}>
-                取消体验
-              </Button>
-            </Popconfirm>
-          )
-        ]}
-        width={500}
-      >
-        {selectedTrial && (
-          <Descriptions bordered column={1}>
-            <Descriptions.Item label="客户姓名">
-              {selectedTrial.childName}
-            </Descriptions.Item>
-            <Descriptions.Item label="联系电话">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <PhoneOutlined />
-                <span style={{ fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>
-                  {selectedTrial.parentPhone}
-                </span>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<CopyOutlined />}
-                  onClick={() => handleCopyPhone(selectedTrial.parentPhone)}
-                />
-              </div>
-            </Descriptions.Item>
-            <Descriptions.Item label="当前状态">
-              <Space>
-                <Tag color={selectedTrial.status === 'SCHEDULED' ? 'purple' : 'cyan'}>
-                  {selectedTrial.statusText}
-                </Tag>
-                {selectedTrial.trialCancelled && (
-                  <Tag color="default">已取消</Tag>
-                )}
-              </Space>
-            </Descriptions.Item>
-            <Descriptions.Item label="体验日期">
-              <span style={{ textDecoration: selectedTrial.trialCancelled ? 'line-through' : 'none' }}>
-                {dayjs(selectedTrial.trialScheduleDate).format('YYYY年MM月DD日')}
-                {' '}
-                <span style={{ color: '#666' }}>
-                  {(() => {
-                    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-                    return weekdays[dayjs(selectedTrial.trialScheduleDate).day()];
-                  })()}
-                </span>
-              </span>
-            </Descriptions.Item>
-            <Descriptions.Item label="体验时间">
-              <span style={{ textDecoration: selectedTrial.trialCancelled ? 'line-through' : 'none' }}>
-                {selectedTrial.trialStartTime && selectedTrial.trialEndTime && 
-                  `${selectedTrial.trialStartTime.substring(0, 5)} - ${selectedTrial.trialEndTime.substring(0, 5)}`
-                }
-              </span>
-            </Descriptions.Item>
-            {selectedTrial.trialCoachName && (
-              <Descriptions.Item label="体验教练">
-                {selectedTrial.trialCoachName}
-              </Descriptions.Item>
-            )}
-          </Descriptions>
-        )}
-      </Modal>
     </div>
   );
 };

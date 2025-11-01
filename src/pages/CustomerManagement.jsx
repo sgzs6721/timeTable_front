@@ -49,7 +49,6 @@ const { TextArea } = Input;
 const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCustomerName }, ref) => {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState([]);
-  const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [form] = Form.useForm();
@@ -66,7 +65,6 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [currentDatePage, setCurrentDatePage] = useState(0);
   const [salesList, setSalesList] = useState([]);
   const [selectedFilterDate, setSelectedFilterDate] = useState(null);
-  const [displayedCount, setDisplayedCount] = useState(10); // 初始显示10条数据
   const [customerTodoStatus, setCustomerTodoStatus] = useState({});
   const [latestTodoByCustomer, setLatestTodoByCustomer] = useState({});
   const [todoInfoLoadingId, setTodoInfoLoadingId] = useState(null);
@@ -79,6 +77,9 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [parseText, setParseText] = useState('');
   const [parsing, setParsing] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // 监听searchCustomerName参数，自动填入搜索框
   useEffect(() => {
@@ -119,10 +120,10 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const isSales = user?.position?.toUpperCase() === 'SALES';
 
   useEffect(() => {
-    fetchCustomers();
     if (isAdmin) {
       fetchSalesList();
     }
+    // fetchCustomers 会由筛选条件的 useEffect 触发，无需在这里调用
   }, []);
 
   useEffect(() => {
@@ -130,21 +131,69 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   }, [customers]);
 
   useEffect(() => {
-    filterCustomers();
-    // 筛选条件变化时，重置显示的数据条数
-    setDisplayedCount(10);
-  }, [customers, activeTab, salesFilter, selectedFilterDate, searchKeyword]);
+    // 筛选条件变化时，重置分页并重新加载
+    setCustomers([]);
+    setCurrentPage(0);
+    setHasMore(true);
+    fetchCustomers(0, true);
+  }, [activeTab, salesFilter, selectedFilterDate, searchKeyword]);
 
-  const fetchCustomers = async () => {
-    setLoading(true);
+  const fetchCustomers = async (page = currentPage, reset = false) => {
+    if (!hasMore && !reset) return;
+    
+    // 防止并发请求
+    if (loading || loadingMore) return;
+    
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+    
     try {
-      const response = await getCustomers();
+      const params = {
+        page: page,
+        pageSize: 20
+      };
+      
+      // 添加过滤参数
+      if (activeTab && activeTab !== 'all') {
+        params.status = activeTab.toUpperCase();
+      }
+      
+      if (salesFilter && salesFilter !== 'all') {
+        params.salesId = parseInt(salesFilter);
+      }
+      
+      if (selectedFilterDate) {
+        params.filterDate = selectedFilterDate.format('YYYY-MM-DD');
+      }
+      
+      if (searchKeyword) {
+        params.keyword = searchKeyword;
+      }
+      
+      const response = await getCustomers(params);
       if (response && response.success) {
-        // 按创建时间倒序排列（最新的在前面）
-        const sortedData = (response.data || []).sort((a, b) => {
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        });
-        setCustomers(sortedData);
+        const newData = response.data || [];
+        
+        if (reset) {
+          setCustomers(newData);
+        } else {
+          // 合并数据并去重（基于customer.id）
+          setCustomers(prev => {
+            const existingIds = new Set(prev.map(c => c.id));
+            const uniqueNewData = newData.filter(c => !existingIds.has(c.id));
+            return [...prev, ...uniqueNewData];
+          });
+        }
+        
+        // 如果返回的数据少于pageSize，说明没有更多数据了
+        if (newData.length < 20) {
+          setHasMore(false);
+        }
+        
+        setCurrentPage(page + 1);
       } else {
         message.error('获取客户列表失败');
       }
@@ -153,6 +202,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       message.error('获取客户列表失败');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -230,44 +280,6 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     }
   };
 
-  const filterCustomers = () => {
-    let filtered = customers;
-
-    // 按状态过滤
-    if (activeTab !== 'all') {
-      filtered = filtered.filter(customer => customer.status === activeTab);
-    }
-
-    // 按销售人员过滤
-    if (salesFilter !== 'all') {
-      filtered = filtered.filter(customer => 
-        customer.createdBy === parseInt(salesFilter) || 
-        customer.assignedSalesId === parseInt(salesFilter)
-      );
-    }
-
-    // 按日期过滤
-    if (selectedFilterDate) {
-      const filterDateStr = dayjs(selectedFilterDate).format('YYYY-MM-DD');
-      filtered = filtered.filter(customer => {
-        const customerDateStr = dayjs(customer.createdAt).format('YYYY-MM-DD');
-        return customerDateStr === filterDateStr;
-      });
-    }
-
-    // 按姓名或电话搜索
-    if (searchKeyword && searchKeyword.trim()) {
-      const keyword = searchKeyword.trim().toLowerCase();
-      filtered = filtered.filter(customer => {
-        const childName = (customer.childName || '').toLowerCase();
-        const parentPhone = (customer.parentPhone || '').toLowerCase();
-        return childName.includes(keyword) || parentPhone.includes(keyword);
-      });
-    }
-
-    setFilteredCustomers(filtered);
-  };
-
   const handleCreate = () => {
     setEditingCustomer(null);
     form.resetFields();
@@ -327,21 +339,10 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         })
       );
       
-      // 同时更新 filteredCustomers 以确保筛选后的列表也更新
-      setFilteredCustomers(prevFiltered => 
-        prevFiltered.map(c => {
-          if (c.id === selectedCustomer.id) {
-            return {
-              ...c,
-              status: newStatus || c.status,
-              statusText: newStatus ? getStatusText(newStatus) : c.statusText,
-              lastStatusChangeNote: lastChangeNote !== undefined ? lastChangeNote : c.lastStatusChangeNote,
-              lastStatusChangeTime: lastChangeNote !== undefined ? new Date().toISOString() : c.lastStatusChangeTime
-            };
-          }
-          return c;
-        })
-      );
+      // 更新待办状态
+      if (newStatus) {
+        await checkAllCustomerTodos();
+      }
     }
   };
 
@@ -534,19 +535,16 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     setActiveTab('all');
     setSelectedFilterDate(null);
     setCurrentDatePage(0);
-    setDisplayedCount(10);
   };
 
   const handleSalesFilterChange = (value) => {
     setSalesFilter(value);
     setCurrentDatePage(0);
-    setDisplayedCount(10);
   };
 
   const handleActiveTabChange = (value) => {
     setActiveTab(value);
     setCurrentDatePage(0);
-    setDisplayedCount(10);
   };
 
   // 智能解析客户信息
@@ -987,22 +985,19 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     return `${dateStr} 星期${weekday}`;
   };
 
-  // 获取要显示的客户数据（按条数切片）
-  const displayedCustomers = filteredCustomers.slice(0, displayedCount);
-  
   // 按日期分组显示的客户
-  const groupedCustomers = groupCustomersByDate(displayedCustomers);
+  const groupedCustomers = groupCustomersByDate(customers);
   const allDateKeys = Object.keys(groupedCustomers);
 
   // 加载更多数据
   const loadMoreData = () => {
-    if (displayedCount < filteredCustomers.length) {
-      setDisplayedCount(prev => Math.min(prev + 10, filteredCustomers.length));
+    if (hasMore && !loadingMore) {
+      fetchCustomers();
     }
   };
 
-  const renderCustomerCard = (customer) => (
-    <Col key={customer.id} xs={24} sm={12} md={12} lg={12} xl={12}>
+  const renderCustomerCard = (customer, key) => (
+    <Col key={key} xs={24} sm={12} md={12} lg={12} xl={12}>
       <Card
         id={`customer-card-${customer.id}`}
         style={{ height: '100%', transition: 'background-color 0.5s ease' }}
@@ -1378,13 +1373,24 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               </Select>
             </Col>
 
-            <Col span={24} style={{ marginBottom: 12 }}>
+            <Col span={12} style={{ marginBottom: 12, paddingRight: 6 }}>
+              <Input
+                placeholder="搜索姓名或电话"
+                value={searchKeyword}
+                onChange={(e) => {
+                  setSearchKeyword(e.target.value);
+                }}
+                allowClear
+                size="large"
+                prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
+              />
+            </Col>
+
+            <Col span={12} style={{ marginBottom: 12, paddingLeft: 6 }}>
               <DatePicker
                 value={selectedFilterDate}
                 onChange={(date) => {
                   setSelectedFilterDate(date);
-                  setCurrentDatePage(0);
-                  setDisplayedCount(10);
                 }}
                 placeholder="选择日期过滤"
                 style={{ width: '100%' }}
@@ -1392,21 +1398,6 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                 allowClear
                 format="YYYY-MM-DD"
                 disabledDate={disabledDate}
-              />
-            </Col>
-
-            <Col span={24} style={{ marginBottom: 12 }}>
-              <Input
-                placeholder="搜索姓名或电话"
-                value={searchKeyword}
-                onChange={(e) => {
-                  setSearchKeyword(e.target.value);
-                  setCurrentDatePage(0);
-                  setDisplayedCount(10);
-                }}
-                allowClear
-                size="large"
-                prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
               />
             </Col>
             </Row>
@@ -1417,7 +1408,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <Spin size="large" />
           </div>
-        ) : filteredCustomers.length === 0 ? (
+        ) : customers.length === 0 && !loading ? (
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <p>暂无客户数据</p>
           </div>
@@ -1471,22 +1462,24 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                   
                   {/* 客户卡片列表 */}
                   <Row gutter={[4, 8]} style={{ margin: 0, width: '100%' }}>
-                    {customers.map(customer => renderCustomerCard(customer))}
+                    {customers.map(customer => 
+                      renderCustomerCard(customer, `${dateKey}-${customer.id}`)
+                    )}
                   </Row>
                 </div>
               );
             })}
             
             {/* 加载更多提示 */}
-            {displayedCount < filteredCustomers.length && (
+            {loadingMore && (
               <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
                 <Spin size="small" /> 加载中...
               </div>
             )}
             
-            {displayedCount >= filteredCustomers.length && filteredCustomers.length > 0 && (
+            {!hasMore && customers.length > 0 && (
               <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-                已加载全部 {filteredCustomers.length} 条数据
+                已加载全部 {customers.length} 条数据
               </div>
             )}
           </div>

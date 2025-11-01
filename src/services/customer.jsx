@@ -6,8 +6,8 @@ export const createCustomer = (customerData) => {
 };
 
 // 获取客户列表
-export const getCustomers = () => {
-  return api.get('/customers');
+export const getCustomers = (params) => {
+  return api.get('/customers', { params });
 };
 
 // 获取客户详情
@@ -31,6 +31,6 @@ export const getCustomersByStatus = (status) => {
 };
 
 // 获取待体验客户列表
-export const getTrialCustomers = () => {
-  return api.get('/customers/trials');
+export const getTrialCustomers = (params) => {
+  return api.get('/customers/trials', { params });
 };
