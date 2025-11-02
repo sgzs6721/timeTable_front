@@ -906,7 +906,7 @@ const ViewTimetable = ({ user }) => {
   const [allSchedules, setAllSchedules] = useState([]);
   // 本页采用"每区块一次"的策略：各区块调用 *Once 方法（带合并+缓存）
   const [templateSchedules, setTemplateSchedules] = useState([]); // 存储固定课表模板数据用于比较
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 初始为false，避免返回时白屏
   
   // 移除了 viewModeRef，简化渲染逻辑
   
@@ -2104,6 +2104,9 @@ const ViewTimetable = ({ user }) => {
 
 
   useEffect(() => {
+    // 保存当前课表ID和访问时间
+    sessionStorage.setItem('last_viewed_timetable_id', String(timetableId));
+    sessionStorage.setItem('last_view_timetable_time', String(Date.now()));
     fetchTimetable();
   }, [timetableId]);
 
@@ -2171,7 +2174,18 @@ const ViewTimetable = ({ user }) => {
   // }, [viewMode, timetable, loading]);
 
   const fetchTimetable = async () => {
-    setLoading(true);
+    // 检查缓存，如果是最近访问的同一课表，不显示loading
+    const lastTimetableId = sessionStorage.getItem('last_viewed_timetable_id');
+    const lastViewTime = sessionStorage.getItem('last_view_timetable_time');
+    const now = Date.now();
+    const isRecentSameTimetable = lastTimetableId === String(timetableId) && 
+                                  lastViewTime && 
+                                  (now - parseInt(lastViewTime)) < 5 * 60 * 1000;
+    
+    if (!isRecentSameTimetable) {
+      setLoading(true);
+    }
+    
     try {
       const response = await getTimetable(timetableId);
       if (response.success) {

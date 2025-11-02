@@ -1279,11 +1279,39 @@ const ActiveBadge = () => (
 
 const Dashboard = ({ user }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [timetables, setTimetables] = useState([]);
-  const [archivedTimetables, setArchivedTimetables] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  // 初始化时同步读取缓存，避免后退时白屏
+  const initCache = () => {
+    const cachedTimetables = sessionStorage.getItem('dashboard_timetables');
+    const cachedScheduleCounts = sessionStorage.getItem('dashboard_schedule_counts');
+    const cacheTimestamp = sessionStorage.getItem('dashboard_cache_timestamp');
+    
+    if (cachedTimetables && cachedScheduleCounts && cacheTimestamp) {
+      const cacheAge = Date.now() - parseInt(cacheTimestamp);
+      if (cacheAge < 5 * 60 * 1000) {
+        try {
+          const parsedTimetables = JSON.parse(cachedTimetables);
+          const parsedScheduleCounts = JSON.parse(cachedScheduleCounts);
+          return {
+            timetables: parsedTimetables.filter(t => !t.isArchived),
+            archivedTimetables: parsedTimetables.filter(t => t.isArchived),
+            scheduleCounts: parsedScheduleCounts,
+            hasValidCache: true
+          };
+        } catch (e) {
+          console.error('缓存解析失败:', e);
+        }
+      }
+    }
+    return { timetables: [], archivedTimetables: [], scheduleCounts: {}, hasValidCache: false };
+  };
+  
+  const cache = initCache();
+  const [timetables, setTimetables] = useState(cache.timetables);
+  const [archivedTimetables, setArchivedTimetables] = useState(cache.archivedTimetables);
+  const [loading, setLoading] = useState(!cache.hasValidCache);
   const [loadingScheduleCounts, setLoadingScheduleCounts] = useState(false);
-  const [timetableScheduleCounts, setTimetableScheduleCounts] = useState({});
+  const [timetableScheduleCounts, setTimetableScheduleCounts] = useState(cache.scheduleCounts);
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
   const [userPermissions, setUserPermissions] = useState(null);
   const [showTrialsList, setShowTrialsList] = useState(false);
@@ -1426,6 +1454,19 @@ const Dashboard = ({ user }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const navigate = useNavigate();
+  
+  // 使用React.memo包装TrialsList，避免Dashboard重新渲染时导致TrialsList重新挂载
+  const TrialsListMemo = React.useMemo(() => React.memo(TrialsList), []);
+  
+  // 创建稳定的回调函数，避免每次渲染都创建新函数导致TrialsList重新渲染
+  const handleCloseTrialsList = React.useCallback(() => {
+    setShowTrialsList(false);
+  }, []);
+  
+  const handleNavigateToCustomerFromTrials = React.useCallback(({ customerId, customerName }) => {
+    setShowTrialsList(false);
+    navigate(`?tab=customers&customerId=${customerId}&customerName=${encodeURIComponent(customerName)}`);
+  }, [navigate]);
 
   // 获取当前用户权限配置
   useEffect(() => {
@@ -1640,36 +1681,10 @@ const Dashboard = ({ user }) => {
 
   useEffect(() => {
     const fetchTimetables = async () => {
-      // 检查是否有缓存的课表数据
-      const cachedTimetables = sessionStorage.getItem('dashboard_timetables');
-      const cachedScheduleCounts = sessionStorage.getItem('dashboard_schedule_counts');
-      const cacheTimestamp = sessionStorage.getItem('dashboard_cache_timestamp');
-      
-      // 如果缓存存在且不超过5分钟，直接使用缓存数据
-      if (cachedTimetables && cachedScheduleCounts && cacheTimestamp) {
-        const now = Date.now();
-        const cacheAge = now - parseInt(cacheTimestamp);
-        if (cacheAge < 5 * 60 * 1000) { // 5分钟内
-          try {
-            const parsedTimetables = JSON.parse(cachedTimetables);
-            const parsedScheduleCounts = JSON.parse(cachedScheduleCounts);
-            
-            const activeTimetables = parsedTimetables.filter(t => !t.isArchived);
-            const archivedTimetables = parsedTimetables.filter(t => t.isArchived);
-            
-            setTimetables(activeTimetables);
-            setArchivedTimetables(archivedTimetables);
-            setTimetableScheduleCounts(parsedScheduleCounts);
-            setLoading(false);
-            return;
-          } catch (error) {
-            console.error('解析缓存数据失败:', error);
-            // 清除损坏的缓存
-            sessionStorage.removeItem('dashboard_timetables');
-            sessionStorage.removeItem('dashboard_schedule_counts');
-            sessionStorage.removeItem('dashboard_cache_timestamp');
-          }
-        }
+      // 如果已经有数据（从初始化缓存加载），直接返回，不调用API
+      if (timetables.length > 0 || archivedTimetables.length > 0) {
+        console.log('使用初始化缓存数据，跳过API请求');
+        return;
       }
       
       try {
@@ -3370,6 +3385,8 @@ const Dashboard = ({ user }) => {
     });
     // 使用ref来跟踪viewMode，防止组件重新渲染时丢失状态
     const viewModeRef = React.useRef(viewMode);
+    // 使用ref标记是否已初始化，避免父组件重新渲染导致重复加载数据
+    const hasInitializedRef = React.useRef(false);
     
     // 包装setViewMode，同时更新ref
     const setViewModeAndRef = React.useCallback((mode) => {
@@ -3543,10 +3560,17 @@ const Dashboard = ({ user }) => {
     };
     
     useEffect(() => {
+      // 只在首次挂载时初始化，避免父组件重新渲染时重复加载
+      if (hasInitializedRef.current) {
+        return;
+      }
+      hasInitializedRef.current = true;
+      
       // 先加载规则，再加载课表数据
       const initData = async () => {
         const rules = await fetchStudentOperationRules(); // 先加载学员操作规则并获取返回值
-        await fetchWeeklyScheduleData('instance', rules); // 传递规则数据
+        // 使用当前的viewMode而不是硬编码为'instance'，避免打开模态框时切换标签
+        await fetchWeeklyScheduleData(viewModeRef.current, rules); // 传递规则数据
       };
       initData();
     }, []); // 移除viewMode依赖，改为手动调用
@@ -3892,7 +3916,7 @@ const Dashboard = ({ user }) => {
                       });
                       setCustomerInfoVisible(true);
                       
-                      // 获取客户流转记录
+                      // 异步获取客户流转记录
                       setCustomerHistoryLoading(true);
                       setCustomerHistory([]);
                       try {
@@ -4129,6 +4153,9 @@ const Dashboard = ({ user }) => {
       </Card>
     );
   };
+  
+  // 使用React.memo包装WeeklyScheduleBlock，避免父组件重新渲染时导致此组件重新挂载
+  const MemoizedWeeklyScheduleBlock = React.memo(WeeklyScheduleBlock);
 
   // 管理员概览组件
   const AdminOverview = ({ dayTab, setDayTab }) => {
@@ -4979,7 +5006,7 @@ const Dashboard = ({ user }) => {
         </Card>
 
         {/* 活动课表本周排课信息 */}
-        <WeeklyScheduleBlock coachColorMap={coachColorMap} />
+        <MemoizedWeeklyScheduleBlock coachColorMap={coachColorMap} />
 
         {/* 学员详情模态框在页面底部统一渲染，避免重复 */}
 
@@ -5331,7 +5358,10 @@ const Dashboard = ({ user }) => {
           zIndex: 1000,
           backgroundColor: '#fff'
         }}>
-          <TrialsList onClose={() => setShowTrialsList(false)} />
+          <TrialsListMemo 
+            onClose={handleCloseTrialsList}
+            onNavigateToCustomer={handleNavigateToCustomerFromTrials}
+          />
         </div>
       )}
     </div>

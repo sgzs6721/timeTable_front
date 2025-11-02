@@ -117,10 +117,18 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
     );
   }
 
+  const isDashboard = location.pathname === '/dashboard';
+  const isViewTimetable = location.pathname.startsWith('/view-timetable/');
+
   return (
     <>
       {user && <AppHeader user={user} onLogout={handleLogout} />}
       <Content>
+        {/* 保持Dashboard mounted，避免后退时白屏 */}
+        {user && <div style={{ display: isDashboard ? 'block' : 'none' }}>
+          <Dashboard user={user} />
+        </div>}
+        
         <Routes>
           <Route
             path="/login"
@@ -138,7 +146,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           />
           <Route
             path="/dashboard"
-            element={user ? <Dashboard user={user} /> : <Navigate to="/login" />}
+            element={user ? null : <Navigate to="/login" />}
           />
           <Route
             path="/create-timetable"

@@ -488,3 +488,8 @@ html {
 .ant-card-body {
   touch-action: auto !important;
 }
+
+/* 防止Modal打开时页面抖动 - 保持页面宽度不变 */
+body.ant-scrolling-effect {
+  overflow: hidden !important;
+}

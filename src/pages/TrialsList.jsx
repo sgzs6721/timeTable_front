@@ -8,7 +8,8 @@ import {
   Popconfirm, 
   DatePicker, 
   Select,
-  Empty
+  Empty,
+  Input
 } from 'antd';
 import { 
   CheckCircleOutlined, 
@@ -16,10 +17,14 @@ import {
   CalendarOutlined,
   UserOutlined,
   PhoneOutlined,
-  LeftCircleOutlined,
+  LeftOutlined,
   ClockCircleOutlined,
-  CopyOutlined
+  CopyOutlined,
+  HistoryOutlined,
+  UserSwitchOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
+import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { changeCustomerStatus } from '../services/customerStatusHistory';
 import { cancelTrialSchedule } from '../services/customerStatusHistory';
 import { getApiBaseUrl } from '../config/api';
@@ -27,16 +32,20 @@ import dayjs from 'dayjs';
 
 const { Option } = Select;
 
-const TrialsList = ({ onClose }) => {
+const TrialsList = ({ onClose, onNavigateToCustomer }) => {
   const [loading, setLoading] = useState(false);
   const [trials, setTrials] = useState([]);
   const [selectedCreator, setSelectedCreator] = useState(null);
   const [trialDateFilter, setTrialDateFilter] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null); // 状态过滤器
+  const [searchKeyword, setSearchKeyword] = useState(''); // 搜索关键字（姓名或电话）
   const [creatorsMap, setCreatorsMap] = useState({});
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   useEffect(() => {
     fetchTrials();
-  }, [selectedCreator, trialDateFilter]);
+  }, [selectedCreator, trialDateFilter, statusFilter, searchKeyword]);
 
   const fetchTrials = async () => {
     setLoading(true);
@@ -68,7 +77,37 @@ const TrialsList = ({ onClose }) => {
       
       if (data && data.success) {
         // 前端再做一层去重：同一个客户（姓名+电话相同）只保留一条最新的记录
-        const trialsData = data.data || [];
+        let trialsData = data.data || [];
+        
+        // 应用状态过滤
+        if (statusFilter) {
+          if (statusFilter === 'CANCELLED') {
+            // 已取消状态
+            trialsData = trialsData.filter(trial => trial.trialCancelled === true);
+          } else if (statusFilter === 'PENDING') {
+            // 待体验（包括待体验和待再体验，且未取消）
+            trialsData = trialsData.filter(trial => 
+              !trial.trialCancelled && 
+              (trial.status === 'SCHEDULED' || trial.status === 'RE_EXPERIENCE')
+            );
+          } else if (statusFilter === 'COMPLETED') {
+            // 已完成（已体验或已成交，且未取消）
+            trialsData = trialsData.filter(trial => 
+              !trial.trialCancelled && 
+              (trial.status === 'VISITED' || trial.status === 'SOLD')
+            );
+          }
+        }
+        
+        // 应用姓名或电话搜索过滤
+        if (searchKeyword && searchKeyword.trim()) {
+          const keyword = searchKeyword.trim().toLowerCase();
+          trialsData = trialsData.filter(trial => 
+            (trial.childName && trial.childName.toLowerCase().includes(keyword)) ||
+            (trial.parentPhone && trial.parentPhone.includes(keyword))
+          );
+        }
+        
         const uniqueTrialsMap = new Map();
         
         trialsData.forEach(trial => {
@@ -146,7 +185,12 @@ const TrialsList = ({ onClose }) => {
     }
   };
 
-  const getStatusTag = (status) => {
+  const getStatusTag = (trial) => {
+    // 如果体验被取消，显示已取消标签
+    if (trial.trialCancelled) {
+      return <Tag color="error" style={{ fontSize: '14px', padding: '2px 8px' }}>已取消</Tag>;
+    }
+    
     const statusMap = {
       'SCHEDULED': { text: '待体验', color: 'purple' },
       'RE_EXPERIENCE': { text: '待再体验', color: 'cyan' },
@@ -154,8 +198,8 @@ const TrialsList = ({ onClose }) => {
       'SOLD': { text: '已成交', color: 'success' }
     };
     
-    const config = statusMap[status] || { text: status, color: 'default' };
-    return <Tag color={config.color}>{config.text}</Tag>;
+    const config = statusMap[trial.status] || { text: trial.status, color: 'default' };
+    return <Tag color={config.color} style={{ fontSize: '14px', padding: '2px 8px' }}>{config.text}</Tag>;
   };
 
   const handleCopyPhone = (phone) => {
@@ -164,6 +208,38 @@ const TrialsList = ({ onClose }) => {
       navigator.clipboard.writeText(phone).then(() => message.success('手机号已复制'));
     } catch (e) {
       message.error('复制失败');
+    }
+  };
+
+  const handleOpenHistory = (trial, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    // 构造客户对象，用于传递给 CustomerStatusHistoryModal
+    const customerObj = {
+      id: trial.customerId,
+      childName: trial.childName,
+      parentPhone: trial.parentPhone,
+      status: trial.status
+    };
+    setSelectedCustomer(customerObj);
+    setHistoryModalVisible(true);
+  };
+
+  const handleHistorySuccess = async () => {
+    // 流转记录更新后，刷新体验列表
+    await fetchTrials();
+  };
+
+  const handleNavigateToCustomer = (trial, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (onNavigateToCustomer) {
+      onNavigateToCustomer({
+        customerId: trial.customerId,
+        customerName: trial.childName
+      });
     }
   };
 
@@ -183,43 +259,90 @@ const TrialsList = ({ onClose }) => {
     <div style={{ padding: '0', width: '100%', height: '100vh', overflow: 'auto' }}>
       <Card 
         title={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            position: 'relative',
+            minHeight: '44px'
+          }}>
             <Button 
               type="text" 
-              icon={<LeftCircleOutlined style={{ fontSize: '20px' }} />} 
+              icon={<LeftOutlined style={{ fontSize: 20 }} />} 
               onClick={onClose}
-              style={{ position: 'absolute', left: 0 }}
+              style={{ 
+                position: 'absolute', 
+                left: 2,
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                border: '1px solid #d9d9d9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0
+              }}
             />
-            <span style={{ fontSize: '16px', fontWeight: '500' }}>体验列表</span>
+            <span style={{ fontSize: '20px', fontWeight: '500' }}>体验列表</span>
           </div>
         }
-        styles={{ body: { padding: '12px' } }}
+        styles={{ 
+          body: { padding: '12px' },
+          header: { padding: '24px 20px', minHeight: '88px' }
+        }}
         style={{ borderRadius: 0, border: 'none' }}
       >
         {/* 过滤器 */}
-        <div style={{ marginBottom: 16, display: 'flex', gap: '12px', flexWrap: 'nowrap' }}>
-          <Select
-            placeholder="全部录入人员"
-            value={selectedCreator}
-            onChange={setSelectedCreator}
-            allowClear
-            style={{ flex: 1 }}
-          >
-            {Object.entries(creatorsMap).map(([id, name]) => (
-              <Option key={id} value={parseInt(id)}>
-                {name}
-              </Option>
-            ))}
-          </Select>
+        <div style={{ marginBottom: 16 }}>
+          {/* 第一行过滤器 */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+            <Select
+              placeholder="全部录入人员"
+              value={selectedCreator}
+              onChange={setSelectedCreator}
+              allowClear
+              style={{ width: '50%' }}
+            >
+              {Object.entries(creatorsMap).map(([id, name]) => (
+                <Option key={id} value={parseInt(id)}>
+                  {name}
+                </Option>
+              ))}
+            </Select>
+            
+            <DatePicker
+              placeholder="选择体验日期"
+              value={trialDateFilter}
+              onChange={setTrialDateFilter}
+              format="YYYY-MM-DD"
+              allowClear
+              style={{ width: '50%' }}
+            />
+          </div>
           
-          <DatePicker
-            placeholder="选择体验日期"
-            value={trialDateFilter}
-            onChange={setTrialDateFilter}
-            format="YYYY-MM-DD"
-            allowClear
-            style={{ flex: 1 }}
-          />
+          {/* 第二行过滤器 */}
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Input
+              placeholder="人员姓名或电话"
+              prefix={<SearchOutlined />}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              allowClear
+              style={{ width: '50%' }}
+            />
+            
+            <Select
+              placeholder="全部状态"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              allowClear
+              style={{ width: '50%' }}
+            >
+              <Option value="PENDING">待体验</Option>
+              <Option value="COMPLETED">已完成</Option>
+              <Option value="CANCELLED">已取消</Option>
+            </Select>
+          </div>
         </div>
 
         {/* 体验列表 */}
@@ -240,23 +363,23 @@ const TrialsList = ({ onClose }) => {
                   {/* 日期标题 */}
                   {date && (
                     <div style={{
-                      padding: '12px 20px',
+                      padding: '14px 20px',
                       background: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
                       borderRadius: '8px',
                       boxShadow: '0 2px 8px rgba(67, 206, 162, 0.25)',
                       marginBottom: 12,
                       color: '#fff',
-                      fontSize: '15px',
+                      fontSize: '17px',
                       fontWeight: '500',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CalendarOutlined />
+                        <CalendarOutlined style={{ fontSize: '18px' }} />
                         {date.format('YYYY-MM-DD dddd')}
                       </div>
-                      <span style={{ fontSize: '13px' }}>
+                      <span style={{ fontSize: '15px' }}>
                         共 {dateTrials.length} 条
                       </span>
                     </div>
@@ -270,7 +393,11 @@ const TrialsList = ({ onClose }) => {
                       style={{ 
                         marginBottom: 12,
                         borderRadius: '8px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                        ...(trial.trialCancelled && {
+                          backgroundColor: '#fafafa',
+                          opacity: 0.7
+                        })
                       }}
                     >
                       {/* 第一行：状态标签和姓名 */}
@@ -281,17 +408,16 @@ const TrialsList = ({ onClose }) => {
                         marginBottom: 12
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {getStatusTag(trial.status)}
-                          <span style={{ fontSize: '16px', fontWeight: '500' }}>
+                          {getStatusTag(trial)}
+                          <span style={{ fontSize: '18px', fontWeight: '500' }}>
                             {trial.childName}
                           </span>
                         </div>
                         
                         <div style={{ display: 'flex', alignItems: 'center', color: '#666' }}>
-                          <PhoneOutlined style={{ marginRight: '4px', fontSize: '13px' }} />
                           <a 
                             href={`tel:${trial.parentPhone}`}
-                            style={{ color: '#1890ff', textDecoration: 'none' }}
+                            style={{ color: '#1890ff', textDecoration: 'none', fontSize: '15px' }}
                           >
                             {trial.parentPhone}
                           </a>
@@ -308,10 +434,10 @@ const TrialsList = ({ onClose }) => {
                       {/* 第二行：体验时间 */}
                       <div style={{ 
                         marginBottom: 8,
-                        fontSize: '14px',
+                        fontSize: '16px',
                         color: '#1890ff'
                       }}>
-                        <ClockCircleOutlined style={{ marginRight: 6 }} />
+                        <ClockCircleOutlined style={{ marginRight: 6, fontSize: '16px' }} />
                         体验时间：
                         {trial.trialScheduleDate 
                           ? dayjs(trial.trialScheduleDate).format('YYYY-MM-DD') 
@@ -323,17 +449,17 @@ const TrialsList = ({ onClose }) => {
                         display: 'flex', 
                         justifyContent: 'space-between', 
                         alignItems: 'center',
-                        fontSize: '13px', 
+                        fontSize: '15px', 
                         color: '#666'
                       }}>
                         <div>
-                          <UserOutlined style={{ marginRight: '6px' }} />
+                          <UserOutlined style={{ marginRight: '6px', fontSize: '15px' }} />
                           教练：{trial.trialCoachName || '未指定'}
                         </div>
                         
-                        {/* 只有待体验状态才显示操作按钮 */}
-                        {(trial.status === 'SCHEDULED' || trial.status === 'RE_EXPERIENCE') && (
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                        {/* 只有待体验状态且未取消才显示取消和完成按钮 */}
+                        {!trial.trialCancelled && (trial.status === 'SCHEDULED' || trial.status === 'RE_EXPERIENCE') && (
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <Popconfirm
                               title="确定取消体验课程？"
                               description="取消后将标记为已取消"
@@ -370,21 +496,57 @@ const TrialsList = ({ onClose }) => {
                         )}
                       </div>
 
-                      {/* 录入信息 */}
+                      {/* 录入信息和流转记录 */}
                       {(trial.createdByName || trial.createdAt) && (
                         <div style={{ 
-                          fontSize: '12px', 
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: '13px', 
                           color: '#999',
                           marginTop: 8,
                           paddingTop: 8,
                           borderTop: '1px solid #f0f0f0'
                         }}>
-                          {trial.createdByName && <span>{trial.createdByName}</span>}
-                          {trial.createdAt && (
-                            <span style={{ marginLeft: 8 }}>
-                              录入于 {dayjs(trial.createdAt).format('YYYY-MM-DD HH:mm')}
-                            </span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div>
+                              {trial.createdByName && <span>{trial.createdByName}</span>}
+                              {trial.createdAt && (
+                                <span style={{ marginLeft: 8 }}>
+                                  录入于 {dayjs(trial.createdAt).format('YYYY-MM-DD HH:mm')}
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* 已完成标识 */}
+                            {!trial.trialCancelled && (trial.status === 'VISITED' || trial.status === 'SOLD') && (
+                              <Tag color="green" style={{ margin: 0, fontSize: '12px' }}>
+                                已完成
+                              </Tag>
+                            )}
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {/* 跳转到客源按钮 */}
+                            <Button 
+                              type="text"
+                              size="small"
+                              icon={<UserSwitchOutlined style={{ fontSize: '16px' }} />}
+                              onClick={(e) => handleNavigateToCustomer(trial, e)}
+                              title="查看客户详情"
+                              style={{ color: '#52c41a', padding: '0 4px' }}
+                            />
+                            
+                            {/* 流转记录按钮 */}
+                            <Button 
+                              type="text"
+                              size="small"
+                              icon={<HistoryOutlined style={{ fontSize: '16px' }} />}
+                              onClick={(e) => handleOpenHistory(trial, e)}
+                              title="流转记录"
+                              style={{ color: '#1890ff', padding: '0 4px' }}
+                            />
+                          </div>
                         </div>
                       )}
                     </Card>
@@ -395,6 +557,14 @@ const TrialsList = ({ onClose }) => {
           </div>
         )}
       </Card>
+
+      {/* 客户状态流转记录模态框 */}
+      <CustomerStatusHistoryModal
+        visible={historyModalVisible}
+        onCancel={() => setHistoryModalVisible(false)}
+        customer={selectedCustomer}
+        onSuccess={handleHistorySuccess}
+      />
     </div>
   );
 };
