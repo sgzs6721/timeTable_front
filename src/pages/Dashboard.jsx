@@ -1325,10 +1325,11 @@ const Dashboard = ({ user }) => {
     return 'timetables';
   });
 
-  // 监听URL参数变化，处理客户定位
+  // 监听URL参数变化，处理客户定位和刷新
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     const customerIdParam = searchParams.get('customerId');
+    const refreshParam = searchParams.get('refresh');
     
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
@@ -1337,6 +1338,49 @@ const Dashboard = ({ user }) => {
     // 如果有customerId参数，切换到客源tab并滚动到对应客户
     if (customerIdParam && tabParam === 'customers') {
       setActiveTab('customers');
+    }
+    
+    // 如果有refresh参数，刷新课表列表
+    if (refreshParam === 'true') {
+      const refreshTimetables = async () => {
+        try {
+          const response = await getTimetables();
+          const allTimetables = response.data;
+          const activeTimetables = allTimetables.filter(t => !t.isArchived);
+          const archivedTimetables = allTimetables.filter(t => t.isArchived);
+
+          setTimetables(activeTimetables);
+          setArchivedTimetables(archivedTimetables);
+          
+          // 清除缓存
+          sessionStorage.removeItem('dashboard_timetables');
+          sessionStorage.removeItem('dashboard_schedule_counts');
+          sessionStorage.removeItem('dashboard_cache_timestamp');
+
+          // 更新课程数量
+          const scheduleCounts = {};
+          await Promise.all(
+            activeTimetables.map(async (timetable) => {
+              try {
+                const scheduleResponse = await getTimetableSchedules(timetable.id);
+                scheduleCounts[timetable.id] = scheduleResponse.data.length;
+              } catch (error) {
+                console.error(`获取课表 ${timetable.id} 的课程数量失败:`, error);
+              }
+            })
+          );
+          setTimetableScheduleCounts(scheduleCounts);
+        } catch (error) {
+          console.error('刷新课表列表失败:', error);
+        }
+      };
+      
+      refreshTimetables();
+      
+      // 清除refresh参数，避免重复刷新
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('refresh');
+      setSearchParams(newSearchParams, { replace: true });
     }
   }, [searchParams]);
   const [coachesStatistics, setCoachesStatistics] = useState(null);

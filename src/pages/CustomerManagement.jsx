@@ -699,11 +699,12 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         message.success(editingCustomer ? '更新成功' : '创建成功');
         setModalVisible(false);
         
-        // 创建成功后，清除过滤条件并重新获取数据
         if (!editingCustomer) {
-          // 新建客户：切换到"全部"视图并重新获取数据
-          setCurrentDatePage(0);
-          await fetchCustomers();
+          // 新建客户：重置列表并重新获取数据
+          setCustomers([]);
+          setCurrentPage(0);
+          setHasMore(true);
+          await fetchCustomers(0, true);
         } else {
           // 更新客户：局部刷新
           setCustomers(prevCustomers => 
@@ -1616,9 +1617,15 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               <Form.Item
                 name="parentPhone"
                 label="家长电话"
-                rules={[{ required: true, message: '请输入家长电话' }]}
+                rules={[
+                  { required: true, message: '请输入家长电话' },
+                  { 
+                    pattern: /^1[3-9]\d{9}$/, 
+                    message: '请输入正确的手机号码' 
+                  }
+                ]}
               >
-                <Input placeholder="请输入家长电话" />
+                <Input placeholder="请输入11位手机号码" maxLength={11} />
               </Form.Item>
             </Col>
           </Row>

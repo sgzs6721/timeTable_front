@@ -106,6 +106,10 @@ const AdminPanel = ({ user }) => {
       }
     }
     
+    // 获取被选中教练的机构ID
+    const selectedCoach = coaches.find(c => c.id === userId);
+    const organizationId = selectedCoach?.organizationId;
+    
     setCreateLoading(true);
     try {
       const response = await createTimetableForUser({
@@ -114,7 +118,8 @@ const AdminPanel = ({ user }) => {
         description: '',
         isWeekly: isWeekly,
         startDate: isWeekly === 0 ? dayjs(startDate).format('YYYY-MM-DD') : null,
-        endDate: isWeekly === 0 ? dayjs(endDate).format('YYYY-MM-DD') : null
+        endDate: isWeekly === 0 ? dayjs(endDate).format('YYYY-MM-DD') : null,
+        organizationId: organizationId
       });
       
       if (response && response.success) {

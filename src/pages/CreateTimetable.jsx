@@ -19,12 +19,13 @@ const CreateTimetable = ({ user }) => {
         type: values.isWeekly ? 'WEEKLY' : 'DATE_RANGE',
         startDate: values.isWeekly ? null : values.startDate?.format('YYYY-MM-DD'),
         endDate: values.isWeekly ? null : values.endDate?.format('YYYY-MM-DD'),
+        organizationId: user?.organizationId,
       };
 
       const response = await createTimetable(timetableData);
       if (response.success) {
         message.success('课表创建成功');
-        navigate('/dashboard?tab=timetables');
+        navigate('/dashboard?tab=timetables&refresh=true');
       } else {
         message.error(response.message || '创建失败');
       }
