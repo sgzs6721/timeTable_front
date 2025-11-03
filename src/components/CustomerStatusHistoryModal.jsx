@@ -681,12 +681,22 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     // 只有当有原始安排且未修改时，才不需要查询
     const shouldFetchCoaches = !originalTrialSchedule || isModified;
     
+    console.log('[CustomerStatusHistoryModal] 时间变更 - shouldFetchCoaches:', shouldFetchCoaches, 
+                'hasSchedulePermission:', hasSchedulePermission, 
+                'hasActiveTimetable:', hasActiveTimetable,
+                'times:', times,
+                'experienceDate:', experienceDate);
+    
     if (shouldFetchCoaches && hasSchedulePermission && hasActiveTimetable && times && times.length === 2 && times[0] && times[1] && experienceDate) {
+      console.log('[CustomerStatusHistoryModal] 开始查询可用教练...');
       fetchAvailableCoaches(experienceDate, times);
     } else if (shouldFetchCoaches && hasSchedulePermission && hasActiveTimetable) {
       // 如果时间不完整，清空教练列表
+      console.log('[CustomerStatusHistoryModal] 时间不完整，清空教练列表');
       setAvailableCoaches([]);
       setSelectedCoach(null);
+    } else {
+      console.log('[CustomerStatusHistoryModal] 不满足查询教练的条件');
     }
   };
   
