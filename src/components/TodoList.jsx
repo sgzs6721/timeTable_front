@@ -1105,21 +1105,6 @@ const TodoList = ({ onUnreadCountChange }) => {
 
   return (
     <div style={{ padding: '12px', maxWidth: '100%', width: '100%' }}>
-      {/* 顶部按钮区域 */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />}
-          onClick={() => setCreateModalVisible(true)}
-          style={{ 
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(24, 144, 255, 0.2)'
-          }}
-        >
-          新建待办
-        </Button>
-      </div>
-
       {/* 顶部筛选tab - 支持左右滑动 */}
       <div 
         className="tab-scroll-container"
@@ -1137,8 +1122,11 @@ const TodoList = ({ onUnreadCountChange }) => {
           padding: '4px',
           borderRadius: '8px',
           border: '1px solid rgba(217, 217, 217, 0.3)',
-          minWidth: 'max-content'
+          minWidth: 'max-content',
+          alignItems: 'center',
+          justifyContent: 'space-between'
         }}>
+          <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
           <div 
             onClick={() => setFilter('all')}
             style={{
@@ -1227,6 +1215,24 @@ const TodoList = ({ onUnreadCountChange }) => {
           >
             已处理 (<span style={{ color: '#52c41a' }}>{todos.filter(t => t.status === 'COMPLETED').length}</span>)
           </div>
+          </div>
+          
+          {/* 新建待办按钮 */}
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />}
+            onClick={() => setCreateModalVisible(true)}
+            style={{ 
+              borderRadius: '6px',
+              marginLeft: '8px',
+              flexShrink: 0,
+              height: '36px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            新建待办
+          </Button>
         </div>
       </div>
 
