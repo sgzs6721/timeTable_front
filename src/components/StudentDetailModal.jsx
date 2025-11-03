@@ -8,6 +8,8 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
   const [scheduleRecords, setScheduleRecords] = useState([]);
   const [leaveRecords, setLeaveRecords] = useState([]);
   const [actualCoachName, setActualCoachName] = useState(coachName);
+  const [queriedNames, setQueriedNames] = useState([]);
+  const [displayName, setDisplayName] = useState(studentName);
 
   const PAGE_SIZE = 10;
   const ITEM_ROW_HEIGHT = 44; // 单行高度，确保分页固定位置
@@ -85,6 +87,21 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
         if (response.data.actualCoachName) {
           setActualCoachName(response.data.actualCoachName);
         }
+        // 设置调试信息
+        if (response.data.queriedNames) {
+          setQueriedNames(response.data.queriedNames);
+        }
+        if (response.data.displayName) {
+          setDisplayName(response.data.displayName);
+        }
+        
+        // 在控制台输出调试信息
+        console.log('=== 学员记录查询调试信息 ===');
+        console.log('显示学员名:', studentName);
+        console.log('实际查询的学员名:', response.data.queriedNames);
+        console.log('教练:', coachName);
+        console.log('上课记录数:', sortedSchedules.length);
+        console.log('记录详情:', sortedSchedules);
       } else {
         message.error('获取学员记录失败');
       }
@@ -303,6 +320,27 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
           <span style={{ color: '#666' }}>教练：</span>
           <span style={{ fontWeight: 500 }}>{actualCoachName}</span>
         </div>
+        
+        {/* 调试信息：显示实际查询的学员名 */}
+        {queriedNames && queriedNames.length > 1 && (
+          <div style={{ 
+            marginBottom: 12, 
+            padding: '8px 12px', 
+            backgroundColor: '#fff7e6',
+            border: '1px solid #ffd591',
+            borderRadius: '4px'
+          }}>
+            <div style={{ fontSize: '12px', color: '#d46b08', marginBottom: 4, fontWeight: 500 }}>
+              提示：查询了以下学员名的记录
+            </div>
+            <div style={{ fontSize: '12px', color: '#d46b08' }}>
+              {queriedNames.join('、')}
+            </div>
+            <div style={{ fontSize: '11px', color: '#8c8c8c', marginTop: 4 }}>
+              （可能存在重命名或合并记录）
+            </div>
+          </div>
+        )}
         
         <Tabs
           defaultActiveKey="schedules"
