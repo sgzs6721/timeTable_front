@@ -875,6 +875,15 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                           if (newCount >= 2 || (hasHour && hasMinute)) {
                             setTimePickerOpen(false); // 关闭面板
                             setTimePickerClickCount(0); // 重置计数器
+                            
+                            // 关闭后立即触发查询教练（使用当前的times而不是state）
+                            if (times && times.length === 2 && times[0] && times[1] && experienceDate) {
+                              console.log('[CustomerStatusHistoryModal] 时间选择完成，立即查询教练', times);
+                              // 延迟一下确保状态更新
+                              setTimeout(() => {
+                                handleTimeChange(times);
+                              }, 100);
+                            }
                           }
                         }
                       }
