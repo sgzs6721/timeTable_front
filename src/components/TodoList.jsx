@@ -478,7 +478,14 @@ const TodoList = ({ onUnreadCountChange }) => {
     } else if (filter === 'completed') {
       return todos.filter(todo => todo.status === 'COMPLETED');
     }
-    return todos;
+    // 默认返回今日待办
+    const today = dayjs().format('YYYY-MM-DD');
+    return todos.filter(todo => {
+      if (todo.status === 'COMPLETED') return false;
+      if (!todo.reminderDate) return false;
+      const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
+      return reminderDay === today;
+    });
   };
 
   const filteredTodos = getFilteredTodos();
@@ -1142,26 +1149,6 @@ const TodoList = ({ onUnreadCountChange }) => {
           </Button>
           
           <div 
-            onClick={() => setFilter('all')}
-            style={{
-              minWidth: '80px',
-              padding: '8px 16px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500',
-              transition: 'all 0.3s',
-              backgroundColor: filter === 'all' ? 'rgba(24, 144, 255, 0.15)' : 'transparent',
-              color: filter === 'all' ? '#1890ff' : '#666',
-              backdropFilter: filter === 'all' ? 'blur(10px)' : 'none',
-              border: filter === 'all' ? '1px solid rgba(24, 144, 255, 0.3)' : '1px solid transparent',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            全部
-          </div>
-          <div 
             onClick={() => setFilter('today')}
             style={{
               minWidth: '80px',
@@ -1286,7 +1273,6 @@ const TodoList = ({ onUnreadCountChange }) => {
           ) : filteredTodos.length === 0 ? (
             <Empty 
               description={
-                filter === 'all' ? '暂无待办' : 
                 filter === 'today' ? '今日暂无待办事项' :
                 filter === 'pending' ? '暂无待办事项' : 
                 '暂无已处理事项'
