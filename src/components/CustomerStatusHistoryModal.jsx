@@ -848,6 +848,11 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                       if (open) {
                         setTimePickerClickCount(0);
                       }
+                      // 关闭时触发查询教练（如果时间已选择完整）
+                      if (!open && experienceTimeRange && experienceTimeRange.length === 2 && experienceTimeRange[0] && experienceTimeRange[1]) {
+                        console.log('[CustomerStatusHistoryModal] 时间选择器关闭，触发查询教练');
+                        handleTimeChange(experienceTimeRange);
+                      }
                     }}
                     onCalendarChange={(times) => {
                       // 立即更新时间，无论是选第一个还是第二个
