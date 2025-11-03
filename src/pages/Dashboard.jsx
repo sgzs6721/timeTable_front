@@ -12,6 +12,7 @@ import { mergeStudents } from '../services/studentMerge';
 import { getAllSalaryCalculations, getAvailableMonths } from '../services/salaryCalculation';
 import { getCustomerStatusHistory } from '../services/customerStatusHistory';
 import { getCurrentUserPermissions } from '../services/rolePermission';
+import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
@@ -5812,7 +5813,7 @@ const MyHours = ({ user }) => {
     
     // 如果工资数据中没有，就从后端获取记薪周期设置并计算
     try {
-      const settingResp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/salary-system-settings/current`, {
+      const settingResp = await fetch(`${getApiBaseUrl()}/salary-system-settings/current`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
