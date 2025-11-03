@@ -630,8 +630,14 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     const isModified = checkScheduleModified(date, experienceTimeRange);
     setScheduleModified(isModified);
     
-    // 如果修改了日期或时间，清空教练选择
-    if (isModified) {
+    // 只有当有原始安排且未修改时，才不需要查询
+    const shouldFetchCoaches = !originalTrialSchedule || isModified;
+    
+    // 如果时间已经选好，且日期已选，则查询可用教练
+    if (shouldFetchCoaches && hasSchedulePermission && date && experienceTimeRange && experienceTimeRange.length === 2 && experienceTimeRange[0] && experienceTimeRange[1]) {
+      fetchAvailableCoaches(date, experienceTimeRange);
+    } else if (shouldFetchCoaches) {
+      // 如果没有完整的时间，清空教练选择
       setAvailableCoaches([]);
       setSelectedCoach(null);
     }
@@ -645,11 +651,14 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     const isModified = checkScheduleModified(experienceDate, times);
     setScheduleModified(isModified);
     
-    // 如果修改了，并且时间完整，则查询可用教练
-    if (isModified && hasSchedulePermission && times && times.length === 2 && times[0] && times[1] && experienceDate) {
+    // 如果时间完整且有日期，则查询可用教练（包括新建和修改的情况）
+    // 只有当有原始安排且未修改时，才不需要查询
+    const shouldFetchCoaches = !originalTrialSchedule || isModified;
+    
+    if (shouldFetchCoaches && hasSchedulePermission && times && times.length === 2 && times[0] && times[1] && experienceDate) {
       fetchAvailableCoaches(experienceDate, times);
-    } else if (isModified) {
-      // 如果修改了但时间不完整，清空教练列表
+    } else if (shouldFetchCoaches && hasSchedulePermission) {
+      // 如果时间不完整，清空教练列表
       setAvailableCoaches([]);
       setSelectedCoach(null);
     }
