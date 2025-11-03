@@ -4636,11 +4636,9 @@ const ViewTimetable = ({ user }) => {
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
               {day.label}
             </div>
-            {viewMode !== 'template' && (
-              <div className="day-date">
-                {currentDate.format('MM/DD')}
-              </div>
-            )}
+            <div className="day-date">
+              {currentDate.format('MM/DD')}
+            </div>
           </div>
         );
       }
