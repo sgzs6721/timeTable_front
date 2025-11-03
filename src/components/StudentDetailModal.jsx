@@ -102,6 +102,16 @@ const StudentDetailModal = ({ visible, onClose, studentName, coachName }) => {
         console.log('教练:', coachName);
         console.log('上课记录数:', sortedSchedules.length);
         console.log('记录详情:', sortedSchedules);
+        console.log('\n=== 每条记录的详细信息 ===');
+        sortedSchedules.forEach((record, index) => {
+          console.log(`记录 ${index + 1}:`, {
+            日期: record.scheduleDate,
+            时间: record.timeRange,
+            查询学员名: record.queriedName,
+            实际学员名: record.actualStudentName,
+            课表: record.timetableName
+          });
+        });
       } else {
         message.error('获取学员记录失败');
       }
