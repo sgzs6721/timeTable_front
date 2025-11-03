@@ -1101,62 +1101,24 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               {(customer.status === 'SCHEDULED' || customer.status === 'RE_EXPERIENCE') ? (
                 <Popover
                   content={
-                    <div style={{ maxWidth: '300px' }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: 8 }}>
-                          {customer.status === 'RE_EXPERIENCE' ? '再体验课安排' : '体验课安排'}
-                        </div>
-                        {loadingTrialSchedule && !trialScheduleCache[customer.id] ? (
-                          <Spin size="small" />
-                        ) : trialScheduleCache[customer.id] ? (
-                          <div style={{ fontSize: '13px', color: '#333' }}>
-                            <div style={{ marginBottom: 6 }}>
-                              <CalendarOutlined style={{ marginRight: 4 }} />
-                              <strong>日期：</strong>
-                              {trialScheduleCache[customer.id].scheduleDate ? 
-                                dayjs(trialScheduleCache[customer.id].scheduleDate).format('YYYY-MM-DD') : '-'}
-                            </div>
-                            <div style={{ marginBottom: 6 }}>
-                              <ClockCircleOutlined style={{ marginRight: 4 }} />
-                              <strong>时间：</strong>
-                              {trialScheduleCache[customer.id].startTime && trialScheduleCache[customer.id].endTime ?
-                                `${trialScheduleCache[customer.id].startTime} - ${trialScheduleCache[customer.id].endTime}` : '-'}
-                            </div>
-                            {trialScheduleCache[customer.id].coachName && (
-                              <div style={{ marginBottom: 6 }}>
-                                <strong>教练：</strong>
-                                {trialScheduleCache[customer.id].coachName}
-                              </div>
-                            )}
-                            {trialScheduleCache[customer.id].note && (
-                              <div style={{ marginTop: 8, padding: '6px', background: '#f5f5f5', borderRadius: '4px', fontSize: '12px' }}>
-                                {trialScheduleCache[customer.id].note}
-                              </div>
-                            )}
-                          </div>
-                        ) : customer.lastStatusChangeNote ? (
-                          <div style={{ fontSize: '13px', color: '#666', whiteSpace: 'pre-wrap' }}>
-                            {customer.lastStatusChangeNote}
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: '13px', color: '#999' }}>
-                            暂无体验时间信息
-                          </div>
-                        )}
+                    loadingTrialSchedule && !trialScheduleCache[customer.id] ? (
+                      <Spin size="small" />
+                    ) : trialScheduleCache[customer.id] && trialScheduleCache[customer.id].scheduleDate ? (
+                      <div style={{ fontSize: '13px', color: '#333' }}>
+                        {(() => {
+                          const scheduleDate = dayjs(trialScheduleCache[customer.id].scheduleDate);
+                          const weekdayMap = ['日', '一', '二', '三', '四', '五', '六'];
+                          const weekday = weekdayMap[scheduleDate.day()];
+                          const dateStr = scheduleDate.format('M.DD');
+                          return `约周${weekday}，${dateStr}`;
+                        })()}
                       </div>
-                      <Button 
-                        type="primary" 
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenHistory(customer, e);
-                        }}
-                      >
-                        查看/编辑详情
-                      </Button>
-                    </div>
+                    ) : (
+                      <div style={{ color: '#999', fontSize: '13px' }}>
+                        暂无体验课安排
+                      </div>
+                    )
                   }
-                  title={customer.status === 'RE_EXPERIENCE' ? '待再体验信息' : '待体验信息'}
                   trigger="click"
                   onOpenChange={(visible) => {
                     if (visible && !trialScheduleCache[customer.id]) {
