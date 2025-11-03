@@ -15,7 +15,8 @@ import {
   UserOutlined,
   CalendarOutlined,
   PhoneOutlined,
-  CloseCircleOutlined
+  CloseCircleOutlined,
+  PlusOutlined
 } from '@ant-design/icons';
 import { 
   getTodos, 
@@ -27,6 +28,7 @@ import {
 import { getTrialCustomers } from '../services/customer';
 import { cancelTrialSchedule, changeCustomerStatus } from '../services/customerStatusHistory';
 import CustomerStatusHistoryModal from './CustomerStatusHistoryModal';
+import CreateTodoModal from './CreateTodoModal';
 import dayjs from 'dayjs';
 import './TodoList.css';
 
@@ -46,6 +48,7 @@ const TodoList = ({ onUnreadCountChange }) => {
   const [selectedCreator, setSelectedCreator] = useState(null); // 选中的录入人员ID
   const [trialDateFilter, setTrialDateFilter] = useState(null); // 体验日期过滤
   const [creatorsMap, setCreatorsMap] = useState({}); // 录入人员映射 {id: name}
+  const [createModalVisible, setCreateModalVisible] = useState(false); // 新建待办模态框
 
   const handleCopyPhone = (phone) => {
     if (!phone) return;
@@ -439,6 +442,11 @@ const TodoList = ({ onUnreadCountChange }) => {
     );
   };
 
+  const handleCreateSuccess = async (newTodo) => {
+    // 新建待办成功后，重新获取待办列表
+    await fetchTodos();
+  };
+
   const getStatusText = (status) => {
     if (!status) return '未知';
     const statusMap = {
@@ -657,6 +665,7 @@ const TodoList = ({ onUnreadCountChange }) => {
     const isPast = todo.reminderDate && dayjs(todo.reminderDate).isBefore(dayjs(), 'day');
     const hasHistory = todo.statusHistory && todo.statusHistory.length > 0;
     const isHistoryExpanded = expandedHistory[todo.id];
+    const isManualTodo = !todo.customerId; // 没有customerId的是手动创建的待办
 
     return (
       <Card
@@ -675,7 +684,19 @@ const TodoList = ({ onUnreadCountChange }) => {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: '8px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: 4 }}>
-                  {todo.customerName && (
+                  {/* 手动创建的待办显示模式 */}
+                  {isManualTodo && (
+                    <>
+                      <Tag color="orange" style={{ margin: 0, fontSize: '12px' }}>
+                        手动创建
+                      </Tag>
+                      <span style={{ fontSize: '16px', color: '#000', fontWeight: 600 }}>
+                        {todo.customerName}
+                      </span>
+                    </>
+                  )}
+                  {/* 从客源创建的待办显示模式 */}
+                  {!isManualTodo && todo.customerName && (
                     <>
                       <span style={{ fontSize: '16px', color: '#000', fontWeight: 600 }}>
                         {todo.customerName}
@@ -702,19 +723,21 @@ const TodoList = ({ onUnreadCountChange }) => {
                     </>
                   )}
                 </div>
-                {/* 状态和地点 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                  {todo.customerStatusText && (
-                    <Tag color="blue" style={{ margin: 0, fontSize: '12px' }}>
-                      {todo.customerStatusText}
-                    </Tag>
-                  )}
-                  {todo.customerSource && (
-                    <span style={{ fontSize: '12px', color: '#666' }}>
-                      📍 {todo.customerSource}
-                    </span>
-                  )}
-                </div>
+                {/* 状态和地点 - 只对客源创建的待办显示 */}
+                {!isManualTodo && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    {todo.customerStatusText && (
+                      <Tag color="blue" style={{ margin: 0, fontSize: '12px' }}>
+                        {todo.customerStatusText}
+                      </Tag>
+                    )}
+                    {todo.customerSource && (
+                      <span style={{ fontSize: '12px', color: '#666' }}>
+                        📍 {todo.customerSource}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
                 {isUnread && (
@@ -810,23 +833,28 @@ const TodoList = ({ onUnreadCountChange }) => {
                 
                 {/* 操作按钮 - 右对齐 */}
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <Button 
-                    type="text" 
-                    size="small"
-                    icon={<UserOutlined />}
-                    title="转到客源"
-                    onClick={(e) => handleGoToCustomer(todo, e)}
-                    style={{ color: '#722ed1' }}
-                  />
-                  {todo.customerId && (
-                    <Button 
-                      type="text" 
-                      size="small"
-                      icon={<HistoryOutlined />}
-                      title="状态流转"
-                      onClick={(e) => handleOpenHistory(todo, e)}
-                      style={{ color: '#1890ff' }}
-                    />
+                  {/* 只有客源创建的待办才显示转到客源和状态流转按钮 */}
+                  {!isManualTodo && (
+                    <>
+                      <Button 
+                        type="text" 
+                        size="small"
+                        icon={<UserOutlined />}
+                        title="转到客源"
+                        onClick={(e) => handleGoToCustomer(todo, e)}
+                        style={{ color: '#722ed1' }}
+                      />
+                      {todo.customerId && (
+                        <Button 
+                          type="text" 
+                          size="small"
+                          icon={<HistoryOutlined />}
+                          title="状态流转"
+                          onClick={(e) => handleOpenHistory(todo, e)}
+                          style={{ color: '#1890ff' }}
+                        />
+                      )}
+                    </>
                   )}
                   {!isCompleted && (
                     <Popconfirm
@@ -871,8 +899,8 @@ const TodoList = ({ onUnreadCountChange }) => {
           </div>
         </div>
 
-        {/* 流转记录 - 独立区域 */}
-        {(hasHistory || todo.customerNotes) && (
+        {/* 流转记录 - 独立区域 - 只对客源创建的待办显示 */}
+        {!isManualTodo && (hasHistory || todo.customerNotes) && (
           <div style={{ 
             marginTop: 8, 
             paddingTop: 8, 
@@ -1077,6 +1105,21 @@ const TodoList = ({ onUnreadCountChange }) => {
 
   return (
     <div style={{ padding: '12px', maxWidth: '100%', width: '100%' }}>
+      {/* 顶部按钮区域 */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button 
+          type="primary" 
+          icon={<PlusOutlined />}
+          onClick={() => setCreateModalVisible(true)}
+          style={{ 
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(24, 144, 255, 0.2)'
+          }}
+        >
+          新建待办
+        </Button>
+      </div>
+
       {/* 顶部筛选tab - 支持左右滑动 */}
       <div 
         className="tab-scroll-container"
@@ -1267,6 +1310,13 @@ const TodoList = ({ onUnreadCountChange }) => {
         onSuccess={handleHistorySuccess}
         onTodoCreated={null}
         onTodoUpdated={handleTodoUpdated}
+      />
+
+      {/* 新建待办模态框 */}
+      <CreateTodoModal
+        visible={createModalVisible}
+        onCancel={() => setCreateModalVisible(false)}
+        onSuccess={handleCreateSuccess}
       />
     </div>
   );
