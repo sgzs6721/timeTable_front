@@ -45,8 +45,9 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   
   // 权限相关状态
   const [hasSchedulePermission, setHasSchedulePermission] = useState(false);
+  const [hasActiveTimetable, setHasActiveTimetable] = useState(false);
 
-  // 获取用户权限
+  // 获取用户权限和机构活动课表状态
   useEffect(() => {
     const fetchUserPermissions = async () => {
       try {
@@ -64,7 +65,32 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       }
     };
     
+    const checkActiveTimetable = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${getApiBaseUrl()}/admin/active-timetables`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.length > 0) {
+          setHasActiveTimetable(true);
+          console.log('[CustomerStatusHistoryModal] 机构有活动课表:', data.data.length, '个');
+        } else {
+          setHasActiveTimetable(false);
+          console.log('[CustomerStatusHistoryModal] 机构没有活动课表');
+        }
+      } catch (error) {
+        console.error('[CustomerStatusHistoryModal] 检查活动课表失败:', error);
+        setHasActiveTimetable(false);
+      }
+    };
+    
     fetchUserPermissions();
+    checkActiveTimetable();
   }, []);
 
   useEffect(() => {
@@ -361,24 +387,24 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const handleSubmit = async (values) => {
     if (!customer) return;
 
-    // 如果是待体验或待再体验状态，验证必填项
-    if (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') {
-      if (!trialStudentName || !trialStudentName.trim()) {
-        message.warning('请输入体验人员姓名');
-        return;
+      // 如果是待体验或待再体验状态，验证必填项
+      if (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') {
+        if (!trialStudentName || !trialStudentName.trim()) {
+          message.warning('请输入体验人员姓名');
+          return;
+        }
+        if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
+          message.warning('请选择体验日期和时间');
+          return;
+        }
+        
+        // 只有当有课表权限、有活动课表、且时间被修改了，才需要选择教练
+        // 如果有原始安排且未修改，则使用原始教练
+        if (hasSchedulePermission && hasActiveTimetable && scheduleModified && !selectedCoach) {
+          message.warning('请选择体验教练');
+          return;
+        }
       }
-      if (!experienceDate || !experienceTimeRange || experienceTimeRange.length !== 2) {
-        message.warning('请选择体验日期和时间');
-        return;
-      }
-      
-      // 如果有课表权限且时间被修改了，则需要选择教练
-      // 如果有原始安排且未修改，则使用原始教练
-      if (hasSchedulePermission && scheduleModified && !selectedCoach) {
-        message.warning('请选择体验教练');
-        return;
-      }
-    }
 
     setLoading(true);
     try {
@@ -393,9 +419,9 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         statusChangeData.trialScheduleDate = experienceDate.format('YYYY-MM-DD');
         statusChangeData.trialStartTime = experienceTimeRange[0].format('HH:mm:ss');
         statusChangeData.trialEndTime = experienceTimeRange[1].format('HH:mm:ss');
-        // 只有有课表权限时才保存教练ID
+        // 只有有课表权限且有活动课表时才保存教练ID
         // 如果有原始安排且未修改，使用原始教练；否则使用选择的教练
-        if (hasSchedulePermission) {
+        if (hasSchedulePermission && hasActiveTimetable) {
           if (!scheduleModified && originalTrialSchedule?.coachId) {
             statusChangeData.trialCoachId = originalTrialSchedule.coachId;
           } else {
@@ -415,7 +441,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         
         // 确定要使用的教练ID
         let coachIdToUse = null;
-        if (hasSchedulePermission) {
+        if (hasSchedulePermission && hasActiveTimetable) {
           if (!scheduleModified && originalTrialSchedule?.coachId) {
             coachIdToUse = originalTrialSchedule.coachId;
           } else {
@@ -423,8 +449,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
           }
         }
         
-        // 只有当用户有课表权限且有教练ID时，才创建体验课程
-        if (hasSchedulePermission && 
+        // 只有当用户有课表权限、有活动课表、且有教练ID时，才创建体验课程
+        if (hasSchedulePermission && hasActiveTimetable &&
             (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') && 
             experienceDate && experienceTimeRange && coachIdToUse) {
           try {
@@ -633,8 +659,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     // 只有当有原始安排且未修改时，才不需要查询
     const shouldFetchCoaches = !originalTrialSchedule || isModified;
     
-    // 如果时间已经选好，且日期已选，则查询可用教练
-    if (shouldFetchCoaches && hasSchedulePermission && date && experienceTimeRange && experienceTimeRange.length === 2 && experienceTimeRange[0] && experienceTimeRange[1]) {
+    // 如果时间已经选好，且日期已选，且有活动课表，则查询可用教练
+    if (shouldFetchCoaches && hasSchedulePermission && hasActiveTimetable && date && experienceTimeRange && experienceTimeRange.length === 2 && experienceTimeRange[0] && experienceTimeRange[1]) {
       fetchAvailableCoaches(date, experienceTimeRange);
     } else if (shouldFetchCoaches) {
       // 如果没有完整的时间，清空教练选择
@@ -651,13 +677,13 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     const isModified = checkScheduleModified(experienceDate, times);
     setScheduleModified(isModified);
     
-    // 如果时间完整且有日期，则查询可用教练（包括新建和修改的情况）
+    // 如果时间完整且有日期，且有活动课表，则查询可用教练（包括新建和修改的情况）
     // 只有当有原始安排且未修改时，才不需要查询
     const shouldFetchCoaches = !originalTrialSchedule || isModified;
     
-    if (shouldFetchCoaches && hasSchedulePermission && times && times.length === 2 && times[0] && times[1] && experienceDate) {
+    if (shouldFetchCoaches && hasSchedulePermission && hasActiveTimetable && times && times.length === 2 && times[0] && times[1] && experienceDate) {
       fetchAvailableCoaches(experienceDate, times);
-    } else if (shouldFetchCoaches && hasSchedulePermission) {
+    } else if (shouldFetchCoaches && hasSchedulePermission && hasActiveTimetable) {
       // 如果时间不完整，清空教练列表
       setAvailableCoaches([]);
       setSelectedCoach(null);
@@ -863,8 +889,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                 </div>
               </div>
               
-              {/* 只有有课表权限的用户才能看到和选择教练 */}
-              {hasSchedulePermission && (
+              {/* 只有有课表权限且机构有活动课表的用户才能看到和选择教练 */}
+              {hasSchedulePermission && hasActiveTimetable && (
                 <>
                   {/* 如果有原始安排且未修改，显示回显的教练信息（不可编辑） */}
                   {originalTrialSchedule && !scheduleModified && originalTrialSchedule.coachName ? (
@@ -950,6 +976,25 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                     </div>
                   ) : null}
                 </>
+              )}
+              
+              {/* 如果有课表权限但没有活动课表，显示提示信息 */}
+              {hasSchedulePermission && !hasActiveTimetable && (
+                <div style={{ 
+                  padding: '12px', 
+                  backgroundColor: '#fffbe6', 
+                  borderRadius: '4px',
+                  color: '#d48806',
+                  border: '1px solid #ffe58f',
+                  marginTop: '12px'
+                }}>
+                  <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
+                    提示
+                  </div>
+                  <div style={{ fontSize: '13px' }}>
+                    当前机构暂无活动课表，体验课程将不会被添加到课表中。如需添加到课表，请先创建并激活课表。
+                  </div>
+                </div>
               )}
             </div>
           )}
