@@ -5792,7 +5792,7 @@ const MyHours = ({ user }) => {
   }, [coachId, user]);
 
   // 处理月份选择
-  const handleMonthChange = (month) => {
+  const handleMonthChange = async (month) => {
     setSelectedMonth(month);
     
     if (!month) {
@@ -5802,11 +5802,53 @@ const MyHours = ({ user }) => {
       return;
     }
     
-    // 从工资数据中找到该月份的记薪周期
+    // 优先从工资数据中找到该月份的记薪周期
     const monthData = salaryData.find(item => item.month === month);
     if (monthData && monthData.salaryPeriodStart && monthData.salaryPeriodEnd) {
       setStartDate(dayjs(monthData.salaryPeriodStart));
       setEndDate(dayjs(monthData.salaryPeriodEnd));
+      return;
+    }
+    
+    // 如果工资数据中没有，就从后端获取记薪周期设置并计算
+    try {
+      const settingResp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/salary-system-settings/current`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (settingResp.ok) {
+        const settingData = await settingResp.json();
+        if (settingData.success && settingData.data) {
+          const setting = settingData.data;
+          const startDay = setting.salaryStartDay || 1;
+          const endDay = setting.salaryEndDay || 31;
+          
+          // 解析月份
+          const yearMonth = dayjs(month + '-01');
+          
+          let periodStart, periodEnd;
+          
+          // 如果开始日<=结束日，在同一个月内
+          if (startDay <= endDay) {
+            periodStart = yearMonth.date(startDay);
+            periodEnd = yearMonth.date(Math.min(endDay, yearMonth.daysInMonth()));
+          } else {
+            // 跨月：从本月开始日到次月结束日
+            periodStart = yearMonth.date(startDay);
+            const nextMonth = yearMonth.add(1, 'month');
+            const actualEndDay = endDay === 0 ? nextMonth.daysInMonth() : endDay;
+            periodEnd = nextMonth.date(Math.min(actualEndDay, nextMonth.daysInMonth()));
+          }
+          
+          setStartDate(periodStart);
+          setEndDate(periodEnd);
+        }
+      }
+    } catch (error) {
+      console.error('获取记薪周期设置失败:', error);
+      message.error('获取记薪周期失败');
     }
   };
 
