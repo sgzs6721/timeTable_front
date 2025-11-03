@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, message } from 'antd';
+import { createTodo } from '../services/todo';
 import dayjs from 'dayjs';
 
 const CreateTodoModal = ({ visible, onCancel, onSuccess }) => {
@@ -22,17 +23,7 @@ const CreateTodoModal = ({ visible, onCancel, onSuccess }) => {
         status: 'PENDING'
       };
 
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}/todos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(todoData)
-      });
-
-      const result = await response.json();
+      const result = await createTodo(todoData);
 
       if (result.success) {
         message.success('待办创建成功');
