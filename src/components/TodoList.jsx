@@ -1123,10 +1123,24 @@ const TodoList = ({ onUnreadCountChange }) => {
           borderRadius: '8px',
           border: '1px solid rgba(217, 217, 217, 0.3)',
           minWidth: 'max-content',
-          alignItems: 'center',
-          justifyContent: 'space-between'
+          alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+          {/* 新建按钮 */}
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />}
+            onClick={() => setCreateModalVisible(true)}
+            style={{ 
+              borderRadius: '6px',
+              flexShrink: 0,
+              height: '36px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            新建
+          </Button>
+          
           <div 
             onClick={() => setFilter('all')}
             style={{
@@ -1215,24 +1229,6 @@ const TodoList = ({ onUnreadCountChange }) => {
           >
             已处理 (<span style={{ color: '#52c41a' }}>{todos.filter(t => t.status === 'COMPLETED').length}</span>)
           </div>
-          </div>
-          
-          {/* 新建待办按钮 */}
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => setCreateModalVisible(true)}
-            style={{ 
-              borderRadius: '6px',
-              marginLeft: '8px',
-              flexShrink: 0,
-              height: '36px',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            新建待办
-          </Button>
         </div>
       </div>
 
