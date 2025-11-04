@@ -15,8 +15,8 @@ const MySalary = ({ user }) => {
   const [availableMonths, setAvailableMonths] = useState([]);
   const isMobile = useMediaQuery('(max-width: 768px)');
   
-  // 判断是否为管理员
-  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+  // 判断是否为管理职位（MANAGER或ADMIN角色可以查看所有人工资）
+  const isAdmin = user?.position === 'MANAGER' || user?.role?.toUpperCase() === 'ADMIN';
 
   useEffect(() => {
     fetchSalaryData();
