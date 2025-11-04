@@ -262,6 +262,24 @@
   color: #08979c;
 }
 
+.salary-btn {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #52c41a;
+}
+
+.salary-btn:hover {
+  background: #d9f7be;
+  border-color: #73d13d;
+  color: #389e0d;
+}
+
+.salary-btn:active {
+  background: #b7eb8f;
+  border-color: #73d13d;
+  color: #389e0d;
+}
+
 .delete-btn {
   background: #fff1f0 !important;
   border: 1px solid #ffccc7 !important;

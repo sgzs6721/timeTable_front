@@ -8,7 +8,8 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, 
   TeamOutlined, UserAddOutlined, UserDeleteOutlined,
   ReloadOutlined, EnvironmentOutlined, PhoneOutlined,
-  EyeOutlined, SettingOutlined, UsergroupAddOutlined
+  EyeOutlined, SettingOutlined, UsergroupAddOutlined,
+  DollarOutlined
 } from '@ant-design/icons';
 import {
   getAllOrganizations,
@@ -299,6 +300,16 @@ const OrganizationManagement = () => {
           className="action-btn settings-btn"
         >
           权限设置
+        </Button>
+        <Button
+          icon={<DollarOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/organizations/${org.id}/salary`);
+          }}
+          className="action-btn salary-btn"
+        >
+          工资管理
         </Button>
         <Button
           icon={<EditOutlined />}

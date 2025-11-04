@@ -268,28 +268,21 @@ const SalarySettings = () => {
   }
 
   return (
-    <div style={{ padding: '12px 24px 24px 24px' }}>
-      <div style={{ marginBottom: 20, fontSize: '16px', fontWeight: 500 }}>
-        人员工资设定
+    <div style={{ padding: '8px 0 24px 0' }}>
+      <div style={{ marginBottom: 16, fontSize: '16px', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>人员工资设定</span>
+        {/* 添加人员按钮 */}
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleOpenModal}
+          style={{
+            borderRadius: '6px'
+          }}
+        >
+          添加人员
+        </Button>
       </div>
-
-      {/* 添加人员按钮 */}
-      <Button
-        type="dashed"
-        icon={<PlusOutlined />}
-        onClick={handleOpenModal}
-        block
-        size="large"
-        style={{
-          marginBottom: 24,
-          height: '60px',
-          fontSize: '16px',
-          borderColor: '#1890ff',
-          color: '#1890ff'
-        }}
-      >
-        添加人员
-      </Button>
 
       {/* 已选择的人员卡片列表 */}
       {selectedUsers.length === 0 ? (
@@ -298,15 +291,16 @@ const SalarySettings = () => {
           style={{ marginTop: 60 }}
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {selectedUsers.map(user => {
             const userEditData = editedData[user.userId] || {};
             return (
               <Card
                 key={user.userId}
                 style={{
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                  border: '1px solid #e8e8e8'
                 }}
               >
                 {/* 用户信息头部 */}

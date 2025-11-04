@@ -21,7 +21,12 @@ const SalaryMaster = () => {
   ];
 
   return (
-    <div style={{ padding: '12px 0' }}>
+    <div style={{ 
+      background: '#fff',
+      borderRadius: '12px',
+      padding: '8px 16px 24px',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
+    }}>
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}

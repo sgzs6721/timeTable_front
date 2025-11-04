@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, Button, Space, Badge, Dropdown, Spin, message, Card, Alert, Modal, Select, Input, Radio, DatePicker, Row, Col } from 'antd';
-import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined, InboxOutlined, DownOutlined, ToolOutlined, WarningOutlined, DollarOutlined } from '@ant-design/icons';
+import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined, InboxOutlined, DownOutlined, ToolOutlined, WarningOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
 import TimetableManagement from './TimetableManagement';
-import SalaryMaster from './SalaryMaster';
 import Footer from '../components/Footer';
 import './AdminPanel.css';
 import { getAllRegistrationRequests, emergencyFixWeeklyInstances, autoFixWeeklyInstances, cleanDuplicateSchedules, getAllUsers, createTimetableForUser } from '../services/admin';
@@ -327,11 +326,6 @@ const AdminPanel = ({ user }) => {
       key: 'users',
       label: '权限管理',
       children: <UserManagement activeTab="users" />,
-    },
-    {
-      key: 'salary',
-      label: '工资设定',
-      children: <SalaryMaster />,
     },
     {
       key: 'pending',
