@@ -41,3 +41,23 @@ export const deleteRole = async (id) => {
   return response.data;
 };
 
+export const getRoleMemberCount = async (roleId) => {
+  const response = await api.get(`/organization-roles/${roleId}/member-count`, { headers: getAuthHeaders() });
+  return response.data;
+};
+
+export const assignRoleToUser = async (roleId, userId) => {
+  const response = await api.post(`/organization-roles/${roleId}/members/${userId}`, {}, { headers: getAuthHeaders() });
+  return response.data;
+};
+
+export const removeUserFromRole = async (roleId, userId) => {
+  const response = await api.delete(`/organization-roles/${roleId}/members/${userId}`, { headers: getAuthHeaders() });
+  return response.data;
+};
+
+export const assignRoleToUsers = async (roleId, userIds) => {
+  const response = await api.post(`/organization-roles/${roleId}/members/batch`, userIds, { headers: getAuthHeaders() });
+  return response.data;
+};
+
