@@ -47,7 +47,7 @@ const OrganizationSalaryManagement = () => {
         margin: '0 auto',
         padding: isMobile ? '0.5rem' : '1rem 2rem 2rem'
       }}>
-        <SalaryMaster />
+        <SalaryMaster organizationId={organizationId} />
       </div>
       
       <Footer />

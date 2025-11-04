@@ -3,7 +3,7 @@ import { Card, InputNumber, Button, message, Spin, Select, Empty, Modal, Popconf
 import { SaveOutlined, UserOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import { getAllUserSalarySettings, saveOrUpdateSalarySetting, deleteSalarySetting } from '../services/salary';
 
-const SalarySettings = () => {
+const SalarySettings = ({ organizationId }) => {
   const [loading, setLoading] = useState(false);
   const [allUsers, setAllUsers] = useState([]); // 所有用户列表
   const [selectedUsers, setSelectedUsers] = useState([]); // 已选择的用户列表（可以有多个）
@@ -15,13 +15,15 @@ const SalarySettings = () => {
   const [userToDelete, setUserToDelete] = useState(null); // 要删除的用户
 
   useEffect(() => {
-    fetchAllUsers();
-  }, []);
+    if (organizationId) {
+      fetchAllUsers();
+    }
+  }, [organizationId]);
 
   const fetchAllUsers = async () => {
     setLoading(true);
     try {
-      const response = await getAllUserSalarySettings();
+      const response = await getAllUserSalarySettings(organizationId);
       if (response && response.success) {
         const allUsersData = response.data || [];
         setAllUsers(allUsersData);
@@ -118,7 +120,7 @@ const SalarySettings = () => {
     
     setLoading(true);
     try {
-      const response = await deleteSalarySetting(userToDelete.userId);
+      const response = await deleteSalarySetting(userToDelete.userId, organizationId);
       if (response && response.success) {
         message.success('删除成功');
         
@@ -218,7 +220,7 @@ const SalarySettings = () => {
         commissionRate: changes.commissionRate !== undefined ? changes.commissionRate : (user.commissionRate || 0)
       };
 
-      const response = await saveOrUpdateSalarySetting(data);
+      const response = await saveOrUpdateSalarySetting(data, organizationId);
       if (response && response.success) {
         message.success('保存成功');
         

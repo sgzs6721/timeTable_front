@@ -34,18 +34,21 @@ api.interceptors.response.use(
 );
 
 // 获取所有用户的工资设置
-export const getAllUserSalarySettings = () => {
-  return api.get('/salary-settings');
+export const getAllUserSalarySettings = (organizationId) => {
+  const params = organizationId ? { organizationId } : {};
+  return api.get('/salary-settings', { params });
 };
 
 // 保存或更新用户工资设置
-export const saveOrUpdateSalarySetting = (data) => {
-  return api.post('/salary-settings', data);
+export const saveOrUpdateSalarySetting = (data, organizationId) => {
+  const params = organizationId ? { organizationId } : {};
+  return api.post('/salary-settings', data, { params });
 };
 
 // 删除用户工资设置
-export const deleteSalarySetting = (userId) => {
-  return api.delete(`/salary-settings/${userId}`);
+export const deleteSalarySetting = (userId, organizationId) => {
+  const params = organizationId ? { organizationId } : {};
+  return api.delete(`/salary-settings/${userId}`, { params });
 };
 
 export default api;

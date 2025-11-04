@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Input, Timeline, Spin, message, Button, Space, Tag, DatePicker, TimePicker, Popconfirm } from 'antd';
 import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, CalendarOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory, cancelTrialSchedule } from '../services/customerStatusHistory';
-import { createTodo, getLatestTodoByCustomer, updateTodo, updateTodoReminderTime } from '../services/todo';
+import { createTodo, getLatestTodoByCustomer, updateTodo, updateTodoReminderTime, cancelTodo } from '../services/todo';
 import { getApiBaseUrl } from '../config/api';
 import { getCurrentUserPermissions } from '../services/rolePermission';
 import dayjs from 'dayjs';
@@ -485,8 +485,9 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
           }
         }
         
-        // 如果设置了待办提醒，创建或更新待办
+        // 处理待办提醒
         if (showTodoReminder && reminderDate && reminderTime) {
+          // 如果设置了待办提醒，创建或更新待办
           try {
             const todoData = {
               customerId: customer.id,
@@ -523,6 +524,24 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
             }
           } catch (error) {
             console.error('保存待办提醒失败:', error);
+          }
+        } else if (!showTodoReminder && existingTodoId) {
+          // 如果原来有待办提醒，但现在关闭了提醒，则关闭（取消）待办
+          try {
+            const cancelResponse = await cancelTodo(existingTodoId);
+            if (cancelResponse && cancelResponse.success) {
+              console.log('待办提醒已关闭');
+              // 通知外层刷新待办状态
+              if (onTodoCreated) {
+                onTodoCreated({
+                  id: customer.id,
+                  childName: customer.childName,
+                  parentPhone: customer.parentPhone
+                });
+              }
+            }
+          } catch (error) {
+            console.error('关闭待办提醒失败:', error);
           }
         }
         

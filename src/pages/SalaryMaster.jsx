@@ -4,19 +4,19 @@ import { UserOutlined, SettingOutlined } from '@ant-design/icons';
 import SalarySettings from './SalarySettings';
 import SalarySystemSettings from './SalarySystemSettings';
 
-const SalaryMaster = () => {
+const SalaryMaster = ({ organizationId }) => {
   const [activeTab, setActiveTab] = useState('coaches');
 
   const tabItems = [
     {
       key: 'coaches',
       label: '教练工资',
-      children: <SalarySettings />,
+      children: <SalarySettings organizationId={organizationId} />,
     },
     {
       key: 'system',
       label: '记薪周期',
-      children: <SalarySystemSettings />,
+      children: <SalarySystemSettings organizationId={organizationId} />,
     },
   ];
 

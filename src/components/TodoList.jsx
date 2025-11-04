@@ -90,7 +90,7 @@ const TodoList = ({ onUnreadCountChange }) => {
   const getTodayTodoCount = (todoList) => {
     const today = dayjs().format('YYYY-MM-DD');
     return todoList.filter(todo => {
-      if (todo.status === 'COMPLETED') return false;
+      if (todo.status === 'COMPLETED' || todo.status === 'CANCELLED') return false;
       if (!todo.reminderDate) return false;
       const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
       return reminderDay === today;
@@ -468,20 +468,20 @@ const TodoList = ({ onUnreadCountChange }) => {
       // 今日待办：提醒日期是今天的未完成待办
       const today = dayjs().format('YYYY-MM-DD');
       return todos.filter(todo => {
-        if (todo.status === 'COMPLETED') return false;
+        if (todo.status === 'COMPLETED' || todo.status === 'CANCELLED') return false;
         if (!todo.reminderDate) return false;
         const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
         return reminderDay === today;
       });
     } else if (filter === 'pending') {
-      return todos.filter(todo => todo.status !== 'COMPLETED');
+      return todos.filter(todo => todo.status !== 'COMPLETED' && todo.status !== 'CANCELLED');
     } else if (filter === 'completed') {
-      return todos.filter(todo => todo.status === 'COMPLETED');
+      return todos.filter(todo => todo.status === 'COMPLETED' || todo.status === 'CANCELLED');
     }
     // 默认返回今日待办
     const today = dayjs().format('YYYY-MM-DD');
     return todos.filter(todo => {
-      if (todo.status === 'COMPLETED') return false;
+      if (todo.status === 'COMPLETED' || todo.status === 'CANCELLED') return false;
       if (!todo.reminderDate) return false;
       const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
       return reminderDay === today;
@@ -668,7 +668,9 @@ const TodoList = ({ onUnreadCountChange }) => {
 
   const renderTodoCard = (todo) => {
     const isCompleted = todo.status === 'COMPLETED';
-    const isUnread = !todo.isRead && !isCompleted;
+    const isCancelled = todo.status === 'CANCELLED';
+    const isProcessed = isCompleted || isCancelled; // 已完成或已取消都视为已处理
+    const isUnread = !todo.isRead && !isProcessed;
     const isPast = todo.reminderDate && dayjs(todo.reminderDate).isBefore(dayjs(), 'day');
     const hasHistory = todo.statusHistory && todo.statusHistory.length > 0;
     const isHistoryExpanded = expandedHistory[todo.id];
@@ -680,7 +682,7 @@ const TodoList = ({ onUnreadCountChange }) => {
         key={todo.id}
         style={{ 
           marginBottom: 12,
-          borderLeft: isUnread ? '4px solid #1890ff' : isCompleted ? '4px solid #52c41a' : '4px solid #d9d9d9',
+          borderLeft: isUnread ? '4px solid #1890ff' : isCompleted ? '4px solid #52c41a' : isCancelled ? '4px solid #faad14' : '4px solid #d9d9d9',
           backgroundColor: isUnread ? '#f0f5ff' : 'white',
           overflow: 'hidden'
         }}
@@ -751,9 +753,12 @@ const TodoList = ({ onUnreadCountChange }) => {
                   <Tag color="blue" style={{ margin: 0, border: 'none' }} icon={<ExclamationCircleOutlined />}>未处理</Tag>
                 )}
                 {isCompleted && (
-                  <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0, border: 'none' }}>已处理</Tag>
+                  <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0, border: 'none' }}>已完成</Tag>
                 )}
-                {isPast && !isCompleted && (
+                {isCancelled && (
+                  <Tag color="orange" icon={<CloseCircleOutlined />} style={{ margin: 0, border: 'none' }}>已取消</Tag>
+                )}
+                {isPast && !isProcessed && (
                   <Tag color="red" style={{ margin: 0, border: 'none' }}>已逾期</Tag>
                 )}
               </div>
@@ -764,7 +769,7 @@ const TodoList = ({ onUnreadCountChange }) => {
               fontWeight: 400,
               marginBottom: 8,
               textDecoration: 'none',
-              color: isCompleted ? '#999' : '#000'
+              color: isProcessed ? '#999' : '#000'
             }}>
               {todo.content}
             </div>
@@ -772,7 +777,7 @@ const TodoList = ({ onUnreadCountChange }) => {
             {todo.reminderDate && (
               <div style={{ 
                 fontSize: '12px', 
-                color: isPast && !isCompleted ? '#ff4d4f' : '#999',
+                color: isPast && !isProcessed ? '#ff4d4f' : '#999',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -824,7 +829,7 @@ const TodoList = ({ onUnreadCountChange }) => {
                         提醒时间：{dayjs(todo.reminderDate).format('YYYY-MM-DD')}
                         {todo.reminderTime && ` ${todo.reminderTime.substring(0, 5)}`}
                       </span>
-                      {!isCompleted && (
+                      {!isProcessed && (
                         <EditOutlined 
                           style={{ cursor: 'pointer', color: '#1890ff' }}
                           onClick={(e) => {
@@ -863,7 +868,7 @@ const TodoList = ({ onUnreadCountChange }) => {
                       )}
                     </>
                   )}
-                  {!isCompleted && (
+                  {!isProcessed && (
                     <Popconfirm
                       title="确定要标记为已处理吗？"
                       onConfirm={() => handleMarkAsCompleted(todo.id)}
@@ -901,6 +906,12 @@ const TodoList = ({ onUnreadCountChange }) => {
               <div style={{ fontSize: '12px', color: '#999', marginTop: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <CheckCircleOutlined style={{ color: '#52c41a' }} />
                 完成时间：{dayjs(todo.completedAt).format('YYYY-MM-DD HH:mm')}
+              </div>
+            )}
+            {isCancelled && todo.cancelledAt && (
+              <div style={{ fontSize: '12px', color: '#999', marginTop: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CloseCircleOutlined style={{ color: '#faad14' }} />
+                取消时间：{dayjs(todo.cancelledAt).format('YYYY-MM-DD HH:mm')}
               </div>
             )}
           </div>
@@ -1194,7 +1205,7 @@ const TodoList = ({ onUnreadCountChange }) => {
               whiteSpace: 'nowrap'
             }}
           >
-            未处理 (<span style={{ color: '#ff4d4f' }}>{todos.filter(t => t.status !== 'COMPLETED').length}</span>)
+            未处理 (<span style={{ color: '#ff4d4f' }}>{todos.filter(t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length}</span>)
           </div>
           <div 
             onClick={() => setFilter('completed')}
@@ -1214,7 +1225,7 @@ const TodoList = ({ onUnreadCountChange }) => {
               whiteSpace: 'nowrap'
             }}
           >
-            已处理 (<span style={{ color: '#52c41a' }}>{todos.filter(t => t.status === 'COMPLETED').length}</span>)
+            已处理 (<span style={{ color: '#52c41a' }}>{todos.filter(t => t.status === 'COMPLETED' || t.status === 'CANCELLED').length}</span>)
           </div>
         </div>
       </div>

@@ -97,6 +97,20 @@ export const markTodoAsCompleted = async (todoId) => {
   }
 };
 
+// 关闭待办（取消）
+export const cancelTodo = async (todoId) => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/todos/${todoId}/cancel`, {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('关闭待办失败:', error);
+    throw error;
+  }
+};
+
 // 删除待办
 export const deleteTodo = async (todoId) => {
   try {

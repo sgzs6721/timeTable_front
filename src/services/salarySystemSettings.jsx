@@ -39,9 +39,10 @@ api.interceptors.response.use(
 );
 
 // 获取当前工资系统设置
-export const getCurrentSalarySystemSettings = async () => {
+export const getCurrentSalarySystemSettings = async (organizationId) => {
   try {
-    const response = await api.get('/salary-system-settings');
+    const params = organizationId ? { organizationId } : {};
+    const response = await api.get('/salary-system-settings', { params });
     return response;
   } catch (error) {
     console.error('获取工资系统设置失败:', error);
@@ -50,9 +51,10 @@ export const getCurrentSalarySystemSettings = async () => {
 };
 
 // 保存或更新工资系统设置
-export const saveOrUpdateSalarySystemSettings = async (settings) => {
+export const saveOrUpdateSalarySystemSettings = async (settings, organizationId) => {
   try {
-    const response = await api.post('/salary-system-settings', settings);
+    const params = organizationId ? { organizationId } : {};
+    const response = await api.post('/salary-system-settings', settings, { params });
     return response;
   } catch (error) {
     console.error('保存工资系统设置失败:', error);

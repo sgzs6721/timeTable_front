@@ -3,7 +3,7 @@ import { Card, Input, Button, message, Spin, Select, Form, DatePicker, Row, Col,
 import { SaveOutlined, SettingOutlined } from '@ant-design/icons';
 import { getCurrentSalarySystemSettings, saveOrUpdateSalarySystemSettings } from '../services/salarySystemSettings';
 
-const SalarySystemSettings = () => {
+const SalarySystemSettings = ({ organizationId }) => {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const [initialValues, setInitialValues] = useState({});
@@ -11,13 +11,15 @@ const SalarySystemSettings = () => {
 
   // 初始化表单默认值
   useEffect(() => {
-    fetchCurrentSettings();
-  }, [form]);
+    if (organizationId) {
+      fetchCurrentSettings();
+    }
+  }, [form, organizationId]);
 
   const fetchCurrentSettings = async () => {
     setLoading(true);
     try {
-      const response = await getCurrentSalarySystemSettings();
+      const response = await getCurrentSalarySystemSettings(organizationId);
       let values;
       if (response && response.success) {
         const settings = response.data;
@@ -69,7 +71,7 @@ const SalarySystemSettings = () => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const response = await saveOrUpdateSalarySystemSettings(values);
+      const response = await saveOrUpdateSalarySystemSettings(values, organizationId);
       if (response && response.success) {
         message.success('工资设置保存成功');
         // 更新初始值并重置变化状态
