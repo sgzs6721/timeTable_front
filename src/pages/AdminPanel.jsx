@@ -214,7 +214,7 @@ const AdminPanel = ({ user }) => {
   const tabItems = [
     {
       key: 'timetables',
-      label: '所有课表',
+      label: '课表管理',
       children: (
         <div style={{ position: 'relative' }}>
           {/* 课表类型切换按钮和批量操作 */}
@@ -321,11 +321,6 @@ const AdminPanel = ({ user }) => {
           )}
         </div>
       ),
-    },
-    {
-      key: 'users',
-      label: '权限管理',
-      children: <UserManagement activeTab="users" />,
     },
     {
       key: 'pending',

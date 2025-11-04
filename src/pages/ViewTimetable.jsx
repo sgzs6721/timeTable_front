@@ -2190,8 +2190,6 @@ const ViewTimetable = ({ user }) => {
       const response = await getTimetable(timetableId);
       if (response.success) {
         const { timetable: timetableData, owner } = response.data;
-        setTimetable(timetableData);
-        setTimetableOwner(owner);
         
         // For weekly timetables, initialize and determine view mode
         // 默认展示：周固定 -> 本周；日期范围 -> 固定
@@ -2203,9 +2201,16 @@ const ViewTimetable = ({ user }) => {
             getCurrentWeekInstance(timetableId)
           ]);
           
+          let finalViewMode = 'template';
+          let finalSchedules = [];
+          let finalWeeklyInstances = [];
+          let finalTemplateSchedules = [];
+          let finalCurrentWeekInstance = null;
+          let finalCurrentInstanceIndex = 0;
+          
           // 处理模板数据
           if (templateResponse && templateResponse.success) {
-            setTemplateSchedules(templateResponse.data || []);
+            finalTemplateSchedules = templateResponse.data || [];
           }
           
           // 处理周实例列表
@@ -2213,7 +2218,7 @@ const ViewTimetable = ({ user }) => {
             const sortedInstances = instancesResponse.data.sort((a, b) => 
               dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))
             );
-            setWeeklyInstances(sortedInstances);
+            finalWeeklyInstances = sortedInstances;
             
             // 处理当前周实例
             if (currentWeekResponse && currentWeekResponse.success && currentWeekResponse.data?.hasInstance) {
@@ -2224,73 +2229,108 @@ const ViewTimetable = ({ user }) => {
               const targetIndex = sortedInstances.findIndex(inst => inst.id === instance.id);
               const finalIndex = targetIndex >= 0 ? targetIndex : sortedInstances.length - 1;
               
-              // 一次性设置所有状态，避免闪烁
-              setViewMode('instance');
-              setCurrentWeekInstance(instance);
-              setAllSchedules(schedules);
-              setCurrentInstanceIndex(finalIndex);
-          } else {
-            // 没有当前周实例，生成一个
-            const newCurrentWeekResponse = await ensureWeekInstanceExists();
-            if (newCurrentWeekResponse && newCurrentWeekResponse.success && newCurrentWeekResponse.data?.hasInstance) {
-              const instance = newCurrentWeekResponse.data.instance;
-              const schedules = newCurrentWeekResponse.data.schedules || [];
-              
-              const targetIndex = sortedInstances.findIndex(inst => inst.id === instance.id);
-              const finalIndex = targetIndex >= 0 ? targetIndex : sortedInstances.length - 1;
-              
-              setViewMode('instance');
-              setCurrentWeekInstance(instance);
-              setAllSchedules(schedules);
-              setCurrentInstanceIndex(finalIndex);
+              finalViewMode = 'instance';
+              finalCurrentWeekInstance = instance;
+              finalSchedules = schedules;
+              finalCurrentInstanceIndex = finalIndex;
+            } else {
+              // 没有当前周实例，生成一个
+              const newCurrentWeekResponse = await ensureWeekInstanceExists();
+              if (newCurrentWeekResponse && newCurrentWeekResponse.success && newCurrentWeekResponse.data?.hasInstance) {
+                const instance = newCurrentWeekResponse.data.instance;
+                const schedules = newCurrentWeekResponse.data.schedules || [];
+                
+                const targetIndex = sortedInstances.findIndex(inst => inst.id === instance.id);
+                const finalIndex = targetIndex >= 0 ? targetIndex : sortedInstances.length - 1;
+                
+                finalViewMode = 'instance';
+                finalCurrentWeekInstance = instance;
+                finalSchedules = schedules;
+                finalCurrentInstanceIndex = finalIndex;
+              }
             }
           }
-          }
+          
+          // 批量更新所有数据状态
+          setTimetable(timetableData);
+          setTimetableOwner(owner);
+          setTemplateSchedules(finalTemplateSchedules);
+          setWeeklyInstances(finalWeeklyInstances);
+          setViewMode(finalViewMode);
+          setCurrentWeekInstance(finalCurrentWeekInstance);
+          setAllSchedules(finalSchedules);
+          setCurrentInstanceIndex(finalCurrentInstanceIndex);
+          
+          // 使用 requestAnimationFrame 确保浏览器完成本次渲染后再关闭loading
+          // 双重 RAF 确保 DOM 已完全绘制
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setLoading(false);
+            });
+          });
+          
+          return; // 提前返回，避免执行后续的setLoading(false)
         } else {
           setViewMode('template');
           const tpl = await getTemplateSchedules(timetableId);
-          if (tpl && tpl.success) setAllSchedules(tpl.data || []);
-        }
+          const finalSchedules = (tpl && tpl.success) ? (tpl.data || []) : [];
+          
+          // 批量更新状态
+          setTimetable(timetableData);
+          setTimetableOwner(owner);
+          setAllSchedules(finalSchedules);
+          
+          // 使用 requestAnimationFrame 确保浏览器完成本次渲染后再关闭loading
+          // 双重 RAF 确保 DOM 已完全绘制
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setLoading(false);
+            });
+          });
+          
+          // 处理日期范围的周数计算
+          if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
+            const start = dayjs(timetableData.startDate);
+            const end = dayjs(timetableData.endDate);
+            const today = dayjs();
 
-        if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
-          const start = dayjs(timetableData.startDate);
-          const end = dayjs(timetableData.endDate);
-          const today = dayjs();
+            // 找到起始日期所在周的周一（与后端逻辑一致）
+            const anchorMonday = start.startOf('week');
 
-          // 找到起始日期所在周的周一（与后端逻辑一致）
-          const anchorMonday = start.startOf('week');
+            // 计算总周数
+            const totalDays = end.diff(anchorMonday, 'day') + 1;
+            const weeks = Math.ceil(totalDays / 7);
+            setTotalWeeks(weeks > 0 ? weeks : 1);
 
-          // 计算总周数
-          const totalDays = end.diff(anchorMonday, 'day') + 1;
-          const weeks = Math.ceil(totalDays / 7);
-          setTotalWeeks(weeks > 0 ? weeks : 1);
+            // 计算当前应该显示的周数
+            let targetWeek = 1; // 默认第一周
 
-          // 计算当前应该显示的周数
-          let targetWeek = 1; // 默认第一周
+            // 检查今天是否在课表日期范围内
+            if (today.isSameOrAfter(start) && today.isSameOrBefore(end)) {
+              // 计算今天是第几周
+              const daysSinceAnchor = today.diff(anchorMonday, 'day');
+              const weekNumber = Math.floor(daysSinceAnchor / 7) + 1;
 
-          // 检查今天是否在课表日期范围内
-          if (today.isSameOrAfter(start) && today.isSameOrBefore(end)) {
-            // 计算今天是第几周
-            const daysSinceAnchor = today.diff(anchorMonday, 'day');
-            const weekNumber = Math.floor(daysSinceAnchor / 7) + 1;
-
-            // 确保周数在有效范围内
-            if (weekNumber >= 1 && weekNumber <= weeks) {
-              targetWeek = weekNumber;
+              // 确保周数在有效范围内
+              if (weekNumber >= 1 && weekNumber <= weeks) {
+                targetWeek = weekNumber;
+              }
             }
-          }
 
-          setCurrentWeek(targetWeek);
+            setCurrentWeek(targetWeek);
+          }
+          
+          return; // 提前返回
         }
       } else {
         message.error(response.message || '获取课表失败');
+        setLoading(false);
         navigate('/dashboard');
       }
     } catch (error) {
       message.error('获取课表失败，请检查网络连接');
-      navigate('/dashboard');
-    } finally {
       setLoading(false);
+      navigate('/dashboard');
     }
   };
 

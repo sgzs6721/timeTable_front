@@ -1,18 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Card, Button, message, Spin, Typography, Space, Table, Modal, Form, Input, Tag, Popconfirm, Select 
+  Card, Button, message, Spin, Typography, Space, Modal, Form, Input, Tag, Popconfirm, Select, List, Avatar, Divider 
 } from 'antd';
 import { 
   LeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
   TrophyOutlined, ShoppingOutlined, CustomerServiceOutlined, ControlOutlined,
-  UsergroupAddOutlined
+  UsergroupAddOutlined, UserAddOutlined, UserDeleteOutlined, TeamOutlined
 } from '@ant-design/icons';
 import { getOrganizationRoles, createRole, updateRole, deleteRole } from '../services/organizationRole';
-import { getOrganization } from '../services/organization';
+import { getOrganization, getOrganizationAdmins } from '../services/organization';
+import { getAllUsers, updateUserInfo } from '../services/admin';
 import './OrganizationRoleManagement.css';
 
 const { Title, Text } = Typography;
+
+// 职位映射和颜色配置
+const POSITION_CONFIG = {
+  'COACH': { label: '教练', color: '#52c41a' },
+  'MANAGER': { label: '管理', color: '#fa8c16' },
+  'SALES': { label: '销售', color: '#1890ff' },
+  'RECEPTIONIST': { label: '前台', color: '#722ed1' }
+};
+
+// 获取职位显示信息
+const getPositionDisplay = (position) => {
+  if (!position) return { label: '未设置', color: '#d9d9d9' };
+  return POSITION_CONFIG[position] || { label: position, color: '#d9d9d9' };
+};
 
 // 预设图标选项
 const ICON_OPTIONS = [
@@ -45,6 +60,16 @@ const OrganizationRoleManagement = () => {
   const [editingRole, setEditingRole] = useState(null);
   const [form] = Form.useForm();
 
+  // 成员管理相关状态
+  const [memberModalVisible, setMemberModalVisible] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+  const [roleMembers, setRoleMembers] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [memberLoading, setMemberLoading] = useState(false);
+  const [addingMember, setAddingMember] = useState(false);
+
   useEffect(() => {
     loadData();
   }, [organizationId]);
@@ -63,6 +88,16 @@ const OrganizationRoleManagement = () => {
       const rolesResponse = await getOrganizationRoles(organizationId);
       if (rolesResponse.success) {
         setRoles(rolesResponse.data || []);
+      }
+
+      // 获取所有用户（用于成员管理）
+      const usersResponse = await getAllUsers();
+      if (usersResponse.success) {
+        // 只获取属于当前机构的用户
+        const orgUsers = (usersResponse.data || []).filter(
+          user => user.organizationId == organizationId && user.status === 'APPROVED'
+        );
+        setAllUsers(orgUsers);
       }
     } catch (error) {
       console.error('加载数据失败:', error);
@@ -88,9 +123,14 @@ const OrganizationRoleManagement = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (role) => {
+    if (role.memberCount > 0) {
+      message.error(`该角色下有 ${role.memberCount} 个成员，无法删除`);
+      return;
+    }
+
     try {
-      const response = await deleteRole(id);
+      const response = await deleteRole(role.id);
       if (response.success) {
         message.success('删除成功');
         loadData();
@@ -132,6 +172,116 @@ const OrganizationRoleManagement = () => {
     }
   };
 
+  // 打开成员管理Modal
+  const handleManageMembers = async (role) => {
+    setSelectedRole(role);
+    setMemberModalVisible(true);
+    await loadRoleMembers(role);
+  };
+
+  // 加载角色成员
+  const loadRoleMembers = async (role) => {
+    try {
+      setMemberLoading(true);
+      
+      // 重新获取最新的用户列表
+      const usersResponse = await getAllUsers();
+      if (usersResponse.success) {
+        const orgUsers = (usersResponse.data || []).filter(
+          user => user.organizationId == organizationId && user.status === 'APPROVED'
+        );
+        setAllUsers(orgUsers);
+        
+        // 从最新数据中筛选出属于该角色的成员
+        // 匹配规则：只根据 position 字段
+        const members = orgUsers.filter(user => user.position === role.roleCode);
+        setRoleMembers(members);
+        
+        // 获取可添加的用户（职位不是当前角色的用户）
+        const available = orgUsers.filter(user => user.position !== role.roleCode);
+        setAvailableUsers(available);
+      }
+    } catch (error) {
+      console.error('加载角色成员失败:', error);
+      message.error('加载角色成员失败');
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  // 添加成员到角色（设置用户职位）
+  const handleAddMember = async () => {
+    if (!selectedUserId) {
+      message.warning('请选择要添加的成员');
+      return;
+    }
+
+    try {
+      setAddingMember(true);
+      // 调用更新用户接口，设置用户的 position 为角色代码
+      const response = await updateUserInfo(selectedUserId, { position: selectedRole.roleCode });
+      if (response.success) {
+        message.success('设置职位成功');
+        setSelectedUserId(null);
+        
+        // 立即更新本地状态
+        setAllUsers(prevUsers => prevUsers.map(user => 
+          user.id === selectedUserId 
+            ? { ...user, position: selectedRole.roleCode }
+            : user
+        ));
+        
+        // 重新加载角色列表（更新成员数量）
+        const rolesResponse = await getOrganizationRoles(organizationId);
+        if (rolesResponse.success) {
+          setRoles(rolesResponse.data || []);
+        }
+        
+        // 重新加载当前角色的成员
+        await loadRoleMembers(selectedRole);
+      } else {
+        message.error(response.message || '设置职位失败');
+      }
+    } catch (error) {
+      console.error('设置职位失败:', error);
+      message.error('设置职位失败');
+    } finally {
+      setAddingMember(false);
+    }
+  };
+
+  // 从角色移除成员（清除用户职位）
+  const handleRemoveMember = async (userId) => {
+    try {
+      // 调用更新用户接口，清除用户的 position
+      const response = await updateUserInfo(userId, { position: null });
+      if (response.success) {
+        message.success('清除职位成功');
+        
+        // 立即更新本地状态
+        setAllUsers(prevUsers => prevUsers.map(user => 
+          user.id === userId 
+            ? { ...user, position: null }
+            : user
+        ));
+        
+        // 重新加载角色列表（更新成员数量）
+        const rolesResponse = await getOrganizationRoles(organizationId);
+        if (rolesResponse.success) {
+          setRoles(rolesResponse.data || []);
+        }
+        
+        // 重新加载当前角色的成员
+        await loadRoleMembers(selectedRole);
+      } else {
+        message.error(response.message || '清除职位失败');
+      }
+    } catch (error) {
+      console.error('清除职位失败:', error);
+      message.error('清除职位失败');
+    }
+  };
+
   const getIconComponent = (iconName, color) => {
     const iconProps = { style: { fontSize: 24, color: color || '#1890ff' } };
     const iconMap = {
@@ -144,51 +294,88 @@ const OrganizationRoleManagement = () => {
     return iconMap[iconName] || <UsergroupAddOutlined {...iconProps} />;
   };
 
-  const renderRoleCard = (role) => (
-    <Card
-      key={role.id}
-      className="role-item-card"
-      hoverable
-      styles={{ body: { padding: '16px' } }}
-    >
-      <div className="role-card-content">
-        <Space size={10} align="start">
-          {getIconComponent(role.icon, role.color)}
-          <div className="role-info">
-            <div className="role-header-line">
-              <span className="role-name">{role.roleName}</span>
-              <span className="role-code">{role.roleCode}</span>
+  const renderRoleCard = (role) => {
+    // 获取该角色的成员列表
+    // 匹配规则：只根据 position 字段
+    const roleMembers = allUsers.filter(user => user.position === role.roleCode);
+    
+    return (
+      <Card
+        key={role.id}
+        className="role-item-card"
+        styles={{ body: { padding: '16px' } }}
+      >
+        <div className="role-card-header">
+          <Space size={10} align="start">
+            {getIconComponent(role.icon, role.color)}
+            <div className="role-info">
+              <div className="role-header-line">
+                <span className="role-name">{role.roleName}</span>
+                <span className="role-code">{role.roleCode}</span>
+              </div>
+              {role.description && (
+                <div className="role-desc">{role.description}</div>
+              )}
             </div>
-            {role.description && (
-              <div className="role-desc">{role.description}</div>
-            )}
-          </div>
-        </Space>
-        
-        <div className="role-actions">
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(role)}
-          />
-          <Popconfirm
-            title="确定删除此角色吗？"
-            onConfirm={() => handleDelete(role.id)}
-            okText="确定"
-            cancelText="取消"
-          >
+          </Space>
+          
+          <div className="role-actions">
             <Button
               type="text"
-              danger
               size="small"
-              icon={<DeleteOutlined />}
+              icon={<TeamOutlined />}
+              onClick={() => handleManageMembers(role)}
+              title="成员管理"
+            >
+              成员
+            </Button>
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(role)}
             />
-          </Popconfirm>
+            <Popconfirm
+              title={roleMembers.length > 0 ? `该角色下有 ${roleMembers.length} 个成员，无法删除` : "确定删除此角色吗？"}
+              onConfirm={() => handleDelete(role)}
+              okText="确定"
+              cancelText="取消"
+              disabled={roleMembers.length > 0}
+            >
+              <Button
+                type="text"
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                disabled={roleMembers.length > 0}
+              />
+            </Popconfirm>
+          </div>
         </div>
-      </div>
-    </Card>
-  );
+
+        {/* 成员列表显示 - 只在有成员时显示 */}
+        {roleMembers.length > 0 && (
+          <div className="role-members-preview">
+            <div className="members-header">
+              <TeamOutlined style={{ marginRight: 4, color: '#1890ff' }} />
+              <span>{roleMembers.length} 个成员</span>
+            </div>
+            <div className="members-list">
+              {roleMembers.map(member => {
+                const positionInfo = getPositionDisplay(member.position);
+                return (
+                  <div key={member.id} className="member-item">
+                    <span className="member-name">{member.nickname || member.username}</span>
+                    <Tag color={positionInfo.color} size="small">{positionInfo.label}</Tag>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   return (
     <div className="org-role-management">
@@ -241,6 +428,7 @@ const OrganizationRoleManagement = () => {
         </div>
       )}
 
+      {/* 新建/编辑角色Modal */}
       <Modal
         title={editingRole ? '编辑角色' : '新建角色'}
         open={modalVisible}
@@ -258,7 +446,7 @@ const OrganizationRoleManagement = () => {
             label="角色名称"
             rules={[{ required: true, message: '请输入角色名称' }]}
           >
-            <Input placeholder="如：教师" />
+            <Input placeholder="如：教练" />
           </Form.Item>
 
           <Form.Item
@@ -269,7 +457,7 @@ const OrganizationRoleManagement = () => {
               { pattern: /^[A-Z_]+$/, message: '只能使用大写字母和下划线' }
             ]}
           >
-            <Input placeholder="如：TEACHER" />
+            <Input placeholder="如：COACH" />
           </Form.Item>
 
           <Form.Item
@@ -320,9 +508,128 @@ const OrganizationRoleManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 成员管理Modal */}
+      <Modal
+        title={`成员管理 - ${selectedRole?.roleName}`}
+        open={memberModalVisible}
+        onCancel={() => setMemberModalVisible(false)}
+        footer={null}
+        width={700}
+      >
+        <div className="member-management">
+          <div className="current-members">
+            <h3>当前成员 ({roleMembers.length})</h3>
+            {memberLoading ? (
+              <div style={{ padding: '40px', textAlign: 'center' }}>
+                <Spin tip="加载中..." />
+              </div>
+            ) : roleMembers.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                暂无成员
+              </div>
+            ) : (
+              <List
+                dataSource={roleMembers}
+                renderItem={(member) => {
+                  const positionInfo = getPositionDisplay(member.position);
+                  return (
+                    <List.Item
+                      actions={[
+                        <Popconfirm
+                          title="确定要移除此成员吗？"
+                          onConfirm={() => handleRemoveMember(member.id)}
+                          okText="确定"
+                          cancelText="取消"
+                        >
+                          <Button
+                            type="link"
+                            danger
+                            icon={<UserDeleteOutlined />}
+                          >
+                            移除
+                          </Button>
+                        </Popconfirm>
+                      ]}
+                    >
+                      <List.Item.Meta
+                        avatar={
+                          member.wechatAvatar ? (
+                            <Avatar src={member.wechatAvatar} />
+                          ) : (
+                            <Avatar style={{ backgroundColor: '#1890ff' }}>
+                              {member.nickname?.[0] || member.username?.[0] || 'U'}
+                            </Avatar>
+                          )
+                        }
+                        title={
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{member.nickname || member.username}</span>
+                            <Tag color={positionInfo.color}>{positionInfo.label}</Tag>
+                          </div>
+                        }
+                        description={member.phone || '未设置手机号'}
+                      />
+                    </List.Item>
+                  );
+                }}
+              />
+            )}
+          </div>
+
+          <Divider />
+
+          <div className="add-member">
+            <h3>添加成员</h3>
+            <p style={{ color: '#999', fontSize: '12px', marginBottom: 16 }}>
+              只能选择属于本机构的用户
+            </p>
+            {availableUsers.length === 0 ? (
+              <div style={{ 
+                padding: '16px', 
+                background: '#f0f0f0', 
+                borderRadius: '8px',
+                textAlign: 'center',
+                color: '#999'
+              }}>
+                暂无可添加的用户
+              </div>
+            ) : (
+              <div>
+                <Select
+                  style={{ width: '100%' }}
+                  placeholder="选择用户添加到角色"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  onChange={(value) => setSelectedUserId(value)}
+                  value={selectedUserId}
+                  options={availableUsers.map(user => {
+                    const positionInfo = getPositionDisplay(user.position);
+                    return {
+                      value: user.id,
+                      label: `${user.nickname || user.username} (${positionInfo.label})`
+                    };
+                  })}
+                />
+                <Button
+                  type="primary"
+                  block
+                  style={{ marginTop: 12 }}
+                  disabled={!selectedUserId}
+                  loading={addingMember}
+                  onClick={handleAddMember}
+                >
+                  确认添加
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
 
 export default OrganizationRoleManagement;
-
