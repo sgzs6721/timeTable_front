@@ -187,7 +187,7 @@ const AppHeader = ({ user, onLogout }) => {
           )}
         </div>
       ),
-      onClick: () => navigate('/organization-management'),
+      onClick: () => navigate('/my-organization'),
     });
   }
   

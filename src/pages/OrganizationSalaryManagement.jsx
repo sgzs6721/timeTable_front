@@ -23,7 +23,7 @@ const OrganizationSalaryManagement = () => {
         position: 'relative'
       }}>
         <Button
-          onClick={() => navigate('/organization-management')}
+          onClick={() => navigate(-1)}
           icon={<LeftOutlined />}
           shape="circle"
           style={{

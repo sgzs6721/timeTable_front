@@ -29,7 +29,9 @@ import {
   BellOutlined,
   PhoneOutlined,
   ClockCircleOutlined,
-  UnorderedListOutlined
+  UnorderedListOutlined,
+  SaveOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { 
@@ -41,6 +43,7 @@ import {
 } from '../services/customer';
 import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo } from '../services/todo';
 import { getTrialSchedule } from '../services/timetable';
+import { getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 import './CustomerManagement.css';
@@ -85,6 +88,10 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const searchDebounceTimer = useRef(null);
+  const [customerHistories, setCustomerHistories] = useState({});
+  const [expandedHistories, setExpandedHistories] = useState({});
+  const [editingHistoryId, setEditingHistoryId] = useState(null);
+  const [editingHistoryNotes, setEditingHistoryNotes] = useState('');
 
   // 监听searchCustomerName参数，自动填入搜索框
   useEffect(() => {
@@ -135,6 +142,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
 
   useEffect(() => {
     checkAllCustomerTodos();
+    fetchAllCustomerHistories();
   }, [customers]);
 
   useEffect(() => {
@@ -299,6 +307,112 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     setLatestTodoByCustomer(latestMap);
   };
 
+  const fetchAllCustomerHistories = async () => {
+    if (!customers || customers.length === 0) return;
+    
+    const histories = {};
+    
+    // 并发获取所有客户的历史记录
+    const promises = customers.map(async (customer) => {
+      try {
+        const response = await getCustomerStatusHistory(customer.id);
+        if (response && response.success && response.data) {
+          histories[customer.id] = response.data;
+        }
+      } catch (error) {
+        console.error(`获取客户 ${customer.id} 的历史记录失败:`, error);
+      }
+    });
+    
+    await Promise.all(promises);
+    setCustomerHistories(histories);
+  };
+
+  // 编辑历史记录
+  const handleEditHistory = (history) => {
+    setEditingHistoryId(history.id);
+    setEditingHistoryNotes(history.notes || '');
+  };
+
+  // 取消编辑
+  const handleCancelEditHistory = () => {
+    setEditingHistoryId(null);
+    setEditingHistoryNotes('');
+  };
+
+  // 保存编辑
+  const handleSaveEditHistory = async (customerId, historyId) => {
+    try {
+      const response = await updateCustomerStatusHistory(historyId, {
+        notes: editingHistoryNotes
+      });
+
+      if (response && response.success) {
+        message.success('更新成功');
+        setEditingHistoryId(null);
+        setEditingHistoryNotes('');
+        
+        // 刷新该客户的历史记录
+        const historyResponse = await getCustomerStatusHistory(customerId);
+        if (historyResponse && historyResponse.success && historyResponse.data) {
+          setCustomerHistories(prev => ({
+            ...prev,
+            [customerId]: historyResponse.data
+          }));
+        }
+      } else {
+        message.error(response.message || '更新失败');
+      }
+    } catch (error) {
+      message.error('更新失败');
+      console.error('更新历史记录失败:', error);
+    }
+  };
+
+  // 删除历史记录
+  const handleDeleteHistory = async (customerId, historyId) => {
+    try {
+      const response = await deleteCustomerStatusHistory(historyId);
+
+      if (response && response.success) {
+        message.success('删除成功');
+        
+        // 刷新该客户的历史记录
+        const historyResponse = await getCustomerStatusHistory(customerId);
+        if (historyResponse && historyResponse.success && historyResponse.data) {
+          setCustomerHistories(prev => ({
+            ...prev,
+            [customerId]: historyResponse.data
+          }));
+        }
+        
+        // 同时更新客户列表中的状态（如果删除的是最新的记录）
+        const updatedHistories = historyResponse?.data || [];
+        if (updatedHistories.length > 0) {
+          const latestHistory = updatedHistories[0];
+          setCustomers(prevCustomers =>
+            prevCustomers.map(c =>
+              c.id === customerId
+                ? {
+                    ...c,
+                    status: latestHistory.toStatus,
+                    statusText: getStatusText(latestHistory.toStatus),
+                    lastStatusChangeNote: latestHistory.notes,
+                    lastStatusChangeTime: latestHistory.createdAt
+                  }
+                : c
+            )
+          );
+        }
+      } else {
+        message.error(response.message || '删除失败');
+      }
+    } catch (error) {
+      message.error('删除失败');
+      console.error('删除历史记录失败:', error);
+    }
+  };
+
   const fetchSalesList = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -376,6 +490,19 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
           return c;
         })
       );
+      
+      // 刷新该客户的历史记录
+      try {
+        const response = await getCustomerStatusHistory(selectedCustomer.id);
+        if (response && response.success && response.data) {
+          setCustomerHistories(prev => ({
+            ...prev,
+            [selectedCustomer.id]: response.data
+          }));
+        }
+      } catch (error) {
+        console.error('刷新客户历史记录失败:', error);
+      }
       
       // 更新待办状态
       if (newStatus) {
@@ -725,7 +852,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       'NEW': 'blue',
       'CONTACTED': 'orange',
       'SCHEDULED': 'purple',
-      'PENDING_CONFIRM': 'yellow',
+      'PENDING_CONFIRM': 'volcano',
       'VISITED': 'green',
       'RE_EXPERIENCE': 'cyan',
       'PENDING_SOLD': 'lime',
@@ -1154,38 +1281,195 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
             </div>
           )}
 
-          {customer.lastStatusChangeNote && (
-            <div style={{ 
-              marginTop: 8,
-              paddingTop: 8,
-              borderTop: '1px dashed #e8e8e8'
-            }}>
+          {(() => {
+            // 过滤掉初始的"新建"记录（toStatus是NEW且fromStatus为空或为NEW的记录）
+            const filteredHistories = customerHistories[customer.id]?.filter(h => 
+              !(h.toStatus === 'NEW' && (!h.fromStatus || h.fromStatus === 'NEW'))
+            ) || [];
+            
+            if (filteredHistories.length === 0) return null;
+            
+            return (
               <div style={{ 
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                color: '#666', 
-                fontSize: '12px',
-                marginBottom: 2
+                marginTop: 8,
+                paddingTop: 8,
+                borderTop: '1px dashed #e8e8e8'
               }}>
-                <span>最近流转：</span>
-                {customer.lastStatusChangeTime && (
-                  <span style={{ color: '#bbb', fontSize: '11px' }}>
-                    {dayjs(customer.lastStatusChangeTime).format('MM-DD HH:mm')}
-                  </span>
-                )}
+                <div style={{ 
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  color: '#666', 
+                  fontSize: '12px',
+                  marginBottom: 4
+                }}>
+                  <span>最近流转：</span>
+                  {filteredHistories.length > 1 && (
+                    <span 
+                      style={{ 
+                        color: '#1890ff', 
+                        fontSize: '11px', 
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedHistories(prev => ({
+                          ...prev,
+                          [customer.id]: !prev[customer.id]
+                        }));
+                      }}
+                    >
+                      {expandedHistories[customer.id] ? '收起' : `展开全部(${filteredHistories.length})`}
+                    </span>
+                  )}
+                </div>
+                
+                {/* 显示历史记录 */}
+                {filteredHistories.map((history, index) => {
+                  // 只显示第一条，或者当展开时显示所有
+                  if (index > 0 && !expandedHistories[customer.id]) {
+                    return null;
+                  }
+                  
+                  const isEditing = editingHistoryId === history.id;
+                  
+                  return (
+                    <div 
+                      key={history.id}
+                      style={{ 
+                        marginBottom: index < filteredHistories.length - 1 ? 12 : 0,
+                        paddingBottom: index < filteredHistories.length - 1 ? 12 : 0,
+                        borderBottom: index < filteredHistories.length - 1 && expandedHistories[customer.id] ? '1px dashed #f0f0f0' : 'none',
+                        padding: isEditing ? '8px' : '0',
+                        backgroundColor: isEditing ? '#f0f5ff' : 'transparent',
+                        borderRadius: isEditing ? '4px' : '0',
+                        border: isEditing ? '1px solid #d9d9d9' : 'none'
+                      }}
+                    >
+                      <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        marginBottom: 4
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+                          {history.fromStatusText && history.fromStatusText !== '无' && (
+                            <>
+                              <Tag 
+                                color={getStatusColor(history.fromStatus)}
+                                style={{ 
+                                  margin: 0, 
+                                  fontSize: '11px', 
+                                  padding: '0 4px', 
+                                  lineHeight: '18px',
+                                  minWidth: '48px',
+                                  textAlign: 'center'
+                                }}
+                              >
+                                {history.fromStatusText}
+                              </Tag>
+                              <span style={{ color: '#999', fontSize: '11px' }}>→</span>
+                            </>
+                          )}
+                          <Tag 
+                            color={getStatusColor(history.toStatus)}
+                            style={{ 
+                              margin: 0, 
+                              fontSize: '11px', 
+                              padding: '0 4px', 
+                              lineHeight: '18px',
+                              minWidth: '48px',
+                              textAlign: 'center'
+                            }}
+                          >
+                            {history.toStatusText}
+                          </Tag>
+                          {!isEditing && (
+                            <>
+                              <EditOutlined 
+                                style={{ fontSize: '11px', color: '#999', cursor: 'pointer', marginLeft: '8px' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditHistory(history);
+                                }}
+                              />
+                              <Popconfirm
+                                title="确定要删除这条历史记录吗？"
+                                onConfirm={(e) => {
+                                  e?.stopPropagation();
+                                  handleDeleteHistory(customer.id, history.id);
+                                }}
+                                okText="确定"
+                                cancelText="取消"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <DeleteOutlined 
+                                  style={{ fontSize: '11px', color: '#ff4d4f', cursor: 'pointer', marginLeft: '8px' }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </Popconfirm>
+                            </>
+                          )}
+                        </div>
+                        <span style={{ color: '#bbb', fontSize: '11px', marginLeft: '8px', whiteSpace: 'nowrap' }}>
+                          {dayjs(history.createdAt).format('MM-DD HH:mm')}
+                        </span>
+                      </div>
+                      {isEditing ? (
+                        <div style={{ marginTop: 8 }}>
+                          <TextArea
+                            value={editingHistoryNotes}
+                            onChange={(e) => setEditingHistoryNotes(e.target.value)}
+                            placeholder="请输入备注信息"
+                            autoSize={{ minRows: 2, maxRows: 6 }}
+                            style={{ marginBottom: 8 }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <Space>
+                            <Button
+                              type="primary"
+                              size="small"
+                              icon={<SaveOutlined />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveEditHistory(customer.id, history.id);
+                              }}
+                            >
+                              保存
+                            </Button>
+                            <Button
+                              size="small"
+                              icon={<CloseOutlined />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelEditHistory();
+                              }}
+                            >
+                              取消
+                            </Button>
+                          </Space>
+                        </div>
+                      ) : (
+                        history.notes && (
+                          <div style={{ 
+                            color: '#999', 
+                            fontSize: '12px',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            lineHeight: '1.6',
+                            marginTop: 2
+                          }}>
+                            {history.notes}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ 
-                color: '#999', 
-                fontSize: '12px',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                lineHeight: '1.5'
-              }}>
-                {customer.lastStatusChangeNote}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
@@ -1630,6 +1914,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         customer={selectedCustomer}
         onSuccess={handleHistorySuccess}
         onTodoCreated={onTodoCreated}
+        hideHistory={true}
       />
 
       {/* 待办提醒模态框 */}

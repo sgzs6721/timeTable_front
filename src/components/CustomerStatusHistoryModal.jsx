@@ -10,7 +10,7 @@ import dayjs from 'dayjs';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, onTodoCreated, onTodoUpdated }) => {
+const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, onTodoCreated, onTodoUpdated, hideHistory = false }) => {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -1223,178 +1223,180 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         </Form>
       </div>
 
-      <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 24 }}>
-        <h3 style={{ marginBottom: 16 }}>历史记录</h3>
-        {fetchingHistory ? (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <Spin />
-          </div>
-        ) : histories.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-            暂无状态变更记录
-          </div>
-        ) : (
-          <Timeline>
-            {histories.map((history) => {
-              const isEditing = editingHistoryId === history.id;
-              
-              return (
-                <Timeline.Item
-                  key={history.id}
-                  dot={<div style={{ display: 'flex', alignItems: 'center', height: '32px', paddingTop: '4px' }}><ClockCircleOutlined style={{ fontSize: '16px' }} /></div>}
-                  style={{
-                    paddingBottom: '16px'
-                  }}
-                >
-                  <div
+      {!hideHistory && (
+        <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 24 }}>
+          <h3 style={{ marginBottom: 16 }}>历史记录</h3>
+          {fetchingHistory ? (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <Spin />
+            </div>
+          ) : histories.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+              暂无状态变更记录
+            </div>
+          ) : (
+            <Timeline>
+              {histories.map((history) => {
+                const isEditing = editingHistoryId === history.id;
+                
+                return (
+                  <Timeline.Item
+                    key={history.id}
+                    dot={<div style={{ display: 'flex', alignItems: 'center', height: '32px', paddingTop: '4px' }}><ClockCircleOutlined style={{ fontSize: '16px' }} /></div>}
                     style={{
-                      padding: '8px',
-                      borderRadius: '4px',
-                      backgroundColor: isEditing ? '#f0f5ff' : 'transparent',
-                      transition: 'background-color 0.3s',
-                      border: isEditing ? '1px solid #d9d9d9' : '1px solid transparent'
+                      paddingBottom: '16px'
                     }}
                   >
-                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Space>
-                        {history.fromStatusText && history.fromStatusText !== '无' && (
-                          <>
-                            <Tag color={getStatusColor(history.fromStatus)}>
-                              {history.fromStatusText}
-                            </Tag>
-                            <span>→</span>
-                          </>
-                        )}
-                        <Tag color={getStatusColor(history.toStatus)}>
-                          {history.toStatusText}
-                        </Tag>
-                      </Space>
-                      {!isEditing && (
+                    <div
+                      style={{
+                        padding: '8px',
+                        borderRadius: '4px',
+                        backgroundColor: isEditing ? '#f0f5ff' : 'transparent',
+                        transition: 'background-color 0.3s',
+                        border: isEditing ? '1px solid #d9d9d9' : '1px solid transparent'
+                      }}
+                    >
+                      <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Space>
-                          <EditOutlined 
-                            style={{ fontSize: '12px', color: '#999', cursor: 'pointer' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditHistory(history);
-                            }}
-                          />
-                          <Popconfirm
-                            title="确定要删除这条历史记录吗？"
-                            onConfirm={(e) => {
-                              e.stopPropagation();
-                              handleDeleteHistory(history.id);
-                            }}
-                            okText="确定"
-                            cancelText="取消"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <DeleteOutlined 
-                              style={{ fontSize: '12px', color: '#ff4d4f', cursor: 'pointer' }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </Popconfirm>
+                          {history.fromStatusText && history.fromStatusText !== '无' && (
+                            <>
+                              <Tag color={getStatusColor(history.fromStatus)}>
+                                {history.fromStatusText}
+                              </Tag>
+                              <span>→</span>
+                            </>
+                          )}
+                          <Tag color={getStatusColor(history.toStatus)}>
+                            {history.toStatusText}
+                          </Tag>
                         </Space>
+                        {!isEditing && (
+                          <Space>
+                            <EditOutlined 
+                              style={{ fontSize: '12px', color: '#999', cursor: 'pointer' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditHistory(history);
+                              }}
+                            />
+                            <Popconfirm
+                              title="确定要删除这条历史记录吗？"
+                              onConfirm={(e) => {
+                                e.stopPropagation();
+                                handleDeleteHistory(history.id);
+                              }}
+                              okText="确定"
+                              cancelText="取消"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DeleteOutlined 
+                                style={{ fontSize: '12px', color: '#ff4d4f', cursor: 'pointer' }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </Popconfirm>
+                          </Space>
+                        )}
+                      </div>
+                      
+                      {isEditing ? (
+                        <div style={{ marginBottom: 8 }}>
+                          <TextArea
+                            value={editingNotes}
+                            onChange={(e) => setEditingNotes(e.target.value)}
+                            placeholder="请输入备注信息"
+                            autoSize={{ minRows: 2, maxRows: 6 }}
+                            style={{ marginBottom: 8 }}
+                          />
+                          <Space>
+                            <Button
+                              type="primary"
+                              size="small"
+                              icon={<SaveOutlined />}
+                              onClick={() => handleSaveEdit(history.id)}
+                            >
+                              保存
+                            </Button>
+                            <Button
+                              size="small"
+                              icon={<CloseOutlined />}
+                              onClick={handleCancelEdit}
+                            >
+                              取消
+                            </Button>
+                          </Space>
+                        </div>
+                      ) : (
+                        <>
+                          {/* 如果是待体验状态且有体验时间，显示体验安排信息 */}
+                          {(history.toStatus === 'SCHEDULED' || history.toStatus === 'RE_EXPERIENCE') && 
+                           history.trialScheduleDate && history.trialStartTime && history.trialEndTime && (
+                            <div style={{ 
+                              marginBottom: 8, 
+                              padding: '8px',
+                              backgroundColor: history.trialCancelled ? '#f5f5f5' : '#f0f5ff',
+                              borderRadius: '4px',
+                              border: history.trialCancelled ? '1px solid #d9d9d9' : '1px solid #91caff',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '13px', color: history.trialCancelled ? '#999' : '#1890ff', marginBottom: 4 }}>
+                                  <CalendarOutlined style={{ marginRight: 4 }} />
+                                  体验时间：
+                                  {history.trialCancelled && (
+                                    <Tag color="default" style={{ marginLeft: 8 }}>已取消</Tag>
+                                  )}
+                                </div>
+                                <div style={{ 
+                                  fontSize: '12px', 
+                                  color: '#666',
+                                  textDecoration: history.trialCancelled ? 'line-through' : 'none'
+                                }}>
+                                  {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                  {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                  {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                                </div>
+                              </div>
+                              {history.trialCancelled !== true && (
+                                <Popconfirm
+                                  title="确定取消体验课程？"
+                                  description="取消后将标记为已取消，如有权限也会从课表中删除"
+                                  onConfirm={() => handleCancelTrialSchedule(history)}
+                                  okText="确定"
+                                  cancelText="取消"
+                                >
+                                  <Button 
+                                    type="text" 
+                                    danger
+                                    size="small"
+                                    icon={<CloseCircleOutlined />}
+                                    style={{ marginLeft: 8 }}
+                                  >
+                                    取消
+                                  </Button>
+                                </Popconfirm>
+                              )}
+                            </div>
+                          )}
+                          {history.notes && (
+                            <div style={{ color: '#666', marginBottom: 4 }}>
+                              {history.notes}
+                            </div>
+                          )}
+                          <div style={{ color: '#999', fontSize: '12px' }}>
+                            {history.createdByName} · {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
+                          </div>
+                        </>
                       )}
                     </div>
-                    
-                    {isEditing ? (
-                      <div style={{ marginBottom: 8 }}>
-                        <TextArea
-                          value={editingNotes}
-                          onChange={(e) => setEditingNotes(e.target.value)}
-                          placeholder="请输入备注信息"
-                          autoSize={{ minRows: 2, maxRows: 6 }}
-                          style={{ marginBottom: 8 }}
-                        />
-                        <Space>
-                          <Button
-                            type="primary"
-                            size="small"
-                            icon={<SaveOutlined />}
-                            onClick={() => handleSaveEdit(history.id)}
-                          >
-                            保存
-                          </Button>
-                          <Button
-                            size="small"
-                            icon={<CloseOutlined />}
-                            onClick={handleCancelEdit}
-                          >
-                            取消
-                          </Button>
-                        </Space>
-                      </div>
-                    ) : (
-                      <>
-                        {/* 如果是待体验状态且有体验时间，显示体验安排信息 */}
-                        {(history.toStatus === 'SCHEDULED' || history.toStatus === 'RE_EXPERIENCE') && 
-                         history.trialScheduleDate && history.trialStartTime && history.trialEndTime && (
-                          <div style={{ 
-                            marginBottom: 8, 
-                            padding: '8px',
-                            backgroundColor: history.trialCancelled ? '#f5f5f5' : '#f0f5ff',
-                            borderRadius: '4px',
-                            border: history.trialCancelled ? '1px solid #d9d9d9' : '1px solid #91caff',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '13px', color: history.trialCancelled ? '#999' : '#1890ff', marginBottom: 4 }}>
-                                <CalendarOutlined style={{ marginRight: 4 }} />
-                                体验时间：
-                                {history.trialCancelled && (
-                                  <Tag color="default" style={{ marginLeft: 8 }}>已取消</Tag>
-                                )}
-                              </div>
-                              <div style={{ 
-                                fontSize: '12px', 
-                                color: '#666',
-                                textDecoration: history.trialCancelled ? 'line-through' : 'none'
-                              }}>
-                                {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
-                                {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
-                                {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
-                              </div>
-                            </div>
-                            {history.trialCancelled !== true && (
-                              <Popconfirm
-                                title="确定取消体验课程？"
-                                description="取消后将标记为已取消，如有权限也会从课表中删除"
-                                onConfirm={() => handleCancelTrialSchedule(history)}
-                                okText="确定"
-                                cancelText="取消"
-                              >
-                                <Button 
-                                  type="text" 
-                                  danger
-                                  size="small"
-                                  icon={<CloseCircleOutlined />}
-                                  style={{ marginLeft: 8 }}
-                                >
-                                  取消
-                                </Button>
-                              </Popconfirm>
-                            )}
-                          </div>
-                        )}
-                        {history.notes && (
-                          <div style={{ color: '#666', marginBottom: 4 }}>
-                            {history.notes}
-                          </div>
-                        )}
-                        <div style={{ color: '#999', fontSize: '12px' }}>
-                          {history.createdByName} · {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </Timeline.Item>
-              );
-            })}
-          </Timeline>
-        )}
-      </div>
+                  </Timeline.Item>
+                );
+              })}
+            </Timeline>
+          )}
+        </div>
+      )}
     </Modal>
   );
 };

@@ -324,11 +324,11 @@ const RolePermissionSettings = () => {
     <div className="role-permission-settings">
       <div className="settings-header">
         <div className="header-content">
-          <Button 
+          <Button
             type="text"
             shape="circle"
             icon={<LeftOutlined />}
-            onClick={() => navigate('/organization-management')}
+            onClick={() => navigate(-1)}
             className="back-btn-circle"
             size="large"
           />

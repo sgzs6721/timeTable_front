@@ -381,11 +381,11 @@ const OrganizationRoleManagement = () => {
     <div className="org-role-management">
       <div className="role-header">
         <div className="header-content">
-          <Button 
+          <Button
             type="text"
             shape="circle"
             icon={<LeftOutlined />}
-            onClick={() => navigate('/organization-management')}
+            onClick={() => navigate(-1)}
             className="back-btn-circle"
             size="large"
           />

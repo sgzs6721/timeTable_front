@@ -22,6 +22,7 @@ import OrganizationManagementAuth from './pages/OrganizationManagementAuth';
 import RolePermissionSettings from './pages/RolePermissionSettings';
 import OrganizationRoleManagement from './pages/OrganizationRoleManagement';
 import OrganizationSalaryManagement from './pages/OrganizationSalaryManagement';
+import MyOrganization from './pages/MyOrganization';
 import { validateToken } from './services/auth';
 import './App.css';
 
@@ -208,6 +209,10 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
               user.role?.toUpperCase() === 'ADMIN' ? <OrganizationManagementAuth /> : 
               <Navigate to="/dashboard" />
             }
+          />
+          <Route
+            path="/my-organization"
+            element={user ? <MyOrganization user={user} /> : <Navigate to="/login" />}
           />
           <Route
             path="/organizations/:organizationId/permissions"
