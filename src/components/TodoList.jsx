@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Timeline, DatePicker, TimePicker, Select, Space } from 'antd';
+import { Card, Button, Tag, Empty, Spin, message, Popconfirm, Timeline, DatePicker, TimePicker, Select, Space, Input } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircleOutlined, 
@@ -26,7 +26,12 @@ import {
   updateTodoReminderTime
 } from '../services/todo';
 import { getTrialCustomers } from '../services/customer';
-import { cancelTrialSchedule, changeCustomerStatus } from '../services/customerStatusHistory';
+import { 
+  cancelTrialSchedule, 
+  changeCustomerStatus,
+  updateCustomerStatusHistory,
+  deleteCustomerStatusHistory
+} from '../services/customerStatusHistory';
 import CustomerStatusHistoryModal from './CustomerStatusHistoryModal';
 import CreateTodoModal from './CreateTodoModal';
 import dayjs from 'dayjs';
@@ -49,6 +54,8 @@ const TodoList = ({ onUnreadCountChange }) => {
   const [trialDateFilter, setTrialDateFilter] = useState(null); // 体验日期过滤
   const [creatorsMap, setCreatorsMap] = useState({}); // 录入人员映射 {id: name}
   const [createModalVisible, setCreateModalVisible] = useState(false); // 新建待办模态框
+  const [editingHistoryId, setEditingHistoryId] = useState(null); // 正在编辑的流转记录ID
+  const [editingHistoryNotes, setEditingHistoryNotes] = useState(''); // 编辑中的流转记录备注
 
   const handleCopyPhone = (phone) => {
     if (!phone) return;
@@ -445,6 +452,58 @@ const TodoList = ({ onUnreadCountChange }) => {
   const handleCreateSuccess = async (newTodo) => {
     // 新建待办成功后，重新获取待办列表
     await fetchTodos();
+  };
+
+  // 开始编辑流转记录
+  const handleStartEditHistory = (history, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setEditingHistoryId(history.id);
+    setEditingHistoryNotes(history.notes || '');
+  };
+
+  // 取消编辑流转记录
+  const handleCancelEditHistory = () => {
+    setEditingHistoryId(null);
+    setEditingHistoryNotes('');
+  };
+
+  // 确认编辑流转记录
+  const handleConfirmEditHistory = async (historyId) => {
+    try {
+      const response = await updateCustomerStatusHistory(historyId, {
+        notes: editingHistoryNotes
+      });
+      if (response && response.success) {
+        message.success('流转记录已更新');
+        // 刷新待办列表
+        await fetchTodos();
+        handleCancelEditHistory();
+      } else {
+        message.error(response.message || '更新失败');
+      }
+    } catch (error) {
+      console.error('更新流转记录失败:', error);
+      message.error('更新失败');
+    }
+  };
+
+  // 删除流转记录
+  const handleDeleteHistory = async (historyId) => {
+    try {
+      const response = await deleteCustomerStatusHistory(historyId);
+      if (response && response.success) {
+        message.success('流转记录已删除');
+        // 刷新待办列表
+        await fetchTodos();
+      } else {
+        message.error(response.message || '删除失败');
+      }
+    } catch (error) {
+      console.error('删除流转记录失败:', error);
+      message.error('删除失败');
+    }
   };
 
   const getStatusText = (status) => {
@@ -976,40 +1035,63 @@ const TodoList = ({ onUnreadCountChange }) => {
                               marginBottom: 4 
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                                <Tag color={
-                                  fromLabel === '新建' ? "green" :
-                                  fromLabel === '已联系' ? "blue" :
-                                  fromLabel === '待确认' ? "gold" :
-                                  fromLabel === '待体验' ? "orange" :
-                                  fromLabel === '待再体验' ? "purple" :
-                                  fromLabel === '已成交' ? "red" :
-                                  fromLabel === '已流失' ? "default" :
-                                  "geekblue"
-                                } style={{ marginRight: 4, flexShrink: 0, width: '5em', display: 'inline-block', textAlign: 'center' }}>
+                                <Tag 
+                                  color={
+                                    fromLabel === '新建' ? "green" :
+                                    fromLabel === '已联系' ? "blue" :
+                                    fromLabel === '待确认' ? "gold" :
+                                    fromLabel === '待体验' ? "orange" :
+                                    fromLabel === '待再体验' ? "purple" :
+                                    fromLabel === '已成交' ? "red" :
+                                    fromLabel === '已流失' ? "default" :
+                                    "geekblue"
+                                  } 
+                                  style={{ marginRight: 4, flexShrink: 0, width: '5em', display: 'inline-block', textAlign: 'center' }}
+                                >
                                   {fromLabel}
                                 </Tag>
                                 <span style={{ margin: '0 4px', flexShrink: 0 }}>→</span>
-                                <Tag color={
-                                  history.toStatusText === '新建' ? "green" :
-                                  history.toStatusText === '已联系' ? "blue" :
-                                  history.toStatusText === '待确认' ? "gold" :
-                                  history.toStatusText === '待体验' ? "orange" :
-                                  history.toStatusText === '待再体验' ? "purple" :
-                                  history.toStatusText === '已成交' ? "red" :
-                                  history.toStatusText === '已流失' ? "default" :
-                                  "cyan"
-                                } style={{ flexShrink: 0, width: '5em', display: 'inline-block', textAlign: 'center' }}>{history.toStatusText}</Tag>
+                                <Tag 
+                                  color={
+                                    history.toStatusText === '新建' ? "green" :
+                                    history.toStatusText === '已联系' ? "blue" :
+                                    history.toStatusText === '待确认' ? "gold" :
+                                    history.toStatusText === '待体验' ? "orange" :
+                                    history.toStatusText === '待再体验' ? "purple" :
+                                    history.toStatusText === '已成交' ? "red" :
+                                    history.toStatusText === '已流失' ? "default" :
+                                    "cyan"
+                                  } 
+                                  style={{ flexShrink: 0, width: '5em', display: 'inline-block', textAlign: 'center' }}
+                                >
+                                  {history.toStatusText}
+                                </Tag>
                               </div>
-                              <div style={{ 
-                                color: '#999', 
-                                fontSize: '11px', 
-                                marginLeft: '8px', 
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0,
-                                textAlign: 'right'
-                              }}>
-                                {history.createdByName && `${history.createdByName} · `}
-                                {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={(e) => handleStartEditHistory(history, e)}
+                                  style={{ padding: '0 4px', height: '20px', color: '#1890ff' }}
+                                  title="编辑备注"
+                                />
+                                <Popconfirm
+                                  title="确定删除此流转记录？"
+                                  onConfirm={() => handleDeleteHistory(history.id)}
+                                  okText="确定"
+                                  cancelText="取消"
+                                >
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{ padding: '0 4px', height: '20px' }}
+                                    title="删除记录"
+                                  />
+                                </Popconfirm>
                               </div>
                             </div>
                             {/* 如果是待体验状态且有体验时间，显示体验时间信息 */}
@@ -1071,15 +1153,54 @@ const TodoList = ({ onUnreadCountChange }) => {
                                 )}
                               </div>
                             )}
-                            {history.notes && history.notes.trim() && (
-                              <div style={{ 
-                                color: '#666', 
-                                marginTop: 4,
-                                fontSize: '12px',
-                                lineHeight: '1.5'
-                              }}>
-                                {history.notes.trim()}
+                            {/* 备注编辑/显示区域 */}
+                            {editingHistoryId === history.id ? (
+                              <div style={{ marginTop: 8 }}>
+                                <Input.TextArea
+                                  value={editingHistoryNotes}
+                                  onChange={(e) => setEditingHistoryNotes(e.target.value)}
+                                  placeholder="输入备注..."
+                                  autoSize={{ minRows: 2, maxRows: 4 }}
+                                  style={{ fontSize: '12px', marginBottom: 8 }}
+                                />
+                                <Space size="small">
+                                  <Button
+                                    type="primary"
+                                    size="small"
+                                    onClick={() => handleConfirmEditHistory(history.id)}
+                                  >
+                                    确定
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    onClick={handleCancelEditHistory}
+                                  >
+                                    取消
+                                  </Button>
+                                </Space>
                               </div>
+                            ) : (
+                              <>
+                                {history.notes && history.notes.trim() && (
+                                  <div style={{ 
+                                    color: '#666', 
+                                    marginTop: 4,
+                                    fontSize: '12px',
+                                    lineHeight: '1.5'
+                                  }}>
+                                    {history.notes.trim()}
+                                  </div>
+                                )}
+                                {/* 录入人和时间信息 */}
+                                <div style={{ 
+                                  color: '#999', 
+                                  fontSize: '11px', 
+                                  marginTop: history.notes && history.notes.trim() ? '8px' : '4px'
+                                }}>
+                                  {history.createdByName && `${history.createdByName} · `}
+                                  {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
+                                </div>
+                              </>
                             )}
                           </div>
                         )
@@ -1093,23 +1214,8 @@ const TodoList = ({ onUnreadCountChange }) => {
                           fontSize: '12px', 
                           paddingBottom: 0
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <div>
-                              <Tag color="green" style={{ marginRight: 4, width: '5em', display: 'inline-block', textAlign: 'center' }}>新建</Tag>
-                            </div>
-                            <div style={{ 
-                              color: '#999', 
-                              fontSize: '11px', 
-                              marginLeft: '8px', 
-                              whiteSpace: 'nowrap',
-                              textAlign: 'right'
-                            }}>
-                              {todo.statusHistory.length > 0 && todo.statusHistory[todo.statusHistory.length - 1].createdByName && 
-                                `${todo.statusHistory[todo.statusHistory.length - 1].createdByName} · `}
-                              {todo.statusHistory.length > 0 && todo.statusHistory[todo.statusHistory.length - 1].createdAt 
-                                ? dayjs(todo.statusHistory[todo.statusHistory.length - 1].createdAt).format('YYYY-MM-DD HH:mm')
-                                : ''}
-                            </div>
+                          <div style={{ marginBottom: 4 }}>
+                            <Tag color="green" style={{ width: '5em', display: 'inline-block', textAlign: 'center' }}>新建</Tag>
                           </div>
                           {todo.customerNotes && todo.customerNotes.trim() && (
                             <div style={{ 
@@ -1121,6 +1227,18 @@ const TodoList = ({ onUnreadCountChange }) => {
                               {todo.customerNotes.trim()}
                             </div>
                           )}
+                          {/* 录入人和时间信息 */}
+                          <div style={{ 
+                            color: '#999', 
+                            fontSize: '11px', 
+                            marginTop: todo.customerNotes && todo.customerNotes.trim() ? '8px' : '4px'
+                          }}>
+                            {todo.statusHistory.length > 0 && todo.statusHistory[todo.statusHistory.length - 1].createdByName && 
+                              `${todo.statusHistory[todo.statusHistory.length - 1].createdByName} · `}
+                            {todo.statusHistory.length > 0 && todo.statusHistory[todo.statusHistory.length - 1].createdAt 
+                              ? dayjs(todo.statusHistory[todo.statusHistory.length - 1].createdAt).format('YYYY-MM-DD HH:mm')
+                              : ''}
+                          </div>
                         </div>
                       )
                     }

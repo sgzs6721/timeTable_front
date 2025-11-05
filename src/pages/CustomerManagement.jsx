@@ -1451,13 +1451,8 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                         })
                       }}
                     >
-                      <div style={{ 
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: 4
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+                      <div style={{ marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           {history.fromStatusText && history.fromStatusText !== '无' && (
                             <>
                               <Tag 
@@ -1489,36 +1484,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                           >
                             {history.toStatusText}
                           </Tag>
-                          {!isEditing && (
-                            <>
-                              <EditOutlined 
-                                style={{ fontSize: '11px', color: '#999', cursor: 'pointer', marginLeft: '8px' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditHistory(history);
-                                }}
-                              />
-                              <Popconfirm
-                                title="确定要删除这条历史记录吗？"
-                                onConfirm={(e) => {
-                                  e?.stopPropagation();
-                                  handleDeleteHistory(customer.id, history.id);
-                                }}
-                                okText="确定"
-                                cancelText="取消"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <DeleteOutlined 
-                                  style={{ fontSize: '11px', color: '#ff4d4f', cursor: 'pointer', marginLeft: '8px' }}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </Popconfirm>
-                            </>
-                          )}
                         </div>
-                        <span style={{ color: '#bbb', fontSize: '11px', marginLeft: '8px', whiteSpace: 'nowrap' }}>
-                          {dayjs(history.createdAt).format('MM-DD HH:mm')}
-                        </span>
                       </div>
                       {isEditing ? (
                         <div style={{ marginTop: 8 }}>
@@ -1568,6 +1534,46 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                               {history.notes}
                             </div>
                           )}
+                          
+                          {/* 录入人和时间信息 + 编辑删除按钮 */}
+                          <div style={{ 
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginTop: history.notes ? '6px' : '2px'
+                          }}>
+                            <div style={{ 
+                              color: '#bbb', 
+                              fontSize: '11px'
+                            }}>
+                              {history.createdByName && `${history.createdByName} `}
+                              {dayjs(history.createdAt).format('YYYY-MM-DD HH:mm')}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <EditOutlined 
+                                style={{ fontSize: '12px', color: '#1890ff', cursor: 'pointer' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditHistory(history);
+                                }}
+                              />
+                              <Popconfirm
+                                title="确定要删除这条历史记录吗？"
+                                onConfirm={(e) => {
+                                  e?.stopPropagation();
+                                  handleDeleteHistory(customer.id, history.id);
+                                }}
+                                okText="确定"
+                                cancelText="取消"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <DeleteOutlined 
+                                  style={{ fontSize: '12px', color: '#ff4d4f', cursor: 'pointer' }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </Popconfirm>
+                            </div>
+                          </div>
                           
                           {/* 如果是待体验状态且有体验时间，显示体验时间信息 */}
                           {(history.toStatus === 'SCHEDULED' || history.toStatus === 'RE_EXPERIENCE') && 
@@ -1668,7 +1674,8 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
-          <div style={{ display: 'flex', gap: '8px', color: '#999', fontSize: '12px', flex: 1, alignItems: 'center' }}>
+          {/* 录入人和时间信息 */}
+          <div style={{ display: 'flex', gap: '8px', color: '#999', fontSize: '12px', alignItems: 'center' }}>
             {customer.createdByName && (
               <span>{customer.createdByName}</span>
             )}
@@ -1676,6 +1683,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               <span>{dayjs(customer.createdAt).format('YYYY-MM-DD HH:mm')}</span>
             )}
           </div>
+          
           <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
             <Button 
               type="text"
