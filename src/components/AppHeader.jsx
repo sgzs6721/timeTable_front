@@ -167,26 +167,7 @@ const AppHeader = ({ user, onLogout }) => {
     adminMenus.push({
       key: 'organization-management',
       icon: <InboxOutlined />,
-      label: (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>机构管理</span>
-          {orgPendingCount > 0 && (
-            <Badge 
-              count={orgPendingCount} 
-              size="small" 
-              style={{ 
-                backgroundColor: '#ff4d4f',
-                fontSize: '9px',
-                lineHeight: '12px',
-                minWidth: '14px',
-                height: '14px',
-                padding: '0 3px',
-                marginLeft: '8px'
-              }}
-            />
-          )}
-        </div>
-      ),
+      label: '机构管理',
       onClick: () => navigate('/my-organization'),
     });
   }

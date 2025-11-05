@@ -7,16 +7,24 @@ import './SelectOrganization.css';
 
 /**
  * 机构代码输入页面
- * 用于微信登录后新用户输入机构代码申请加入
+ * 用于微信登录后新用户输入机构代码申请加入，或已登录用户申请加入其他机构
  */
 const SelectOrganization = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [submitting, setSubmitting] = useState(false);
   const [wechatUserInfo, setWechatUserInfo] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [form] = Form.useForm();
 
   useEffect(() => {
+    // 检查是否已登录
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsLoggedIn(true);
+      return;
+    }
+
     // 优先从location.state获取，否则从sessionStorage获取
     let userInfo = location.state?.wechatUserInfo;
     if (!userInfo) {
@@ -43,37 +51,59 @@ const SelectOrganization = () => {
     try {
       setSubmitting(true);
       
-      const response = await axios.post(`${API_BASE_URL}/auth/wechat/apply-by-code`, {
-        organizationCode: values.organizationCode.trim(),
-        wechatUserInfo
-      });
+      let response;
+      
+      if (isLoggedIn) {
+        // 已登录用户申请加入其他机构
+        const token = localStorage.getItem('token');
+        response = await axios.post(
+          `${API_BASE_URL}/organizations/apply-by-code`,
+          { organizationCode: values.organizationCode.trim() },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        // 微信登录的新用户
+        response = await axios.post(`${API_BASE_URL}/auth/wechat/apply-by-code`, {
+          organizationCode: values.organizationCode.trim(),
+          wechatUserInfo
+        });
+      }
 
       if (response.data.success) {
         const data = response.data.data;
         
-        // 如果直接加入成功（没有管理员，成为管理员）
-        if (data.token && data.user) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          sessionStorage.removeItem('wechatUserInfo');
-          
-          message.success(response.data.message || '加入机构成功！');
-          
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 500);
-        } else {
-          // 提交申请成功，跳转到申请状态页面
+        if (isLoggedIn) {
+          // 已登录用户：申请提交成功，返回到个人账号页面
           message.success(response.data.message || '申请已提交！');
-          
           setTimeout(() => {
-            navigate('/application-status', {
-              state: {
-                requestInfo: data,
-                wechatUserInfo
-              }
-            });
+            navigate('/user-profile');
           }, 1000);
+        } else {
+          // 微信新用户：原有逻辑
+          // 如果直接加入成功（没有管理员，成为管理员）
+          if (data.token && data.user) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            sessionStorage.removeItem('wechatUserInfo');
+            
+            message.success(response.data.message || '加入机构成功！');
+            
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 500);
+          } else {
+            // 提交申请成功，跳转到申请状态页面
+            message.success(response.data.message || '申请已提交！');
+            
+            setTimeout(() => {
+              navigate('/application-status', {
+                state: {
+                  requestInfo: data,
+                  wechatUserInfo
+                }
+              });
+            }, 1000);
+          }
         }
       } else {
         message.error(response.data.message || '操作失败');
@@ -117,28 +147,27 @@ const SelectOrganization = () => {
             />
           </Form.Item>
 
-          <Form.Item>
-            <Button
-              type="primary"
-              size="large"
-              block
-              htmlType="submit"
-              loading={submitting}
-              className="submit-button"
-            >
-              提交
-            </Button>
-          </Form.Item>
-
           <Form.Item style={{ marginBottom: 0 }}>
-            <Button
-              size="large"
-              block
-              onClick={() => navigate(-1)}
-              className="back-button"
-            >
-              返回
-            </Button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <Button
+                size="large"
+                onClick={() => navigate(-1)}
+                className="back-button"
+                style={{ flex: 1 }}
+              >
+                返回
+              </Button>
+              <Button
+                type="primary"
+                size="large"
+                htmlType="submit"
+                loading={submitting}
+                className="submit-button"
+                style={{ flex: 1 }}
+              >
+                提交
+              </Button>
+            </div>
           </Form.Item>
         </Form>
       </div>

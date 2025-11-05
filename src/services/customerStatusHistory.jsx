@@ -78,3 +78,19 @@ export const cancelTrialSchedule = async (customerId, historyId) => {
   }
 };
 
+export const completeTrialSchedule = async (customerId, historyId) => {
+  try {
+    const response = await fetch(
+      `${getApiBaseUrl()}/customers/${customerId}/status-history/${historyId}/complete-trial`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders()
+      }
+    );
+    return await response.json();
+  } catch (error) {
+    console.error('标记体验完成失败:', error);
+    throw error;
+  }
+};
+

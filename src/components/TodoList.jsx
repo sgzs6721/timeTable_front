@@ -550,9 +550,9 @@ const TodoList = ({ onUnreadCountChange }) => {
         <div style={{ 
           marginBottom: '8px',
           padding: '8px',
-          backgroundColor: trial.trialCancelled ? '#f5f5f5' : '#f0f5ff',
+          backgroundColor: trial.trialCancelled ? '#f5f5f5' : (trial.trialCompleted ? '#f6ffed' : '#f0f5ff'),
           borderRadius: '4px',
-          border: trial.trialCancelled ? '1px solid #d9d9d9' : '1px solid #91caff'
+          border: trial.trialCancelled ? '1px solid #d9d9d9' : (trial.trialCompleted ? '1px solid #95de64' : '1px solid #91caff')
         }}>
           {/* 第一行：体验时间信息（不换行） */}
           <div style={{ 
@@ -563,14 +563,25 @@ const TodoList = ({ onUnreadCountChange }) => {
             whiteSpace: 'nowrap',
             overflow: 'hidden'
           }}>
-            <CalendarOutlined style={{ color: trial.trialCancelled ? '#999' : '#1890ff', fontSize: '14px', flexShrink: 0 }} />
+            <CalendarOutlined style={{ 
+              color: trial.trialCancelled ? '#999' : (trial.trialCompleted ? '#52c41a' : '#1890ff'), 
+              fontSize: '14px', 
+              flexShrink: 0 
+            }} />
             <span style={{ fontSize: '13px', color: '#666', flexShrink: 0 }}>
-              体验时间：
+              体验时间
             </span>
+            {trial.trialCancelled ? (
+              <Tag color="default" size="small" style={{ margin: 0, flexShrink: 0 }}>已取消</Tag>
+            ) : trial.trialCompleted ? (
+              <Tag color="success" size="small" style={{ margin: 0, flexShrink: 0 }}>已完成</Tag>
+            ) : (
+              <Tag color="processing" size="small" style={{ margin: 0, flexShrink: 0 }}>待体验</Tag>
+            )}
             <span style={{ 
               fontSize: '13px', 
               fontWeight: 'bold', 
-              color: trial.trialCancelled ? '#999' : '#1890ff',
+              color: trial.trialCancelled ? '#999' : (trial.trialCompleted ? '#52c41a' : '#1890ff'),
               textDecoration: trial.trialCancelled ? 'line-through' : 'none',
               flexShrink: 0,
               whiteSpace: 'nowrap'
@@ -585,9 +596,6 @@ const TodoList = ({ onUnreadCountChange }) => {
                 return weekdays[dayjs(trial.trialScheduleDate).day()];
               })()}
             </span>
-            {trial.trialCancelled && (
-              <Tag color="default" style={{ marginLeft: 8, flexShrink: 0 }}>已取消</Tag>
-            )}
           </div>
 
           {/* 第二行：教练信息和操作按钮 */}
@@ -603,8 +611,8 @@ const TodoList = ({ onUnreadCountChange }) => {
               教练：{trial.trialCoachName || '未指定'}
             </div>
             
-            {/* 操作按钮（右对齐） */}
-            {trial.trialCancelled !== true && (
+            {/* 操作按钮（右对齐）- 只有待体验状态才显示 */}
+            {!trial.trialCancelled && !trial.trialCompleted && (
               <div style={{ display: 'flex', gap: '8px' }}>
                 <Popconfirm
                   title="确定取消体验课程？"
@@ -1011,20 +1019,21 @@ const TodoList = ({ onUnreadCountChange }) => {
                                 marginTop: 12,
                                 marginBottom: 4,
                                 padding: '8px',
-                                backgroundColor: history.trialCancelled ? '#f5f5f5' : '#f0f5ff',
+                                backgroundColor: history.trialCancelled ? '#f5f5f5' : (history.trialCompleted ? '#f6ffed' : '#f0f5ff'),
                                 borderRadius: '4px',
-                                border: history.trialCancelled ? '1px solid #d9d9d9' : '1px solid #91caff',
+                                border: history.trialCancelled ? '1px solid #d9d9d9' : (history.trialCompleted ? '1px solid #95de64' : '1px solid #91caff'),
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center'
                               }}>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '11px', color: history.trialCancelled ? '#999' : '#1890ff', marginBottom: 4 }}>
+                                  <div style={{ 
+                                    fontSize: '11px', 
+                                    color: '#000',
+                                    marginBottom: 4
+                                  }}>
                                     <CalendarOutlined style={{ marginRight: 4 }} />
                                     体验时间：
-                                    {history.trialCancelled && (
-                                      <Tag color="default" size="small" style={{ marginLeft: 8 }}>已取消</Tag>
-                                    )}
                                   </div>
                                   <div style={{ 
                                     fontWeight: 'bold', 
@@ -1037,7 +1046,11 @@ const TodoList = ({ onUnreadCountChange }) => {
                                     {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
                                   </div>
                                 </div>
-                                {history.trialCancelled !== true && (
+                                {history.trialCancelled ? (
+                                  <Tag color="default" size="small" style={{ marginLeft: 8 }}>已取消</Tag>
+                                ) : history.trialCompleted ? (
+                                  <Tag color="success" size="small" style={{ marginLeft: 8 }}>已完成</Tag>
+                                ) : (
                                   <Popconfirm
                                     title="确定取消体验课程？"
                                     description="取消后将标记为已取消，如有权限也会从课表中删除"

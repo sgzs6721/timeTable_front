@@ -43,7 +43,7 @@ import {
 } from '../services/customer';
 import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo } from '../services/todo';
 import { getTrialSchedule } from '../services/timetable';
-import { getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory } from '../services/customerStatusHistory';
+import { getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory, cancelTrialSchedule, completeTrialSchedule } from '../services/customerStatusHistory';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 import './CustomerManagement.css';
@@ -410,6 +410,60 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     } catch (error) {
       message.error('删除失败');
       console.error('删除历史记录失败:', error);
+    }
+  };
+
+  // 取消体验课程
+  const handleCancelTrialSchedule = async (customerId, historyId) => {
+    try {
+      message.loading({ content: '正在取消体验课程...', key: 'cancelTrial' });
+      
+      const response = await cancelTrialSchedule(customerId, historyId);
+      
+      if (response && response.success) {
+        message.success({ content: '✓ 体验课程已取消', key: 'cancelTrial' });
+        
+        // 刷新该客户的历史记录
+        const historyResponse = await getCustomerStatusHistory(customerId);
+        if (historyResponse && historyResponse.success && historyResponse.data) {
+          setCustomerHistories(prev => ({
+            ...prev,
+            [customerId]: historyResponse.data
+          }));
+        }
+      } else {
+        message.error({ content: response.message || '取消失败', key: 'cancelTrial' });
+      }
+    } catch (error) {
+      console.error('取消体验课程失败:', error);
+      message.error({ content: '取消体验课程失败', key: 'cancelTrial' });
+    }
+  };
+
+  // 完成体验课程
+  const handleCompleteTrialSchedule = async (customerId, historyId) => {
+    try {
+      message.loading({ content: '正在标记体验完成...', key: 'completeTrial' });
+      
+      const response = await completeTrialSchedule(customerId, historyId);
+      
+      if (response && response.success) {
+        message.success({ content: '✓ 体验课程已标记完成', key: 'completeTrial' });
+        
+        // 刷新该客户的历史记录
+        const historyResponse = await getCustomerStatusHistory(customerId);
+        if (historyResponse && historyResponse.success && historyResponse.data) {
+          setCustomerHistories(prev => ({
+            ...prev,
+            [customerId]: historyResponse.data
+          }));
+        }
+      } else {
+        message.error({ content: response.message || '标记失败', key: 'completeTrial' });
+      }
+    } catch (error) {
+      console.error('标记体验完成失败:', error);
+      message.error({ content: '标记体验完成失败', key: 'completeTrial' });
     }
   };
 
@@ -1340,11 +1394,20 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                       style={{ 
                         marginBottom: index < filteredHistories.length - 1 ? 12 : 0,
                         paddingBottom: index < filteredHistories.length - 1 ? 12 : 0,
-                        borderBottom: index < filteredHistories.length - 1 && expandedHistories[customer.id] ? '1px dashed #f0f0f0' : 'none',
-                        padding: isEditing ? '8px' : '0',
-                        backgroundColor: isEditing ? '#f0f5ff' : 'transparent',
-                        borderRadius: isEditing ? '4px' : '0',
-                        border: isEditing ? '1px solid #d9d9d9' : 'none'
+                        ...(isEditing ? {
+                          padding: '8px',
+                          backgroundColor: '#f0f5ff',
+                          borderRadius: '4px',
+                          borderTop: '1px solid #d9d9d9',
+                          borderRight: '1px solid #d9d9d9',
+                          borderBottom: '1px solid #d9d9d9',
+                          borderLeft: '1px solid #d9d9d9'
+                        } : {
+                          padding: '0',
+                          backgroundColor: 'transparent',
+                          borderRadius: '0',
+                          borderBottom: index < filteredHistories.length - 1 && expandedHistories[customer.id] ? '1px dashed #f0f0f0' : 'none'
+                        })
                       }}
                     >
                       <div style={{ 
@@ -1451,18 +1514,109 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                           </Space>
                         </div>
                       ) : (
-                        history.notes && (
-                          <div style={{ 
-                            color: '#999', 
-                            fontSize: '12px',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                            lineHeight: '1.6',
-                            marginTop: 2
-                          }}>
-                            {history.notes}
-                          </div>
-                        )
+                        <>
+                          {history.notes && (
+                            <div style={{ 
+                              color: '#999', 
+                              fontSize: '12px',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              lineHeight: '1.6',
+                              marginTop: 2
+                            }}>
+                              {history.notes}
+                            </div>
+                          )}
+                          
+                          {/* 如果是待体验状态且有体验时间，显示体验时间信息 */}
+                          {(history.toStatus === 'SCHEDULED' || history.toStatus === 'RE_EXPERIENCE') && 
+                           history.trialScheduleDate && history.trialStartTime && history.trialEndTime && (
+                            <div style={{ 
+                              marginTop: 8,
+                              padding: '8px',
+                              backgroundColor: history.trialCancelled ? '#f5f5f5' : (history.trialCompleted ? '#f6ffed' : '#f0f5ff'),
+                              borderRadius: '4px',
+                              borderTop: history.trialCancelled ? '1px solid #d9d9d9' : (history.trialCompleted ? '1px solid #95de64' : '1px solid #91caff'),
+                              borderRight: history.trialCancelled ? '1px solid #d9d9d9' : (history.trialCompleted ? '1px solid #95de64' : '1px solid #91caff'),
+                              borderBottom: history.trialCancelled ? '1px solid #d9d9d9' : (history.trialCompleted ? '1px solid #95de64' : '1px solid #91caff'),
+                              borderLeft: history.trialCancelled ? '1px solid #d9d9d9' : (history.trialCompleted ? '1px solid #95de64' : '1px solid #91caff'),
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ 
+                                  fontSize: '11px', 
+                                  color: '#000',
+                                  marginBottom: 4
+                                }}>
+                                  <CalendarOutlined style={{ marginRight: 4 }} />
+                                  体验时间：
+                                </div>
+                                <div style={{ 
+                                  fontSize: '11px', 
+                                  color: '#666',
+                                  textDecoration: history.trialCancelled ? 'line-through' : 'none'
+                                }}>
+                                  {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                  {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                  {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                                  {' '}
+                                  {(() => {
+                                    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                                    return weekdays[dayjs(history.trialScheduleDate).day()];
+                                  })()}
+                                </div>
+                              </div>
+                              {history.trialCancelled ? (
+                                <Tag color="default" size="small" style={{ marginLeft: 8 }}>已取消</Tag>
+                              ) : history.trialCompleted ? (
+                                <Tag color="success" size="small" style={{ marginLeft: 8 }}>已完成</Tag>
+                              ) : (
+                                <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
+                                  <Popconfirm
+                                    title="确定取消体验课程？"
+                                    description="取消后将标记为已取消"
+                                    onConfirm={(e) => {
+                                      e?.stopPropagation();
+                                      handleCancelTrialSchedule(customer.id, history.id);
+                                    }}
+                                    okText="确定"
+                                    cancelText="取消"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Button 
+                                      type="text" 
+                                      danger
+                                      size="small"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      取消
+                                    </Button>
+                                  </Popconfirm>
+                                  <Popconfirm
+                                    title="确定标记为已完成？"
+                                    onConfirm={(e) => {
+                                      e?.stopPropagation();
+                                      handleCompleteTrialSchedule(customer.id, history.id);
+                                    }}
+                                    okText="确定"
+                                    cancelText="取消"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Button 
+                                      type="primary"
+                                      size="small"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      完成
+                                    </Button>
+                                  </Popconfirm>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   );
@@ -1599,62 +1753,63 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                 style={{ width: '100%' }}
                 placeholder="全部状态"
                 size="large"
+                optionLabelProp="label"
               >
-                <Option value="all">
+                <Option value="all" label="全部状态">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>全部状态</span>
                     <span style={{ color: '#1890ff', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('all')}</span>
                   </div>
                 </Option>
-                <Option value="NEW">
+                <Option value="NEW" label="新建">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>新建</span>
                     <span style={{ color: '#52c41a', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('NEW')}</span>
                   </div>
                 </Option>
-                <Option value="CONTACTED">
+                <Option value="CONTACTED" label="已联系">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>已联系</span>
                     <span style={{ color: '#13c2c2', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('CONTACTED')}</span>
                   </div>
                 </Option>
-                <Option value="PENDING_CONFIRM">
+                <Option value="PENDING_CONFIRM" label="待确认">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>待确认</span>
                     <span style={{ color: '#722ed1', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('PENDING_CONFIRM')}</span>
                   </div>
                 </Option>
-                <Option value="SCHEDULED">
+                <Option value="SCHEDULED" label="待体验">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>待体验</span>
                     <span style={{ color: '#fa8c16', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('SCHEDULED')}</span>
                   </div>
                 </Option>
-                <Option value="VISITED">
+                <Option value="VISITED" label="已体验">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>已体验</span>
                     <span style={{ color: '#eb2f96', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('VISITED')}</span>
                   </div>
                 </Option>
-                <Option value="RE_EXPERIENCE">
+                <Option value="RE_EXPERIENCE" label="待再体验">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>待再体验</span>
                     <span style={{ color: '#faad14', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('RE_EXPERIENCE')}</span>
                   </div>
                 </Option>
-                <Option value="PENDING_SOLD">
+                <Option value="PENDING_SOLD" label="待成交">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>待成交</span>
                     <span style={{ color: '#f5222d', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('PENDING_SOLD')}</span>
                   </div>
                 </Option>
-                <Option value="SOLD">
+                <Option value="SOLD" label="已成交">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>已成交</span>
                     <span style={{ color: '#52c41a', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('SOLD')}</span>
                   </div>
                 </Option>
-                <Option value="CLOSED">
+                <Option value="CLOSED" label="已结束">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>已结束</span>
                     <span style={{ color: '#8c8c8c', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('CLOSED')}</span>
