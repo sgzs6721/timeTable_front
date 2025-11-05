@@ -777,6 +777,11 @@ const TodoList = ({ onUnreadCountChange }) => {
                       <span style={{ fontSize: '16px', color: '#000', fontWeight: 600 }}>
                         {todo.customerName}
                       </span>
+                      {todo.customerSource && (
+                        <Tag color="default" style={{ margin: 0, fontSize: '12px' }}>
+                          📍 {todo.customerSource}
+                        </Tag>
+                      )}
                       {todo.customerPhone && (
                         <span style={{ fontSize: '14px', color: '#666', fontWeight: 400 }}>
                           <a 
@@ -799,21 +804,6 @@ const TodoList = ({ onUnreadCountChange }) => {
                     </>
                   )}
                 </div>
-                {/* 状态和地点 - 只对客源创建的待办显示 */}
-                {!isManualTodo && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    {todo.customerStatusText && (
-                      <Tag color="blue" style={{ margin: 0, fontSize: '12px' }}>
-                        {todo.customerStatusText}
-                      </Tag>
-                    )}
-                    {todo.customerSource && (
-                      <span style={{ fontSize: '12px', color: '#666' }}>
-                        📍 {todo.customerSource}
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
                 {isUnread && (
@@ -831,14 +821,22 @@ const TodoList = ({ onUnreadCountChange }) => {
               </div>
             </div>
 
-            <div style={{ 
-              fontSize: '14px', 
-              fontWeight: 400,
-              marginBottom: 8,
-              textDecoration: 'none',
-              color: isProcessed ? '#999' : '#000'
-            }}>
-              {todo.content}
+            {/* 状态标签和内容 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 8, flexWrap: 'wrap' }}>
+              {/* 状态标签 - 只对客源创建的待办显示 */}
+              {!isManualTodo && todo.customerStatusText && (
+                <Tag color="blue" style={{ margin: 0, fontSize: '12px' }}>
+                  {todo.customerStatusText}
+                </Tag>
+              )}
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 400,
+                textDecoration: 'none',
+                color: isProcessed ? '#999' : '#000'
+              }}>
+                {todo.content}
+              </span>
             </div>
 
             {todo.reminderDate && (
@@ -1311,7 +1309,7 @@ const TodoList = ({ onUnreadCountChange }) => {
             今日 (<span style={{ color: '#ff4d4f' }}>{(() => {
               const today = dayjs().format('YYYY-MM-DD');
               return todos.filter(todo => {
-                if (todo.status === 'COMPLETED') return false;
+                if (todo.status === 'COMPLETED' || todo.status === 'CANCELLED') return false;
                 if (!todo.reminderDate) return false;
                 const reminderDay = dayjs(todo.reminderDate).format('YYYY-MM-DD');
                 return reminderDay === today;
