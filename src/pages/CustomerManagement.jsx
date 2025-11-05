@@ -1918,7 +1918,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         ) : (
           <div 
             className="customer-card-list" 
-            style={{ overflow: 'auto', width: '100%', maxHeight: 'calc(100vh - 400px)' }}
+            style={{ overflowY: 'auto', overflowX: 'hidden', width: '100%', maxHeight: 'calc(100vh - 240px)' }}
             onScroll={(e) => {
               const { scrollTop, scrollHeight, clientHeight } = e.target;
               // 当滚动到底部附近100px时，加载更多
@@ -1980,9 +1980,10 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               </div>
             )}
             
-            {!hasMore && customers.length > 0 && (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-                已加载全部 {customers.length} 条数据
+            {/* 数据加载状态提示 */}
+            {!loadingMore && customers.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '12px' }}>
+                {hasMore ? `已加载 ${customers.length} 条数据，向下滚动加载更多` : `已加载全部 ${customers.length} 条数据`}
               </div>
             )}
           </div>

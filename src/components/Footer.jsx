@@ -3,7 +3,7 @@ import React from 'react';
 const Footer = () => {
   return (
     <div style={{ 
-      marginTop: 'auto',
+      marginTop: '16px',
       paddingTop: '16px',
       paddingBottom: '16px'
     }}>

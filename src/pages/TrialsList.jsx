@@ -195,7 +195,9 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
       'SCHEDULED': { text: '待体验', color: 'purple' },
       'RE_EXPERIENCE': { text: '待再体验', color: 'cyan' },
       'VISITED': { text: '已体验', color: 'green' },
-      'SOLD': { text: '已成交', color: 'success' }
+      'SOLD': { text: '已成交', color: 'success' },
+      'PENDING_CONFIRM': { text: '待确认', color: 'orange' },
+      'PENDING_SOLD': { text: '待成交', color: 'gold' }
     };
     
     const config = statusMap[trial.status] || { text: trial.status, color: 'default' };
