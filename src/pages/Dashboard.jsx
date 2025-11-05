@@ -5766,7 +5766,25 @@ const MyHours = ({ user }) => {
         setSalaryData(salaryResp.data || []);
       }
       
-      // 从课时记录中提取月份（不限制记薪周期）
+      // 获取记薪周期设置
+      const settingResp = await fetch(`${getApiBaseUrl()}/salary-system-settings/current`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      let startDay = 1;
+      let endDay = 31;
+      
+      if (settingResp.ok) {
+        const settingData = await settingResp.json();
+        if (settingData.success && settingData.data) {
+          startDay = settingData.data.salaryStartDay || 1;
+          endDay = settingData.data.salaryEndDay || 31;
+        }
+      }
+      
+      // 从课时记录中提取月份，并根据记薪周期计算归属月份
       const params = {
         coachId: user?.role?.toUpperCase() === 'ADMIN' ? (coachId ? String(coachId) : undefined) : undefined,
         page: 1,
@@ -5775,14 +5793,34 @@ const MyHours = ({ user }) => {
       const hoursResp = await getMyHoursPaged(params);
       if (hoursResp && hoursResp.success) {
         const records = hoursResp.data?.list || [];
-        // 提取所有不重复的月份
         const monthsSet = new Set();
+        
         records.forEach(record => {
           if (record.scheduleDate) {
-            const month = dayjs(record.scheduleDate).format('YYYY-MM');
-            monthsSet.add(month);
+            const recordDate = dayjs(record.scheduleDate);
+            const day = recordDate.date();
+            
+            // 根据记薪周期判断该日期属于哪个工资月份
+            let salaryMonth;
+            
+            if (startDay <= endDay) {
+              // 同月内：直接就是当月
+              salaryMonth = recordDate.format('YYYY-MM');
+            } else {
+              // 跨月：16-15
+              // 如果日期 >= startDay（例如16日），属于当月工资
+              // 如果日期 <= endDay（例如15日），属于上月工资
+              if (day >= startDay) {
+                salaryMonth = recordDate.format('YYYY-MM');
+              } else {
+                salaryMonth = recordDate.subtract(1, 'month').format('YYYY-MM');
+              }
+            }
+            
+            monthsSet.add(salaryMonth);
           }
         });
+        
         // 转为数组并排序（降序）
         const monthsArray = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
         setAvailableMonths(monthsArray);
@@ -5803,15 +5841,7 @@ const MyHours = ({ user }) => {
       return;
     }
     
-    // 优先从工资数据中找到该月份的记薪周期
-    const monthData = salaryData.find(item => item.month === month);
-    if (monthData && monthData.salaryPeriodStart && monthData.salaryPeriodEnd) {
-      setStartDate(dayjs(monthData.salaryPeriodStart));
-      setEndDate(dayjs(monthData.salaryPeriodEnd));
-      return;
-    }
-    
-    // 如果工资数据中没有，就从后端获取记薪周期设置并计算
+    // 总是从后端获取记薪周期设置并计算（不依赖工资数据）
     try {
       const settingResp = await fetch(`${getApiBaseUrl()}/salary-system-settings/current`, {
         headers: {
@@ -5826,8 +5856,8 @@ const MyHours = ({ user }) => {
           const startDay = setting.salaryStartDay || 1;
           const endDay = setting.salaryEndDay || 31;
           
-          // 解析月份
-          const yearMonth = dayjs(month + '-01');
+          // 解析月份（例如："2025-10"）
+          const yearMonth = dayjs(month, 'YYYY-MM');
           
           let periodStart, periodEnd;
           
@@ -5837,11 +5867,16 @@ const MyHours = ({ user }) => {
             periodEnd = yearMonth.date(Math.min(endDay, yearMonth.daysInMonth()));
           } else {
             // 跨月：从本月开始日到次月结束日
+            // 例如：选择10月，记薪周期16-15，应该是10月16日到11月15日
             periodStart = yearMonth.date(startDay);
             const nextMonth = yearMonth.add(1, 'month');
             const actualEndDay = endDay === 0 ? nextMonth.daysInMonth() : endDay;
             periodEnd = nextMonth.date(Math.min(actualEndDay, nextMonth.daysInMonth()));
           }
+          
+          console.log('选择月份:', month);
+          console.log('记薪周期设置:', startDay, '-', endDay);
+          console.log('计算结果:', periodStart.format('YYYY-MM-DD'), '到', periodEnd.format('YYYY-MM-DD'));
           
           setStartDate(periodStart);
           setEndDate(periodEnd);
