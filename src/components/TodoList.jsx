@@ -16,7 +16,8 @@ import {
   CalendarOutlined,
   PhoneOutlined,
   CloseCircleOutlined,
-  PlusOutlined
+  PlusOutlined,
+  FormOutlined
 } from '@ant-design/icons';
 import { 
   getTodos, 
@@ -975,24 +976,34 @@ const TodoList = ({ onUnreadCountChange }) => {
                 marginTop: 4,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '8px'
               }}>
-                {todo.createdByName && <span>{todo.createdByName}</span>}
-                {todo.createdByName && todo.createdAt && <span>·</span>}
-                {todo.createdAt && <span>{dayjs(todo.createdAt).format('YYYY-MM-DD HH:mm')}</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FormOutlined style={{ color: '#ff9800' }} />
+                  <span>
+                    创建时间：
+                    {todo.createdAt && dayjs(todo.createdAt).format('YYYY-MM-DD HH:mm')}
+                    {todo.createdAt && todo.createdByName && ' · '}
+                    {todo.createdByName && todo.createdByName}
+                  </span>
+                </div>
               </div>
             )}
 
             {isCompleted && todo.completedAt && (
-              <div style={{ fontSize: '12px', color: '#999', marginTop: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                完成时间：{dayjs(todo.completedAt).format('YYYY-MM-DD HH:mm')}
+              <div style={{ fontSize: '12px', color: '#999', marginTop: 4, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                  <span>完成时间：{dayjs(todo.completedAt).format('YYYY-MM-DD HH:mm')}</span>
+                </div>
               </div>
             )}
             {isCancelled && todo.cancelledAt && (
-              <div style={{ fontSize: '12px', color: '#999', marginTop: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CloseCircleOutlined style={{ color: '#faad14' }} />
-                取消时间：{dayjs(todo.cancelledAt).format('YYYY-MM-DD HH:mm')}
+              <div style={{ fontSize: '12px', color: '#999', marginTop: 4, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CloseCircleOutlined style={{ color: '#faad14' }} />
+                  <span>取消时间：{dayjs(todo.cancelledAt).format('YYYY-MM-DD HH:mm')}</span>
+                </div>
               </div>
             )}
           </div>
