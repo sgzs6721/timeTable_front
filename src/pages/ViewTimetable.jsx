@@ -1817,7 +1817,10 @@ const ViewTimetable = ({ user }) => {
 
     const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-    if (sortedSchedules.length === 0) {
+    // 过滤掉占用时间段，只保留真正的课程
+    const validSchedules = sortedSchedules.filter(s => s.studentName !== '【占用】');
+    
+    if (validSchedules.length === 0) {
       const dateText = targetDate ? targetDate.format('YYYY-MM-DD') : '该天';
       message.info(`${dateText}没有课程`);
       return;
