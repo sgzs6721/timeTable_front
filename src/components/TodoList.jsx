@@ -967,6 +967,22 @@ const TodoList = ({ onUnreadCountChange }) => {
               </div>
             )}
 
+            {/* 手动创建的待办显示创建人和创建日期 */}
+            {isManualTodo && (todo.createdByName || todo.createdAt) && (
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#999',
+                marginTop: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                {todo.createdByName && <span>{todo.createdByName}</span>}
+                {todo.createdByName && todo.createdAt && <span>·</span>}
+                {todo.createdAt && <span>{dayjs(todo.createdAt).format('YYYY-MM-DD HH:mm')}</span>}
+              </div>
+            )}
+
             {isCompleted && todo.completedAt && (
               <div style={{ fontSize: '12px', color: '#999', marginTop: 4, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <CheckCircleOutlined style={{ color: '#52c41a' }} />
@@ -1438,6 +1454,7 @@ const TodoList = ({ onUnreadCountChange }) => {
         onSuccess={handleHistorySuccess}
         onTodoCreated={null}
         onTodoUpdated={handleTodoUpdated}
+        hideHistory={true}
       />
 
       {/* 新建待办模态框 */}

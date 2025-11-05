@@ -564,6 +564,7 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
         onCancel={() => setHistoryModalVisible(false)}
         customer={selectedCustomer}
         onSuccess={handleHistorySuccess}
+        hideHistory={true}
       />
     </div>
   );

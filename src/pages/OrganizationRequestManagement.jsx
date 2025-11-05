@@ -144,54 +144,100 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     }
   };
 
-  const renderRequestCard = (request) => (
-    <Card 
-      key={request.id}
-      className="request-card"
-      hoverable
-    >
-      <div className="request-card-content">
-        <div className="request-info">
-          <Avatar 
-            src={request.wechatAvatar} 
-            icon={<UserOutlined />}
-            size={48}
-          />
-          <div className="request-details">
-            <div className="request-name">{request.wechatNickname || '未知用户'}</div>
-            <div className="request-meta">
-              <span className="request-time">
-                {new Date(request.createdAt).toLocaleString('zh-CN')}
-              </span>
+  const renderRequestCard = (request) => {
+    // 判断是否为普通注册申请（ID为负数）
+    const isNormalRegistration = request.id < 0;
+    const isPending = request.status === 'PENDING';
+    const isApproved = request.status === 'APPROVED';
+    const isRejected = request.status === 'REJECTED';
+    
+    return (
+      <Card 
+        key={request.id}
+        className="request-card"
+        hoverable
+        style={isApproved ? { borderColor: '#52c41a' } : isRejected ? { borderColor: '#ff4d4f' } : {}}
+      >
+        <div className="request-card-content">
+          <div className="request-info">
+            <Avatar 
+              src={request.wechatAvatar} 
+              icon={<UserOutlined />}
+              size={48}
+              style={isNormalRegistration ? { backgroundColor: '#87d068' } : {}}
+            />
+            <div className="request-details">
+              <div className="request-name">
+                {request.wechatNickname || '未知用户'}
+                {isNormalRegistration && (
+                  <Tag color="green" style={{ marginLeft: 8 }}>普通注册</Tag>
+                )}
+                {!isNormalRegistration && request.wechatAvatar && (
+                  <Tag color="blue" style={{ marginLeft: 8 }}>微信用户</Tag>
+                )}
+              </div>
+              <div className="request-meta">
+                <span className="request-time">
+                  {new Date(request.createdAt).toLocaleString('zh-CN')}
+                </span>
+              </div>
+              <div className="request-org">{request.organizationName}</div>
+              {request.applyReason && (
+                <div className="request-reason" style={{ 
+                  fontSize: '12px', 
+                  color: '#666', 
+                  marginTop: '4px',
+                  maxWidth: '400px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {request.applyReason}
+                </div>
+              )}
+              {isRejected && request.rejectReason && (
+                <div style={{ 
+                  fontSize: '12px', 
+                  color: '#ff4d4f', 
+                  marginTop: '4px',
+                  maxWidth: '400px'
+                }}>
+                  拒绝理由：{request.rejectReason}
+                </div>
+              )}
             </div>
-            <div className="request-org">{request.organizationName}</div>
+          </div>
+          
+          <div className="request-actions">
+            {isPending && <Tag color="gold">待审批</Tag>}
+            {isApproved && <Tag color="green">已批准</Tag>}
+            {isRejected && <Tag color="red">已拒绝</Tag>}
+            
+            {isPending && (
+              <Space size="small">
+                <Button
+                  size="small"
+                  icon={<CheckOutlined />}
+                  type="primary"
+                  onClick={() => handleApprove(request)}
+                >
+                  通过
+                </Button>
+                <Button
+                  size="small"
+                  danger
+                  icon={<CloseOutlined />}
+                  onClick={() => handleReject(request)}
+                >
+                  拒绝
+                </Button>
+              </Space>
+            )}
           </div>
         </div>
-        
-        <div className="request-actions">
-          <Tag color="gold">待审批</Tag>
-          <Space size="small">
-            <Button
-              size="small"
-              icon={<CheckOutlined />}
-              type="primary"
-              onClick={() => handleApprove(request)}
-            >
-              通过
-            </Button>
-            <Button
-              size="small"
-              danger
-              icon={<CloseOutlined />}
-              onClick={() => handleReject(request)}
-            >
-              拒绝
-            </Button>
-          </Space>
-        </div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   return (
     <div className="organization-request-management">
@@ -203,7 +249,7 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
         <div className="empty-container">
           <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
             <div style={{ fontSize: 48, color: '#d9d9d9' }}>📋</div>
-            <div style={{ color: '#999' }}>暂无待审批申请</div>
+            <div style={{ color: '#999' }}>暂无申请记录</div>
           </Space>
         </div>
       ) : (
@@ -310,8 +356,6 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
               >
                 <Select>
                   <Option value="COACH">教练</Option>
-                  <Option value="SALES">销售</Option>
-                  <Option value="RECEPTIONIST">前台</Option>
                 </Select>
               </Form.Item>
             </Form>
