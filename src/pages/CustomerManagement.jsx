@@ -31,15 +31,18 @@ import {
   ClockCircleOutlined,
   UnorderedListOutlined,
   SaveOutlined,
-  CloseOutlined
+  CloseOutlined,
+  UserSwitchOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
+import AssignCustomerModal from '../components/AssignCustomerModal';
 import { 
   createCustomer, 
   getCustomers, 
   updateCustomer, 
   deleteCustomer, 
-  getCustomersByStatus 
+  getCustomersByStatus,
+  assignCustomer as assignCustomerApi
 } from '../services/customer';
 import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo } from '../services/todo';
 import { getTrialSchedule } from '../services/timetable';
@@ -92,6 +95,8 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [expandedHistories, setExpandedHistories] = useState({});
   const [editingHistoryId, setEditingHistoryId] = useState(null);
   const [editingHistoryNotes, setEditingHistoryNotes] = useState('');
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [assigningCustomer, setAssigningCustomer] = useState(null);
 
   // 监听searchCustomerName参数，自动填入搜索框
   useEffect(() => {
@@ -747,6 +752,42 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     }).catch(() => {
       message.error('复制失败');
     });
+  };
+
+  const handleOpenAssignModal = (customer, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setAssigningCustomer(customer);
+    setAssignModalVisible(true);
+  };
+
+  const handleAssignCustomer = async (assignedUserId) => {
+    if (!assigningCustomer) return;
+    
+    try {
+      const response = await assignCustomerApi(assigningCustomer.id, assignedUserId);
+      
+      if (response && response.success) {
+        message.success('分配成功');
+        setAssignModalVisible(false);
+        setAssigningCustomer(null);
+        
+        // 局部刷新：更新客户列表中的分配信息
+        setCustomers(prevCustomers => 
+          prevCustomers.map(c => 
+            c.id === assigningCustomer.id 
+              ? { ...c, assignedSalesId: assignedUserId, assignedSalesName: response.data.assignedSalesName }
+              : c
+          )
+        );
+      } else {
+        message.error(response?.message || '分配失败');
+      }
+    } catch (error) {
+      console.error('分配客户失败:', error);
+      message.error('分配客户失败');
+    }
   };
 
   const handleResetFilters = () => {
@@ -1684,6 +1725,17 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
             />
             <Button 
               type="text"
+              icon={<UserSwitchOutlined />}
+              title="分配客户"
+              onClick={(e) => handleOpenAssignModal(customer, e)}
+              size="small"
+              style={{ 
+                color: '#52c41a',
+                cursor: 'pointer'
+              }}
+            />
+            <Button 
+              type="text"
               icon={<EditOutlined />}
               title="编辑"
               onClick={() => handleEdit(customer)}
@@ -2254,6 +2306,17 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
           </div>
         )}
       </Modal>
+
+      {/* 分配客户模态框 */}
+      <AssignCustomerModal
+        visible={assignModalVisible}
+        customer={assigningCustomer}
+        onCancel={() => {
+          setAssignModalVisible(false);
+          setAssigningCustomer(null);
+        }}
+        onSuccess={handleAssignCustomer}
+      />
     </div>
   );
 };

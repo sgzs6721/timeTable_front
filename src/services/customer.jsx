@@ -34,3 +34,10 @@ export const getCustomersByStatus = (status) => {
 export const getTrialCustomers = (params) => {
   return api.get('/customers/trials', { params });
 };
+
+// 分配客户
+export const assignCustomer = (customerId, assignedUserId) => {
+  return api.post(`/customers/${customerId}/assign`, null, {
+    params: { assignedUserId }
+  });
+};
