@@ -6259,8 +6259,8 @@ const ViewTimetable = ({ user }) => {
           {/* 第一行：图例和视图切换按钮 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* 在周固定课表中显示图例和提示信息 */}
-              {(timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate) || isInitialLoading ? (
+              {/* 在周固定课表的实例视图中显示图例和提示信息 */}
+              {((timetable?.isWeekly && !timetable?.startDate && !timetable?.endDate && displayViewMode === 'instance') || (isInitialLoading && displayViewMode === 'instance')) ? (
                 <>
                   {/* 图例说明 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
