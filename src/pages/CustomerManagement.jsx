@@ -2255,23 +2255,33 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               paddingTop: 8, 
               borderTop: '1px solid #f0f0f0' 
             }}>
-              <Button 
-                type="primary" 
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => handleSwitchToEditTodo(viewTodoCustomer)}
-              >
-                编辑提醒
-              </Button>
-              <Button 
-                danger 
-                size="small"
-                icon={<DeleteOutlined />}
-                onClick={() => setShowCancelConfirm(true)}
-                disabled={showCancelConfirm}
-              >
-                取消提醒
-              </Button>
+              {/* 权限判断：客户已分配则只有被分配人可编辑，未分配则只有创建者可编辑 */}
+              {(() => {
+                const canEdit = viewTodoCustomer.assignedSalesId 
+                  ? viewTodoCustomer.assignedSalesId === user?.id  // 客户已分配：只有被分配人可编辑
+                  : latestTodoByCustomer[viewTodoCustomer.id].createdBy === user?.id;  // 客户未分配：只有创建者可编辑
+                return canEdit && (
+                  <>
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => handleSwitchToEditTodo(viewTodoCustomer)}
+                    >
+                      编辑提醒
+                    </Button>
+                    <Button 
+                      danger 
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={() => setShowCancelConfirm(true)}
+                      disabled={showCancelConfirm}
+                    >
+                      取消提醒
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
             
             {showCancelConfirm && (

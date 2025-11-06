@@ -5184,7 +5184,7 @@ const Dashboard = ({ user }) => {
             }}>{unreadTodoCount}</span>
           </span>
         ) : '待办',
-        children: <TodoList key={todoListKey} onUnreadCountChange={setUnreadTodoCount} />
+        children: <TodoList key={todoListKey} onUnreadCountChange={setUnreadTodoCount} user={user} />
       });
     }
     

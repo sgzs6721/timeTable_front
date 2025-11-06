@@ -38,7 +38,7 @@ import CreateTodoModal from './CreateTodoModal';
 import dayjs from 'dayjs';
 import './TodoList.css';
 
-const TodoList = ({ onUnreadCountChange }) => {
+const TodoList = ({ onUnreadCountChange, user }) => {
   const navigate = useNavigate();
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -895,7 +895,13 @@ const TodoList = ({ onUnreadCountChange }) => {
                         提醒时间：{dayjs(todo.reminderDate).format('YYYY-MM-DD')}
                         {todo.reminderTime && ` ${todo.reminderTime.substring(0, 5)}`}
                       </span>
-                      {!isProcessed && (
+                      {/* 权限判断：客户已分配则只有被分配人可编辑，未分配则只有创建者可编辑 */}
+                      {!isProcessed && (() => {
+                        const canEdit = todo.customerAssignedSalesId 
+                          ? todo.customerAssignedSalesId === user?.id  // 客户已分配：只有被分配人可编辑
+                          : todo.createdBy === user?.id;  // 客户未分配：只有创建者可编辑
+                        return canEdit;
+                      })() && (
                         <EditOutlined 
                           style={{ cursor: 'pointer', color: '#1890ff' }}
                           onClick={(e) => {
