@@ -44,7 +44,7 @@ import {
   getCustomersByStatus,
   assignCustomer as assignCustomerApi
 } from '../services/customer';
-import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo } from '../services/todo';
+import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo, getLatestTodosByCustomers } from '../services/todo';
 import { getTrialSchedule } from '../services/timetable';
 import { getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory, cancelTrialSchedule, completeTrialSchedule } from '../services/customerStatusHistory';
 import { getApiBaseUrl } from '../config/api';
@@ -136,11 +136,17 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   }));
 
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+  const isManager = user?.position?.toUpperCase() === 'MANAGER';
   const isSales = user?.position?.toUpperCase() === 'SALES';
 
   useEffect(() => {
-    if (isAdmin) {
+    // 管理员和管理职位可以查看所有销售
+    if (isAdmin || isManager) {
       fetchSalesList();
+    }
+    // 销售职位只能看自己的，设置筛选为自己
+    if (isSales && user?.id) {
+      setSalesFilter(user.id.toString());
     }
     // fetchCustomers 会由筛选条件的 useEffect 触发，无需在这里调用
   }, []);
@@ -261,52 +267,34 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     if (!customers || customers.length === 0) return;
     
     const todoStatus = {};
-    // 批量获取所有待办，只需一次请求
-    let allTodos = [];
+    const latestMap = {};
+    
     try {
-      const todosResp = await getTodos();
-      if (todosResp && todosResp.success) {
-        allTodos = todosResp.data || [];
+      // 使用新的批量接口，传入客户ID列表
+      const customerIds = customers.map(c => c.id);
+      const response = await getLatestTodosByCustomers(customerIds);
+      
+      if (response && response.success && response.data) {
+        const allTodos = response.data || [];
+        
+        // 建立 customerId -> todo 的映射
+        allTodos.forEach(todo => {
+          if (todo.customerId) {
+            latestMap[todo.customerId] = todo;
+            todoStatus[todo.customerId] = true;
+          }
+        });
       }
     } catch (e) {
-      console.error('获取待办列表失败:', e);
+      console.error('批量获取客户待办失败:', e);
     }
-
-    const latestMap = {};
-    const byCustomerId = new Map();
-    allTodos.forEach(t => {
-      const key = t.customerId != null ? String(t.customerId) : null;
-      if (key) {
-        const arr = byCustomerId.get(key) || [];
-        arr.push(t);
-        byCustomerId.set(key, arr);
+    
+    // 设置所有没有待办的客户状态为false
+    customers.forEach(customer => {
+      if (!todoStatus[customer.id]) {
+        todoStatus[customer.id] = false;
       }
     });
-
-    // 直接从已获取的待办数据中判断，不再逐个调用接口
-    for (const customer of customers) {
-      // 匹配该客户最近一条待办（兼容缺失customerId的数据）
-      let candidates = byCustomerId.get(String(customer.id)) || [];
-      if (candidates.length === 0) {
-        candidates = allTodos.filter(t => {
-          const nameMatch = t.customerName === customer.childName;
-          const phoneMatch = customer.parentPhone ? (t.customerPhone === customer.parentPhone) : false;
-          return nameMatch || phoneMatch;
-        });
-      }
-      
-      // 根据是否有待办设置状态
-      todoStatus[customer.id] = candidates.length > 0;
-      
-      if (candidates.length > 0) {
-        candidates.sort((a, b) => {
-          const aKey = `${a.reminderDate || a.createdAt || ''} ${a.reminderTime || ''}`;
-          const bKey = `${b.reminderDate || b.createdAt || ''} ${b.reminderTime || ''}`;
-          return bKey.localeCompare(aKey);
-        });
-        latestMap[customer.id] = candidates[0];
-      }
-    }
 
     setCustomerTodoStatus(todoStatus);
     setLatestTodoByCustomer(latestMap);
@@ -483,7 +471,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       const data = await response.json();
       if (data && data.success) {
         // 只获取销售人员
-        const sales = (data.data || []).filter(u => u.position === 'SALES' || u.role === 'ADMIN');
+        const sales = (data.data || []).filter(u => u.position === 'SALES' || u.position === 'MANAGER');
         setSalesList(sales);
       }
     } catch (error) {
@@ -739,7 +727,9 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     if (customer.notes) {
       copyText += `备注：${customer.notes}\n`;
     }
-    if (customer.lastStatusChangeNote) {
+    
+    // 只有当流转备注存在且与客户备注不同时才显示最近流转
+    if (customer.lastStatusChangeNote && customer.lastStatusChangeNote !== customer.notes) {
       copyText += `\n最近流转：\n${getStatusText(customer.status)}：${customer.lastStatusChangeNote}`;
       if (customer.lastStatusChangeTime) {
         copyText += ` ${dayjs(customer.lastStatusChangeTime).format('MM-DD HH:mm')}`;
@@ -1314,7 +1304,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {customer.source && (
                 <span style={{ color: '#999', fontSize: '12px' }}>
                   {customer.source}
@@ -1734,11 +1724,13 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
             <Button 
               type="text"
               icon={<UserSwitchOutlined />}
-              title="分配客户"
+              title={customer.assignedSalesId && customer.assignedSalesId !== user?.id 
+                ? `已分配给：${customer.assignedSalesName || '其他人'}（点击重新分配）` 
+                : "分配客户"}
               onClick={(e) => handleOpenAssignModal(customer, e)}
               size="small"
               style={{ 
-                color: '#52c41a',
+                color: customer.assignedSalesId && customer.assignedSalesId !== user?.id ? '#faad14' : '#52c41a',
                 cursor: 'pointer'
               }}
             />
@@ -1787,26 +1779,33 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               </Button>
             </Col>
             
-            {isAdmin && (
+            {(isAdmin || isManager || isSales) && (
               <Col span={12} style={{ marginBottom: 12 }}>
                 <Select
                   value={salesFilter}
                   onChange={handleSalesFilterChange}
                   style={{ width: '100%' }}
-                  placeholder="全部销售"
+                  placeholder={isSales ? (user?.nickname || user?.username || "当前用户") : "全部销售"}
                   size="large"
+                  disabled={isSales}
                 >
-                  <Option value="all">全部销售</Option>
-                  {salesList.map(sales => (
-                    <Option key={sales.id} value={sales.id.toString()}>
-                      {sales.nickname || sales.username}
-                    </Option>
-                  ))}
+                  {(isAdmin || isManager) ? (
+                    <>
+                      <Option value="all">全部销售</Option>
+                      {salesList.map(sales => (
+                        <Option key={sales.id} value={sales.id.toString()}>
+                          {sales.nickname || sales.username}
+                        </Option>
+                      ))}
+                    </>
+                  ) : (
+                    <Option value={user?.id?.toString()}>{user?.nickname || user?.username}</Option>
+                  )}
                 </Select>
               </Col>
             )}
             
-            <Col span={isAdmin ? 12 : 24} style={{ marginBottom: 12 }}>
+            <Col span={(isAdmin || isManager || isSales) ? 12 : 24} style={{ marginBottom: 12 }}>
               <Select
                 value={activeTab}
                 onChange={handleActiveTabChange}

@@ -153,6 +153,21 @@ export const getLatestTodoByCustomer = async (customerId) => {
   }
 };
 
+// 批量获取客户的最新待办
+export const getLatestTodosByCustomers = async (customerIds) => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/todos/customers/latest`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(customerIds)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('批量获取客户待办失败:', error);
+    return { success: false, data: [] };
+  }
+};
+
 // 更新待办
 export const updateTodo = async (todoId, todoData) => {
   try {

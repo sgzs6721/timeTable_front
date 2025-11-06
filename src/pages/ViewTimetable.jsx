@@ -117,7 +117,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
   const [leaveReason, setLeaveReason] = React.useState('');
   const [leaveSubmitting, setLeaveSubmitting] = React.useState(false);
   const isNameChanged = name !== schedule.studentName;
-  const isBlocked = schedule.studentName === '【占用】'; // 判断是否为占用时间段
+  const isBlocked = !!schedule.isTimeBlock; // 判断是否为占用时间段（支持true或1）
   
   // 根据开始和结束时间判断是否为半小时课程
   const isActuallyHalfHour = React.useMemo(() => {
@@ -1186,7 +1186,7 @@ const ViewTimetable = ({ user }) => {
 
   // 判断是否为占用时间段并返回样式
   const getScheduleStyle = (schedule, baseColor) => {
-    const isBlocked = schedule.studentName === '【占用】';
+    const isBlocked = !!schedule.isTimeBlock;
     if (isBlocked) {
       return {
         background: 'repeating-linear-gradient(45deg, transparent, transparent 8px, #d9d9d9 8px, #d9d9d9 9px)',
@@ -1206,7 +1206,7 @@ const ViewTimetable = ({ user }) => {
 
   // 获取显示的学生名称（占用时间段显示"占用"）
   const getDisplayName = (schedule) => {
-    return schedule.studentName === '【占用】' ? '占用' : schedule.studentName;
+    return !!schedule.isTimeBlock ? '占用' : schedule.studentName;
   };
 
   // 根据日期和时间获取对应的课程
@@ -1229,7 +1229,7 @@ const ViewTimetable = ({ user }) => {
   // 计算课程的课时数（半小时课程按0.5计算，占用时间段不计入课时）
   const calculateScheduleHours = (schedule) => {
     // 占用时间段不计入课时
-    if (schedule.studentName === '【占用】') {
+    if (!!schedule.isTimeBlock) {
       return 0;
     }
     
@@ -1358,6 +1358,7 @@ const ViewTimetable = ({ user }) => {
       startTime: startTimeFormatted,
       endTime: endTimeFormatted,
       note: `时间占用 (${scheduleInfo.isHalfHour ? '30分钟' : '1小时'})`,
+      isTimeBlock: true,
     };
 
     if (scheduleDate) {
@@ -1381,7 +1382,8 @@ const ViewTimetable = ({ user }) => {
           startTime: startTimeFormatted,
           endTime: endTimeFormatted,
           note: payload.note,
-          scheduleDate: payload.scheduleDate
+          scheduleDate: payload.scheduleDate,
+          isTimeBlock: true
         };
         
         setAllSchedules(prev => [...prev, newSchedule]);
@@ -1818,7 +1820,7 @@ const ViewTimetable = ({ user }) => {
     const sortedSchedules = schedulesForDay.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     // 过滤掉占用时间段，只保留真正的课程
-    const validSchedules = sortedSchedules.filter(s => s.studentName !== '【占用】');
+    const validSchedules = sortedSchedules.filter(s => !s.isTimeBlock);
     
     if (validSchedules.length === 0) {
       const dateText = targetDate ? targetDate.format('YYYY-MM-DD') : '该天';
@@ -2025,7 +2027,7 @@ const ViewTimetable = ({ user }) => {
 
   const generateCopyTextForDay = (schedules, targetDate, dayLabel, includeOtherCoaches = false, otherCoachesData = null) => {
     // 过滤掉占用时间段
-    const validSchedules = schedules ? schedules.filter(s => s.studentName !== '【占用】') : [];
+    const validSchedules = schedules ? schedules.filter(s => !s.isTimeBlock) : [];
     
     if (!validSchedules || validSchedules.length === 0) return '没有可复制的课程';
     
@@ -4202,6 +4204,8 @@ const ViewTimetable = ({ user }) => {
             const timeSlot = timeSlots[parseInt(timeIndex)];
             
             const schedules = displaySchedules.filter(s => {
+              // 注意：这里不过滤占用时间段，占用时间段也可以被删除
+              
               const timeKeyFromSchedule = `${s.startTime.substring(0, 5)}-${s.endTime.substring(0, 5)}`;
               let scheduleDayKey;
               if (timetable.isWeekly) {
@@ -4487,7 +4491,7 @@ const ViewTimetable = ({ user }) => {
     }
     
     // 过滤掉占用时间段
-    const validSchedules = schedules.filter(schedule => schedule.studentName !== '【占用】');
+    const validSchedules = schedules.filter(schedule => !schedule.isTimeBlock);
     
     if (!validSchedules.length) return { hours: 0, count: 0, students: 0 };
     
@@ -4743,6 +4747,8 @@ const ViewTimetable = ({ user }) => {
         }),
         render: (text, record) => {
           const schedules = displaySchedules.filter(s => {
+            // 注意：这里不过滤占用时间段，因为需要在课表上显示
+            
             const scheduleStartTime = s.startTime.substring(0, 5);
             const scheduleEndTime = s.endTime.substring(0, 5);
             const timeKey = `${scheduleStartTime}-${scheduleEndTime}`;
@@ -5369,7 +5375,7 @@ const ViewTimetable = ({ user }) => {
               >
                 {schedules.map((student, idx) => {
                   // 在周实例视图中检查课程的特殊状态
-                  const isBlocked = student.studentName === '【占用】';
+                  const isBlocked = !!student.isTimeBlock;
                   const isManualAdded = viewMode === 'instance' && student.isManualAdded;
                   const isModified = viewMode === 'instance' && student.isModified;
                   
@@ -5743,7 +5749,7 @@ const ViewTimetable = ({ user }) => {
                 <div style={{ height: '50%', position: 'relative' }}>
                   {firstHalfCourse ? (
                     (() => {
-                      const isBlocked = firstHalfCourse.studentName === '【占用】';
+                      const isBlocked = !!firstHalfCourse.isTimeBlock;
                       const isManualAdded = viewMode === 'instance' && firstHalfCourse.isManualAdded;
                       const isModified = viewMode === 'instance' && firstHalfCourse.isModified;
                       let borderColor = '';
@@ -5884,7 +5890,7 @@ const ViewTimetable = ({ user }) => {
                 <div style={{ height: '50%', position: 'relative' }}>
                   {secondHalfCourse ? (
                     (() => {
-                      const isBlocked = secondHalfCourse.studentName === '【占用】';
+                      const isBlocked = !!secondHalfCourse.isTimeBlock;
                       const isManualAdded = viewMode === 'instance' && secondHalfCourse.isManualAdded;
                       const isModified = viewMode === 'instance' && secondHalfCourse.isModified;
                       let borderColor = '';
@@ -6039,7 +6045,7 @@ const ViewTimetable = ({ user }) => {
               <div className="schedule-cell-content" style={{ position: 'relative', height: '48px' }}>
                 {schedules.map((student, idx) => {
                   // 在周实例视图中检查课程的特殊状态
-                  const isBlocked = student.studentName === '【占用】';
+                  const isBlocked = !!student.isTimeBlock;
                   const isManualAdded = viewMode === 'instance' && student.isManualAdded;
                   const isModified = viewMode === 'instance' && student.isModified;
                   

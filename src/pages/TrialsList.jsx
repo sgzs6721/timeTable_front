@@ -42,10 +42,30 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
   const [creatorsMap, setCreatorsMap] = useState({});
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  
+  // 获取当前用户信息
+  const [currentUser, setCurrentUser] = useState(null);
+  const isSales = currentUser?.position?.toUpperCase() === 'SALES';
+  const isManager = currentUser?.position?.toUpperCase() === 'MANAGER';
 
   useEffect(() => {
-    fetchTrials();
-  }, [selectedCreator, trialDateFilter, statusFilter, searchKeyword]);
+    // 获取用户信息
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      setCurrentUser(user);
+      // 如果是销售职位，自动设置为只看自己
+      if (user.position?.toUpperCase() === 'SALES' && user.id) {
+        setSelectedCreator(user.id);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchTrials();
+    }
+  }, [selectedCreator, trialDateFilter, statusFilter, searchKeyword, currentUser]);
 
   const fetchTrials = async () => {
     setLoading(true);
@@ -299,17 +319,26 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
           {/* 第一行过滤器 */}
           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
             <Select
-              placeholder="全部录入人员"
+              placeholder={isSales ? (currentUser?.nickname || currentUser?.username || "当前用户") : "全部录入人员"}
               value={selectedCreator}
               onChange={setSelectedCreator}
-              allowClear
+              allowClear={!isSales}
+              disabled={isSales}
               style={{ width: '50%' }}
             >
-              {Object.entries(creatorsMap).map(([id, name]) => (
-                <Option key={id} value={parseInt(id)}>
-                  {name}
+              {isSales ? (
+                // 销售职位只显示自己
+                <Option value={currentUser?.id}>
+                  {currentUser?.nickname || currentUser?.username}
                 </Option>
-              ))}
+              ) : (
+                // 管理职位显示所有录入人
+                Object.entries(creatorsMap).map(([id, name]) => (
+                  <Option key={id} value={parseInt(id)}>
+                    {name}
+                  </Option>
+                ))
+              )}
             </Select>
             
             <DatePicker

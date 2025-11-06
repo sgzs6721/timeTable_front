@@ -19,8 +19,12 @@ const MySalary = ({ user }) => {
   const isAdmin = user?.position === 'MANAGER' || user?.role?.toUpperCase() === 'ADMIN';
 
   useEffect(() => {
-    fetchSalaryData();
-    fetchAvailableMonths();
+    // 先获取工资数据，再获取可用月份列表
+    const loadData = async () => {
+      await fetchSalaryData();
+      await fetchAvailableMonths();
+    };
+    loadData();
   }, []);
 
   useEffect(() => {
@@ -331,16 +335,16 @@ const MySalary = ({ user }) => {
 
   // 生成月份选项（从后端API获取的可用月份列表，并附带记薪周期）
   const monthOptions = availableMonths.map(month => {
-    // 找到该月份的salaryPeriod
+    // 找到该月份的任意一条记录来获取salaryPeriod（同一个月的记薪周期应该都一样）
     const monthData = salaryData.find(item => item.month === month);
     const salaryPeriod = monthData?.salaryPeriod;
     
     return (
       <Option key={month} value={month}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>{dayjs(month).format('YYYY年MM月')}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <span style={{ flex: '0 0 auto' }}>{dayjs(month).format('YYYY年MM月')}</span>
           {salaryPeriod && (
-            <span style={{ fontSize: '12px', color: '#8c8c8c', marginLeft: '12px' }}>
+            <span style={{ fontSize: '12px', color: '#8c8c8c', marginLeft: '12px', flex: '0 0 auto', whiteSpace: 'nowrap' }}>
               {salaryPeriod}
             </span>
           )}

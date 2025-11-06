@@ -33,9 +33,9 @@ const AssignCustomerModal = ({ visible, customer, onCancel, onSuccess }) => {
       });
       const data = await response.json();
       if (data && data.success) {
-        // 获取销售人员和管理员
+        // 获取销售和管理职位的人员
         const users = (data.data || []).filter(u => 
-          u.position === 'SALES' || u.role === 'ADMIN'
+          u.position === 'SALES' || u.position === 'MANAGER'
         );
         setSalesList(users);
       } else {
@@ -90,7 +90,7 @@ const AssignCustomerModal = ({ visible, customer, onCancel, onSuccess }) => {
             )}
             {customer.assignedSalesName && (
               <div>
-                <strong>当前负责人：</strong>{customer.assignedSalesName}
+                <strong>已分配给：</strong>{customer.assignedSalesName}
               </div>
             )}
           </div>
@@ -109,26 +109,28 @@ const AssignCustomerModal = ({ visible, customer, onCancel, onSuccess }) => {
               value={selectedUserId}
               onChange={setSelectedUserId}
               style={{ width: '100%' }}
-              placeholder="请选择销售人员或管理员"
+              placeholder="请选择分配对象"
               showSearch
               optionFilterProp="children"
               filterOption={(input, option) =>
                 (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
               }
             >
-              {salesList.map(user => (
-                <Option key={user.id} value={user.id}>
-                  {user.nickname || user.username}
-                  {user.role === 'ADMIN' && ' (管理员)'}
-                  {user.position === 'SALES' && ' (销售)'}
-                </Option>
-              ))}
+              {salesList.map(user => {
+                let positionText = '';
+                if (user.position === 'COACH') positionText = ' (教练)';
+                else if (user.position === 'SALES') positionText = ' (销售)';
+                else if (user.position === 'RECEPTIONIST') positionText = ' (前台)';
+                else if (user.position === 'MANAGER') positionText = ' (管理)';
+                
+                return (
+                  <Option key={user.id} value={user.id}>
+                    {user.nickname || user.username}{positionText}
+                  </Option>
+                );
+              })}
             </Select>
           )}
-        </div>
-
-        <div style={{ marginTop: 12, fontSize: '12px', color: '#999' }}>
-          提示：分配后，被分配人可以像自己的客户一样查看和管理该客户
         </div>
       </div>
     </Modal>

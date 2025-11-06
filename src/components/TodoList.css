@@ -76,6 +76,18 @@
   max-width: 100% !important;
 }
 
+/* 状态标签容器不换行 */
+.status-tag-container {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+}
+
+.status-tag-container .ant-tag {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
 /* Timeline 内容区域宽度优化 - 保留圆点但缩小占用空间 */
 .todo-card .ant-timeline-item-content {
   max-width: 100% !important;

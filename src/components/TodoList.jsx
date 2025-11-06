@@ -1059,7 +1059,7 @@ const TodoList = ({ onUnreadCountChange }) => {
                               flexWrap: 'nowrap',
                               marginBottom: 4 
                             }}>
-                              <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                              <div className="status-tag-container" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                                 <Tag 
                                   color={
                                     fromLabel === '新建' ? "green" :
@@ -1071,7 +1071,7 @@ const TodoList = ({ onUnreadCountChange }) => {
                                     fromLabel === '已流失' ? "default" :
                                     "geekblue"
                                   } 
-                                  style={{ marginRight: 4, flexShrink: 0, width: '5em', display: 'inline-block', textAlign: 'center' }}
+                                  style={{ marginRight: 4, flexShrink: 0, minWidth: '5em', display: 'inline-block', textAlign: 'center' }}
                                 >
                                   {fromLabel}
                                 </Tag>
@@ -1087,12 +1087,12 @@ const TodoList = ({ onUnreadCountChange }) => {
                                     history.toStatusText === '已流失' ? "default" :
                                     "cyan"
                                   } 
-                                  style={{ flexShrink: 0, width: '5em', display: 'inline-block', textAlign: 'center' }}
+                                  style={{ flexShrink: 0, minWidth: '5em', display: 'inline-block', textAlign: 'center' }}
                                 >
                                   {history.toStatusText}
                                 </Tag>
                               </div>
-                              <div style={{ display: 'flex', gap: '4px' }}>
+                              <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                                 <Button
                                   type="text"
                                   size="small"

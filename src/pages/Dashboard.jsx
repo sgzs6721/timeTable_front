@@ -4438,8 +4438,8 @@ const Dashboard = ({ user }) => {
               const seen = new Set();
               
               schedules.forEach(s => {
-                // 过滤掉请假学员，不显示在今日课程中
-                if (s.isOnLeave) {
+                // 过滤掉请假学员和占用时间段，不显示在今日课程中
+                if (s.isOnLeave || s.isTimeBlock === true) {
                   return;
                 }
                 const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
@@ -4482,8 +4482,8 @@ const Dashboard = ({ user }) => {
                     const seen2 = new Set();
                     
                     schedules2.forEach(s => {
-                      // 过滤掉请假学员，不显示在今日课程中
-                      if (s.isOnLeave) {
+                      // 过滤掉请假学员和占用时间段，不显示在今日课程中
+                      if (s.isOnLeave || s.isTimeBlock === true) {
                         return;
                       }
                       const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
@@ -4529,6 +4529,10 @@ const Dashboard = ({ user }) => {
               const seen = new Set();
               
               schedules.forEach(s => {
+                // 过滤掉占用时间段
+                if (s.isTimeBlock === true) {
+                  return;
+                }
                 const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                 if (!seen.has(key)) {
                   seen.add(key);
@@ -4565,6 +4569,10 @@ const Dashboard = ({ user }) => {
                     const seen2 = new Set();
                     
                     schedules2.forEach(s => {
+                      // 过滤掉占用时间段
+                      if (s.isTimeBlock === true) {
+                        return;
+                      }
                       const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
                       if (!seen2.has(key)) {
                         seen2.add(key);
