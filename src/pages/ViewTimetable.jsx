@@ -1839,16 +1839,57 @@ const ViewTimetable = ({ user }) => {
       timeSlotsForDay.push({
         time: `${hour.toString().padStart(2, '0')}:00`,
         displayTime: `${hour}-${hour + 1}`,
+        hourStart: hour
       });
     }
 
     const tableData = timeSlotsForDay.map((slot, index) => {
-      const schedule = sortedSchedules.find(s => s.startTime.substring(0, 5) === slot.time);
+      // 查找在这个小时内开始的所有课程（包括整点和半点）
+      const schedulesInHour = sortedSchedules.filter(s => {
+        const scheduleHour = parseInt(s.startTime.substring(0, 2));
+        return scheduleHour === slot.hourStart;
+      });
+      
+      // 如果有多个课程，显示时间信息；如果只有一个，像之前一样显示
+      let displayText = '';
+      if (schedulesInHour.length === 0) {
+        displayText = '';
+      } else if (schedulesInHour.length === 1) {
+        const s = schedulesInHour[0];
+        if (s.startTime.substring(0, 5) !== slot.time) {
+          // 格式化时间：16:30 -> 16.30, 17:00 -> 17
+          const startHour = s.startTime.substring(0, 2);
+          const startMin = s.startTime.substring(3, 5);
+          const endHour = s.endTime.substring(0, 2);
+          const endMin = s.endTime.substring(3, 5);
+          
+          const startTimeStr = startMin === '00' ? startHour : `${startHour}.${startMin}`;
+          const endTimeStr = endMin === '00' ? endHour : `${endHour}.${endMin}`;
+          
+          displayText = `${startTimeStr}-${endTimeStr} ${s.isOnLeave ? `${s.studentName}（请假）` : s.studentName}`;
+        } else {
+          displayText = s.isOnLeave ? `${s.studentName}（请假）` : s.studentName;
+        }
+      } else {
+        // 多个课程，每个都显示完整时间
+        displayText = schedulesInHour.map(s => {
+          const startHour = s.startTime.substring(0, 2);
+          const startMin = s.startTime.substring(3, 5);
+          const endHour = s.endTime.substring(0, 2);
+          const endMin = s.endTime.substring(3, 5);
+          
+          const startTimeStr = startMin === '00' ? startHour : `${startHour}.${startMin}`;
+          const endTimeStr = endMin === '00' ? endHour : `${endHour}.${endMin}`;
+          
+          return `${startTimeStr}-${endTimeStr} ${s.isOnLeave ? `${s.studentName}（请假）` : s.studentName}`;
+        }).join(' / ');
+      }
+      
       return {
         key: index,
         time: slot.displayTime,
-        studentName: schedule ? (schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName) : '',
-        schedule: schedule || null,
+        studentName: displayText,
+        schedule: schedulesInHour[0] || null,
       };
     });
 
