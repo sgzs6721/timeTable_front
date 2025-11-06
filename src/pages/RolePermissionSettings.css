@@ -60,15 +60,18 @@
 }
 
 .roles-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .role-card {
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
+  width: 100%;
 }
 
 .role-card:hover {
@@ -236,7 +239,7 @@
 
 @media (max-width: 1200px) {
   .roles-container {
-    grid-template-columns: 1fr;
+    max-width: 100%;
   }
 }
 

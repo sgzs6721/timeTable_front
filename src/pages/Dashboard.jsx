@@ -1610,8 +1610,6 @@ const Dashboard = ({ user }) => {
 
   // 获取所有课表信息并建立教练课表映射
   const fetchAllTimetablesInfo = useCallback(async () => {
-    if (user?.role?.toUpperCase() !== 'ADMIN') return;
-    
     try {
       const response = await getAllTimetablesAdmin(true); // 只获取活动课表
       if (response.success) {
@@ -1630,7 +1628,7 @@ const Dashboard = ({ user }) => {
     } catch (error) {
       console.error('获取课表信息失败:', error);
     }
-  }, [user]);
+  }, []);
 
   // 获取教练统计信息
   const fetchCoachesStatistics = useCallback(async () => {
@@ -1656,7 +1654,21 @@ const Dashboard = ({ user }) => {
     } finally {
       setStatisticsLoading(false);
     }
-  }, [user]);
+  }, []);
+
+  // 当权限加载后，如果用户有dashboard权限，则加载统计数据
+  useEffect(() => {
+    if (!userPermissions || !userPermissions.menuPermissions) return;
+    
+    const menuPerms = userPermissions.menuPermissions;
+    
+    // 如果用户有dashboard权限，获取教练统计信息和课表信息
+    if (menuPerms.dashboard === true) {
+      console.log('[Dashboard] 用户有dashboard权限，加载统计数据');
+      fetchCoachesStatistics();
+      fetchAllTimetablesInfo();
+    }
+  }, [userPermissions, fetchCoachesStatistics, fetchAllTimetablesInfo]);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((columnIndex) => {
@@ -1784,13 +1796,7 @@ const Dashboard = ({ user }) => {
       }
     };
     fetchTimetables();
-    
-    // 如果是管理员，获取教练统计信息和课表信息
-    if (user?.role?.toUpperCase() === 'ADMIN') {
-      fetchCoachesStatistics();
-      fetchAllTimetablesInfo();
-    }
-  }, [user]); // 移除fetchCoachesStatistics依赖，避免无限循环
+  }, [user]);
 
   // 设为活动课表
   const handleSetActiveTimetable = (id) => {
