@@ -738,6 +738,12 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       onCancel={onCancel}
       footer={null}
       width={700}
+      maskClosable={false}
+      keyboard={true}
+      centered
+      destroyOnClose
+      style={{ maxHeight: '90vh' }}
+      bodyStyle={{ maxHeight: 'calc(90vh - 110px)', overflowY: 'auto' }}
     >
       <div style={{ marginBottom: 24 }}>
         <h3 style={{ marginBottom: 16 }}>切换状态</h3>
@@ -824,6 +830,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                       // 不能选择过去的日期
                       return current && current < dayjs().startOf('day');
                     }}
+                    getPopupContainer={(node) => node.parentNode}
                   />
                 </div>
                 
@@ -865,6 +872,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                       }
                     })}
                     hideDisabledOptions={true}
+                    getPopupContainer={(node) => node.parentNode}
                   />
                 </div>
               </div>
@@ -1071,6 +1079,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                         placeholder="请选择日期"
                         format="YYYY-MM-DD"
                         inputReadOnly
+                        getPopupContainer={(node) => node.parentNode}
                       />
                       <TimePicker
                         value={isEditingReminder ? tempReminderTime : reminderTime}
@@ -1089,6 +1098,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                           }
                         })}
                         hideDisabledOptions={true}
+                        getPopupContainer={(node) => node.parentNode}
                       />
                     </div>
                     <div style={{ marginBottom: isEditingReminder ? 8 : 0 }}>
