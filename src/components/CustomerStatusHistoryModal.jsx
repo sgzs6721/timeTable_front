@@ -46,9 +46,23 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   // 权限相关状态
   const [hasSchedulePermission, setHasSchedulePermission] = useState(false);
   const [hasActiveTimetable, setHasActiveTimetable] = useState(false);
+  
+  // 当前用户信息
+  const [currentUser, setCurrentUser] = useState(null);
 
   // 获取用户权限和机构活动课表状态
   useEffect(() => {
+    // 获取当前用户信息
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user);
+      } catch (error) {
+        console.error('[CustomerStatusHistoryModal] 解析用户信息失败:', error);
+      }
+    }
+    
     const fetchUserPermissions = async () => {
       try {
         const response = await getCurrentUserPermissions();
@@ -92,6 +106,9 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
     fetchUserPermissions();
     checkActiveTimetable();
   }, []);
+  
+  // 判断客户是否分配给其他人
+  const isAssignedToOthers = customer && customer.assignedSalesId && currentUser && customer.assignedSalesId !== currentUser.id;
 
   useEffect(() => {
     if (visible && customer) {
@@ -443,8 +460,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
         // 如果提供了完整的教练ID、日期、时间等信息，后端会自动创建体验课到课表
         // 因此前端不需要再次调用 /schedules/trial 接口，避免重复插入
         
-        // 处理待办提醒
-        if (showTodoReminder && reminderDate && reminderTime) {
+        // 处理待办提醒（如果客户已分配给其他人，跳过待办提醒更新）
+        if (!isAssignedToOthers && showTodoReminder && reminderDate && reminderTime) {
           // 如果设置了待办提醒，创建或更新待办
           try {
             const todoData = {
@@ -483,8 +500,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
           } catch (error) {
             console.error('保存待办提醒失败:', error);
           }
-        } else if (!showTodoReminder && existingTodoId) {
-          // 如果原来有待办提醒，但现在关闭了提醒，则关闭（取消）待办
+        } else if (!isAssignedToOthers && !showTodoReminder && existingTodoId) {
+          // 如果原来有待办提醒，但现在关闭了提醒，则关闭（取消）待办（客户分配给其他人时跳过）
           try {
             const cancelResponse = await cancelTodo(existingTodoId);
             if (cancelResponse && cancelResponse.success) {
@@ -1006,14 +1023,29 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                 type="dashed"
                 icon={<BellOutlined />}
                 onClick={() => setShowTodoReminder(!showTodoReminder)}
+                disabled={isAssignedToOthers}
                 style={{ 
                   width: '100%',
                   borderColor: showTodoReminder ? '#1890ff' : undefined,
                   color: showTodoReminder ? '#1890ff' : undefined
                 }}
+                title={isAssignedToOthers ? `此客户已分配给${customer.assignedSalesName || '其他人'}，无法编辑待办提醒` : ''}
               >
                 {showTodoReminder ? '已开启待办提醒' : '设置待办提醒'}
               </Button>
+              {isAssignedToOthers && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '8px 12px',
+                  backgroundColor: '#fff7e6',
+                  borderRadius: '4px',
+                  color: '#d48806',
+                  border: '1px solid #ffe58f',
+                  fontSize: '13px'
+                }}>
+                  此客户已分配给 <strong>{customer.assignedSalesName || '其他人'}</strong>，待办提醒功能不可用
+                </div>
+              )}
             </div>
             
             {showTodoReminder && (
@@ -1043,6 +1075,8 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                           setTempReminderTime(reminderTime);
                           setTempReminderContent(reminderContent);
                         }}
+                        disabled={isAssignedToOthers}
+                        title={isAssignedToOthers ? '此客户已分配给其他人，无法编辑' : ''}
                       >
                         编辑
                       </Button>
