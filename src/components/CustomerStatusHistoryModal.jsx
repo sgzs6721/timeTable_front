@@ -36,8 +36,6 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
   const [selectedCoach, setSelectedCoach] = useState(null);
   const [loadingCoaches, setLoadingCoaches] = useState(false);
   const [trialStudentName, setTrialStudentName] = useState('');
-  const [timePickerOpen, setTimePickerOpen] = useState(false);
-  const [timePickerClickCount, setTimePickerClickCount] = useState(0);
   
   // 原始体验安排信息（用于回显）
   const [originalTrialSchedule, setOriginalTrialSchedule] = useState(null);
@@ -821,6 +819,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                     format="YYYY-MM-DD"
                     style={{ width: '100%' }}
                     placeholder="选择体验日期"
+                    inputReadOnly
                     disabledDate={(current) => {
                       // 不能选择过去的日期
                       return current && current < dayjs().startOf('day');
@@ -835,74 +834,37 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                   </div>
                   <TimePicker.RangePicker
                     value={experienceTimeRange}
-                    open={timePickerOpen}
-                    onOpenChange={(open) => {
-                      setTimePickerOpen(open);
-                      // 打开时重置计数器
-                      if (open) {
-                        setTimePickerClickCount(0);
-                      }
-                      // 关闭时触发查询教练（如果时间已选择完整）
-                      if (!open && experienceTimeRange && experienceTimeRange.length === 2 && experienceTimeRange[0] && experienceTimeRange[1]) {
-                        console.log('[CustomerStatusHistoryModal] 时间选择器关闭，触发查询教练');
-                        handleTimeChange(experienceTimeRange);
-                      }
-                    }}
-                    onCalendarChange={(times) => {
-                      // 立即更新时间，无论是选第一个还是第二个
+                    onChange={(times) => {
+                      // 更新时间并查询教练
                       setExperienceTimeRange(times);
-                      
-                      // 增加点击计数
-                      const newCount = timePickerClickCount + 1;
-                      setTimePickerClickCount(newCount);
-                      
-                      // 检查是否已经选择了完整的时间（小时和分钟都有）
-                      // 如果times[0]存在且包含完整的小时和分钟信息，就关闭
-                      if (times && times.length >= 1 && times[0]) {
-                        const firstTime = times[0];
-                        // 检查时间对象是否有效且包含小时和分钟
-                        if (firstTime && firstTime.isValid && firstTime.isValid()) {
-                          const hasHour = firstTime.hour() !== undefined;
-                          const hasMinute = firstTime.minute() !== undefined;
-                          
-                          // 如果已经点击了2次，或者时间已经完整（有小时和分钟），就关闭
-                          if (newCount >= 2 || (hasHour && hasMinute)) {
-                            setTimePickerOpen(false); // 关闭面板
-                            setTimePickerClickCount(0); // 重置计数器
-                            
-                            // 关闭后立即触发查询教练（使用当前的times而不是state）
-                            if (times && times.length === 2 && times[0] && times[1] && experienceDate) {
-                              console.log('[CustomerStatusHistoryModal] 时间选择完成，立即查询教练', times);
-                              // 延迟一下确保状态更新
-                              setTimeout(() => {
-                                handleTimeChange(times);
-                              }, 100);
-                            }
-                          }
-                        }
+                      if (times && times.length === 2 && times[0] && times[1]) {
+                        handleTimeChange(times);
                       }
                     }}
-                    onChange={handleTimeChange}
                     format="HH:mm"
                     style={{ width: '100%' }}
-                    placeholder={['开始时间', '结束时间']}
+                    placeholder={['开始', '结束']}
                     minuteStep={30}
                     showNow={false}
                     inputReadOnly
                     use12Hours={false}
-                    popupClassName="no-confirm-timepicker"
-                    changeOnBlur={false}
                     disabledTime={() => ({
                       disabledHours: () => {
                         // 禁用10点之前和20点之后的小时（保留10-20点）
                         return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
+                      },
+                      disabledMinutes: () => {
+                        // 只允许00和30分钟，禁用其他所有分钟
+                        const disabled = [];
+                        for (let i = 0; i < 60; i++) {
+                          if (i !== 0 && i !== 30) {
+                            disabled.push(i);
+                          }
+                        }
+                        return disabled;
                       }
                     })}
-                    hideDisabledOptions={false}
-                    showTime={{
-                      hideDisabledOptions: false,
-                      minuteStep: 30
-                    }}
+                    hideDisabledOptions={true}
                   />
                 </div>
               </div>
@@ -1108,6 +1070,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                         style={{ flex: 1 }}
                         placeholder="请选择日期"
                         format="YYYY-MM-DD"
+                        inputReadOnly
                       />
                       <TimePicker
                         value={isEditingReminder ? tempReminderTime : reminderTime}
@@ -1116,17 +1079,16 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                         placeholder="请选择时间"
                         format="HH:mm"
                         minuteStep={10}
+                        inputReadOnly
+                        showNow={false}
+                        use12Hours={false}
                         disabledTime={() => ({
                           disabledHours: () => {
                             // 只允许10-20点
                             return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
                           }
                         })}
-                        showTime={{
-                          hideDisabledOptions: true
-                        }}
-                        showNow={false}
-                        popupClassName="custom-time-picker"
+                        hideDisabledOptions={true}
                       />
                     </div>
                     <div style={{ marginBottom: isEditingReminder ? 8 : 0 }}>
