@@ -25,6 +25,8 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [approveForm] = Form.useForm();
+  const [hasManagerInOrg, setHasManagerInOrg] = useState(false);
+  const [checkingManager, setCheckingManager] = useState(false);
 
   useEffect(() => {
     fetchPendingRequests();
@@ -42,7 +44,23 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
       });
 
       if (response.data.success) {
-        setRequests(response.data.data || []);
+        const allRequests = response.data.data || [];
+        
+        // 排序：未审核的在前面，然后按时间倒序
+        const sortedRequests = allRequests.sort((a, b) => {
+          // 先按状态排序，PENDING在前
+          if (a.status === 'PENDING' && b.status !== 'PENDING') {
+            return -1;
+          }
+          if (a.status !== 'PENDING' && b.status === 'PENDING') {
+            return 1;
+          }
+          
+          // 同一状态内按时间倒序（最新的在前）
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        
+        setRequests(sortedRequests);
         // 通知父组件更新数量
         if (onUpdate) {
           onUpdate();
@@ -58,10 +76,48 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     }
   };
 
-  const handleApprove = (record) => {
+  const handleApprove = async (record) => {
     setSelectedRequest(record);
     approveForm.resetFields();
     setApproveModalVisible(true);
+    
+    // 检查机构是否已有管理职位成员
+    await checkOrganizationManager(record.organizationId);
+  };
+  
+  const checkOrganizationManager = async (organizationId) => {
+    try {
+      setCheckingManager(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`${API_BASE_URL}/admin/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.data.success) {
+        const users = response.data.data || [];
+        // 检查该机构是否有MANAGER职位的用户
+        const hasManager = users.some(user => 
+          user.organizationId === organizationId && 
+          user.position === 'MANAGER' &&
+          user.status === 'APPROVED'
+        );
+        setHasManagerInOrg(hasManager);
+        
+        // 如果没有管理职位成员，默认设置为MANAGER
+        if (!hasManager) {
+          approveForm.setFieldsValue({ defaultPosition: 'MANAGER' });
+        } else {
+          approveForm.setFieldsValue({ defaultPosition: 'COACH' });
+        }
+      }
+    } catch (error) {
+      console.error('检查机构管理职位失败:', error);
+    } finally {
+      setCheckingManager(false);
+    }
   };
 
   const handleReject = (record) => {
@@ -77,7 +133,17 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
 
   const confirmApprove = async () => {
     try {
-      const values = await approveForm.validateFields();
+      let defaultPosition = 'COACH';
+      
+      // 如果机构没有管理职位成员，自动设置为MANAGER
+      if (!hasManagerInOrg) {
+        defaultPosition = 'MANAGER';
+      } else {
+        // 如果有管理职位成员，从表单获取选择的职位
+        const values = await approveForm.validateFields();
+        defaultPosition = values.defaultPosition || 'COACH';
+      }
+      
       const token = localStorage.getItem('token');
 
       const response = await axios.post(
@@ -85,8 +151,8 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
         {
           requestId: selectedRequest.id,
           approved: true,
-          defaultRole: values.defaultRole || 'USER',
-          defaultPosition: values.defaultPosition || 'COACH'
+          defaultRole: 'USER',
+          defaultPosition: defaultPosition
         },
         {
           headers: {
@@ -169,20 +235,28 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
             <div className="request-details">
               <div className="request-name">
                 {request.wechatNickname || '未知用户'}
-                {isNormalRegistration && (
-                  <Tag color="green" style={{ marginLeft: 8 }}>普通注册</Tag>
-                )}
-                {!isNormalRegistration && request.wechatAvatar && (
-                  <Tag color="blue" style={{ marginLeft: 8 }}>微信用户</Tag>
+                {isNormalRegistration && request.applyReason && request.applyReason.includes('用户名') && (
+                  <span style={{ 
+                    marginLeft: '12px', 
+                    fontSize: '14px', 
+                    color: '#666',
+                    fontWeight: 'normal'
+                  }}>
+                    {request.applyReason.split('，').find(part => part.includes('用户名'))}
+                  </span>
                 )}
               </div>
               <div className="request-meta">
+                {isNormalRegistration ? (
+                  <Tag color="green">普通注册</Tag>
+                ) : request.wechatAvatar && (
+                  <Tag color="blue">微信用户</Tag>
+                )}
                 <span className="request-time">
                   {new Date(request.createdAt).toLocaleString('zh-CN')}
                 </span>
               </div>
-              <div className="request-org">{request.organizationName}</div>
-              {request.applyReason && (
+              {request.applyReason ? (
                 <div className="request-reason" style={{ 
                   fontSize: '12px', 
                   color: '#666', 
@@ -192,7 +266,15 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
                 }}>
-                  {request.applyReason}
+                  {isNormalRegistration 
+                    ? '通过注册表单申请'
+                    : '申请加入'
+                  }
+                </div>
+              ) : null}
+              {request.organizationName && (
+                <div style={{ marginTop: '6px' }}>
+                  <Tag color="purple">{request.organizationName}</Tag>
                 </div>
               )}
               {isRejected && request.rejectReason && (
@@ -337,28 +419,41 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
           <>
             <p>确认批准 <strong>{selectedRequest.wechatNickname}</strong> 加入 <strong>{selectedRequest.organizationName}</strong> 吗？</p>
             
-            <Form form={approveForm} layout="vertical">
-              <Form.Item 
-                label="默认角色" 
-                name="defaultRole"
-                initialValue="USER"
-              >
-                <Select>
-                  <Option value="USER">普通用户</Option>
-                  <Option value="ADMIN">管理员</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item 
-                label="默认职位" 
-                name="defaultPosition"
-                initialValue="COACH"
-              >
-                <Select>
-                  <Option value="COACH">教练</Option>
-                </Select>
-              </Form.Item>
-            </Form>
+            {checkingManager ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <Spin tip="检查机构职位信息..." />
+              </div>
+            ) : (
+              <Form form={approveForm} layout="vertical">
+                {!hasManagerInOrg ? (
+                  <div style={{ 
+                    padding: '12px', 
+                    background: '#e6f7ff', 
+                    border: '1px solid #91d5ff',
+                    borderRadius: '4px',
+                    marginBottom: '16px'
+                  }}>
+                    <p style={{ margin: 0, color: '#1890ff' }}>
+                      该机构暂无管理职位成员，将自动设置为<strong>管理职位</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <Form.Item 
+                    label="职位" 
+                    name="defaultPosition"
+                    initialValue="COACH"
+                    rules={[{ required: true, message: '请选择职位' }]}
+                  >
+                    <Select>
+                      <Option value="COACH">教练</Option>
+                      <Option value="SALES">销售</Option>
+                      <Option value="RECEPTIONIST">前台</Option>
+                      <Option value="MANAGER">管理</Option>
+                    </Select>
+                  </Form.Item>
+                )}
+              </Form>
+            )}
           </>
         )}
       </Modal>

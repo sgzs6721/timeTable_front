@@ -6,8 +6,10 @@
 .requests-grid {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .request-card {
@@ -21,7 +23,7 @@
 }
 
 .request-card .ant-card-body {
-  padding: 16px;
+  padding: 20px 24px;
 }
 
 .request-card-content {
@@ -55,7 +57,7 @@
   color: #999;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .request-divider {

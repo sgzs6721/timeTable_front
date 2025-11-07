@@ -113,7 +113,9 @@ export const getPendingRequestsCount = async () => {
     headers: getAuthHeaders()
   });
   if (response.data.success) {
-    return response.data.data?.length || 0;
+    const requests = response.data.data || [];
+    // 只统计状态为 PENDING 的申请
+    return requests.filter(req => req.status === 'PENDING').length;
   }
   return 0;
 };
