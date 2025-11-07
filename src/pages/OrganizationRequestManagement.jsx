@@ -256,27 +256,17 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
                   {new Date(request.createdAt).toLocaleString('zh-CN')}
                 </span>
               </div>
-              {request.applyReason ? (
-                <div className="request-reason" style={{ 
-                  fontSize: '12px', 
-                  color: '#666', 
-                  marginTop: '4px',
-                  maxWidth: '400px',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {isNormalRegistration 
-                    ? '通过注册表单申请'
-                    : '申请加入'
-                  }
-                </div>
-              ) : null}
-              {request.organizationName && (
-                <div style={{ marginTop: '6px' }}>
+              <div style={{ 
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '12px', color: '#666' }}>申请加入</span>
+                {request.organizationName && (
                   <Tag color="purple">{request.organizationName}</Tag>
-                </div>
-              )}
+                )}
+              </div>
               {isRejected && request.rejectReason && (
                 <div style={{ 
                   fontSize: '12px', 
