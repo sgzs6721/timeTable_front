@@ -439,51 +439,9 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       if (response && response.success) {
         message.success('状态变更成功');
         
-        // 确定要使用的教练ID
-        let coachIdToUse = null;
-        if (hasSchedulePermission && hasActiveTimetable) {
-          if (!scheduleModified && originalTrialSchedule?.coachId) {
-            coachIdToUse = originalTrialSchedule.coachId;
-          } else {
-            coachIdToUse = selectedCoach;
-          }
-        }
-        
-        // 只有当用户有课表权限、有活动课表、且有教练ID时，才创建体验课程
-        if (hasSchedulePermission && hasActiveTimetable &&
-            (values.toStatus === 'SCHEDULED' || values.toStatus === 'RE_EXPERIENCE') && 
-            experienceDate && experienceTimeRange && coachIdToUse) {
-          try {
-            const scheduleResponse = await fetch(`${getApiBaseUrl()}/schedules/trial`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: JSON.stringify({
-                coachId: coachIdToUse,
-                studentName: trialStudentName.trim(),
-                scheduleDate: experienceDate.format('YYYY-MM-DD'),
-                startTime: experienceTimeRange[0].format('HH:mm'),
-                endTime: experienceTimeRange[1].format('HH:mm'),
-                isTrial: true,
-                isHalfHour: true,
-                customerPhone: customer.parentPhone,
-                customerId: customer.id
-              })
-            });
-            
-            const scheduleData = await scheduleResponse.json();
-            if (scheduleData.success) {
-              message.success('体验课已添加到课表');
-            } else {
-              message.error(scheduleData.message || '添加体验课失败');
-            }
-          } catch (error) {
-            console.error('添加体验课失败:', error);
-            message.error('添加体验课失败');
-          }
-        }
+        // 后端的 changeCustomerStatus 接口已经自动处理了体验课的创建
+        // 如果提供了完整的教练ID、日期、时间等信息，后端会自动创建体验课到课表
+        // 因此前端不需要再次调用 /schedules/trial 接口，避免重复插入
         
         // 处理待办提醒
         if (showTodoReminder && reminderDate && reminderTime) {
