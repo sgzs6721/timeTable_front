@@ -807,23 +807,43 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     setParsing(true);
     
     try {
-      // 解析逻辑：智能提取姓名、电话、年龄、性别等信息
+      // 解析逻辑：智能提取姓名、电话、微信、年龄、性别等信息
       let text = parseText.trim();
       
       // 1. 提取手机号（11位数字）
       const phoneMatch = text.match(/1[3-9]\d{9}/);
       const phone = phoneMatch ? phoneMatch[0] : '';
       
-      // 2. 去除开头的序号（如：1、1，1. 等）
+      // 2. 提取微信号（字母数字组合，长度6-20位）
+      // 微信号规则：可以包含字母、数字、下划线、连字符
+      let wechat = '';
+      const wechatPattern = /[a-zA-Z]+[a-zA-Z0-9_-]{5,19}|[a-zA-Z0-9_-]*[a-zA-Z]+[0-9]+[a-zA-Z0-9_-]*|[a-zA-Z0-9_-]*[0-9]+[a-zA-Z]+[a-zA-Z0-9_-]*/g;
+      const wechatMatches = text.match(wechatPattern);
+      if (wechatMatches) {
+        // 过滤掉手机号和纯数字
+        for (const match of wechatMatches) {
+          if (match.length >= 6 && 
+              match.length <= 20 && 
+              !/^1[3-9]\d{9}$/.test(match) && 
+              !/^\d+$/.test(match) &&
+              /[a-zA-Z]/.test(match) &&
+              /\d/.test(match)) {
+            wechat = match;
+            break;
+          }
+        }
+      }
+      
+      // 3. 去除开头的序号（如：1、1，1. 等）
       // 只有当开头不是手机号时才去除序号，限制为1-3位数字
       if (!text.match(/^1[3-9]\d{9}/)) {
         text = text.replace(/^\d{1,3}[，,、.\s]+/, '');
       }
       
-      // 3. 按逗号、顿号或句号分割信息
+      // 4. 按逗号、顿号或句号分割信息
       const parts = text.split(/[，,、。.]+/).map(p => p.trim()).filter(p => p && p.length > 0);
       
-      // 4. 智能提取姓名：找2-4个连续中文字符，且不包含数字、不是电话号码、不是常见描述词
+      // 5. 智能提取姓名：找2-4个连续中文字符，且不包含数字、不是电话号码、不是常见描述词
       let name = '';
       const excludeWords = ['男', '女', '岁', '周', '月', '日', '点', '分', '早', '晚', '上午', '下午', '时间', '有空', '方便'];
       for (const part of parts) {
@@ -838,7 +858,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         }
       }
       
-      // 5. 如果没找到独立的姓名，尝试从复合文本中提取
+      // 6. 如果没找到独立的姓名，尝试从复合文本中提取
       if (!name) {
         for (const part of parts) {
           // 匹配开头的2-4个中文字符（如"安安，5岁"中的"安安"）
@@ -850,14 +870,20 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         }
       }
       
-      // 6. 组合详细信息（保留所有信息）
-      let details = text
-        .replace(phoneMatch ? phoneMatch[0] : '', '') // 去除电话
+      // 7. 组合详细信息（保留所有信息，但去除已识别的电话和微信）
+      let details = text;
+      if (phoneMatch) {
+        details = details.replace(phoneMatch[0], ''); // 去除电话
+      }
+      if (wechat) {
+        details = details.replace(wechat, ''); // 去除微信号
+      }
+      details = details
         .replace(/^[，,、.。\s]+/, '') // 去除开头的标点和空格
         .replace(/[，,、.。\s]+$/, '') // 去除结尾的标点和空格
         .trim();
       
-      // 7. 清理details中多余的逗号和空格
+      // 8. 清理details中多余的逗号和空格
       details = details
         .replace(/[，,、]+/g, '，')
         .replace(/\s+/g, ' ')
@@ -865,17 +891,18 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
         .replace(/，+$/, '')
         .trim();
       
-      // 填充表单
+      // 填充表单（优先使用手机号，没有手机号则使用微信号）
+      const contactInfo = phone || wechat;
       form.setFieldsValue({
         childName: name,
-        parentPhone: phone,
+        parentPhone: contactInfo,
         notes: details
       });
       
-      if (name || phone) {
+      if (name || contactInfo) {
         message.success('解析成功！请检查并完善信息');
       } else {
-        message.warning('未能识别姓名或电话，请手动填写');
+        message.warning('未能识别姓名或联系方式，请手动填写');
       }
       
       setShowSmartParse(false);
@@ -2077,16 +2104,27 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
             <Col span={12}>
               <Form.Item
                 name="parentPhone"
-                label="家长电话"
+                label="家长电话/微信"
                 rules={[
-                  { required: true, message: '请输入家长电话' },
-                  { 
-                    pattern: /^1[3-9]\d{9}$/, 
-                    message: '请输入正确的手机号码' 
-                  }
+                  { required: true, message: '请输入家长电话或微信' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || value.trim() === '') {
+                        return Promise.reject(new Error('请输入家长电话或微信'));
+                      }
+                      // 如果看起来像手机号（全是数字且长度为11），则验证手机号格式
+                      if (/^\d+$/.test(value) && value.length === 11) {
+                        if (!/^1[3-9]\d{9}$/.test(value)) {
+                          return Promise.reject(new Error('请输入正确的手机号码'));
+                        }
+                      }
+                      // 其他情况视为微信号，通过验证
+                      return Promise.resolve();
+                    },
+                  }),
                 ]}
               >
-                <Input placeholder="请输入11位手机号码" maxLength={11} />
+                <Input placeholder="请输入电话或微信号" />
               </Form.Item>
             </Col>
           </Row>
