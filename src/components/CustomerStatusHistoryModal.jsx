@@ -1308,19 +1308,30 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                                 <div style={{ fontSize: '13px', color: history.trialCancelled ? '#999' : '#1890ff', marginBottom: 4 }}>
                                   <CalendarOutlined style={{ marginRight: 4 }} />
                                   体验时间：
+                                  <span style={{ 
+                                    fontSize: '12px', 
+                                    color: '#666',
+                                    textDecoration: history.trialCancelled ? 'line-through' : 'none',
+                                    marginLeft: '4px'
+                                  }}>
+                                    {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                    {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                    {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                                  </span>
                                   {history.trialCancelled && (
                                     <Tag color="default" style={{ marginLeft: 8 }}>已取消</Tag>
                                   )}
                                 </div>
-                                <div style={{ 
-                                  fontSize: '12px', 
-                                  color: '#666',
-                                  textDecoration: history.trialCancelled ? 'line-through' : 'none'
-                                }}>
-                                  {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
-                                  {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
-                                  {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
-                                </div>
+                                {history.trialCoachName && (
+                                  <div style={{ 
+                                    fontSize: '12px', 
+                                    color: '#666',
+                                    marginTop: 4
+                                  }}>
+                                    <UserOutlined style={{ marginRight: 4 }} />
+                                    体验教练：{history.trialCoachName}
+                                  </div>
+                                )}
                               </div>
                               {history.trialCancelled !== true && (
                                 <Popconfirm

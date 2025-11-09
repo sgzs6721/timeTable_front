@@ -32,7 +32,8 @@ import {
   UnorderedListOutlined,
   SaveOutlined,
   CloseOutlined,
-  UserSwitchOutlined
+  UserSwitchOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import AssignCustomerModal from '../components/AssignCustomerModal';
@@ -1616,21 +1617,32 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                                 }}>
                                   <CalendarOutlined style={{ marginRight: 4 }} />
                                   体验时间：
+                                  <span style={{ 
+                                    fontSize: '11px', 
+                                    color: '#666',
+                                    textDecoration: history.trialCancelled ? 'line-through' : 'none',
+                                    marginLeft: '4px'
+                                  }}>
+                                    {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                    {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                    {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                                    {' '}
+                                    {(() => {
+                                      const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                                      return weekdays[dayjs(history.trialScheduleDate).day()];
+                                    })()}
+                                  </span>
                                 </div>
-                                <div style={{ 
-                                  fontSize: '11px', 
-                                  color: '#666',
-                                  textDecoration: history.trialCancelled ? 'line-through' : 'none'
-                                }}>
-                                  {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
-                                  {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
-                                  {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
-                                  {' '}
-                                  {(() => {
-                                    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-                                    return weekdays[dayjs(history.trialScheduleDate).day()];
-                                  })()}
-                                </div>
+                                {history.trialCoachName && (
+                                  <div style={{ 
+                                    fontSize: '11px', 
+                                    color: '#666',
+                                    marginTop: 4
+                                  }}>
+                                    <UserOutlined style={{ marginRight: 4 }} />
+                                    体验教练：{history.trialCoachName}
+                                  </div>
+                                )}
                               </div>
                               {history.trialCancelled ? (
                                 <Tag color="default" size="small" style={{ marginLeft: 8 }}>已取消</Tag>

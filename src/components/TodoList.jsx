@@ -614,7 +614,7 @@ const TodoList = ({ onUnreadCountChange, user }) => {
           borderRadius: '4px',
           border: trial.trialCancelled ? '1px solid #d9d9d9' : (trial.trialCompleted ? '1px solid #95de64' : '1px solid #91caff')
         }}>
-          {/* 第一行：体验时间信息（不换行） */}
+          {/* 第一行：体验时间信息 */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -658,19 +658,27 @@ const TodoList = ({ onUnreadCountChange, user }) => {
             </span>
           </div>
 
-          {/* 第二行：教练信息和操作按钮 */}
+          {/* 第二行：体验教练信息 */}
           <div style={{ 
             display: 'flex', 
-            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            gap: '6px',
+            marginBottom: '8px',
+            fontSize: '13px', 
+            color: '#666'
+          }}>
+            <UserOutlined style={{ marginRight: '6px' }} />
+            体验教练：{trial.trialCoachName || '未指定'}
+          </div>
+
+          {/* 第三行：操作按钮 */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
             alignItems: 'center',
             fontSize: '13px', 
             color: '#666'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <UserOutlined style={{ marginRight: '6px' }} />
-              教练：{trial.trialCoachName || '未指定'}
-            </div>
-            
             {/* 操作按钮（右对齐）- 只有待体验状态才显示 */}
             {!trial.trialCancelled && !trial.trialCompleted && (
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -1147,17 +1155,28 @@ const TodoList = ({ onUnreadCountChange, user }) => {
                                   }}>
                                     <CalendarOutlined style={{ marginRight: 4 }} />
                                     体验时间：
+                                    <span style={{ 
+                                      fontWeight: 'bold', 
+                                      color: '#666', 
+                                      fontSize: '11px',
+                                      textDecoration: history.trialCancelled ? 'line-through' : 'none',
+                                      marginLeft: '4px'
+                                    }}>
+                                      {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                      {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                      {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                                    </span>
                                   </div>
-                                  <div style={{ 
-                                    fontWeight: 'bold', 
-                                    color: '#666', 
-                                    fontSize: '11px',
-                                    textDecoration: history.trialCancelled ? 'line-through' : 'none'
-                                  }}>
-                                    {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
-                                    {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
-                                    {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
-                                  </div>
+                                  {history.trialCoachName && (
+                                    <div style={{ 
+                                      fontSize: '11px', 
+                                      color: '#666',
+                                      marginTop: 4
+                                    }}>
+                                      <UserOutlined style={{ marginRight: 4 }} />
+                                      体验教练：{history.trialCoachName}
+                                    </div>
+                                  )}
                                 </div>
                                 {history.trialCancelled ? (
                                   <Tag color="default" size="small" style={{ marginLeft: 8 }}>已取消</Tag>
@@ -1264,11 +1283,32 @@ const TodoList = ({ onUnreadCountChange, user }) => {
                             fontSize: '11px', 
                             marginTop: todo.customerNotes && todo.customerNotes.trim() ? '8px' : '4px'
                           }}>
-                            {todo.statusHistory.length > 0 && todo.statusHistory[todo.statusHistory.length - 1].createdByName && 
-                              `${todo.statusHistory[todo.statusHistory.length - 1].createdByName} · `}
-                            {todo.statusHistory.length > 0 && todo.statusHistory[todo.statusHistory.length - 1].createdAt 
-                              ? dayjs(todo.statusHistory[todo.statusHistory.length - 1].createdAt).format('YYYY-MM-DD HH:mm')
-                              : ''}
+                            {(() => {
+                              // 优先使用最后一条流转记录的创建人和时间
+                              if (todo.statusHistory && todo.statusHistory.length > 0) {
+                                const lastHistory = todo.statusHistory[todo.statusHistory.length - 1];
+                                return (
+                                  <>
+                                    {lastHistory.createdByName && `${lastHistory.createdByName} · `}
+                                    {lastHistory.createdAt ? dayjs(lastHistory.createdAt).format('YYYY-MM-DD HH:mm') : ''}
+                                  </>
+                                );
+                              }
+                              // 如果没有流转记录，使用待办创建时间
+                              if (todo.createdAt) {
+                                return (
+                                  <>
+                                    {todo.createdByName && `${todo.createdByName} · `}
+                                    {dayjs(todo.createdAt).format('YYYY-MM-DD HH:mm')}
+                                  </>
+                                );
+                              }
+                              // 如果都没有，尝试使用客户创建时间
+                              if (todo.customerCreatedAt) {
+                                return dayjs(todo.customerCreatedAt).format('YYYY-MM-DD HH:mm');
+                              }
+                              return '';
+                            })()}
                           </div>
                         </div>
                       )

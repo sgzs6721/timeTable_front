@@ -478,18 +478,24 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
                           : '-'} {trial.trialStartTime || ''}-{trial.trialEndTime || ''}
                       </div>
 
-                      {/* 第三行：教练和操作按钮 */}
+                      {/* 第三行：体验教练 */}
+                      <div style={{ 
+                        marginBottom: 8,
+                        fontSize: '16px',
+                        color: '#666'
+                      }}>
+                        <UserOutlined style={{ marginRight: '6px', fontSize: '16px' }} />
+                        体验教练：{trial.trialCoachName || '未指定'}
+                      </div>
+
+                      {/* 第四行：操作按钮 */}
                       <div style={{ 
                         display: 'flex', 
-                        justifyContent: 'space-between', 
+                        justifyContent: 'flex-end', 
                         alignItems: 'center',
                         fontSize: '15px', 
                         color: '#666'
                       }}>
-                        <div>
-                          <UserOutlined style={{ marginRight: '6px', fontSize: '15px' }} />
-                          教练：{trial.trialCoachName || '未指定'}
-                        </div>
                         
                         {/* 只有待体验状态且未取消才显示取消和完成按钮 */}
                         {!trial.trialCancelled && (trial.status === 'SCHEDULED' || trial.status === 'RE_EXPERIENCE') && (
