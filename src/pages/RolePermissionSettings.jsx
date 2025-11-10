@@ -110,8 +110,8 @@ const RolePermissionSettings = () => {
           });
           actionItems.forEach(item => {
             if (permissionsMap[role.roleCode].actionPermissions[item.key] === undefined) {
-              // 管理员、机构管理默认关闭
-              if (item.key === 'admin' || item.key === 'organization-management') {
+              // 管理员默认关闭，机构管理默认开启
+              if (item.key === 'admin') {
                 permissionsMap[role.roleCode].actionPermissions[item.key] = false;
               } else {
                 permissionsMap[role.roleCode].actionPermissions[item.key] = true;

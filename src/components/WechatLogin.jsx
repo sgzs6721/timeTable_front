@@ -100,10 +100,12 @@ const WechatLogin = ({ onLogin, disabled = false }) => {
         style={{
           height: '45px',
           width: '100%',
-          backgroundColor: disabled ? '#f5f5f5' : '#07c160',
-          borderColor: disabled ? '#d9d9d9' : '#07c160',
+          backgroundColor: disabled ? '#d9d9d9' : '#07c160',
+          borderColor: disabled ? '#bfbfbf' : '#07c160',
           fontSize: '16px',
-          color: disabled ? 'rgba(0, 0, 0, 0.25)' : '#ffffff'
+          color: disabled ? 'rgba(0, 0, 0, 0.45)' : '#ffffff',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1
         }}
       >
         微信登录

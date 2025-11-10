@@ -116,7 +116,7 @@ const Login = ({ onLogin }) => {
 
           <Divider style={{ margin: '12px 0' }}>其他登录方式</Divider>
           
-          <WechatLogin onLogin={onLogin} disabled={false} />
+          <WechatLogin onLogin={onLogin} disabled={true} />
 
           {/* 底部版权信息 */}
           <div style={{ height: '16px' }} />

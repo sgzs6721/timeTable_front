@@ -205,9 +205,8 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           <Route
             path="/organization-management"
             element={
-              !user ? <Navigate to="/login" /> : 
-              user.role?.toUpperCase() === 'ADMIN' ? <OrganizationManagementAuth /> : 
-              <Navigate to="/dashboard" />
+              !user ? <Navigate to="/login" /> :
+              <OrganizationManagementAuth />
             }
           />
           <Route
