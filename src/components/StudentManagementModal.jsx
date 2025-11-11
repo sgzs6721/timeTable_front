@@ -282,29 +282,29 @@ const StudentManagementModal = ({ visible, onClose, availableStudents = [] }) =>
       footer={null}
     >
       <div style={{ marginBottom: 16 }}>
-        <Button.Group>
-          <Button 
+        <Space.Compact>
+          <Button
             type={activeTab === 'manage' ? 'primary' : 'default'}
             onClick={() => setActiveTab('manage')}
             icon={<UserOutlined />}
           >
             学员管理
           </Button>
-          <Button 
+          <Button
             type={activeTab === 'merge' ? 'primary' : 'default'}
             onClick={() => setActiveTab('merge')}
             icon={<TeamOutlined />}
           >
             合并设置
           </Button>
-          <Button 
+          <Button
             type={activeTab === 'alias' ? 'primary' : 'default'}
             onClick={() => setActiveTab('alias')}
             icon={<SettingOutlined />}
           >
             别名设置
           </Button>
-        </Button.Group>
+        </Space.Compact>
       </div>
 
       {activeTab === 'manage' && (

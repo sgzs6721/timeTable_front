@@ -215,20 +215,20 @@ const StudentMergeModal = ({ visible, onClose, availableStudents = [] }) => {
       footer={null}
     >
       <div style={{ marginBottom: 16 }}>
-        <Button.Group>
-          <Button 
+        <Space.Compact>
+          <Button
             type={activeTab === 'merge' ? 'primary' : 'default'}
             onClick={() => setActiveTab('merge')}
           >
             学员合并
           </Button>
-          <Button 
+          <Button
             type={activeTab === 'alias' ? 'primary' : 'default'}
             onClick={() => setActiveTab('alias')}
           >
             学员别名
           </Button>
-        </Button.Group>
+        </Space.Compact>
       </div>
 
       {activeTab === 'merge' && (

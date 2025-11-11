@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, InputNumber, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination, Form, Timeline } from 'antd';
+import { Button, List, Avatar, message, Empty, Spin, Modal, Table, Divider, Tag, Popover, Input, InputNumber, Dropdown, Menu, Checkbox, DatePicker, Select, Tabs, Card, Statistic, Row, Col, Pagination, Form, Timeline, Space } from 'antd';
 import { PlusOutlined, CalendarOutlined, CopyOutlined, EditOutlined, CheckOutlined, CloseOutlined, StarFilled, UpOutlined, DownOutlined, RetweetOutlined, InboxOutlined, DeleteOutlined, UserOutlined, BarChartOutlined, EllipsisOutlined, MoneyCollectOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTimetables, deleteTimetable, getTimetableSchedules, createSchedule, updateSchedule, deleteSchedule, updateTimetable, setActiveTimetable, archiveTimetableApi, getActiveSchedulesByDateMerged, copyTimetableToUser, getWeeksWithCountsApi, convertDateToWeeklyApi, convertWeeklyToDateApi, copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, clearTimetableSchedules, getTodaySchedulesOnce, getTomorrowSchedulesOnce, getAllTimetables as getAllTimetablesSvc, getMyHoursPaged } from '../services/timetable';
@@ -4102,35 +4102,35 @@ const Dashboard = ({ user }) => {
       <Card title={viewMode === 'instance' ? '本周排课信息' : viewMode === 'template' ? '固定课表模板' : '体验课程'} size="small" style={{ marginTop: '24px' }}
         extra={
           <div>
-            <Button.Group>
-              <Button 
-                size="small" 
-                type={viewMode==='trial' ? 'primary' : 'default'} 
+            <Space.Compact>
+              <Button
+                size="small"
+                type={viewMode==='trial' ? 'primary' : 'default'}
                 loading={weeklyScheduleLoading && viewMode !== 'trial'}
                 disabled={weeklyScheduleLoading}
                 onClick={switchToTrialView}
               >
                 体验
               </Button>
-              <Button 
-                size="small" 
-                type={viewMode==='instance' ? 'primary' : 'default'} 
+              <Button
+                size="small"
+                type={viewMode==='instance' ? 'primary' : 'default'}
                 loading={weeklyScheduleLoading && viewMode !== 'instance'}
                 disabled={weeklyScheduleLoading}
                 onClick={switchToInstanceView}
               >
                 本周
               </Button>
-              <Button 
-                size="small" 
-                type={viewMode==='template' ? 'primary' : 'default'} 
+              <Button
+                size="small"
+                type={viewMode==='template' ? 'primary' : 'default'}
                 loading={weeklyScheduleLoading && viewMode !== 'template'}
                 disabled={weeklyScheduleLoading}
                 onClick={switchToTemplateView}
               >
                 固定
               </Button>
-            </Button.Group>
+            </Space.Compact>
           </div>
         }
       >
@@ -4702,10 +4702,10 @@ const Dashboard = ({ user }) => {
           title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0' }}>
               <div>
-                <Button.Group>
+                <Space.Compact>
                   <Button type={dayTab==='today' ? 'primary' : 'default'} size="small" onClick={()=>setDayTab('today')}>今日</Button>
                   <Button type={dayTab==='tomorrow' ? 'primary' : 'default'} size="small" onClick={()=>setDayTab('tomorrow')}>明日</Button>
-                </Button.Group>
+                </Space.Compact>
               </div>
               <span style={{ color: '#999', fontSize: 13, textAlign: 'right', display: 'block', width: '100%' }}>
                 {dayTab==='today' ? '今日有课教练' : '明日有课教练'} 
