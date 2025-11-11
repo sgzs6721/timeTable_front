@@ -52,8 +52,12 @@ const AdminPanel = ({ user }) => {
   useEffect(() => {
     // 获取用户权限
     fetchUserPermissions();
-    
-    // 拉取待审批数量
+    // 获取所有用户（教练）列表
+    fetchCoaches();
+  }, []);
+
+  // 基于权限拉取待审批数量
+  useEffect(() => {
     const fetchPending = async () => {
       try {
         const res = await getAllRegistrationRequests();
@@ -62,11 +66,10 @@ const AdminPanel = ({ user }) => {
         }
       } catch {}
     };
-    fetchPending();
-    
-    // 获取所有用户（教练）列表
-    fetchCoaches();
-  }, []);
+    if (userPermissions?.actionPermissions?.admin && userPermissions?.actionPermissions?.admin_pending) {
+      fetchPending();
+    }
+  }, [userPermissions]);
 
   // 获取教练列表
   const fetchCoaches = async () => {
@@ -228,8 +231,12 @@ const AdminPanel = ({ user }) => {
     ],
   });
 
+  const canAdmin = userPermissions?.actionPermissions?.admin === true;
+  const canAdminTimetables = canAdmin && userPermissions?.actionPermissions?.admin_timetables === true;
+  const canAdminPending = canAdmin && userPermissions?.actionPermissions?.admin_pending === true;
+
   const tabItems = [
-    {
+    ...(canAdminTimetables ? [{
       key: 'timetables',
       label: '课表管理',
       children: (
@@ -338,8 +345,8 @@ const AdminPanel = ({ user }) => {
           )}
         </div>
       ),
-    },
-    {
+    }] : []),
+    ...(canAdminPending ? [{
       key: 'pending',
       label: (
         <span>
@@ -348,7 +355,7 @@ const AdminPanel = ({ user }) => {
         </span>
       ),
       children: <UserManagement activeTab="pending" />,
-    },
+    }] : []),
   ];
 
   const renderTabBar = (props, DefaultTabBar) => (

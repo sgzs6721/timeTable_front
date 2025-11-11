@@ -89,7 +89,7 @@ const CopyTimetableModal = ({ visible, onCancel, onSuccess, timetable }) => {
       okText="确认复制"
       cancelText="取消"
       width={520}
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f6f8fa', borderRadius: '6px' }}>
         <div style={{ fontWeight: 500, marginBottom: '4px' }}>源课表信息：</div>

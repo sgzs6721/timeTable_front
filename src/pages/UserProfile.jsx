@@ -294,7 +294,9 @@ const UserProfile = ({ user }) => {
           alignItems: 'center', 
           minHeight: '400px' 
         }}>
-          <Spin size="large" tip="加载中..." />
+          <Spin size="large">
+            <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+          </Spin>
         </div>
       </div>
     );

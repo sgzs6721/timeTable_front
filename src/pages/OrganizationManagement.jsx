@@ -584,7 +584,9 @@ const OrganizationManagement = () => {
             <h3>当前管理员</h3>
             {loadingAdmins ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
-                <Spin tip="加载中..." />
+                <Spin>
+                  <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+                </Spin>
               </div>
             ) : admins.length === 0 ? (
               <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>

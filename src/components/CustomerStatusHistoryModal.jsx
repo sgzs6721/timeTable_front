@@ -741,7 +741,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       maskClosable={false}
       keyboard={true}
       centered
-      destroyOnClose
+      destroyOnHidden
       style={{ maxHeight: '90vh' }}
       styles={{ body: { maxHeight: 'calc(90vh - 110px)', overflowY: 'auto' } }}
     >
@@ -905,7 +905,9 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                     </div>
                   ) : loadingCoaches ? (
                     <div style={{ textAlign: 'center', padding: '20px' }}>
-                      <Spin tip="正在查询有空的教练..." />
+                      <Spin>
+                        <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>正在查询有空的教练...</div>
+                      </Spin>
                     </div>
                   ) : availableCoaches.length > 0 ? (
                     <div>

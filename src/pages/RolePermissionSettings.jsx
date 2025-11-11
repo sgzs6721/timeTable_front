@@ -42,6 +42,9 @@ const RolePermissionSettings = () => {
   const actionItems = [
     { key: 'refresh', label: '刷新', icon: '🔄' },
     { key: 'admin', label: '管理员', icon: '⚙️' },
+    // 管理员子权限（用于页面展示，真实存储为 actionPermissions 中的独立键）
+    { key: 'admin_timetables', label: '课表管理', icon: '📅', isSubOf: 'admin' },
+    { key: 'admin_pending', label: '注册通知', icon: '📥', isSubOf: 'admin' },
     { key: 'organization-management', label: '机构管理', icon: '🏢' },
     { key: 'archived', label: '归档课表', icon: '📦' },
     { key: 'profile', label: '个人账号', icon: '👤' },
@@ -110,9 +113,12 @@ const RolePermissionSettings = () => {
             }
           });
           actionItems.forEach(item => {
+            // 仅对非展示用的 subItem 或主项进行默认值设置
             if (permissionsMap[role.roleCode].actionPermissions[item.key] === undefined) {
-              // 管理员默认关闭，机构管理默认开启
+              // 管理员主开关默认关闭；其余默认开启；子权限默认与主开关一致（主开关关闭时也会被UI禁用）
               if (item.key === 'admin') {
+                permissionsMap[role.roleCode].actionPermissions[item.key] = false;
+              } else if (item.isSubOf === 'admin') {
                 permissionsMap[role.roleCode].actionPermissions[item.key] = false;
               } else {
                 permissionsMap[role.roleCode].actionPermissions[item.key] = true;
@@ -300,18 +306,71 @@ const RolePermissionSettings = () => {
                 </Title>
               </div>
               <div className="permission-grid">
-                {actionItems.map(item => (
-                  <div key={item.key} className="permission-item">
-                    <Space>
-                      <span className="permission-icon">{item.icon}</span>
-                      <Text>{item.label}</Text>
-                    </Space>
-                    <Switch
-                      checked={currentPermissions.actionPermissions[item.key]}
-                      onChange={(checked) => handleActionPermissionChange(role.roleCode, item.key, checked)}
-                      disabled={item.disabled}
-                    />
-                  </div>
+                {actionItems
+                  .filter(item => !item.isSubOf)  // 先渲染主项
+                  .map(item => (
+                  <React.Fragment key={item.key}>
+                    <div className="permission-item">
+                      <Space>
+                        <span className="permission-icon">{item.icon}</span>
+                        <Text>{item.label}</Text>
+                      </Space>
+                      <Switch
+                        checked={currentPermissions.actionPermissions[item.key]}
+                        onChange={(checked) => handleActionPermissionChange(role.roleCode, item.key, checked)}
+                        disabled={item.disabled}
+                      />
+                    </div>
+                    {/* 渲染管理员子权限：当管理员开启时显示两个tab的开关 */}
+                    {item.key === 'admin' && currentPermissions.actionPermissions['admin'] && (
+                      <div
+                        className="permission-item"
+                        style={{
+                          gridColumn: '1 / -1',
+                          paddingLeft: 28
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 16,
+                            flexWrap: 'nowrap'
+                          }}
+                        >
+                          {['admin_timetables', 'admin_pending'].map((subKey) => {
+                            const sub = actionItems.find(a => a.key === subKey);
+                            if (!sub) return null;
+                            return (
+                              <div
+                                key={sub.key}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: 12,
+                                  padding: '8px 12px',
+                                  borderRadius: 8,
+                                  border: '1px solid #f0f0f0',
+                                  background: '#fafafa',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                <Space>
+                                  <span className="permission-icon">{sub.icon}</span>
+                                  <Text>{sub.label}</Text>
+                                </Space>
+                                <Switch
+                                  checked={currentPermissions.actionPermissions[sub.key]}
+                                  onChange={(checked) => handleActionPermissionChange(role.roleCode, sub.key, checked)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </React.Fragment>
                 ))}
               </div>
             </div>
@@ -348,7 +407,9 @@ const RolePermissionSettings = () => {
 
       {loading ? (
         <div className="loading-state">
-          <Spin size="large" tip="加载中..." />
+          <Spin size="large">
+            <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+          </Spin>
         </div>
       ) : roles.length === 0 ? (
         <div className="empty-state">

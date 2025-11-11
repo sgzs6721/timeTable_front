@@ -24,8 +24,8 @@ const AppHeader = ({ user, onLogout }) => {
 
   // 获取待审批用户数量
   const fetchPendingCount = async () => {
-    // 使用权限系统判断是否有管理员权限
-    if (userPermissions?.actionPermissions?.admin) {
+    // 使用权限系统判断是否有管理员及“注册通知”子权限
+    if (userPermissions?.actionPermissions?.admin && userPermissions?.actionPermissions?.admin_pending) {
       try {
         const response = await getAllRegistrationRequests();
         if (response.success) {
@@ -89,9 +89,9 @@ const AppHeader = ({ user, onLogout }) => {
 
   // 定期检查待审批数量（每30秒检查一次）
   useEffect(() => {
-    if (userPermissions?.actionPermissions?.admin || userPermissions?.actionPermissions?.['organization-management']) {
+    if ((userPermissions?.actionPermissions?.admin && userPermissions?.actionPermissions?.admin_pending) || userPermissions?.actionPermissions?.['organization-management']) {
       const interval = setInterval(() => {
-        if (userPermissions?.actionPermissions?.admin) {
+        if (userPermissions?.actionPermissions?.admin && userPermissions?.actionPermissions?.admin_pending) {
           fetchPendingCount();
         }
         if (userPermissions?.actionPermissions?.['organization-management']) {
@@ -267,7 +267,7 @@ const AppHeader = ({ user, onLogout }) => {
                 {user?.nickname || user?.username}
               </span>
               <Badge 
-                count={userPermissions?.actionPermissions?.admin && pendingCount > 0 ? pendingCount : 0}
+                count={userPermissions?.actionPermissions?.admin && userPermissions?.actionPermissions?.admin_pending && pendingCount > 0 ? pendingCount : 0}
                 size="small"
                 style={{ 
                   backgroundColor: '#ff4d4f',

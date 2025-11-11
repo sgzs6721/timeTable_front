@@ -69,7 +69,7 @@ const EditScheduleModal = ({ visible, onCancel, onOk, schedule, timetable }) => 
       open={visible}
       onOk={handleOk}
       onCancel={onCancel}
-      destroyOnClose
+      destroyOnHidden
       okText="保存"
       cancelText="取消"
     >

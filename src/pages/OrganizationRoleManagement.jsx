@@ -410,7 +410,9 @@ const OrganizationRoleManagement = () => {
 
       {loading ? (
         <div className="loading-state">
-          <Spin size="large" tip="加载中..." />
+          <Spin size="large">
+            <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+          </Spin>
         </div>
       ) : (
         <div className="roles-grid">
@@ -520,7 +522,9 @@ const OrganizationRoleManagement = () => {
             <h3>当前成员 ({roleMembers.length})</h3>
             {memberLoading ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
-                <Spin tip="加载中..." />
+                <Spin>
+                  <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+                </Spin>
               </div>
             ) : roleMembers.length === 0 ? (
               <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>

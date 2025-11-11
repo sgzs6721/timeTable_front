@@ -396,7 +396,9 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     <div className="organization-request-management">
       {loading ? (
         <div className="loading-container">
-          <Spin tip="加载中..." />
+          <Spin>
+            <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+          </Spin>
         </div>
       ) : requests.length === 0 ? (
         <div className="empty-container">
@@ -492,7 +494,9 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
             
             {checkingManager ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
-                <Spin tip="检查机构职位信息..." />
+                <Spin>
+                  <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>检查机构职位信息...</div>
+                </Spin>
               </div>
             ) : (
               <Form form={approveForm} layout="vertical">

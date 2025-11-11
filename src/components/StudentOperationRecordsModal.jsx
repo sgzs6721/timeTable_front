@@ -478,7 +478,7 @@ const StudentOperationRecordsModal = ({ visible, onClose, studentName, coachId, 
         onCancel={onClose}
         footer={null}
         width={600}
-        destroyOnClose
+        destroyOnHidden
       >
       {(() => {
         const groupedRecords = groupRecordsByType(records);

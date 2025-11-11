@@ -36,7 +36,7 @@ const LeaveRequestModal = ({ visible, onCancel, onOk, schedule }) => {
       open={visible}
       onOk={handleOk}
       onCancel={handleCancel}
-      destroyOnClose
+      destroyOnHidden
       okText="确认请假"
       cancelText="取消"
       confirmLoading={loading}

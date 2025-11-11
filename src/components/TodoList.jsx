@@ -1468,7 +1468,9 @@ const TodoList = ({ onUnreadCountChange, user }) => {
           // 体验列表
           loadingTrials ? (
             <div style={{ textAlign: 'center', padding: '50px' }}>
-              <Spin tip="加载中..." />
+              <Spin>
+                <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+              </Spin>
             </div>
           ) : trials.length === 0 ? (
             <Empty description="暂无待体验客户" style={{ padding: '50px 0' }} />
