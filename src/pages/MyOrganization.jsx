@@ -5,8 +5,8 @@ import {
   Card, Spin
 } from 'antd';
 import {
-  EditOutlined, EyeOutlined, SettingOutlined, 
-  UsergroupAddOutlined, DollarOutlined, LeftOutlined
+  EditOutlined, EyeOutlined, SettingOutlined,
+  UsergroupAddOutlined, DollarOutlined, LeftOutlined, BellOutlined
 } from '@ant-design/icons';
 import {
   getOrganizationById,
@@ -128,6 +128,16 @@ const MyOrganization = ({ user }) => {
           className="action-btn salary-btn"
         >
           工资管理
+        </Button>
+        <Button
+          icon={<BellOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/organizations/${organization.id}/notifications`);
+          }}
+          className="action-btn notification-btn"
+        >
+          通知设置
         </Button>
         <Button
           icon={<EditOutlined />}

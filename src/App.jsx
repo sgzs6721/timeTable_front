@@ -22,6 +22,7 @@ import OrganizationManagementAuth from './pages/OrganizationManagementAuth';
 import RolePermissionSettings from './pages/RolePermissionSettings';
 import OrganizationRoleManagement from './pages/OrganizationRoleManagement';
 import OrganizationSalaryManagement from './pages/OrganizationSalaryManagement';
+import OrganizationNotificationSettings from './pages/OrganizationNotificationSettings';
 import MyOrganization from './pages/MyOrganization';
 import { validateToken } from './services/auth';
 import './App.css';
@@ -227,6 +228,12 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
             path="/organizations/:organizationId/salary"
             element={
               !user ? <Navigate to="/login" /> : <OrganizationSalaryManagement />
+            }
+          />
+          <Route
+            path="/organizations/:organizationId/notifications"
+            element={
+              !user ? <Navigate to="/login" /> : <OrganizationNotificationSettings />
             }
           />
           <Route

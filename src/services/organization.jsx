@@ -120,3 +120,25 @@ export const getPendingRequestsCount = async () => {
   return 0;
 };
 
+/**
+ * 获取机构通知设置
+ */
+export const getOrganizationNotificationSettings = async (organizationId) => {
+  const response = await axios.get(`${API_BASE_URL}/organizations/${organizationId}/notifications`, {
+    headers: getAuthHeaders()
+  });
+  return response.data;
+};
+
+/**
+ * 更新机构通知设置
+ */
+export const updateOrganizationNotificationSettings = async (organizationId, notificationSettings) => {
+  const response = await axios.put(
+    `${API_BASE_URL}/organizations/${organizationId}/notifications`,
+    notificationSettings,
+    { headers: getAuthHeaders() }
+  );
+  return response.data;
+};
+

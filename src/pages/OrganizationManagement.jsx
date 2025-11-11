@@ -5,11 +5,11 @@ import {
   Popconfirm, Card, Select, Divider, Avatar, List, Tabs, Badge, Spin
 } from 'antd';
 import {
-  PlusOutlined, EditOutlined, DeleteOutlined, 
+  PlusOutlined, EditOutlined, DeleteOutlined,
   TeamOutlined, UserAddOutlined, UserDeleteOutlined,
   ReloadOutlined, EnvironmentOutlined, PhoneOutlined,
   EyeOutlined, SettingOutlined, UsergroupAddOutlined,
-  DollarOutlined
+  DollarOutlined, BellOutlined
 } from '@ant-design/icons';
 import {
   getAllOrganizations,
@@ -305,6 +305,15 @@ const OrganizationManagement = () => {
           className="action-btn salary-btn"
         >
           工资管理
+        </Button>
+        <Button
+          icon={<BellOutlined />}
+          onClick={() => {
+            navigate(`/organizations/${org.id}/notifications`);
+          }}
+          className="action-btn notification-btn"
+        >
+          通知设置
         </Button>
         <Button
           icon={<EditOutlined />}

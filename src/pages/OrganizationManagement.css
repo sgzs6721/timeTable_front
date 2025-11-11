@@ -162,6 +162,27 @@
   gap: 8px;
 }
 
+.notification-btn {
+  /* 与其它按钮统一：浅底 + 描边 + 同色系文字，叠加轻磨砂 */
+  background: rgba(249, 240, 255, 0.7); /* 接近 settings-btn 的浅紫 */
+  border: 1px solid #d3adf7;
+  color: #722ed1;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.notification-btn:hover {
+  background: rgba(239, 219, 255, 0.9);
+  border-color: #9254de;
+  color: #531dab;
+}
+
+.notification-btn:active {
+  background: #d3adf7;
+  border-color: #9254de;
+  color: #531dab;
+}
+
 .settings-btn {
   background: #f9f0ff;
   border: 1px solid #d3adf7;
@@ -481,6 +502,25 @@
     min-width: auto;
     margin-right: 0;
     margin-bottom: 4px;
+  }
+
+  /* 手机端：与其它按钮保持一致，同时保留轻磨砂 */
+  .notification-btn {
+    background: rgba(249, 240, 255, 0.85);
+    border: 1px solid #d3adf7;
+    color: #722ed1;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .notification-btn:hover {
+    background: rgba(239, 219, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(114, 46, 209, 0.12);
+  }
+  .notification-btn:active {
+    background: #d3adf7;
+    transform: translateY(0);
+    box-shadow: 0 3px 10px rgba(114, 46, 209, 0.12);
   }
 }
 
