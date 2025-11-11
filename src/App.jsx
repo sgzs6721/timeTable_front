@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Layout, message } from 'antd';
+import { Layout, message, Button } from 'antd';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -168,7 +168,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           />
           <Route
             path="/admin"
-            element={user && user.role?.toUpperCase() === 'ADMIN' ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />}
+            element={user ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />}
           />
           <Route
             path="/preview-merge"
@@ -204,10 +204,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           />
           <Route
             path="/organization-management"
-            element={
-              !user ? <Navigate to="/login" /> :
-              <OrganizationManagementAuth />
-            }
+            element={<OrganizationManagementAuth />}
           />
           <Route
             path="/my-organization"
@@ -216,25 +213,20 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           <Route
             path="/organizations/:organizationId/permissions"
             element={
-              !user ? <Navigate to="/login" /> : 
-              user.role?.toUpperCase() === 'ADMIN' ? <RolePermissionSettings /> : 
-              <Navigate to="/dashboard" />
+              !user ? <Navigate to="/login" /> :
+              <RolePermissionSettings />
             }
           />
           <Route
             path="/organizations/:organizationId/roles"
             element={
-              !user ? <Navigate to="/login" /> : 
-              user.role?.toUpperCase() === 'ADMIN' ? <OrganizationRoleManagement /> : 
-              <Navigate to="/dashboard" />
+              !user ? <Navigate to="/login" /> : <OrganizationRoleManagement />
             }
           />
           <Route
             path="/organizations/:organizationId/salary"
             element={
-              !user ? <Navigate to="/login" /> : 
-              user.role?.toUpperCase() === 'ADMIN' ? <OrganizationSalaryManagement /> : 
-              <Navigate to="/dashboard" />
+              !user ? <Navigate to="/login" /> : <OrganizationSalaryManagement />
             }
           />
           <Route

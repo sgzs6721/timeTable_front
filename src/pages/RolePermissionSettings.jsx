@@ -63,7 +63,7 @@ const RolePermissionSettings = () => {
         setOrganization(orgResponse.data);
       }
 
-      // 获取机构的角色列表
+      // 获取机构的职位列表
       const rolesResponse = await getOrganizationRoles(organizationId);
       let loadedRoles = [];
       if (rolesResponse.success && rolesResponse.data) {
@@ -76,7 +76,7 @@ const RolePermissionSettings = () => {
       if (response.success && response.data) {
         const permissionsMap = {};
 
-        // 初始化所有角色的权限
+        // 初始化所有职位的权限
         loadedRoles.forEach(role => {
           permissionsMap[role.roleCode] = {
             roleId: role.id,
@@ -88,8 +88,9 @@ const RolePermissionSettings = () => {
         // 填充从后端获取的权限
         response.data.forEach(perm => {
           if (permissionsMap[perm.role]) {
+            const roleData = loadedRoles.find(r => r.roleCode === perm.role);
             permissionsMap[perm.role] = {
-              roleId: perm.roleId,
+              roleId: perm.roleId || (roleData ? roleData.id : null),
               menuPermissions: perm.menuPermissions || {},
               actionPermissions: perm.actionPermissions || {}
             };
@@ -334,7 +335,7 @@ const RolePermissionSettings = () => {
           />
           <div className="header-left">
             <Title level={2} style={{ margin: 0 }}>
-              角色权限设置
+              职位权限设置
             </Title>
             {organization && (
               <Text type="secondary">
@@ -352,14 +353,14 @@ const RolePermissionSettings = () => {
       ) : roles.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">📋</div>
-          <h3>暂无角色权限设置</h3>
-          <p>该机构还没有配置任何角色，请先在角色管理中创建角色</p>
+          <h3>暂无职位权限设置</h3>
+          <p>该机构还没有配置任何职位，请先在职位管理中创建职位</p>
           <Button
             type="primary"
             size="large"
             onClick={() => navigate(`/organizations/${organizationId}/roles`)}
           >
-            前往角色管理
+            前往职位管理
           </Button>
         </div>
       ) : (

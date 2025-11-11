@@ -48,7 +48,7 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
   const isSales = currentUser?.position?.toUpperCase() === 'SALES';
   const isCoach = currentUser?.position?.toUpperCase() === 'COACH';
   const isManager = currentUser?.position?.toUpperCase() === 'MANAGER';
-  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
+  const isAdmin = currentUser?.position?.toUpperCase() === 'MANAGER';
 
   useEffect(() => {
     // 获取用户信息

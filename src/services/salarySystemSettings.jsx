@@ -29,6 +29,7 @@ api.interceptors.response.use(
     return response.data;
   },
   (error) => {
+    // 处理401未授权错误
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

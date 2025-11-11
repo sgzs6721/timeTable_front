@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Table, Button, message, Modal, Input, Tag, Card, 
-  Space, Avatar, Descriptions, Select, Form, Spin 
+import {
+  Table, Button, message, Modal, Input, Tag, Card,
+  Space, Avatar, Descriptions, Select, Form, Spin, Popconfirm
 } from 'antd';
-import { 
-  CheckOutlined, CloseOutlined, EyeOutlined, UserOutlined
+import {
+  CheckOutlined, CloseOutlined, EyeOutlined, UserOutlined, DeleteOutlined
 } from '@ant-design/icons';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { getOrganizationRoles } from '../services/organizationRole';
 import './OrganizationRequestManagement.css';
 
 const { TextArea } = Input;
@@ -27,6 +28,8 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
   const [approveForm] = Form.useForm();
   const [hasManagerInOrg, setHasManagerInOrg] = useState(false);
   const [checkingManager, setCheckingManager] = useState(false);
+  const [organizationRoles, setOrganizationRoles] = useState([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
 
   useEffect(() => {
     fetchPendingRequests();
@@ -83,6 +86,9 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     
     // 检查机构是否已有管理职位成员
     await checkOrganizationManager(record.organizationId);
+    
+    // 获取机构的职位列表
+    await fetchOrganizationRoles(record.organizationId);
   };
   
   const checkOrganizationManager = async (organizationId) => {
@@ -120,6 +126,25 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     }
   };
 
+  const fetchOrganizationRoles = async (organizationId) => {
+    try {
+      setLoadingRoles(true);
+      const response = await getOrganizationRoles(organizationId);
+      if (response.success) {
+        setOrganizationRoles(response.data || []);
+      } else {
+        message.error('获取机构职位失败');
+        setOrganizationRoles([]);
+      }
+    } catch (error) {
+      console.error('获取机构职位失败:', error);
+      message.error(error.response?.data?.message || '获取机构职位失败');
+      setOrganizationRoles([]);
+    } finally {
+      setLoadingRoles(false);
+    }
+  };
+
   const handleReject = (record) => {
     setSelectedRequest(record);
     setRejectReason('');
@@ -133,16 +158,9 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
 
   const confirmApprove = async () => {
     try {
-      let defaultPosition = 'COACH';
-      
-      // 如果机构没有管理职位成员，自动设置为MANAGER
-      if (!hasManagerInOrg) {
-        defaultPosition = 'MANAGER';
-      } else {
-        // 如果有管理职位成员，从表单获取选择的职位
-        const values = await approveForm.validateFields();
-        defaultPosition = values.defaultPosition || 'COACH';
-      }
+      // 总是从表单获取选择的职位
+      const values = await approveForm.validateFields();
+      const defaultPosition = values.defaultPosition || 'COACH';
       
       const token = localStorage.getItem('token');
 
@@ -207,6 +225,36 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     } catch (error) {
       console.error('拒绝失败:', error);
       message.error(error.response?.data?.message || '拒绝失败');
+    }
+  };
+
+  const handleDelete = async (record) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.delete(
+        `${API_BASE_URL}/organization-requests/${record.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data.success) {
+        message.success('申请已删除');
+        // 从列表中移除该申请
+        setRequests(prevRequests => prevRequests.filter(req => req.id !== record.id));
+        // 通知父组件更新数量
+        if (onUpdate) {
+          onUpdate();
+        }
+      } else {
+        message.error(response.data.message || '删除失败');
+      }
+    } catch (error) {
+      console.error('删除失败:', error);
+      message.error(error.response?.data?.message || '删除失败');
     }
   };
 
@@ -282,8 +330,41 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
           
           <div className="request-actions">
             {isPending && <Tag color="gold">待审批</Tag>}
-            {isApproved && <Tag color="green">已批准</Tag>}
+            {isApproved && (
+              <>
+                <Tag color="green">已批准</Tag>
+                {request.position && (
+                  <Tag color="blue">
+                    {request.position === 'COACH' ? '教练' :
+                     request.position === 'SALES' ? '销售' :
+                     request.position === 'RECEPTIONIST' ? '前台' :
+                     request.position === 'MANAGER' ? '管理' : request.position}
+                  </Tag>
+                )}
+              </>
+            )}
             {isRejected && <Tag color="red">已拒绝</Tag>}
+            
+            {(isApproved || isRejected) && (
+              <Space size="small">
+                <Popconfirm
+                  title="确定要删除此申请记录吗？"
+                  description="删除后将无法恢复"
+                  onConfirm={() => handleDelete(request)}
+                  okText="确定"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                  >
+                    移除
+                  </Button>
+                </Popconfirm>
+              </Space>
+            )}
             
             {isPending && (
               <Space size="small">
@@ -415,33 +496,48 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
               </div>
             ) : (
               <Form form={approveForm} layout="vertical">
-                {!hasManagerInOrg ? (
-                  <div style={{ 
-                    padding: '12px', 
-                    background: '#e6f7ff', 
+                {!hasManagerInOrg && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#e6f7ff',
                     border: '1px solid #91d5ff',
                     borderRadius: '4px',
                     marginBottom: '16px'
                   }}>
                     <p style={{ margin: 0, color: '#1890ff' }}>
-                      该机构暂无管理职位成员，将自动设置为<strong>管理职位</strong>
+                      该机构暂无管理职位成员，建议设置为<strong>管理职位</strong>
                     </p>
                   </div>
-                ) : (
-                  <Form.Item 
-                    label="职位" 
-                    name="defaultPosition"
-                    initialValue="COACH"
-                    rules={[{ required: true, message: '请选择职位' }]}
-                  >
-                    <Select>
-                      <Option value="COACH">教练</Option>
-                      <Option value="SALES">销售</Option>
-                      <Option value="RECEPTIONIST">前台</Option>
-                      <Option value="MANAGER">管理</Option>
-                    </Select>
-                  </Form.Item>
                 )}
+                <Form.Item
+                  label="职位"
+                  name="defaultPosition"
+                  initialValue={!hasManagerInOrg ? "MANAGER" : (organizationRoles.length > 0 ? organizationRoles[0].roleCode : "COACH")}
+                  rules={[{ required: true, message: '请选择职位' }]}
+                >
+                  {loadingRoles ? (
+                    <Select loading={true}>
+                      <Option value="">加载中...</Option>
+                    </Select>
+                  ) : (
+                    <Select>
+                      {organizationRoles.length > 0 ? (
+                        organizationRoles.map(role => (
+                          <Option key={role.id} value={role.roleCode}>
+                            {role.roleName}
+                          </Option>
+                        ))
+                      ) : (
+                        <>
+                          <Option value="COACH">教练</Option>
+                          <Option value="SALES">销售</Option>
+                          <Option value="RECEPTIONIST">前台</Option>
+                          <Option value="MANAGER">管理</Option>
+                        </>
+                      )}
+                    </Select>
+                  )}
+                </Form.Item>
               </Form>
             )}
           </>

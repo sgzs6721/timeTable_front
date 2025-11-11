@@ -15,18 +15,21 @@ import './OrganizationRoleManagement.css';
 
 const { Title, Text } = Typography;
 
-// 职位映射和颜色配置
-const POSITION_CONFIG = {
-  'COACH': { label: '教练', color: '#52c41a' },
-  'MANAGER': { label: '管理', color: '#fa8c16' },
-  'SALES': { label: '销售', color: '#1890ff' },
-  'RECEPTIONIST': { label: '前台', color: '#722ed1' }
-};
-
 // 获取职位显示信息
-const getPositionDisplay = (position) => {
+const getPositionDisplay = (position, roles = []) => {
   if (!position) return { label: '未设置', color: '#d9d9d9' };
-  return POSITION_CONFIG[position] || { label: position, color: '#d9d9d9' };
+  
+  // 从当前机构的职位中查找匹配的职位
+  const role = roles.find(r => r.roleCode === position);
+  if (role) {
+    return {
+      label: role.roleName,
+      color: role.color || '#1890ff'
+    };
+  }
+  
+  // 如果没找到，返回默认值
+  return { label: position, color: '#d9d9d9' };
 };
 
 // 预设图标选项
@@ -84,7 +87,7 @@ const OrganizationRoleManagement = () => {
         setOrganization(orgResponse.data);
       }
 
-      // 获取角色列表
+      // 获取职位列表
       const rolesResponse = await getOrganizationRoles(organizationId);
       if (rolesResponse.success) {
         setRoles(rolesResponse.data || []);
@@ -125,7 +128,7 @@ const OrganizationRoleManagement = () => {
 
   const handleDelete = async (role) => {
     if (role.memberCount > 0) {
-      message.error(`该角色下有 ${role.memberCount} 个成员，无法删除`);
+      message.error(`该职位下有 ${role.memberCount} 个成员，无法删除`);
       return;
     }
 
@@ -179,7 +182,7 @@ const OrganizationRoleManagement = () => {
     await loadRoleMembers(role);
   };
 
-  // 加载角色成员
+  // 加载职位成员
   const loadRoleMembers = async (role) => {
     try {
       setMemberLoading(true);
@@ -192,24 +195,24 @@ const OrganizationRoleManagement = () => {
         );
         setAllUsers(orgUsers);
         
-        // 从最新数据中筛选出属于该角色的成员
+        // 从最新数据中筛选出属于该职位的成员
         // 匹配规则：只根据 position 字段
         const members = orgUsers.filter(user => user.position === role.roleCode);
         setRoleMembers(members);
         
-        // 获取可添加的用户（职位不是当前角色的用户）
+        // 获取可添加的用户（职位不是当前职位的用户）
         const available = orgUsers.filter(user => user.position !== role.roleCode);
         setAvailableUsers(available);
       }
     } catch (error) {
-      console.error('加载角色成员失败:', error);
-      message.error('加载角色成员失败');
+      console.error('加载职位成员失败:', error);
+      message.error('加载职位成员失败');
     } finally {
       setMemberLoading(false);
     }
   };
 
-  // 添加成员到角色（设置用户职位）
+  // 添加成员到职位（设置用户职位）
   const handleAddMember = async () => {
     if (!selectedUserId) {
       message.warning('请选择要添加的成员');
@@ -218,7 +221,7 @@ const OrganizationRoleManagement = () => {
 
     try {
       setAddingMember(true);
-      // 调用更新用户接口，设置用户的 position 为角色代码
+      // 调用更新用户接口，设置用户的 position 为职位代码
       const response = await updateUserInfo(selectedUserId, { position: selectedRole.roleCode });
       if (response.success) {
         message.success('设置职位成功');
@@ -231,13 +234,13 @@ const OrganizationRoleManagement = () => {
             : user
         ));
         
-        // 重新加载角色列表（更新成员数量）
+        // 重新加载职位列表（更新成员数量）
         const rolesResponse = await getOrganizationRoles(organizationId);
         if (rolesResponse.success) {
           setRoles(rolesResponse.data || []);
         }
         
-        // 重新加载当前角色的成员
+        // 重新加载当前职位的成员
         await loadRoleMembers(selectedRole);
       } else {
         message.error(response.message || '设置职位失败');
@@ -250,29 +253,24 @@ const OrganizationRoleManagement = () => {
     }
   };
 
-  // 从角色移除成员（清除用户职位）
+  // 从职位移除成员（清除用户职位）
   const handleRemoveMember = async (userId) => {
     try {
       // 调用更新用户接口，清除用户的 position
       const response = await updateUserInfo(userId, { position: null });
+      console.log('移除成员API响应:', response);
+      
       if (response.success) {
         message.success('清除职位成功');
         
-        // 立即更新本地状态
-        setAllUsers(prevUsers => prevUsers.map(user => 
-          user.id === userId 
-            ? { ...user, position: null }
-            : user
-        ));
+        // 重新加载数据以确保与后端同步
+        await loadRoleMembers(selectedRole);
         
-        // 重新加载角色列表（更新成员数量）
+        // 重新加载职位列表（更新成员数量）
         const rolesResponse = await getOrganizationRoles(organizationId);
         if (rolesResponse.success) {
           setRoles(rolesResponse.data || []);
         }
-        
-        // 重新加载当前角色的成员
-        await loadRoleMembers(selectedRole);
       } else {
         message.error(response.message || '清除职位失败');
       }
@@ -295,7 +293,7 @@ const OrganizationRoleManagement = () => {
   };
 
   const renderRoleCard = (role) => {
-    // 获取该角色的成员列表
+    // 获取该职位的成员列表
     // 匹配规则：只根据 position 字段
     const roleMembers = allUsers.filter(user => user.position === role.roleCode);
     
@@ -336,7 +334,7 @@ const OrganizationRoleManagement = () => {
               onClick={() => handleEdit(role)}
             />
             <Popconfirm
-              title={roleMembers.length > 0 ? `该角色下有 ${roleMembers.length} 个成员，无法删除` : "确定删除此角色吗？"}
+              title={roleMembers.length > 0 ? `该职位下有 ${roleMembers.length} 个成员，无法删除` : "确定删除此职位吗？"}
               onConfirm={() => handleDelete(role)}
               okText="确定"
               cancelText="取消"
@@ -362,7 +360,7 @@ const OrganizationRoleManagement = () => {
             </div>
             <div className="members-list">
               {roleMembers.map(member => {
-                const positionInfo = getPositionDisplay(member.position);
+                const positionInfo = getPositionDisplay(member.position, roles);
                 return (
                   <div key={member.id} className="member-item">
                     <span className="member-name">{member.nickname || member.username}</span>
@@ -391,7 +389,7 @@ const OrganizationRoleManagement = () => {
           />
           <div className="header-center">
             <Title level={2} style={{ margin: 0 }}>
-              角色管理
+              职位管理
             </Title>
             {organization && (
               <Text type="secondary">
@@ -406,7 +404,7 @@ const OrganizationRoleManagement = () => {
           onClick={handleCreate}
           disabled={loading}
         >
-          新建角色
+          新建职位
         </Button>
       </div>
 
@@ -421,16 +419,16 @@ const OrganizationRoleManagement = () => {
           ) : (
             <div className="empty-state">
               <div className="empty-icon">👥</div>
-              <h3>暂无角色</h3>
-              <p>该机构还没有创建任何角色，点击上方"新建角色"按钮开始创建</p>
+              <h3>暂无职位</h3>
+              <p>该机构还没有创建任何职位，点击上方"新建职位"按钮开始创建</p>
             </div>
           )}
         </div>
       )}
 
-      {/* 新建/编辑角色Modal */}
+      {/* 新建/编辑职位Modal */}
       <Modal
-        title={editingRole ? '编辑角色' : '新建角色'}
+        title={editingRole ? '编辑职位' : '新建职位'}
         open={modalVisible}
         onOk={handleSubmit}
         onCancel={() => setModalVisible(false)}
@@ -443,17 +441,17 @@ const OrganizationRoleManagement = () => {
         >
           <Form.Item
             name="roleName"
-            label="角色名称"
-            rules={[{ required: true, message: '请输入角色名称' }]}
+            label="职位名称"
+            rules={[{ required: true, message: '请输入职位名称' }]}
           >
             <Input placeholder="如：教练" />
           </Form.Item>
 
           <Form.Item
             name="roleCode"
-            label="角色代码"
+            label="职位代码"
             rules={[
-              { required: true, message: '请输入角色代码' },
+              { required: true, message: '请输入职位代码' },
               { pattern: /^[A-Z_]+$/, message: '只能使用大写字母和下划线' }
             ]}
           >
@@ -504,7 +502,7 @@ const OrganizationRoleManagement = () => {
             name="description"
             label="描述"
           >
-            <Input.TextArea rows={3} placeholder="角色描述" />
+            <Input.TextArea rows={3} placeholder="职位描述" />
           </Form.Item>
         </Form>
       </Modal>
@@ -598,7 +596,7 @@ const OrganizationRoleManagement = () => {
               <div>
                 <Select
                   style={{ width: '100%' }}
-                  placeholder="选择用户添加到角色"
+                  placeholder="选择用户添加到职位"
                   showSearch
                   filterOption={(input, option) =>
                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
@@ -606,10 +604,13 @@ const OrganizationRoleManagement = () => {
                   onChange={(value) => setSelectedUserId(value)}
                   value={selectedUserId}
                   options={availableUsers.map(user => {
-                    const positionInfo = getPositionDisplay(user.position);
+                    // 获取当前机构的职位信息，而不是使用全局的POSITION_CONFIG
+                    const currentRole = roles.find(role => role.roleCode === user.position);
+                    const positionLabel = currentRole ? currentRole.roleName :
+                                      (user.position ? getPositionDisplay(user.position).label : '未设置');
                     return {
                       value: user.id,
-                      label: `${user.nickname || user.username} (${positionInfo.label})`
+                      label: `${user.nickname || user.username} (${positionLabel})`
                     };
                   })}
                 />

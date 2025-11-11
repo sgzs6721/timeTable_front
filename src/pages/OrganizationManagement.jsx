@@ -260,11 +260,10 @@ const OrganizationManagement = () => {
         </div>
       </div>
 
-      <div className="org-card-actions" onClick={(e) => e.stopPropagation()}>
+      <div className="org-card-actions">
         <Button
           icon={<EyeOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             handleViewDetail(org);
           }}
           className="action-btn detail-btn"
@@ -273,8 +272,7 @@ const OrganizationManagement = () => {
         </Button>
         <Button
           icon={<TeamOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             handleManageAdmins(org);
           }}
           className="action-btn admin-btn"
@@ -283,18 +281,16 @@ const OrganizationManagement = () => {
         </Button>
         <Button
           icon={<UsergroupAddOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             navigate(`/organizations/${org.id}/roles`);
           }}
           className="action-btn role-btn"
         >
-          角色管理
+          职位管理
         </Button>
         <Button
           icon={<SettingOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             handleSettings(org);
           }}
           className="action-btn settings-btn"
@@ -303,8 +299,7 @@ const OrganizationManagement = () => {
         </Button>
         <Button
           icon={<DollarOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             navigate(`/organizations/${org.id}/salary`);
           }}
           className="action-btn salary-btn"
@@ -313,8 +308,7 @@ const OrganizationManagement = () => {
         </Button>
         <Button
           icon={<EditOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             handleEdit(org);
           }}
           className="action-btn edit-btn"
@@ -334,7 +328,6 @@ const OrganizationManagement = () => {
           <Button
             icon={<DeleteOutlined />}
             className="action-btn delete-btn"
-            onClick={(e) => e.stopPropagation()}
           >
             删除
           </Button>

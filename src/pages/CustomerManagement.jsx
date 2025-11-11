@@ -136,7 +136,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     }
   }));
 
-  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+  const isAdmin = user?.position?.toUpperCase() === 'MANAGER';
   const isManager = user?.position?.toUpperCase() === 'MANAGER';
   const isSales = user?.position?.toUpperCase() === 'SALES';
 

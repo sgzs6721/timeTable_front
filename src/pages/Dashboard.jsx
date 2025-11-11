@@ -3689,8 +3689,7 @@ const Dashboard = ({ user }) => {
           if (targetMode !== 'trial') {
             const isAdmin = s.ownerPosition === 'ADMIN' || 
                            s.ownerRole === 'ADMIN' ||
-                           s.position === 'ADMIN' ||
-                           s.role === 'ADMIN';
+                           s.position === 'MANAGER';
             
             if (isAdmin) {
               return;
@@ -3722,8 +3721,7 @@ const Dashboard = ({ user }) => {
           if (targetMode !== 'trial') {
             const isAdmin = schedule.ownerPosition === 'ADMIN' || 
                            schedule.ownerRole === 'ADMIN' ||
-                           schedule.position === 'ADMIN' ||
-                           schedule.role === 'ADMIN';
+                           schedule.position === 'MANAGER';
             
             if (isAdmin) {
               return;
@@ -5146,7 +5144,7 @@ const Dashboard = ({ user }) => {
   const buildTabItems = () => {
     const tabItems = [];
     
-    const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+    const isAdmin = user?.position?.toUpperCase() === 'MANAGER';
     const isSales = user?.position?.toUpperCase() === 'SALES';
     
     // 获取菜单权限配置，如果未加载则使用默认值
@@ -5241,7 +5239,7 @@ const Dashboard = ({ user }) => {
             setSelectedCoach(coachName); // 使用传递过来的教练名称
             setStudentDetailVisible(true);
           }}
-          showAllCheckbox={user?.role?.toUpperCase() === 'ADMIN'} // 只有管理员显示"全部"复选框
+          showAllCheckbox={user?.position?.toUpperCase() === 'MANAGER'} // 只有管理员显示"全部"复选框
         />
       });
     }
@@ -5719,7 +5717,7 @@ const MyHours = ({ user }) => {
     setLoading(true);
     try {
       // 管理员：加载教练下拉（后端已去重并按注册时间倒序）
-      if (user?.role?.toUpperCase() === 'ADMIN') {
+      if (user?.position?.toUpperCase() === 'MANAGER') {
         const resp = await getCoachesWithTimetables();
         const options = (resp?.data?.list || []).map(x => ({ value: String(x.id), label: x.name, createdAt: x.createdAt }));
         setCoachOptions(options);
@@ -5734,7 +5732,7 @@ const MyHours = ({ user }) => {
       const params = {
         startDate: startDate ? dayjs(startDate).format('YYYY-MM-DD') : undefined,
         endDate: endDate ? dayjs(endDate).format('YYYY-MM-DD') : undefined,
-        coachId: user?.role?.toUpperCase() === 'ADMIN' ? (coachId ? String(coachId) : undefined) : undefined,
+        coachId: user?.position?.toUpperCase() === 'MANAGER' ? (coachId ? String(coachId) : undefined) : undefined,
         sortOrder,
         page,
         size: pageSize
@@ -5748,7 +5746,7 @@ const MyHours = ({ user }) => {
       const grandTotalHours = resp?.data?.grandTotalHours || 0;
       
       // 规范字段（兼容现有列定义）
-      const selectedCoachName = user?.role?.toUpperCase() === 'ADMIN'
+      const selectedCoachName = user?.position?.toUpperCase() === 'MANAGER'
         ? (coachOptions.find(o => String(o.value) === String(coachId))?.label || '')
         : (user?.nickname || user?.username || '');
       const mapped = list.map(s => ({
@@ -5800,7 +5798,7 @@ const MyHours = ({ user }) => {
       
       // 从课时记录中提取月份，并根据记薪周期计算归属月份
       const params = {
-        coachId: user?.role?.toUpperCase() === 'ADMIN' ? (coachId ? String(coachId) : undefined) : undefined,
+        coachId: user?.position?.toUpperCase() === 'MANAGER' ? (coachId ? String(coachId) : undefined) : undefined,
         page: 1,
         size: 1000 // 获取足够多的记录以提取所有月份
       };
@@ -6000,7 +5998,7 @@ const MyHours = ({ user }) => {
   ];
 
   const columns = React.useMemo(() => {
-    if (user?.role?.toUpperCase() === 'ADMIN') {
+    if (user?.position?.toUpperCase() === 'MANAGER') {
       return [
         ...baseColumns,
         { title: '教练', dataIndex: 'timetableOwner', key: 'coach', width: 100, align: 'center', render: v => v || '-' }
@@ -6042,7 +6040,7 @@ const MyHours = ({ user }) => {
               ))}
             </Select>
           </div>
-          {user?.role?.toUpperCase() === 'ADMIN' ? (
+          {user?.position?.toUpperCase() === 'MANAGER' ? (
             <div style={{ flex: '1 1 auto', maxWidth: 'calc(50% + 78px)', display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <Select
@@ -6187,7 +6185,7 @@ const DeleteModal = ({ visible, studentName, activeCoachId, showAllStudents, stu
       // 确定要传递的教练ID
       let coachId;
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const isAdmin = currentUser.role === 'ADMIN';
+      const isAdmin = currentUser.position === 'MANAGER';
       
       if (isAdmin && showAllStudents) {
         // 管理员在分组模式：查找学员对应的教练ID

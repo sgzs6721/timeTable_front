@@ -29,7 +29,7 @@ const SalarySettings = ({ organizationId }) => {
         setAllUsers(allUsersData);
         
         // 自动显示已有工资设置的用户（过滤掉工资数据全为0的用户）
-        const usersWithSalarySettings = allUsersData.filter(user => 
+        const usersWithSalarySettings = allUsersData.filter(user =>
           user.role === 'USER' && (
             (user.baseSalary && user.baseSalary > 0) ||
             (user.socialSecurity && user.socialSecurity > 0) ||

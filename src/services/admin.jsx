@@ -70,7 +70,7 @@ export const createTimetableForUser = async (timetableData) => {
 };
 
 // 更新用户权限
-// 统一接口：更新用户信息（角色、用户名等）
+// 统一接口：更新用户信息（职位、用户名等）
 export const updateUserInfo = async (userId, data) => {
   try {
     const response = await api.put(`/admin/users/${userId}`, data);
@@ -80,7 +80,7 @@ export const updateUserInfo = async (userId, data) => {
   }
 };
 
-// 兼容旧用法：仅更新角色
+// 兼容旧用法：仅更新职位
 export const updateUserRole = async (userId, role) => updateUserInfo(userId, { role });
 
 // 重置用户密码

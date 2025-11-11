@@ -132,7 +132,7 @@ const CopyTimetableModal = ({ visible, onCancel, onSuccess, timetable }) => {
                     <span>{getUserDisplayName(user)}</span>
                   </div>
                   <span style={{ color: '#666', fontSize: '12px' }}>
-                    {user.role === 'ADMIN' ? '管理员' : '普通用户'}
+                    {user.position === 'MANAGER' ? '管理员' : '普通用户'}
                   </span>
                 </div>
               </Option>

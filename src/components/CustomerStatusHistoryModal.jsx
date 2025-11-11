@@ -743,7 +743,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
       centered
       destroyOnClose
       style={{ maxHeight: '90vh' }}
-      bodyStyle={{ maxHeight: 'calc(90vh - 110px)', overflowY: 'auto' }}
+      styles={{ body: { maxHeight: 'calc(90vh - 110px)', overflowY: 'auto' } }}
     >
       <div style={{ marginBottom: 24 }}>
         <h3 style={{ marginBottom: 16 }}>切换状态</h3>

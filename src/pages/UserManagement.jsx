@@ -165,7 +165,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
     setNicknameModalVisible(true);
   };
 
-  // 已合并到角色编辑弹窗中，单独的“编辑用户名”入口不再使用
+  // 已合并到职位编辑弹窗中，单独的"编辑用户名"入口不再使用
 
   const handleDeleteUser = (user) => {
     Modal.confirm({
@@ -415,8 +415,8 @@ const UserManagement = ({ activeTab = 'users' }) => {
   // 过滤用户数据
   const filteredUsers = users.filter(user => {
     if (positionFilter === 'all') return true;
-    if (positionFilter === 'admin') return user.role === 'ADMIN';
-    if (positionFilter === 'no_position') return user.role !== 'ADMIN' && !user.position;
+    if (positionFilter === 'admin') return user.position === 'MANAGER';
+    if (positionFilter === 'no_position') return user.position !== 'MANAGER' && !user.position;
     return user.position === positionFilter;
   });
 
@@ -437,7 +437,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
       },
     },
     {
-      title: '当前角色',
+      title: '当前职位',
       dataIndex: 'role',
       key: 'role',
       align: 'center',
@@ -449,10 +449,10 @@ const UserManagement = ({ activeTab = 'users' }) => {
           'MANAGER': { label: '管理', bgColor: 'rgba(24, 144, 255, 0.15)', textColor: '#1890ff', borderColor: 'rgba(24, 144, 255, 0.3)' }
         };
         
-        const roleLabel = role === 'ADMIN' ? '管理员' : '普通用户';
-        const roleBgColor = role === 'ADMIN' ? 'rgba(245, 34, 45, 0.15)' : 'rgba(24, 144, 255, 0.15)';
-        const roleTextColor = role === 'ADMIN' ? '#f5222d' : '#1890ff';
-        const roleBorderColor = role === 'ADMIN' ? 'rgba(245, 34, 45, 0.3)' : 'rgba(24, 144, 255, 0.3)';
+        const roleLabel = position === 'MANAGER' ? '管理员' : '普通用户';
+        const roleBgColor = position === 'MANAGER' ? 'rgba(245, 34, 45, 0.15)' : 'rgba(24, 144, 255, 0.15)';
+        const roleTextColor = position === 'MANAGER' ? '#f5222d' : '#1890ff';
+        const roleBorderColor = position === 'MANAGER' ? 'rgba(245, 34, 45, 0.3)' : 'rgba(24, 144, 255, 0.3)';
         
         // 如果没有职位，只显示角色标签
         if (!record.position) {
@@ -530,7 +530,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
                 e.stopPropagation();
                 handleEditRole(record);
               }}
-              title="变更权限"
+              title="变更职位"
               style={{ fontSize: '16px', color: '#722ed1', padding: '0 6px' }}
             />
             
@@ -556,10 +556,10 @@ const UserManagement = ({ activeTab = 'users' }) => {
                 handleDeleteUser(record);
               }}
               title="删除用户"
-              disabled={record.role === 'ADMIN'}
+              disabled={record.position === 'MANAGER'}
               style={{
                 fontSize: '16px',
-                color: record.role === 'ADMIN' ? undefined : '#f5222d',
+                color: record.position === 'MANAGER' ? undefined : '#f5222d',
                 padding: '0 6px'
               }}
             />
@@ -882,7 +882,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
         </div>
       )}
       
-      {/* 角色编辑模态框 */}
+      {/* 职位编辑模态框 */}
       <Modal
         title="编辑用户信息"
         open={roleModalVisible}
@@ -894,7 +894,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
       >
         <div style={{ marginBottom: 16 }}>
           <p>用户：{editingUser?.username}</p>
-          <p>当前角色：{editingUser?.role === 'ADMIN' ? '管理员' : '普通用户'}</p>
+          <p>当前职位：{editingUser?.position === 'MANAGER' ? '管理员' : '普通用户'}</p>
         </div>
         <div style={{ marginBottom: 12 }}>
           <label>新用户名：</label>
@@ -913,17 +913,6 @@ const UserManagement = ({ activeTab = 'users' }) => {
             placeholder="请输入新昵称（可留空）"
             style={{ width: '100%', marginTop: 8 }}
           />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>新角色：</label>
-          <Select
-            value={selectedRole}
-            onChange={setSelectedRole}
-            style={{ width: '100%', marginTop: 8 }}
-          >
-            <Option value="USER">普通用户</Option>
-            <Option value="ADMIN">管理员</Option>
-          </Select>
         </div>
         <div>
           <label>新职位：</label>
@@ -991,7 +980,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
         </div>
       </Modal>
 
-      {/* 移除单独的用户名编辑弹窗，功能已合并到角色编辑弹窗 */}
+      {/* 移除单独的用户名编辑弹窗，功能已合并到职位编辑弹窗 */}
 
       {/* 新建用户模态框 */}
       <Modal
@@ -1038,7 +1027,7 @@ const UserManagement = ({ activeTab = 'users' }) => {
           
           <div>
             <label style={{ display: 'block', marginBottom: '8px' }}>
-              角色 <span style={{ color: 'red' }}>*</span>
+              职位 <span style={{ color: 'red' }}>*</span>
             </label>
             <Select
               value={newUserForm.role}

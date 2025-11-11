@@ -8,6 +8,7 @@ import TimetableManagement from './TimetableManagement';
 import Footer from '../components/Footer';
 import './AdminPanel.css';
 import { getAllRegistrationRequests, emergencyFixWeeklyInstances, autoFixWeeklyInstances, cleanDuplicateSchedules, getAllUsers, createTimetableForUser } from '../services/admin';
+import { getCurrentUserPermissions } from '../services/rolePermission';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -21,6 +22,7 @@ const AdminPanel = ({ user }) => {
   const [timetableLoading, setTimetableLoading] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [fixLoading, setFixLoading] = useState(false);
+  const [userPermissions, setUserPermissions] = useState(null);
   
   // 创建课表相关状态
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -35,7 +37,22 @@ const AdminPanel = ({ user }) => {
     endDate: null
   });
 
+  // 获取当前用户权限配置
+  const fetchUserPermissions = async () => {
+    try {
+      const response = await getCurrentUserPermissions();
+      if (response && response.success) {
+        setUserPermissions(response.data);
+      }
+    } catch (error) {
+      console.error('获取用户权限失败:', error);
+    }
+  };
+
   useEffect(() => {
+    // 获取用户权限
+    fetchUserPermissions();
+    
     // 拉取待审批数量
     const fetchPending = async () => {
       try {

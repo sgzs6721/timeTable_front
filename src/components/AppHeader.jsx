@@ -24,7 +24,8 @@ const AppHeader = ({ user, onLogout }) => {
 
   // 获取待审批用户数量
   const fetchPendingCount = async () => {
-    if (user?.role?.toUpperCase() === 'ADMIN') {
+    // 使用权限系统判断是否有管理员权限
+    if (userPermissions?.actionPermissions?.admin) {
       try {
         const response = await getAllRegistrationRequests();
         if (response.success) {
@@ -40,7 +41,8 @@ const AppHeader = ({ user, onLogout }) => {
 
   // 获取待审批机构申请数量
   const fetchOrgPendingCount = async () => {
-    if (user?.role?.toUpperCase() === 'ADMIN') {
+    // 使用权限系统判断是否有机构管理权限
+    if (userPermissions?.actionPermissions?.['organization-management']) {
       try {
         const count = await getPendingRequestsCount();
         setOrgPendingCount(count);
