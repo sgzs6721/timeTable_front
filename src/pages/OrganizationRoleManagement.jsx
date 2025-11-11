@@ -10,7 +10,7 @@ import {
 } from '@ant-design/icons';
 import { getOrganizationRoles, createRole, updateRole, deleteRole } from '../services/organizationRole';
 import { getOrganization, getOrganizationAdmins } from '../services/organization';
-import { getAllUsers, updateUserInfo } from '../services/admin';
+import { getAllUsers, getUsersByOrganization, updateUserInfo } from '../services/admin';
 import './OrganizationRoleManagement.css';
 
 const { Title, Text } = Typography;
@@ -93,14 +93,12 @@ const OrganizationRoleManagement = () => {
         setRoles(rolesResponse.data || []);
       }
 
-      // 获取所有用户（用于成员管理）
-      const usersResponse = await getAllUsers();
+      // 获取指定机构的用户（若后端不支持该参数，会自动回退为全量，再前端过滤）
+      const usersResponse = await getUsersByOrganization(organizationId);
       if (usersResponse.success) {
-        // 只获取属于当前机构的用户
-        const orgUsers = (usersResponse.data || []).filter(
-          user => user.organizationId == organizationId && user.status === 'APPROVED'
-        );
-        setAllUsers(orgUsers);
+        // 不再过滤、全部展示
+        const users = usersResponse.data || usersResponse?.data?.data || [];
+        setAllUsers(users);
       }
     } catch (error) {
       console.error('加载数据失败:', error);
@@ -187,11 +185,11 @@ const OrganizationRoleManagement = () => {
     try {
       setMemberLoading(true);
       
-      // 重新获取最新的用户列表
-      const usersResponse = await getAllUsers();
+      // 重新获取最新的用户列表（按机构）
+      const usersResponse = await getUsersByOrganization(organizationId);
       if (usersResponse.success) {
-        const orgUsers = (usersResponse.data || []).filter(
-          user => user.organizationId == organizationId && user.status === 'APPROVED'
+        const orgUsers = (usersResponse.data || usersResponse?.data?.data || []).filter(
+          user => String(user.organizationId) === String(organizationId)
         );
         setAllUsers(orgUsers);
         
@@ -534,7 +532,12 @@ const OrganizationRoleManagement = () => {
               <List
                 dataSource={roleMembers}
                 renderItem={(member) => {
-                  const positionInfo = getPositionDisplay(member.position);
+                  // 展示真实的 organizationId，显示职位和归属
+                  const positionInfo = getPositionDisplay(member.position, roles);
+                  const orgNote =
+                    String(member.organizationId) !== String(organizationId)
+                      ? `【归属orgId:${member.organizationId}】`
+                      : '';
                   return (
                     <List.Item
                       actions={[
@@ -568,9 +571,11 @@ const OrganizationRoleManagement = () => {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{member.nickname || member.username}</span>
                             <Tag color={positionInfo.color}>{positionInfo.label}</Tag>
+                            {orgNote && (
+                              <span style={{ color: '#f5222d', fontWeight: 700 }}>{orgNote}</span>
+                            )}
                           </div>
                         }
-                        description={member.phone || '未设置手机号'}
                       />
                     </List.Item>
                   );
@@ -608,10 +613,10 @@ const OrganizationRoleManagement = () => {
                   onChange={(value) => setSelectedUserId(value)}
                   value={selectedUserId}
                   options={availableUsers.map(user => {
-                    // 获取当前机构的职位信息，而不是使用全局的POSITION_CONFIG
                     const currentRole = roles.find(role => role.roleCode === user.position);
                     const positionLabel = currentRole ? currentRole.roleName :
-                                      (user.position ? getPositionDisplay(user.position).label : '未设置');
+                                          (user.position ? getPositionDisplay(user.position).label : '未设置');
+                    // 新增org信息
                     return {
                       value: user.id,
                       label: `${user.nickname || user.username} (${positionLabel})`

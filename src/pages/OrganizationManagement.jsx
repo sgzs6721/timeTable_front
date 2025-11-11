@@ -262,24 +262,6 @@ const OrganizationManagement = () => {
 
       <div className="org-card-actions">
         <Button
-          icon={<EyeOutlined />}
-          onClick={() => {
-            handleViewDetail(org);
-          }}
-          className="action-btn detail-btn"
-        >
-          详情
-        </Button>
-        <Button
-          icon={<TeamOutlined />}
-          onClick={() => {
-            handleManageAdmins(org);
-          }}
-          className="action-btn admin-btn"
-        >
-          管理员
-        </Button>
-        <Button
           icon={<UsergroupAddOutlined />}
           onClick={() => {
             navigate(`/organizations/${org.id}/roles`);
@@ -641,7 +623,6 @@ const OrganizationManagement = () => {
                         })()
                       }
                       title={admin.nickname || admin.username}
-                      description={`电话: ${admin.phone || '未设置'}`}
                     />
                   </List.Item>
                 )}
@@ -690,7 +671,7 @@ const OrganizationManagement = () => {
                     value={selectedUserId}
                     options={availableUsers.map(user => ({
                       value: user.id,
-                      label: `${user.nickname || user.username} ${user.phone ? `(${user.phone})` : ''}`
+                      label: `${user.nickname || user.username}`
                     }))}
                   />
                   <Button

@@ -49,6 +49,18 @@ export const getAllUsers = async () => {
   }
 };
 
+// 按机构ID获取用户列表（后端若不支持，将回退到全量后前端过滤）
+export const getUsersByOrganization = async (organizationId) => {
+  try {
+    const response = await api.get(`/admin/users`, {
+      params: { organizationId }
+    });
+    return response;
+  } catch (error) {
+    // 回退：与 getAllUsers 行为一致，交由前端过滤
+    return getAllUsers();
+  }
+};
 // 创建新用户
 export const createUser = async (userData) => {
   try {
