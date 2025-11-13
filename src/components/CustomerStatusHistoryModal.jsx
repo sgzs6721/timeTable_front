@@ -830,7 +830,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                       // 不能选择过去的日期
                       return current && current < dayjs().startOf('day');
                     }}
-                    getPopupContainer={(node) => node.parentNode}
+                    getPopupContainer={() => document.body}
                   />
                 </div>
                 
@@ -872,7 +872,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                       }
                     })}
                     hideDisabledOptions={true}
-                    getPopupContainer={(node) => node.parentNode}
+                    getPopupContainer={() => document.body}
                   />
                 </div>
               </div>
@@ -1081,7 +1081,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                         placeholder="请选择日期"
                         format="YYYY-MM-DD"
                         inputReadOnly
-                        getPopupContainer={(node) => node.parentNode}
+                        getPopupContainer={() => document.body}
                       />
                       <TimePicker
                         value={isEditingReminder ? tempReminderTime : reminderTime}
@@ -1100,7 +1100,7 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                           }
                         })}
                         hideDisabledOptions={true}
-                        getPopupContainer={(node) => node.parentNode}
+                        getPopupContainer={() => document.body}
                       />
                     </div>
                     <div style={{ marginBottom: isEditingReminder ? 8 : 0 }}>

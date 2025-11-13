@@ -22,11 +22,40 @@ code {
   --pastel-4: 186, 255, 201; /* mint */
   --pastel-5: 186, 225, 255; /* sky */
   --pastel-6: 218, 198, 255; /* lavender */
+  /* Primary color override */
+  --primary-color: #722ED1;
 }
 
 .app-container {
   min-height: 100vh;
   background: transparent;
+}
+
+/* Ant Design Primary Button Global Style Override */
+.ant-btn-primary {
+  background-color: #9254de !important;
+  border-color: #9254de !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  background-color: #722ED1 !important;
+  border-color: #722ED1 !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:active {
+  background-color: #531dab !important;
+  border-color: #531dab !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:disabled {
+  background-color: #9254de !important;
+  border-color: #9254de !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+  opacity: 0.6;
 }
 
 /* Header 样式 */
