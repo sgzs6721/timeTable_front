@@ -32,30 +32,44 @@ code {
 }
 
 /* Ant Design Primary Button Global Style Override */
+.ant-btn.ant-btn-primary,
+button.ant-btn.ant-btn-primary,
 .ant-btn-primary {
   background-color: #9254de !important;
   border-color: #9254de !important;
   color: #ffffff !important;
+  background-image: none !important;
 }
 
+.ant-btn.ant-btn-primary:hover,
+.ant-btn.ant-btn-primary:focus,
+button.ant-btn.ant-btn-primary:hover,
+button.ant-btn.ant-btn-primary:focus,
 .ant-btn-primary:hover,
 .ant-btn-primary:focus {
   background-color: #722ED1 !important;
   border-color: #722ED1 !important;
   color: #ffffff !important;
+  background-image: none !important;
 }
 
+.ant-btn.ant-btn-primary:active,
+button.ant-btn.ant-btn-primary:active,
 .ant-btn-primary:active {
   background-color: #531dab !important;
   border-color: #531dab !important;
   color: #ffffff !important;
+  background-image: none !important;
 }
 
+.ant-btn.ant-btn-primary:disabled,
+button.ant-btn.ant-btn-primary:disabled,
 .ant-btn-primary:disabled {
   background-color: #9254de !important;
   border-color: #9254de !important;
   color: rgba(255, 255, 255, 0.45) !important;
   opacity: 0.6;
+  background-image: none !important;
 }
 
 /* Header 样式 */
@@ -248,6 +262,37 @@ code {
 
 /* 移动端适配 (768px 以下) */
 @media (max-width: 768px) {
+  /* 确保移动端按钮样式 */
+  .ant-btn.ant-btn-primary,
+  button.ant-btn.ant-btn-primary,
+  .ant-btn-primary {
+    background-color: #9254de !important;
+    border-color: #9254de !important;
+    color: #ffffff !important;
+    background-image: none !important;
+  }
+
+  .ant-btn.ant-btn-primary:hover,
+  .ant-btn.ant-btn-primary:focus,
+  button.ant-btn.ant-btn-primary:hover,
+  button.ant-btn.ant-btn-primary:focus,
+  .ant-btn-primary:hover,
+  .ant-btn-primary:focus {
+    background-color: #722ED1 !important;
+    border-color: #722ED1 !important;
+    color: #ffffff !important;
+    background-image: none !important;
+  }
+
+  .ant-btn.ant-btn-primary:active,
+  button.ant-btn.ant-btn-primary:active,
+  .ant-btn-primary:active {
+    background-color: #531dab !important;
+    border-color: #531dab !important;
+    color: #ffffff !important;
+    background-image: none !important;
+  }
+
   .layout-header {
     padding: 0 16px;
     height: 67px !important;
@@ -346,6 +391,37 @@ code {
 
 /* 小屏幕设备适配 (480px 以下) */
 @media (max-width: 480px) {
+  /* 确保小屏幕设备按钮样式 */
+  .ant-btn.ant-btn-primary,
+  button.ant-btn.ant-btn-primary,
+  .ant-btn-primary {
+    background-color: #9254de !important;
+    border-color: #9254de !important;
+    color: #ffffff !important;
+    background-image: none !important;
+  }
+
+  .ant-btn.ant-btn-primary:hover,
+  .ant-btn.ant-btn-primary:focus,
+  button.ant-btn.ant-btn-primary:hover,
+  button.ant-btn.ant-btn-primary:focus,
+  .ant-btn-primary:hover,
+  .ant-btn-primary:focus {
+    background-color: #722ED1 !important;
+    border-color: #722ED1 !important;
+    color: #ffffff !important;
+    background-image: none !important;
+  }
+
+  .ant-btn.ant-btn-primary:active,
+  button.ant-btn.ant-btn-primary:active,
+  .ant-btn-primary:active {
+    background-color: #531dab !important;
+    border-color: #531dab !important;
+    color: #ffffff !important;
+    background-image: none !important;
+  }
+
   .layout-header {
     height: 60px !important;
     line-height: 60px !important;
