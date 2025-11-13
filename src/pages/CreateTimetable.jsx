@@ -92,7 +92,7 @@ const CreateTimetable = ({ user }) => {
                 label="开始日期"
                 rules={[{ required: true, message: '请选择开始日期!' }]}
               >
-                <DatePicker style={{ width: '100%' }} placeholder="选择开始日期" />
+                <DatePicker style={{ width: '100%' }} placeholder="选择开始日期" inputReadOnly />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -112,7 +112,7 @@ const CreateTimetable = ({ user }) => {
                   }),
                 ]}
               >
-                <DatePicker style={{ width: '100%' }} placeholder="选择结束日期" />
+                <DatePicker style={{ width: '100%' }} placeholder="选择结束日期" inputReadOnly />
               </Form.Item>
             </Col>
           </Row>

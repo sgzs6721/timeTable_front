@@ -96,7 +96,7 @@ const EditScheduleModal = ({ visible, onCancel, onOk, schedule, timetable }) => 
             name="scheduleDate"
             rules={[{ required: true, message: '请选择日期' }]}
           >
-            <DatePicker format="YYYY-MM-DD" />
+            <DatePicker format="YYYY-MM-DD" inputReadOnly />
           </Form.Item>
         )}
 
@@ -105,7 +105,7 @@ const EditScheduleModal = ({ visible, onCancel, onOk, schedule, timetable }) => 
           name="timeRange"
           rules={[{ required: true, message: '请选择时间段' }]}
         >
-          <TimeRangePicker format="HH:mm" />
+          <TimeRangePicker format="HH:mm" inputReadOnly />
         </Form.Item>
       </Form>
     </Modal>

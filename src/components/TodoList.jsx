@@ -870,6 +870,7 @@ const TodoList = ({ onUnreadCountChange, user }) => {
                           onChange={(date) => {
                             setEditingDate(date ? date.format('YYYY-MM-DD') : null);
                           }}
+                          inputReadOnly
                         />
                         <TimePicker
                           value={editingTime ? dayjs(editingTime, 'HH:mm:ss') : null}
@@ -879,6 +880,7 @@ const TodoList = ({ onUnreadCountChange, user }) => {
                           onChange={(time) => {
                             setEditingTime(time ? `${time.format('HH:mm')}:00` : null);
                           }}
+                          inputReadOnly
                         />
                       </Space>
                       <Space size="small">
@@ -1457,6 +1459,7 @@ const TodoList = ({ onUnreadCountChange, user }) => {
               size="large"
               allowClear
               format="YYYY-MM-DD"
+              inputReadOnly
             />
           </div>
         </div>

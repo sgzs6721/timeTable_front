@@ -106,6 +106,7 @@ const CreateTodoModal = ({ visible, onCancel, onSuccess }) => {
             format="YYYY-MM-DD"
             placeholder="选择提醒日期"
             disabledDate={(current) => current && current < dayjs().startOf('day')}
+            inputReadOnly
           />
         </Form.Item>
 
@@ -119,6 +120,7 @@ const CreateTodoModal = ({ visible, onCancel, onSuccess }) => {
             style={{ width: '100%' }}
             format="HH:mm"
             placeholder="选择提醒时间"
+            inputReadOnly
           />
         </Form.Item>
       </Form>

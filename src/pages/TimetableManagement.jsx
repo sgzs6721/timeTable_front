@@ -943,6 +943,7 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
               value={dateRange?.[0] || null}
               onChange={(v) => setDateRange([v, dateRange?.[1] || null])}
               disabled={converting}
+              inputReadOnly
             />
             <div style={{ marginBottom: 8 }}>结束日期：</div>
             <DatePicker
@@ -950,6 +951,7 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
               value={dateRange?.[1] || null}
               onChange={(v) => setDateRange([dateRange?.[0] || null, v])}
               disabled={converting}
+              inputReadOnly
             />
             {/* 版权信息 */}
             <Footer />
