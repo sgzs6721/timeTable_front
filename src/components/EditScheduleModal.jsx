@@ -105,7 +105,12 @@ const EditScheduleModal = ({ visible, onCancel, onOk, schedule, timetable }) => 
           name="timeRange"
           rules={[{ required: true, message: '请选择时间段' }]}
         >
-          <TimeRangePicker format="HH:mm" inputReadOnly />
+          <TimeRangePicker 
+            format="HH:mm" 
+            inputReadOnly 
+            popupClassName="ios-timepicker-fix"
+            getPopupContainer={() => document.body}
+          />
         </Form.Item>
       </Form>
     </Modal>

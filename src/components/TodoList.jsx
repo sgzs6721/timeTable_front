@@ -881,6 +881,8 @@ const TodoList = ({ onUnreadCountChange, user }) => {
                             setEditingTime(time ? `${time.format('HH:mm')}:00` : null);
                           }}
                           inputReadOnly
+                          popupClassName="ios-timepicker-fix"
+                          getPopupContainer={() => document.body}
                         />
                       </Space>
                       <Space size="small">

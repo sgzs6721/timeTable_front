@@ -1612,3 +1612,74 @@ button.ant-btn.ant-btn-primary:disabled,
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
+
+/* iOS 16 TimePicker 兼容性修复 */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 768px) {
+    /* TimePicker 弹窗居中显示 */
+    .ios-timepicker-fix.ant-picker-dropdown,
+    .ant-picker-dropdown.ant-picker-dropdown-placement-bottomLeft {
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      z-index: 10000 !important;
+      max-width: 90vw !important;
+      max-height: 70vh !important;
+      overflow: visible !important;
+    }
+
+    .ios-timepicker-fix .ant-picker-time-panel,
+    .ant-picker-time-panel {
+      position: relative !important;
+      background: white !important;
+      border-radius: 8px !important;
+      box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05) !important;
+      max-height: 60vh !important;
+      overflow: hidden !important;
+      width: 280px !important;
+    }
+
+    .ios-timepicker-fix .ant-picker-time-panel-column,
+    .ant-picker-time-panel-column {
+      height: 200px !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+    }
+
+    .ios-timepicker-fix .ant-picker-time-panel-cell,
+    .ant-picker-time-panel-cell {
+      padding: 8px 0 !important;
+      height: 40px !important;
+      line-height: 24px !important;
+      text-align: center !important;
+      font-size: 16px !important;
+    }
+
+    /* 确保弹窗背景遮罩正确显示 */
+    .ios-timepicker-fix::before,
+    .ant-picker-dropdown::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: -1;
+    }
+  }
+}
+
+/* 通用 iOS 兼容性修复 - 不依赖 @supports */
+@media (max-width: 768px) and (-webkit-min-device-pixel-ratio: 1) {
+  .ios-timepicker-fix {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 10000 !important;
+    max-width: 90vw !important;
+    max-height: 70vh !important;
+  }
+}
