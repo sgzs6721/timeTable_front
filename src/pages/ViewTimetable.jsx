@@ -748,6 +748,7 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
             <Button
               size="small"
               type={halfHourPosition === 'first' ? 'primary' : 'default'}
+              ghost={halfHourPosition === 'first'}
               onClick={() => setHalfHourPosition('first')}
               disabled={addLoading || (disableHalfHourSwitch && halfHourPosition !== 'first')}
               style={{ flex: 1, fontSize: '11px' }}
@@ -773,6 +774,7 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
             <Button
               size="small"
               type={halfHourPosition === 'second' ? 'primary' : 'default'}
+              ghost={halfHourPosition === 'second'}
               onClick={() => setHalfHourPosition('second')}
               disabled={addLoading || (disableHalfHourSwitch && halfHourPosition !== 'second')}
               style={{ flex: 1, fontSize: '11px' }}
@@ -847,6 +849,7 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
             <Button
               size="small"
               type={halfHourPosition === 'first' ? 'primary' : 'default'}
+              ghost={halfHourPosition === 'first'}
               onClick={() => setHalfHourPosition('first')}
               disabled={addLoading || (disableHalfHourSwitch && halfHourPosition !== 'first')}
               style={{ flex: 1, fontSize: '11px' }}
@@ -856,6 +859,7 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
             <Button
               size="small"
               type={halfHourPosition === 'second' ? 'primary' : 'default'}
+              ghost={halfHourPosition === 'second'}
               onClick={() => setHalfHourPosition('second')}
               disabled={addLoading || (disableHalfHourSwitch && halfHourPosition !== 'second')}
               style={{ flex: 1, fontSize: '11px' }}
