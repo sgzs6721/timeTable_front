@@ -608,7 +608,7 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
                             时间：
                             {trial.trialScheduleDate 
                               ? dayjs(trial.trialScheduleDate).format('YYYY-MM-DD') 
-                              : '-'} {trial.trialStartTime || ''}-{trial.trialEndTime || ''}
+                              : '-'} {trial.trialStartTime ? dayjs(trial.trialStartTime, 'HH:mm:ss').format('HH:mm') : ''}-{trial.trialEndTime ? dayjs(trial.trialEndTime, 'HH:mm:ss').format('HH:mm') : ''}
                           </div>
                           {!trial.trialCancelled && (trial.status === 'SCHEDULED' || trial.status === 'RE_EXPERIENCE') && (
                             <Button
