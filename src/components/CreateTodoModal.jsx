@@ -121,7 +121,7 @@ const CreateTodoModal = ({ visible, onCancel, onSuccess }) => {
             format="HH:mm"
             placeholder="选择提醒时间"
             inputReadOnly
-            popupClassName="ios-timepicker-fix"
+            classNames={{ popup: 'ios-timepicker-fix' }}
             getPopupContainer={() => document.body}
           />
         </Form.Item>

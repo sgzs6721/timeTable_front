@@ -9,7 +9,9 @@ import {
   DatePicker, 
   Select,
   Empty,
-  Input
+  Input,
+  TimePicker,
+  Space
 } from 'antd';
 import { 
   CheckCircleOutlined, 
@@ -22,7 +24,10 @@ import {
   CopyOutlined,
   HistoryOutlined,
   UserSwitchOutlined,
-  SearchOutlined
+  SearchOutlined,
+  EditOutlined,
+  SaveOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { changeCustomerStatus } from '../services/customerStatusHistory';
@@ -42,6 +47,10 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
   const [creatorsMap, setCreatorsMap] = useState({});
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [editingTrialId, setEditingTrialId] = useState(null); // 正在编辑的体验ID
+  const [editingDate, setEditingDate] = useState(null); // 编辑中的日期
+  const [editingTimeRange, setEditingTimeRange] = useState(null); // 编辑中的时间范围
+  const [editingLoading, setEditingLoading] = useState(false); // 编辑保存中
   
   // 获取当前用户信息
   const [currentUser, setCurrentUser] = useState(null);
@@ -206,6 +215,69 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
       console.error('取消体验课程失败:', error);
       message.error({ content: '取消体验课程失败', key: 'cancelTrial' });
     }
+  };
+
+  // 开始编辑体验时间
+  const handleStartEditTrial = (trial) => {
+    setEditingTrialId(trial.historyId);
+    setEditingDate(trial.trialScheduleDate ? dayjs(trial.trialScheduleDate) : null);
+    if (trial.trialStartTime && trial.trialEndTime) {
+      setEditingTimeRange([
+        dayjs(trial.trialStartTime, 'HH:mm:ss'),
+        dayjs(trial.trialEndTime, 'HH:mm:ss')
+      ]);
+    }
+  };
+
+  // 保存编辑的体验时间
+  const handleSaveEditTrial = async (trial) => {
+    if (!editingDate || !editingTimeRange || editingTimeRange.length !== 2) {
+      message.warning('请选择完整的日期和时间');
+      return;
+    }
+
+    setEditingLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${getApiBaseUrl()}/customers/${trial.customerId}/status-history/${trial.historyId}/update-trial-time`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            trialScheduleDate: editingDate.format('YYYY-MM-DD'),
+            trialStartTime: editingTimeRange[0].format('HH:mm:ss'),
+            trialEndTime: editingTimeRange[1].format('HH:mm:ss')
+          })
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        message.success('体验时间已更新');
+        setEditingTrialId(null);
+        setEditingDate(null);
+        setEditingTimeRange(null);
+        await fetchTrials();
+      } else {
+        message.error(data.message || '更新失败');
+      }
+    } catch (error) {
+      console.error('更新体验时间失败:', error);
+      message.error('更新失败');
+    } finally {
+      setEditingLoading(false);
+    }
+  };
+
+  // 取消编辑
+  const handleCancelEditTrial = () => {
+    setEditingTrialId(null);
+    setEditingDate(null);
+    setEditingTimeRange(null);
   };
 
   const getStatusTag = (trial) => {
@@ -466,26 +538,98 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
                       </div>
 
                       {/* 第二行：体验时间 */}
-                      <div style={{ 
-                        marginBottom: 8,
-                        fontSize: '16px',
-                        color: '#1890ff'
-                      }}>
-                        <ClockCircleOutlined style={{ marginRight: 6, fontSize: '16px' }} />
-                        体验时间：
-                        {trial.trialScheduleDate 
-                          ? dayjs(trial.trialScheduleDate).format('YYYY-MM-DD') 
-                          : '-'} {trial.trialStartTime || ''}-{trial.trialEndTime || ''}
-                      </div>
+                      {editingTrialId === trial.historyId ? (
+                        // 编辑模式
+                        <div style={{ 
+                          marginBottom: 8,
+                          padding: '8px',
+                          backgroundColor: '#f0f5ff',
+                          borderRadius: '4px',
+                          border: '1px solid #91caff'
+                        }}>
+                          <div style={{ marginBottom: 8, fontSize: '13px', color: '#1890ff', fontWeight: 500 }}>
+                            编辑体验时间：
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: 8 }}>
+                            <DatePicker
+                              value={editingDate}
+                              onChange={setEditingDate}
+                              format="YYYY-MM-DD"
+                              style={{ flex: 1 }}
+                              placeholder="选择日期"
+                              inputReadOnly
+                              getPopupContainer={() => document.body}
+                            />
+                            <TimePicker.RangePicker
+                              value={editingTimeRange}
+                              onChange={setEditingTimeRange}
+                              format="HH:mm"
+                              style={{ flex: 1 }}
+                              placeholder={['开始', '结束']}
+                              minuteStep={30}
+                              showNow={false}
+                              inputReadOnly
+                              hideDisabledOptions={true}
+                              getPopupContainer={() => document.body}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <Button 
+                              size="small" 
+                              icon={<SaveOutlined />}
+                              type="primary"
+                              loading={editingLoading}
+                              onClick={() => handleSaveEditTrial(trial)}
+                            >
+                              保存
+                            </Button>
+                            <Button 
+                              size="small" 
+                              icon={<CloseOutlined />}
+                              onClick={handleCancelEditTrial}
+                              disabled={editingLoading}
+                            >
+                              取消
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        // 显示模式
+                        <div style={{ 
+                          marginBottom: 8,
+                          fontSize: '16px',
+                          color: '#666',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div>
+                            <ClockCircleOutlined style={{ marginRight: 6, fontSize: '16px' }} />
+                            时间：
+                            {trial.trialScheduleDate 
+                              ? dayjs(trial.trialScheduleDate).format('YYYY-MM-DD') 
+                              : '-'} {trial.trialStartTime || ''}-{trial.trialEndTime || ''}
+                          </div>
+                          {!trial.trialCancelled && (trial.status === 'SCHEDULED' || trial.status === 'RE_EXPERIENCE') && (
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => handleStartEditTrial(trial)}
+                              style={{ color: '#666', padding: 0 }}
+                            />
+                          )}
+                        </div>
+                      )}
 
-                      {/* 第三行：体验教练 */}
+                      {/* 第三行：教练 */}
                       <div style={{ 
                         marginBottom: 8,
                         fontSize: '16px',
                         color: '#666'
                       }}>
                         <UserOutlined style={{ marginRight: '6px', fontSize: '16px' }} />
-                        体验教练：{trial.trialCoachName || '未指定'}
+                        教练：{trial.trialCoachName || '未指定'}
                       </div>
 
                       {/* 第四行：操作按钮 */}

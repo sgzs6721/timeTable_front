@@ -545,19 +545,19 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
               调换
             </Button>
             <Button
-              type="primary"
-              danger
-              loading={deleteLoading}
+              type="default"
+              size="small"
               onClick={(e) => { 
                 e.stopPropagation(); 
                 onDelete(); 
               }}
-              size="small"
+              loading={deleteLoading}
               disabled={deleteLoading}
-              style={{ 
+              style={{
                 flex: 1,
                 backgroundColor: '#ff4d4f',
-                borderColor: '#ff4d4f'
+                borderColor: '#ff4d4f',
+                color: 'white'
               }}
             >
               删除
@@ -1664,7 +1664,7 @@ const ViewTimetable = ({ user }) => {
             }, 100);
           }
         }}
-                          overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                          styles={{ body: { maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' } }}
                       overlayStyle={{ maxWidth: '90vw' }}
       >
         <div style={{ height: '48px', cursor: 'pointer' }} />
@@ -5154,7 +5154,7 @@ const ViewTimetable = ({ user }) => {
                 trigger={multiSelectMode ? "contextMenu" : (deleteMode ? "none" : "click")}
                 open={!timetable?.isArchived && !deleteMode && (openPopoverKey === cellKey || (schedules.length > 0 && schedules.some(s => s.id === openScheduleId)))}
                 onOpenChange={handleOpenChange}
-                overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                styles={{ body: { maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' } }}
                 overlayStyle={{ maxWidth: '90vw' }}
               >
                 <div style={{ 
@@ -5811,7 +5811,7 @@ const ViewTimetable = ({ user }) => {
                               setOpenScheduleId(newOpen ? firstHalfCourse.id : null);
                             }
                           }}
-                          overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                          styles={{ body: { maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' } }}
                           overlayStyle={{ maxWidth: '90vw' }}
                     >
                       <div
@@ -5875,7 +5875,7 @@ const ViewTimetable = ({ user }) => {
                       trigger="click"
                       open={!timetable?.isArchived && openPopoverKey === `${cellKey}-first-half-empty`}
                       onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-first-half-empty` : null)}
-                      overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                      styles={{ body: { maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' } }}
                       overlayStyle={{ maxWidth: '90vw' }}
                     >
                       <div style={{
@@ -5952,7 +5952,7 @@ const ViewTimetable = ({ user }) => {
                               setOpenScheduleId(newOpen ? secondHalfCourse.id : null);
                             }
                           }}
-                          overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                          styles={{ body: { maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' } }}
                           overlayStyle={{ maxWidth: '90vw' }}
                     >
                       <div
@@ -6016,7 +6016,7 @@ const ViewTimetable = ({ user }) => {
                       trigger="click"
                       open={!timetable?.isArchived && openPopoverKey === `${cellKey}-second-half-empty`}
                       onOpenChange={(newOpen) => setOpenPopoverKey(newOpen ? `${cellKey}-second-half-empty` : null)}
-                      overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+                      styles={{ body: { maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' } }}
                       overlayStyle={{ maxWidth: '90vw' }}
                     >
                       <div style={{
@@ -6039,7 +6039,7 @@ const ViewTimetable = ({ user }) => {
               trigger="click"
               open={openPopoverKey === cellKey}
               onOpenChange={handleOpenChange}
-              overlayInnerStyle={{ maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' }}
+              styles={{ body: { maxHeight: '80vh', maxWidth: '90vw', overflow: 'auto', overflowX: 'hidden' } }}
               overlayStyle={{ maxWidth: '90vw' }}
             >
               <div className="schedule-cell-content" style={{ position: 'relative', height: '48px' }}>
@@ -6817,7 +6817,7 @@ const ViewTimetable = ({ user }) => {
             zIndex: 1000,
             borderRadius: '6px'
           }}>
-            <Spin size="small" tip={
+            <Spin size="small" description={
               loading ? "正在加载课表..." :
               isInitialLoading ? "正在初始化..." :
               instancesLoading ? "切换周实例中..." : 

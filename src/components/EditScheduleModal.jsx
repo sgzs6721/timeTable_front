@@ -108,7 +108,7 @@ const EditScheduleModal = ({ visible, onCancel, onOk, schedule, timetable }) => 
           <TimeRangePicker 
             format="HH:mm" 
             inputReadOnly 
-            popupClassName="ios-timepicker-fix"
+            classNames={{ popup: 'ios-timepicker-fix' }}
             getPopupContainer={() => document.body}
           />
         </Form.Item>

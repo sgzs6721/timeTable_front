@@ -96,6 +96,10 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [expandedHistories, setExpandedHistories] = useState({});
   const [editingHistoryId, setEditingHistoryId] = useState(null);
   const [editingHistoryNotes, setEditingHistoryNotes] = useState('');
+  const [editingTrialHistoryId, setEditingTrialHistoryId] = useState(null);
+  const [editingDate, setEditingDate] = useState(null);
+  const [editingTimeRange, setEditingTimeRange] = useState(null);
+  const [editingLoading, setEditingLoading] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assigningCustomer, setAssigningCustomer] = useState(null);
 
@@ -459,6 +463,79 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       console.error('标记体验完成失败:', error);
       message.error({ content: '标记体验完成失败', key: 'completeTrial' });
     }
+  };
+
+  // 开始编辑体验时间
+  const handleStartEditTrial = (history) => {
+    setEditingTrialHistoryId(history.id);
+    setEditingDate(history.trialScheduleDate ? dayjs(history.trialScheduleDate) : null);
+    if (history.trialStartTime && history.trialEndTime) {
+      setEditingTimeRange([
+        dayjs(history.trialStartTime, 'HH:mm:ss'),
+        dayjs(history.trialEndTime, 'HH:mm:ss')
+      ]);
+    } else {
+      setEditingTimeRange(null);
+    }
+  };
+
+  // 保存编辑的体验时间
+  const handleSaveEditTrial = async (customerId, history) => {
+    if (!editingDate || !editingTimeRange || editingTimeRange.length !== 2) {
+      message.warning('请选择完整的日期和时间');
+      return;
+    }
+
+    setEditingLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${getApiBaseUrl()}/customers/${customerId}/status-history/${history.id}/update-trial-time`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            trialScheduleDate: editingDate.format('YYYY-MM-DD'),
+            trialStartTime: editingTimeRange[0].format('HH:mm:ss'),
+            trialEndTime: editingTimeRange[1].format('HH:mm:ss')
+          })
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        message.success('体验时间已更新');
+        setEditingTrialHistoryId(null);
+        setEditingDate(null);
+        setEditingTimeRange(null);
+        
+        // 刷新该客户的历史记录
+        const historyResponse = await getCustomerStatusHistory(customerId);
+        if (historyResponse && historyResponse.success && historyResponse.data) {
+          setCustomerHistories(prev => ({
+            ...prev,
+            [customerId]: historyResponse.data
+          }));
+        }
+      } else {
+        message.error(data.message || '更新失败');
+      }
+    } catch (error) {
+      console.error('更新体验时间失败:', error);
+      message.error('更新失败');
+    } finally {
+      setEditingLoading(false);
+    }
+  };
+
+  // 取消编辑体验时间
+  const handleCancelEditTrial = () => {
+    setEditingTrialHistoryId(null);
+    setEditingDate(null);
+    setEditingTimeRange(null);
   };
 
   const fetchSalesList = async () => {
@@ -1610,29 +1687,108 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                               alignItems: 'center'
                             }}>
                               <div style={{ flex: 1 }}>
-                                <div style={{ 
-                                  fontSize: '11px', 
-                                  color: '#000',
-                                  marginBottom: 4
-                                }}>
-                                  <CalendarOutlined style={{ marginRight: 4 }} />
-                                  体验时间：
-                                  <span style={{ 
+                                {editingTrialHistoryId === history.id ? (
+                                  <div style={{ marginBottom: 4 }}>
+                                    <div style={{ fontSize: '11px', color: '#000', marginBottom: 4 }}>
+                                      <CalendarOutlined style={{ marginRight: 4 }} />
+                                      时间：
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: 8 }}>
+                                      <DatePicker
+                                        value={editingDate}
+                                        onChange={setEditingDate}
+                                        format="YYYY-MM-DD"
+                                        style={{ flex: 1, fontSize: '11px' }}
+                                        size="small"
+                                        inputReadOnly
+                                      />
+                                      <TimePicker.RangePicker
+                                        value={editingTimeRange}
+                                        onChange={(times) => {
+                                          console.log('Time changed:', times);
+                                          setEditingTimeRange(times);
+                                        }}
+                                        onSelect={(times) => {
+                                          console.log('Time selected:', times);
+                                          setEditingTimeRange(times);
+                                        }}
+                                        format="HH:mm"
+                                        style={{ flex: 1, fontSize: '11px' }}
+                                        size="small"
+                                        minuteStep={30}
+                                        showNow={false}
+                                        inputReadOnly
+                                        needConfirm={true}
+                                        disabledMinutes={() => {
+                                          const allMinutes = Array.from({ length: 60 }, (_, i) => i);
+                                          return allMinutes.filter(m => m !== 0 && m !== 30);
+                                        }}
+                                        hideDisabledOptions={false}
+                                        popupClassName="show-all-minutes-picker"
+                                      />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                      <Button 
+                                        size="small" 
+                                        icon={<SaveOutlined />}
+                                        type="primary"
+                                        loading={editingLoading}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSaveEditTrial(customer.id, history);
+                                        }}
+                                      >
+                                        保存
+                                      </Button>
+                                      <Button 
+                                        size="small" 
+                                        icon={<CloseOutlined />}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCancelEditTrial();
+                                        }}
+                                        disabled={editingLoading}
+                                      >
+                                        取消
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ 
                                     fontSize: '11px', 
-                                    color: '#666',
-                                    textDecoration: history.trialCancelled ? 'line-through' : 'none',
-                                    marginLeft: '4px'
+                                    color: '#000',
+                                    marginBottom: 4
                                   }}>
-                                    {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
-                                    {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
-                                    {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
-                                    {' '}
-                                    {(() => {
-                                      const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-                                      return weekdays[dayjs(history.trialScheduleDate).day()];
-                                    })()}
-                                  </span>
-                                </div>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                      <CalendarOutlined style={{ marginRight: 4 }} />
+                                      时间：
+                                      <span style={{ 
+                                        fontSize: '11px', 
+                                        color: '#666',
+                                        textDecoration: history.trialCancelled ? 'line-through' : 'none',
+                                        marginLeft: '4px'
+                                      }}>
+                                        {dayjs(history.trialScheduleDate).format('YYYY-MM-DD')} {' '}
+                                        {dayjs(history.trialStartTime, 'HH:mm:ss').format('HH:mm')}-
+                                        {dayjs(history.trialEndTime, 'HH:mm:ss').format('HH:mm')}
+                                      </span>
+                                      {!history.trialCancelled && !history.trialCompleted && (
+                                        <EditOutlined
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStartEditTrial(history);
+                                          }}
+                                          style={{ 
+                                            color: '#1890ff', 
+                                            cursor: 'pointer',
+                                            fontSize: '11px',
+                                            marginLeft: '4px'
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                                 {history.trialCoachName && (
                                   <div style={{ 
                                     fontSize: '11px', 
@@ -1640,55 +1796,57 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                                     marginTop: 4
                                   }}>
                                     <UserOutlined style={{ marginRight: 4 }} />
-                                    体验教练：{history.trialCoachName}
+                                    教练：{history.trialCoachName}
                                   </div>
                                 )}
                               </div>
-                              {history.trialCancelled ? (
-                                <Tag color="default" size="small" style={{ marginLeft: 8 }}>已取消</Tag>
-                              ) : history.trialCompleted ? (
-                                <Tag color="success" size="small" style={{ marginLeft: 8 }}>已完成</Tag>
-                              ) : (
-                                <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
-                                  <Popconfirm
-                                    title="确定取消体验课程？"
-                                    description="取消后将标记为已取消"
-                                    onConfirm={(e) => {
-                                      e?.stopPropagation();
-                                      handleCancelTrialSchedule(customer.id, history.id);
-                                    }}
-                                    okText="确定"
-                                    cancelText="取消"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <Button 
-                                      type="text" 
-                                      danger
-                                      size="small"
+                              {editingTrialHistoryId === history.id ? null : (
+                                history.trialCancelled ? (
+                                  <Tag color="default" size="small" style={{ marginLeft: 8 }}>已取消</Tag>
+                                ) : history.trialCompleted ? (
+                                  <Tag color="success" size="small" style={{ marginLeft: 8 }}>已完成</Tag>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
+                                    <Popconfirm
+                                      title="确定取消体验课程？"
+                                      description="取消后将标记为已取消"
+                                      onConfirm={(e) => {
+                                        e?.stopPropagation();
+                                        handleCancelTrialSchedule(customer.id, history.id);
+                                      }}
+                                      okText="确定"
+                                      cancelText="取消"
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      取消
-                                    </Button>
-                                  </Popconfirm>
-                                  <Popconfirm
-                                    title="确定标记为已完成？"
-                                    onConfirm={(e) => {
-                                      e?.stopPropagation();
-                                      handleCompleteTrialSchedule(customer.id, history.id);
-                                    }}
-                                    okText="确定"
-                                    cancelText="取消"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <Button 
-                                      type="primary"
-                                      size="small"
+                                      <Button 
+                                        type="text" 
+                                        danger
+                                        size="small"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        取消
+                                      </Button>
+                                    </Popconfirm>
+                                    <Popconfirm
+                                      title="确定标记为已完成？"
+                                      onConfirm={(e) => {
+                                        e?.stopPropagation();
+                                        handleCompleteTrialSchedule(customer.id, history.id);
+                                      }}
+                                      okText="确定"
+                                      cancelText="取消"
                                       onClick={(e) => e.stopPropagation()}
                                     >
+                                      <Button 
+                                        type="primary"
+                                        size="small"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
                                       完成
                                     </Button>
-                                  </Popconfirm>
-                                </div>
+                                    </Popconfirm>
+                                  </div>
+                                )
                               )}
                             </div>
                           )}
@@ -2229,7 +2387,14 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               />
               <TimePicker
                 value={todoReminderTime}
-                onChange={setTodoReminderTime}
+                onChange={(time) => {
+                  console.log('Reminder time changed:', time);
+                  setTodoReminderTime(time);
+                }}
+                onSelect={(time) => {
+                  console.log('Reminder time selected:', time);
+                  setTodoReminderTime(time);
+                }}
                 style={{ flex: 1 }}
                 placeholder="请选择提醒时间"
                 format="HH:mm"
@@ -2240,11 +2405,10 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                     return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
                   }
                 })}
-                showTime={{
-                  hideDisabledOptions: true
-                }}
+                hideDisabledOptions={false}
                 showNow={false}
-                popupClassName="custom-time-picker"
+                needConfirm={true}
+                popupClassName="show-all-minutes-picker"
               />
             </div>
           </div>

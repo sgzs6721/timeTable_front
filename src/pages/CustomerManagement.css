@@ -103,3 +103,168 @@
   touch-action: pan-y !important;
   overscroll-behavior: contain !important;
 }
+
+/* 时间选择器样式优化 - 显示所有分钟选项 */
+.show-all-minutes-picker .ant-picker-time-panel-column {
+  overflow-y: auto;
+  max-height: 224px; /* 确保能显示多个选项 */
+}
+
+/* 确保选中项居中显示 */
+.show-all-minutes-picker .ant-picker-time-panel-column > li.ant-picker-time-panel-cell-selected {
+  font-weight: bold;
+  background: #e6f7ff;
+}
+
+/* 强制显示00和30分钟选项 */
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) {
+  height: auto !important;
+}
+
+/* 设置分钟面板的初始滚动位置，确保00和30同时可见 */
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 特别处理分钟面板中的00和30选项 */
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) li:nth-child(1),
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) li:nth-child(31) {
+  display: block !important;
+}
+
+/* 调整滚动条样式 */
+.show-all-minutes-picker .ant-picker-time-panel-column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.show-all-minutes-picker .ant-picker-time-panel-column::-webkit-scrollbar-thumb {
+  background-color: #d9d9d9;
+  border-radius: 4px;
+}
+
+/* 确保选中项居中显示 */
+.show-all-minutes-picker .ant-picker-time-panel-column > li.ant-picker-time-panel-cell {
+  text-align: center;
+  width: 100%;
+}
+
+/* 选中项样式 */
+.show-all-minutes-picker .ant-picker-time-panel-column > li.ant-picker-time-panel-cell-selected {
+  font-weight: bold;
+  background: #e6f7ff;
+  position: relative;
+}
+
+/* 确保选中项始终居中显示 */
+.show-all-minutes-picker .ant-picker-time-panel-column {
+  position: relative;
+}
+
+.show-all-minutes-picker .ant-picker-time-panel-column::before,
+.show-all-minutes-picker .ant-picker-time-panel-column::after {
+  content: '';
+  display: block;
+  height: 32px;
+  width: 100%;
+}
+
+/* 设置滚动行为，使选中项居中 */
+.show-all-minutes-picker .ant-picker-time-panel-column {
+  scroll-padding: 50px 0;
+  scroll-snap-type: y mandatory;
+}
+
+.show-all-minutes-picker .ant-picker-time-panel-cell {
+  scroll-snap-align: center;
+}
+
+/* 设置分钟面板的高度和填充，确保可以同时显示00和30 */
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) {
+  padding-top: 0;
+  padding-bottom: 0;
+  min-height: 100px;
+  scroll-behavior: auto;
+  scroll-padding-top: 32px;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 确保所有分钟选项都可以点击 */
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) li {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* 强制显示00和30分钟选项 */
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) .ant-picker-time-panel-cell:nth-child(1),
+.show-all-minutes-picker .ant-picker-time-panel-column:nth-child(2) .ant-picker-time-panel-cell:nth-child(31) {
+  display: block !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* 确保确认按钮显示 */
+.show-all-minutes-picker .ant-picker-footer {
+  display: flex !important;
+  justify-content: flex-end !important;
+  padding: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.show-all-minutes-picker .ant-picker-footer-extra {
+  display: flex !important;
+  flex: auto;
+}
+
+.show-all-minutes-picker .ant-picker-now {
+  display: none !important;
+}
+
+/* 确保确认按钮样式正确 */
+.show-all-minutes-picker .ant-picker-ok {
+  display: block !important;
+  margin-left: 8px !important;
+}
+
+.show-all-minutes-picker .ant-picker-ok button {
+  background-color: #1890ff;
+  border-color: #1890ff;
+  color: white;
+  border-radius: 2px;
+  padding: 0 8px;
+  height: 24px;
+  line-height: 22px;
+  font-size: 12px;
+}
+
+/* 允许在小时和分钟面板之间切换 */
+.no-hour-switch .ant-picker-header-view {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 确保分钟选项可以点击 */
+.no-hour-switch .ant-picker-time-panel-column {
+  pointer-events: auto !important;
+}
+
+/* 确保小时和分钟面板都可以点击 */
+.no-hour-switch .ant-picker-time-panel-column:first-child,
+.no-hour-switch .ant-picker-time-panel-column:nth-child(2) {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* 确保所有时间选项都可以点击 */
+.no-hour-switch .ant-picker-time-panel-column .ant-picker-time-panel-cell {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* 确保时间输入框可以点击切换面板 */
+.no-hour-switch .ant-picker-input {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
