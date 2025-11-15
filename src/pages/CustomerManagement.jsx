@@ -46,7 +46,7 @@ import {
   assignCustomer as assignCustomerApi
 } from '../services/customer';
 import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo, getLatestTodosByCustomers } from '../services/todo';
-import { getTrialSchedule } from '../services/timetable';
+import { getTrialSchedule, getAvailableCoaches } from '../services/timetable';
 import { getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory, cancelTrialSchedule, completeTrialSchedule } from '../services/customerStatusHistory';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
@@ -102,6 +102,9 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [editingLoading, setEditingLoading] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [assigningCustomer, setAssigningCustomer] = useState(null);
+  const [availableCoaches, setAvailableCoaches] = useState([]);
+  const [loadingCoaches, setLoadingCoaches] = useState(false);
+  const [selectedCoach, setSelectedCoach] = useState(null); // 选择的教练
 
   // 监听searchCustomerName参数，自动填入搜索框
   useEffect(() => {
@@ -465,17 +468,53 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     }
   };
 
+  // 查询指定时间段有空的教练
+  const fetchAvailableCoaches = async (date, timeRange) => {
+    if (!date || !timeRange || timeRange.length !== 2) {
+      setAvailableCoaches([]);
+      return;
+    }
+
+    setLoadingCoaches(true);
+    try {
+      const response = await getAvailableCoaches(
+        date.format('YYYY-MM-DD'),
+        timeRange[0].format('HH:mm:ss'),
+        timeRange[1].format('HH:mm:ss')
+      );
+      
+      if (response && response.success && response.data) {
+        setAvailableCoaches(response.data);
+      } else {
+        setAvailableCoaches([]);
+      }
+    } catch (error) {
+      console.error('查询有空教练失败:', error);
+      setAvailableCoaches([]);
+    } finally {
+      setLoadingCoaches(false);
+    }
+  };
+
   // 开始编辑体验时间
   const handleStartEditTrial = (history) => {
     setEditingTrialHistoryId(history.id);
     setEditingDate(history.trialScheduleDate ? dayjs(history.trialScheduleDate) : null);
+    // 初始化选择的教练
+    setSelectedCoach(history.trialCoachName || null);
     if (history.trialStartTime && history.trialEndTime) {
-      setEditingTimeRange([
+      const timeRange = [
         dayjs(history.trialStartTime, 'HH:mm:ss'),
         dayjs(history.trialEndTime, 'HH:mm:ss')
-      ]);
+      ];
+      setEditingTimeRange(timeRange);
+      // 初始化时查询有空的教练
+      if (history.trialScheduleDate) {
+        fetchAvailableCoaches(dayjs(history.trialScheduleDate), timeRange);
+      }
     } else {
       setEditingTimeRange(null);
+      setAvailableCoaches([]);
     }
   };
 
@@ -486,9 +525,21 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       return;
     }
 
+    if (!selectedCoach) {
+      message.warning('请选择教练');
+      return;
+    }
+
     setEditingLoading(true);
     try {
       const token = localStorage.getItem('token');
+      const requestBody = {
+        trialScheduleDate: editingDate.format('YYYY-MM-DD'),
+        trialStartTime: editingTimeRange[0].format('HH:mm:ss'),
+        trialEndTime: editingTimeRange[1].format('HH:mm:ss'),
+        trialCoachName: selectedCoach
+      };
+      
       const response = await fetch(
         `${getApiBaseUrl()}/customers/${customerId}/status-history/${history.id}/update-trial-time`,
         {
@@ -497,20 +548,18 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            trialScheduleDate: editingDate.format('YYYY-MM-DD'),
-            trialStartTime: editingTimeRange[0].format('HH:mm:ss'),
-            trialEndTime: editingTimeRange[1].format('HH:mm:ss')
-          })
+          body: JSON.stringify(requestBody)
         }
       );
 
       const data = await response.json();
       if (data.success) {
-        message.success('体验时间已更新');
+        message.success('体验时间和教练已更新');
         setEditingTrialHistoryId(null);
         setEditingDate(null);
         setEditingTimeRange(null);
+        setAvailableCoaches([]);
+        setSelectedCoach(null);
         
         // 刷新该客户的历史记录
         const historyResponse = await getCustomerStatusHistory(customerId);
@@ -536,6 +585,8 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
     setEditingTrialHistoryId(null);
     setEditingDate(null);
     setEditingTimeRange(null);
+    setAvailableCoaches([]);
+    setSelectedCoach(null);
   };
 
   const fetchSalesList = async () => {
@@ -1528,8 +1579,8 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                     <div 
                       key={history.id}
                       style={{ 
-                        marginBottom: index < filteredHistories.length - 1 ? 12 : 0,
-                        paddingBottom: index < filteredHistories.length - 1 ? 12 : 0,
+                        marginBottom: index < filteredHistories.length - 1 ? 16 : 0,
+                        paddingBottom: index < filteredHistories.length - 1 ? 16 : 0,
                         ...(isEditing ? {
                           padding: '8px',
                           backgroundColor: '#f0f5ff',
@@ -1542,7 +1593,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                           padding: '0',
                           backgroundColor: 'transparent',
                           borderRadius: '0',
-                          borderBottom: index < filteredHistories.length - 1 && expandedHistories[customer.id] ? '1px dashed #f0f0f0' : 'none'
+                          borderBottom: index < filteredHistories.length - 1 && expandedHistories[customer.id] ? '1px dashed #e8e8e8' : 'none'
                         })
                       }}
                     >
@@ -1675,6 +1726,7 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                            history.trialScheduleDate && history.trialStartTime && history.trialEndTime && (
                             <div style={{ 
                               marginTop: 8,
+                              marginBottom: 8,
                               padding: '8px',
                               backgroundColor: history.trialCancelled ? '#f5f5f5' : (history.trialCompleted ? '#f6ffed' : '#f0f5ff'),
                               borderRadius: '4px',
@@ -1696,7 +1748,12 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: 8 }}>
                                       <DatePicker
                                         value={editingDate}
-                                        onChange={setEditingDate}
+                                        onChange={(date) => {
+                                          setEditingDate(date);
+                                          if (date && editingTimeRange && editingTimeRange.length === 2) {
+                                            fetchAvailableCoaches(date, editingTimeRange);
+                                          }
+                                        }}
                                         format="YYYY-MM-DD"
                                         style={{ flex: 1, fontSize: '11px' }}
                                         size="small"
@@ -1707,10 +1764,16 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                                         onChange={(times) => {
                                           console.log('Time changed:', times);
                                           setEditingTimeRange(times);
+                                          if (times && times.length === 2 && editingDate) {
+                                            fetchAvailableCoaches(editingDate, times);
+                                          }
                                         }}
                                         onSelect={(times) => {
                                           console.log('Time selected:', times);
                                           setEditingTimeRange(times);
+                                          if (times && times.length === 2 && editingDate) {
+                                            fetchAvailableCoaches(editingDate, times);
+                                          }
                                         }}
                                         format="HH:mm"
                                         style={{ flex: 1, fontSize: '11px' }}
@@ -1727,6 +1790,76 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
                                         popupClassName="show-all-minutes-picker"
                                       />
                                     </div>
+                                    {/* 显示教练列表 */}
+                                    {editingDate && editingTimeRange && editingTimeRange.length === 2 && (
+                                      <div style={{ marginBottom: 8 }}>
+                                        {loadingCoaches ? (
+                                          <div style={{ fontSize: '11px', color: '#666', marginBottom: 4 }}>
+                                            <UserOutlined style={{ marginRight: 4 }} />
+                                            查询教练中...
+                                            <Spin size="small" style={{ marginLeft: 8 }} />
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <div style={{ fontSize: '11px', color: '#666', marginBottom: 8 }}>
+                                              <UserOutlined style={{ marginRight: 4 }} />
+                                              选择教练
+                                            </div>
+                                            <div style={{ 
+                                              display: 'grid', 
+                                              gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', 
+                                              gap: '6px' 
+                                            }}>
+                                              {(() => {
+                                                // 创建合并的教练列表：初始教练 + 有空教练（去重）
+                                                const displayCoaches = [...availableCoaches];
+                                                
+                                                // 如果有初始教练（history.trialCoachName），且不在有空列表中，则添加到列表开头
+                                                if (history.trialCoachName) {
+                                                  const hasInitialCoach = availableCoaches.some(coach => 
+                                                    history.trialCoachName === (coach.nickname || coach.username)
+                                                  );
+                                                  
+                                                  if (!hasInitialCoach) {
+                                                    // 创建一个虚拟的教练对象用于显示初始教练
+                                                    displayCoaches.unshift({
+                                                      id: 'initial-coach',
+                                                      nickname: history.trialCoachName,
+                                                      username: history.trialCoachName
+                                                    });
+                                                  }
+                                                }
+                                                
+                                                return displayCoaches.map(coach => {
+                                                  const coachName = coach.nickname || coach.username;
+                                                  const isSelected = selectedCoach === coachName;
+                                                  return (
+                                                    <div
+                                                      key={coach.id}
+                                                      onClick={() => setSelectedCoach(coachName)}
+                                                      style={{
+                                                        padding: '6px 10px',
+                                                        border: isSelected ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                                                        borderRadius: '4px',
+                                                        textAlign: 'center',
+                                                        cursor: 'pointer',
+                                                        backgroundColor: isSelected ? '#e6f7ff' : '#fff',
+                                                        color: isSelected ? '#1890ff' : '#000',
+                                                        fontSize: '12px',
+                                                        transition: 'all 0.3s',
+                                                        fontWeight: isSelected ? '500' : 'normal'
+                                                      }}
+                                                    >
+                                                      {coachName}
+                                                    </div>
+                                                  );
+                                                });
+                                              })()}
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
                                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                       <Button 
                                         size="small" 

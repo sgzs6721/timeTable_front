@@ -11,7 +11,8 @@ import {
   Empty,
   Input,
   TimePicker,
-  Space
+  Space,
+  Tooltip
 } from 'antd';
 import { 
   CheckCircleOutlined, 
@@ -32,6 +33,7 @@ import {
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import { changeCustomerStatus } from '../services/customerStatusHistory';
 import { cancelTrialSchedule } from '../services/customerStatusHistory';
+import { getAvailableCoaches } from '../services/timetable';
 import { getApiBaseUrl } from '../config/api';
 import dayjs from 'dayjs';
 
@@ -51,6 +53,9 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
   const [editingDate, setEditingDate] = useState(null); // 编辑中的日期
   const [editingTimeRange, setEditingTimeRange] = useState(null); // 编辑中的时间范围
   const [editingLoading, setEditingLoading] = useState(false); // 编辑保存中
+  const [availableCoaches, setAvailableCoaches] = useState([]); // 有空的教练列表
+  const [loadingCoaches, setLoadingCoaches] = useState(false); // 加载教练中
+  const [selectedCoach, setSelectedCoach] = useState(null); // 选择的教练
   
   // 获取当前用户信息
   const [currentUser, setCurrentUser] = useState(null);
@@ -217,15 +222,53 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
     }
   };
 
+  // 查询指定时间段有空的教练
+  const fetchAvailableCoaches = async (date, timeRange) => {
+    if (!date || !timeRange || timeRange.length !== 2) {
+      setAvailableCoaches([]);
+      return;
+    }
+
+    setLoadingCoaches(true);
+    try {
+      const response = await getAvailableCoaches(
+        date.format('YYYY-MM-DD'),
+        timeRange[0].format('HH:mm:ss'),
+        timeRange[1].format('HH:mm:ss')
+      );
+      
+      if (response && response.success && response.data) {
+        setAvailableCoaches(response.data);
+      } else {
+        setAvailableCoaches([]);
+      }
+    } catch (error) {
+      console.error('查询有空教练失败:', error);
+      setAvailableCoaches([]);
+    } finally {
+      setLoadingCoaches(false);
+    }
+  };
+
   // 开始编辑体验时间
   const handleStartEditTrial = (trial) => {
     setEditingTrialId(trial.historyId);
     setEditingDate(trial.trialScheduleDate ? dayjs(trial.trialScheduleDate) : null);
+    // 初始化选择的教练
+    setSelectedCoach(trial.trialCoachName || null);
     if (trial.trialStartTime && trial.trialEndTime) {
-      setEditingTimeRange([
+      const timeRange = [
         dayjs(trial.trialStartTime, 'HH:mm:ss'),
         dayjs(trial.trialEndTime, 'HH:mm:ss')
-      ]);
+      ];
+      setEditingTimeRange(timeRange);
+      // 初始化时查询有空的教练
+      if (trial.trialScheduleDate) {
+        fetchAvailableCoaches(dayjs(trial.trialScheduleDate), timeRange);
+      }
+    } else {
+      setEditingTimeRange(null);
+      setAvailableCoaches([]);
     }
   };
 
@@ -236,9 +279,21 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
       return;
     }
 
+    if (!selectedCoach) {
+      message.warning('请选择教练');
+      return;
+    }
+
     setEditingLoading(true);
     try {
       const token = localStorage.getItem('token');
+      const requestBody = {
+        trialScheduleDate: editingDate.format('YYYY-MM-DD'),
+        trialStartTime: editingTimeRange[0].format('HH:mm:ss'),
+        trialEndTime: editingTimeRange[1].format('HH:mm:ss'),
+        trialCoachName: selectedCoach
+      };
+      
       const response = await fetch(
         `${getApiBaseUrl()}/customers/${trial.customerId}/status-history/${trial.historyId}/update-trial-time`,
         {
@@ -247,20 +302,18 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            trialScheduleDate: editingDate.format('YYYY-MM-DD'),
-            trialStartTime: editingTimeRange[0].format('HH:mm:ss'),
-            trialEndTime: editingTimeRange[1].format('HH:mm:ss')
-          })
+          body: JSON.stringify(requestBody)
         }
       );
 
       const data = await response.json();
       if (data.success) {
-        message.success('体验时间已更新');
+        message.success('体验时间和教练已更新');
         setEditingTrialId(null);
         setEditingDate(null);
         setEditingTimeRange(null);
+        setAvailableCoaches([]);
+        setSelectedCoach(null);
         await fetchTrials();
       } else {
         message.error(data.message || '更新失败');
@@ -278,6 +331,8 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
     setEditingTrialId(null);
     setEditingDate(null);
     setEditingTimeRange(null);
+    setAvailableCoaches([]);
+    setSelectedCoach(null);
   };
 
   const getStatusTag = (trial) => {
@@ -553,7 +608,12 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
                           <div style={{ display: 'flex', gap: '8px', marginBottom: 8 }}>
                             <DatePicker
                               value={editingDate}
-                              onChange={setEditingDate}
+                              onChange={(date) => {
+                                setEditingDate(date);
+                                if (date && editingTimeRange && editingTimeRange.length === 2) {
+                                  fetchAvailableCoaches(date, editingTimeRange);
+                                }
+                              }}
                               format="YYYY-MM-DD"
                               style={{ flex: 1 }}
                               placeholder="选择日期"
@@ -562,7 +622,12 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
                             />
                             <TimePicker.RangePicker
                               value={editingTimeRange}
-                              onChange={setEditingTimeRange}
+                              onChange={(times) => {
+                                setEditingTimeRange(times);
+                                if (times && times.length === 2 && editingDate) {
+                                  fetchAvailableCoaches(editingDate, times);
+                                }
+                              }}
                               format="HH:mm"
                               style={{ flex: 1 }}
                               placeholder={['开始', '结束']}
@@ -573,6 +638,76 @@ const TrialsList = ({ onClose, onNavigateToCustomer }) => {
                               getPopupContainer={() => document.body}
                             />
                           </div>
+                          {/* 显示教练列表 */}
+                          {editingDate && editingTimeRange && editingTimeRange.length === 2 && (
+                            <div style={{ marginBottom: 8 }}>
+                              {loadingCoaches ? (
+                                <div style={{ fontSize: '12px', color: '#666', marginBottom: 4 }}>
+                                  <UserOutlined style={{ marginRight: 4 }} />
+                                  查询教练中...
+                                  <Spin size="small" style={{ marginLeft: 8 }} />
+                                </div>
+                              ) : (
+                                <>
+                                  <div style={{ fontSize: '12px', color: '#666', marginBottom: 8 }}>
+                                    <UserOutlined style={{ marginRight: 4 }} />
+                                    选择教练
+                                  </div>
+                                  <div style={{ 
+                                    display: 'grid', 
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', 
+                                    gap: '8px' 
+                                  }}>
+                                    {(() => {
+                                      // 创建合并的教练列表：初始教练 + 有空教练（去重）
+                                      const displayCoaches = [...availableCoaches];
+                                      
+                                      // 如果有初始教练（trial.trialCoachName），且不在有空列表中，则添加到列表开头
+                                      if (trial.trialCoachName) {
+                                        const hasInitialCoach = availableCoaches.some(coach => 
+                                          trial.trialCoachName === (coach.nickname || coach.username)
+                                        );
+                                        
+                                        if (!hasInitialCoach) {
+                                          // 创建一个虚拟的教练对象用于显示初始教练
+                                          displayCoaches.unshift({
+                                            id: 'initial-coach',
+                                            nickname: trial.trialCoachName,
+                                            username: trial.trialCoachName
+                                          });
+                                        }
+                                      }
+                                      
+                                      return displayCoaches.map(coach => {
+                                        const coachName = coach.nickname || coach.username;
+                                        const isSelected = selectedCoach === coachName;
+                                        return (
+                                          <div
+                                            key={coach.id}
+                                            onClick={() => setSelectedCoach(coachName)}
+                                            style={{
+                                              padding: '8px 12px',
+                                              border: isSelected ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                                              borderRadius: '4px',
+                                              textAlign: 'center',
+                                              cursor: 'pointer',
+                                              backgroundColor: isSelected ? '#e6f7ff' : '#fff',
+                                              color: isSelected ? '#1890ff' : '#000',
+                                              fontSize: '13px',
+                                              transition: 'all 0.3s',
+                                              fontWeight: isSelected ? '500' : 'normal'
+                                            }}
+                                          >
+                                            {coachName}
+                                          </div>
+                                        );
+                                      });
+                                    })()}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                             <Button 
                               size="small" 

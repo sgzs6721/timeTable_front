@@ -579,3 +579,19 @@ export const getTrialSchedule = async (studentName) => {
     throw error;
   }
 };
+
+// 查询指定时间段有空的教练列表
+export const getAvailableCoaches = async (date, startTime, endTime) => {
+  try {
+    const response = await api.get('/schedules/available-coaches', {
+      params: {
+        date,
+        startTime,
+        endTime
+      }
+    });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
