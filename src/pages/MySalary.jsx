@@ -179,6 +179,8 @@ const MySalary = ({ user }) => {
     Object.keys(monthGroups)
       .sort((a, b) => b.localeCompare(a)) // 最新月份在前
       .forEach(month => {
+        const monthData = monthGroups[month];
+        
         // 添加月份分组标题
         groupedData.push({
           id: `month-${month}`,
@@ -194,7 +196,29 @@ const MySalary = ({ user }) => {
         });
         
         // 添加该月份的数据
-        groupedData.push(...monthGroups[month]);
+        groupedData.push(...monthData);
+        
+        // 计算该月份的小计
+        const monthTotalBaseSalary = monthData.reduce((sum, row) => sum + (row.baseSalary || 0), 0);
+        const monthTotalHours = monthData.reduce((sum, row) => sum + (row.totalHours || 0), 0);
+        const monthTotalHourlyPay = monthData.reduce((sum, row) => sum + (row.hourlyPay || 0), 0);
+        const monthTotalCommission = monthData.reduce((sum, row) => sum + (row.commission || 0), 0);
+        const monthTotalSocialSecurity = monthData.reduce((sum, row) => sum + (row.socialSecurity || 0), 0);
+        const monthTotalSalary = monthData.reduce((sum, row) => sum + (row.totalSalary || 0), 0);
+        
+        // 添加该月份的小计行
+        groupedData.push({
+          id: `subtotal-${month}`,
+          isMonthSubtotal: true,
+          month: month,
+          coachName: '总计',
+          baseSalary: monthTotalBaseSalary,
+          totalHours: monthTotalHours,
+          hourlyPay: monthTotalHourlyPay,
+          commission: monthTotalCommission,
+          socialSecurity: monthTotalSocialSecurity,
+          totalSalary: monthTotalSalary
+        });
       });
 
     return groupedData;
@@ -222,6 +246,9 @@ const MySalary = ({ user }) => {
             </div>
           );
         }
+        if (record.isMonthSubtotal) {
+          return <Text strong style={{ color: '#1890ff', whiteSpace: 'nowrap' }}>{text}</Text>;
+        }
         // 普通用户显示月份
         if (!isAdmin) {
           return <Text strong style={{ whiteSpace: 'nowrap' }}>{dayjs(text).format('YYYY年MM月')}</Text>;
@@ -232,7 +259,8 @@ const MySalary = ({ user }) => {
         style: { 
           whiteSpace: 'nowrap', 
           textAlign: record.isMonthHeader ? 'left' : 'center',
-          backgroundColor: record.isMonthHeader ? '#f0f9ff' : 'transparent'
+          backgroundColor: record.isMonthHeader ? '#f0f9ff' : (record.isMonthSubtotal ? '#fafafa' : 'transparent'),
+          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
         },
         colSpan: record.isMonthHeader ? 7 : 1
       })
@@ -246,13 +274,18 @@ const MySalary = ({ user }) => {
       render: (value, record) => {
         if (record.isMonthHeader) return null;
         return (
-          <Text strong style={{ fontSize: '16px', whiteSpace: 'nowrap' }}>
+          <Text strong={record.isMonthSubtotal} style={{ fontSize: record.isMonthSubtotal ? '16px' : '16px', whiteSpace: 'nowrap' }}>
             ¥{Math.round(value)}
           </Text>
         );
       },
       onCell: (record) => ({
-        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        style: { 
+          whiteSpace: 'nowrap', 
+          textAlign: 'center',
+          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
+          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+        },
         colSpan: record.isMonthHeader ? 0 : 1
       })
     },
@@ -267,7 +300,12 @@ const MySalary = ({ user }) => {
         return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
-        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        style: { 
+          whiteSpace: 'nowrap', 
+          textAlign: 'center',
+          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
+          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+        },
         colSpan: record.isMonthHeader ? 0 : 1
       })
     },
@@ -282,7 +320,12 @@ const MySalary = ({ user }) => {
         return <span style={{ whiteSpace: 'nowrap' }}>{value}</span>;
       },
       onCell: (record) => ({
-        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        style: { 
+          whiteSpace: 'nowrap', 
+          textAlign: 'center',
+          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
+          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+        },
         colSpan: record.isMonthHeader ? 0 : 1
       })
     },
@@ -297,7 +340,12 @@ const MySalary = ({ user }) => {
         return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
-        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        style: { 
+          whiteSpace: 'nowrap', 
+          textAlign: 'center',
+          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
+          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+        },
         colSpan: record.isMonthHeader ? 0 : 1
       })
     },
@@ -312,7 +360,12 @@ const MySalary = ({ user }) => {
         return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
-        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        style: { 
+          whiteSpace: 'nowrap', 
+          textAlign: 'center',
+          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
+          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+        },
         colSpan: record.isMonthHeader ? 0 : 1
       })
     },
@@ -327,7 +380,12 @@ const MySalary = ({ user }) => {
         return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
-        style: { whiteSpace: 'nowrap', textAlign: 'center' },
+        style: { 
+          whiteSpace: 'nowrap', 
+          textAlign: 'center',
+          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
+          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+        },
         colSpan: record.isMonthHeader ? 0 : 1
       })
     }
@@ -409,8 +467,13 @@ const MySalary = ({ user }) => {
                 scroll={{ x: 570 }}
                 size={isMobile ? 'small' : 'middle'}
                 summary={(pageData) => {
-                  // 过滤掉月份标题行
-                  const dataRows = pageData.filter(row => !row.isMonthHeader);
+                  // 对于管理员在"全部月份"视图下，不显示底部总计（已有每月小计）
+                  if (isAdmin && selectedMonth === 'all') {
+                    return null;
+                  }
+                  
+                  // 过滤掉月份标题行和小计行
+                  const dataRows = pageData.filter(row => !row.isMonthHeader && !row.isMonthSubtotal);
                   
                   if (dataRows.length === 0) return null;
                   
