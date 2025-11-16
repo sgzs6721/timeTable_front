@@ -2471,13 +2471,11 @@ const ViewTimetable = ({ user }) => {
 
   // 4. 获取本周数据（每区块一次）- 统一走聚合接口
   const fetchWeekInstanceSchedules = async (requestId) => {
-    
     // 同时获取本周实例数据和模板数据
     const [instanceResponse, templateResponse] = await Promise.all([
       getThisWeekSchedulesSessionOnce(timetableId),
       getTemplateSchedules(timetableId)
     ]);
-    
     
     if (instanceResponse && instanceResponse.success) {
       if (latestRequestIdRef.current === (requestId ?? latestRequestIdRef.current)) {
@@ -3118,7 +3116,7 @@ const ViewTimetable = ({ user }) => {
         const timeKey = `${leaveSchedule.startTime.substring(0,5)}-${leaveSchedule.endTime.substring(0,5)}`;
         setLeaveSlotMap(prev => {
           const newMap = new Map(prev);
-          newMap.set(`${dayKey}|${timeKey}`, leaveSchedule.studentName || '');
+          newMap.set(`${dayKey}|${timeKey}`, { studentName: leaveSchedule.studentName || '', scheduleId: leaveSchedule.id });
           return newMap;
         });
         
@@ -3149,32 +3147,46 @@ const ViewTimetable = ({ user }) => {
         // 请假恢复：使用cancelLeave API
         try {
           const response = await cancelLeave(cancelInfo.scheduleId);
-          if (response.success) {
+          if (response.success && response.data) {
             message.success('恢复成功');
-            // 清除缓存，确保获取最新数据
-            invalidateTimetableCache(timetableId);
-            await fetchWeekInstanceSchedules();
-            setOpenPopoverKey(null);
             
-            // 恢复成功后，从leaveSlotMap中移除该记录
-            const timeInfoParts = cancelInfo.timeInfo.split(', ');
-            // 将中文星期转换为英文小写
-            const chineseToEnglishDay = {
-              '星期一': 'monday',
-              '星期二': 'tuesday',
-              '星期三': 'wednesday',
-              '星期四': 'thursday',
-              '星期五': 'friday',
-              '星期六': 'saturday',
-              '星期日': 'sunday'
-            };
-            const dayKey = chineseToEnglishDay[timeInfoParts[0]] || timeInfoParts[0].toLowerCase();
-            const timeKey = timeInfoParts[1];
-            setLeaveSlotMap(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(`${dayKey}|${timeKey}`);
-              return newMap;
-            });
+            // 立即将恢复的课程添加到 allSchedules 中
+            const restoredSchedule = response.data;
+            
+            // 检查课程是否已经在列表中
+            const existingIndex = allSchedules.findIndex(s => s.id === restoredSchedule.id);
+            
+            if (existingIndex >= 0) {
+              // 更新现有课程
+              const newSchedules = [...allSchedules];
+              newSchedules[existingIndex] = restoredSchedule;
+              setAllSchedules(newSchedules);
+            } else {
+              // 添加新课程
+              setAllSchedules([...allSchedules, restoredSchedule]);
+            }
+            
+            // 清除缓存，确保下次获取最新数据
+            invalidateTimetableCache(timetableId);
+            
+            // 重新获取包含请假课程的完整数据来更新leaveSlotMap
+            try {
+              const leaveResponse = await getCurrentWeekInstanceIncludingLeaves(timetableId);
+              if (leaveResponse && leaveResponse.success && leaveResponse.data && Array.isArray(leaveResponse.data.schedules)) {
+                const map = new Map();
+                leaveResponse.data.schedules.filter(s => s.isOnLeave).forEach(s => {
+                  const dayKey = (s.dayOfWeek || '').toLowerCase();
+                  const timeKey = `${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`;
+                  // 存储对象，包含学员名和实例课程ID
+                  map.set(`${dayKey}|${timeKey}`, { studentName: s.studentName || '', scheduleId: s.id });
+                });
+                setLeaveSlotMap(map);
+              }
+            } catch (leaveError) {
+              console.error('更新请假映射失败:', leaveError);
+            }
+            
+            setOpenPopoverKey(null);
           } else {
             message.error(response.message || '恢复失败');
           }
@@ -4570,7 +4582,7 @@ const ViewTimetable = ({ user }) => {
             response.data.schedules.filter(s => s.isOnLeave).forEach(s => {
               const dayKey = (s.dayOfWeek || '').toLowerCase();
               const timeKey = `${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`;
-              map.set(`${dayKey}|${timeKey}`, s.studentName || '');
+              map.set(`${dayKey}|${timeKey}`, { studentName: s.studentName || '', scheduleId: s.id });
             });
             setLeaveSlotMap(map);
           } else {
@@ -4620,8 +4632,6 @@ const ViewTimetable = ({ user }) => {
   const displaySchedules = ((switchToInstanceLoading || switchToTemplateLoading) && tempSchedules.length > 0 
     ? tempSchedules 
     : allSchedules).filter(s => !s.isOnLeave);
-  
-  // 调试信息已移除
   
   const displayViewMode = (switchToInstanceLoading || switchToTemplateLoading) && tempViewMode 
     ? tempViewMode 
@@ -5110,12 +5120,12 @@ const ViewTimetable = ({ user }) => {
                 : `${record.time}`;
 
             const slotKey = `${day.key}|${record.time}`;
-            const leaveStudent = leaveSlotMap.get(slotKey);
+            const leaveInfo = leaveSlotMap.get(slotKey);
             const cancelInfo = templateScheduleExists && templateScheduleForCell ? {
-              studentName: templateScheduleForCell.studentName,
-              type: leaveStudent ? '请假' : '取消',
+              studentName: leaveInfo ? leaveInfo.studentName : templateScheduleForCell.studentName,
+              type: leaveInfo ? '请假' : '取消',
               timeInfo,
-              scheduleId: templateScheduleForCell.id
+              scheduleId: leaveInfo ? leaveInfo.scheduleId : templateScheduleForCell.id
             } : null;
 
             return (

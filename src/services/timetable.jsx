@@ -528,6 +528,8 @@ export const invalidateTimetableCache = (timetableId) => {
     cacheBox.tomorrow.delete(key);
     cacheBox.week.delete(key);
     cacheBox.template.delete(key);
+    // 清除会话级缓存
+    sessionOnceCache.delete(`this-week-${timetableId}`);
   } catch (e) {
     // 忽略缓存删除异常
   }
