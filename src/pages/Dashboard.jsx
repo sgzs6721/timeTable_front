@@ -111,10 +111,22 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true, currentUser }) => 
   }, [showAllStudents]);
 
   const handleStudentClick = React.useCallback((studentName) => {
-    // 获取当前用户的昵称或用户名作为教练名称
-    const coachName = currentUser?.nickname || currentUser?.username || null;
+    // 如果是"全部学员"模式，需要找到该学员所属的教练
+    let coachName = currentUser?.nickname || currentUser?.username || null;
+    
+    if (showAllStudents) {
+      // 在分组数据中查找该学员所属的教练
+      for (const group of students) {
+        const student = (group.students || []).find(s => s.studentName === studentName);
+        if (student) {
+          coachName = group.coachName;
+          break;
+        }
+      }
+    }
+    
     onStudentClick(studentName, coachName);
-  }, [onStudentClick, currentUser]);
+  }, [onStudentClick, currentUser, showAllStudents, students]);
 
   const handleCheckboxChange = React.useCallback((e) => {
     // 无论当前状态如何，只要点击"全部"复选框，就退出操作状态
