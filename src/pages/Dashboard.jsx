@@ -5848,24 +5848,24 @@ const MyHours = ({ user }) => {
         // 转为数组并排序（降序）
         const monthsArray = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
         setAvailableMonths(monthsArray);
+        
+        // 如果还没有选择月份且有可用月份，自动选择第一个（最新）月份
+        if (!selectedMonth && monthsArray.length > 0) {
+          const latestMonth = monthsArray[0];
+          setSelectedMonth(latestMonth);
+          // 自动设置该月份对应的日期范围
+          await setDateRangeForMonth(latestMonth);
+        }
       }
     } catch (error) {
       console.error('获取月份和工资数据失败:', error);
     }
-  }, [coachId, user]);
+  }, [coachId, user, selectedMonth]);
 
-  // 处理月份选择
-  const handleMonthChange = async (month) => {
-    setSelectedMonth(month);
+  // 根据月份设置日期范围的通用函数
+  const setDateRangeForMonth = async (month) => {
+    if (!month) return;
     
-    if (!month) {
-      // 清空选择
-      setStartDate(null);
-      setEndDate(null);
-      return;
-    }
-    
-    // 总是从后端获取记薪周期设置并计算（不依赖工资数据）
     try {
       const settingResp = await fetch(`${getApiBaseUrl()}/salary-system-settings/current`, {
         headers: {
@@ -5912,11 +5912,29 @@ const MyHours = ({ user }) => {
     }
   };
 
+  // 处理月份选择
+  const handleMonthChange = async (month) => {
+    setSelectedMonth(month);
+    
+    if (!month) {
+      // 清空选择
+      setStartDate(null);
+      setEndDate(null);
+      return;
+    }
+    
+    // 使用通用函数设置日期范围
+    await setDateRangeForMonth(month);
+  };
+
   // 初始化时加载数据
   React.useEffect(() => { 
-    fetchData();
-    fetchAvailableMonthsAndSalary();
-    isInitialized.current = true;
+    const initializeData = async () => {
+      // 先获取月份数据，这会自动设置最新月份和对应的日期范围
+      await fetchAvailableMonthsAndSalary();
+      isInitialized.current = true;
+    };
+    initializeData();
   }, []); // 空依赖数组，只在组件挂载时执行一次
   
   // 切换教练时重新获取月份
@@ -5925,6 +5943,14 @@ const MyHours = ({ user }) => {
       fetchAvailableMonthsAndSalary();
     }
   }, [coachId, fetchAvailableMonthsAndSalary]);
+  
+  // 当日期范围设置后自动查询数据
+  React.useEffect(() => {
+    if (isInitialized.current && startDate && endDate) {
+      setPage(1); // 重置到第一页
+      fetchData();
+    }
+  }, [startDate, endDate, fetchData]);
   
   // 分页时自动查询
   React.useEffect(() => { 
