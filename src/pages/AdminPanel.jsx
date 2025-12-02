@@ -346,6 +346,11 @@ const AdminPanel = ({ user }) => {
         </div>
       ),
     }] : []),
+    ...(canAdmin ? [{
+      key: 'users',
+      label: '用户管理',
+      children: <UserManagement activeTab="users" />,
+    }] : []),
     ...(canAdminPending ? [{
       key: 'pending',
       label: (

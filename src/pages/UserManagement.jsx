@@ -458,10 +458,10 @@ const UserManagement = ({ activeTab = 'users' }) => {
           'MANAGER': { label: '管理', bgColor: 'rgba(24, 144, 255, 0.15)', textColor: '#1890ff', borderColor: 'rgba(24, 144, 255, 0.3)' }
         };
         
-        const roleLabel = position === 'MANAGER' ? '管理员' : '普通用户';
-        const roleBgColor = position === 'MANAGER' ? 'rgba(245, 34, 45, 0.15)' : 'rgba(24, 144, 255, 0.15)';
-        const roleTextColor = position === 'MANAGER' ? '#f5222d' : '#1890ff';
-        const roleBorderColor = position === 'MANAGER' ? 'rgba(245, 34, 45, 0.3)' : 'rgba(24, 144, 255, 0.3)';
+        const roleLabel = record.position === 'MANAGER' ? '管理员' : '普通用户';
+        const roleBgColor = record.position === 'MANAGER' ? 'rgba(245, 34, 45, 0.15)' : 'rgba(24, 144, 255, 0.15)';
+        const roleTextColor = record.position === 'MANAGER' ? '#f5222d' : '#1890ff';
+        const roleBorderColor = record.position === 'MANAGER' ? 'rgba(245, 34, 45, 0.3)' : 'rgba(24, 144, 255, 0.3)';
         
         // 如果没有职位，只显示角色标签
         if (!record.position) {
