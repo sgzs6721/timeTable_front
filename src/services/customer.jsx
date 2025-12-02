@@ -41,3 +41,8 @@ export const assignCustomer = (customerId, assignedUserId) => {
     params: { assignedUserId }
   });
 };
+
+// 获取状态统计
+export const getCustomerStatusCounts = (params) => {
+  return api.get('/customers/status-counts', { params });
+};

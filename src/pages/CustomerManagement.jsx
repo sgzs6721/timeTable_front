@@ -33,7 +33,8 @@ import {
   SaveOutlined,
   CloseOutlined,
   UserSwitchOutlined,
-  UserOutlined
+  UserOutlined,
+  FilterOutlined
 } from '@ant-design/icons';
 import CustomerStatusHistoryModal from '../components/CustomerStatusHistoryModal';
 import AssignCustomerModal from '../components/AssignCustomerModal';
@@ -43,7 +44,8 @@ import {
   updateCustomer, 
   deleteCustomer, 
   getCustomersByStatus,
-  assignCustomer as assignCustomerApi
+  assignCustomer as assignCustomerApi,
+  getCustomerStatusCounts
 } from '../services/customer';
 import { createTodo, checkCustomerHasTodo, getTodos, updateTodo, deleteTodo, getLatestTodosByCustomers } from '../services/todo';
 import { getTrialSchedule, getAvailableCoaches } from '../services/timetable';
@@ -105,6 +107,8 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
   const [availableCoaches, setAvailableCoaches] = useState([]);
   const [loadingCoaches, setLoadingCoaches] = useState(false);
   const [selectedCoach, setSelectedCoach] = useState(null); // 选择的教练
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true); // 过滤器折叠状态，默认收起
+  const [allStatusCounts, setAllStatusCounts] = useState({}); // 所有客户的状态统计数据
 
   // 监听searchCustomerName参数，自动填入搜索框
   useEffect(() => {
@@ -166,11 +170,16 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
 
   useEffect(() => {
     // 筛选条件变化时，重置分页并重新加载
-    setCustomers([]);
     setCurrentPage(0);
     setHasMore(true);
     fetchCustomers(0, true);
+    fetchAllStatusCounts(); // 获取所有状态统计
   }, [activeTab, salesFilter, selectedFilterDate, searchKeyword]);
+
+  // 初始化时获取状态统计
+  useEffect(() => {
+    fetchAllStatusCounts();
+  }, []);
 
   // 清理防抖定时器
   useEffect(() => {
@@ -180,6 +189,41 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
       }
     };
   }, []);
+
+  // 处理状态点击事件
+  const handleStatusClick = (status) => {
+    // 如果点击的是当前选中的状态，则重置为显示全部
+    const newTab = activeTab === status ? 'all' : status;
+    setActiveTab(newTab);
+    // 注意：不需要手动调用 fetchCustomers，useEffect 会自动触发
+  };
+
+  // 获取所有客户的状态统计
+  const fetchAllStatusCounts = async () => {
+    try {
+      const params = {};
+      
+      // 添加过滤参数（不包括状态过滤，因为我们要所有状态的统计）
+      if (salesFilter && salesFilter !== 'all') {
+        params.salesId = parseInt(salesFilter);
+      }
+      
+      if (selectedFilterDate) {
+        params.filterDate = selectedFilterDate.format('YYYY-MM-DD');
+      }
+      
+      if (searchKeyword) {
+        params.keyword = searchKeyword;
+      }
+      
+      const response = await getCustomerStatusCounts(params);
+      if (response && response.success && response.data) {
+        setAllStatusCounts(response.data);
+      }
+    } catch (error) {
+      console.error('获取状态统计失败:', error);
+    }
+  };
 
   // 处理搜索输入变化（带防抖）
   const handleSearchInputChange = (e) => {
@@ -2104,134 +2148,223 @@ const CustomerManagement = ({ user, onTodoCreated, highlightCustomerId, searchCu
               </Button>
             </Col>
             <Col span={12} style={{ marginBottom: 12 }}>
-              <Button icon={<UnorderedListOutlined />} onClick={onShowTrialsList} size="large" style={{ width: '100%' }}>
-                体验列表
-              </Button>
-            </Col>
-            
-            {(isAdmin || isManager || isSales) && (
-              <Col span={12} style={{ marginBottom: 12 }}>
-                <Select
-                  value={salesFilter}
-                  onChange={handleSalesFilterChange}
-                  style={{ width: '100%' }}
-                  placeholder={isSales ? (user?.nickname || user?.username || "当前用户") : "全部销售"}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button icon={<UnorderedListOutlined />} onClick={onShowTrialsList} size="large" style={{ flex: 1 }}>
+                  体验列表
+                </Button>
+                <Button 
+                  icon={<FilterOutlined />} 
+                  onClick={() => setFiltersCollapsed(!filtersCollapsed)} 
                   size="large"
-                  disabled={isSales}
-                >
-                  {(isAdmin || isManager) ? (
-                    <>
-                      <Option value="all">全部销售</Option>
-                      {salesList.map(sales => (
-                        <Option key={sales.id} value={sales.id.toString()}>
-                          {sales.nickname || sales.username}
-                        </Option>
-                      ))}
-                    </>
-                  ) : (
-                    <Option value={user?.id?.toString()}>{user?.nickname || user?.username}</Option>
-                  )}
-                </Select>
-              </Col>
-            )}
+                  type={filtersCollapsed ? 'default' : 'primary'}
+                  title={filtersCollapsed ? '展开过滤选框' : '收起过滤选框'}
+                />
+              </div>
+            </Col>
             
-            <Col span={(isAdmin || isManager || isSales) ? 12 : 24} style={{ marginBottom: 12 }}>
-              <Select
-                value={activeTab}
-                onChange={handleActiveTabChange}
-                style={{ width: '100%' }}
-                placeholder="全部状态"
-                size="large"
-                optionLabelProp="label"
-              >
-                <Option value="all" label="全部状态">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>全部状态</span>
-                    <span style={{ color: '#1890ff', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('all')}</span>
-                  </div>
-                </Option>
-                <Option value="NEW" label="新建">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>新建</span>
-                    <span style={{ color: '#52c41a', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('NEW')}</span>
-                  </div>
-                </Option>
-                <Option value="CONTACTED" label="已联系">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>已联系</span>
-                    <span style={{ color: '#13c2c2', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('CONTACTED')}</span>
-                  </div>
-                </Option>
-                <Option value="PENDING_CONFIRM" label="待确认">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>待确认</span>
-                    <span style={{ color: '#722ed1', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('PENDING_CONFIRM')}</span>
-                  </div>
-                </Option>
-                <Option value="SCHEDULED" label="待体验">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>待体验</span>
-                    <span style={{ color: '#fa8c16', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('SCHEDULED')}</span>
-                  </div>
-                </Option>
-                <Option value="VISITED" label="已体验">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>已体验</span>
-                    <span style={{ color: '#eb2f96', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('VISITED')}</span>
-                  </div>
-                </Option>
-                <Option value="RE_EXPERIENCE" label="待再体验">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>待再体验</span>
-                    <span style={{ color: '#faad14', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('RE_EXPERIENCE')}</span>
-                  </div>
-                </Option>
-                <Option value="PENDING_SOLD" label="待成交">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>待成交</span>
-                    <span style={{ color: '#f5222d', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('PENDING_SOLD')}</span>
-                  </div>
-                </Option>
-                <Option value="SOLD" label="已成交">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>已成交</span>
-                    <span style={{ color: '#52c41a', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('SOLD')}</span>
-                  </div>
-                </Option>
-                <Option value="CLOSED" label="已结束">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>已结束</span>
-                    <span style={{ color: '#8c8c8c', fontWeight: 'bold', marginLeft: '8px' }}>{getStatusCount('CLOSED')}</span>
-                  </div>
-                </Option>
-              </Select>
+            {/* 状态统计显示 */}
+            <Col span={24} style={{ marginBottom: 12 }}>
+              <div style={{ 
+                padding: '12px', 
+                backgroundColor: '#f0f5ff', 
+                borderRadius: '6px',
+                border: '1px solid #d6e4ff',
+                fontSize: '13px',
+                lineHeight: '1.5',
+                color: '#333'
+              }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between' }}>
+                  <span 
+                    onClick={() => handleStatusClick('all')} 
+                    style={{ 
+                      color: '#1890ff', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'all' ? 'bold' : 'normal',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    全部: {allStatusCounts.total || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('NEW')} 
+                    style={{ 
+                      color: '#52c41a', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'NEW' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'NEW' ? 'underline' : 'none'
+                    }}
+                  >
+                    新建: {allStatusCounts.NEW || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('CONTACTED')} 
+                    style={{ 
+                      color: '#13c2c2', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'CONTACTED' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'CONTACTED' ? 'underline' : 'none'
+                    }}
+                  >
+                    已联系: {allStatusCounts.CONTACTED || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('PENDING_CONFIRM')} 
+                    style={{ 
+                      color: '#722ed1', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'PENDING_CONFIRM' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'PENDING_CONFIRM' ? 'underline' : 'none'
+                    }}
+                  >
+                    待确认: {allStatusCounts.PENDING_CONFIRM || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('SCHEDULED')} 
+                    style={{ 
+                      color: '#fa8c16', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'SCHEDULED' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'SCHEDULED' ? 'underline' : 'none'
+                    }}
+                  >
+                    待体验: {allStatusCounts.SCHEDULED || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('VISITED')} 
+                    style={{ 
+                      color: '#eb2f96', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'VISITED' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'VISITED' ? 'underline' : 'none'
+                    }}
+                  >
+                    已体验: {allStatusCounts.VISITED || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('RE_EXPERIENCE')} 
+                    style={{ 
+                      color: '#faad14', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'RE_EXPERIENCE' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'RE_EXPERIENCE' ? 'underline' : 'none'
+                    }}
+                  >
+                    待再体验: {allStatusCounts.RE_EXPERIENCE || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('PENDING_SOLD')} 
+                    style={{ 
+                      color: '#f5222d', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'PENDING_SOLD' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'PENDING_SOLD' ? 'underline' : 'none'
+                    }}
+                  >
+                    待成交: {allStatusCounts.PENDING_SOLD || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('SOLD')} 
+                    style={{ 
+                      color: '#52c41a', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'SOLD' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'SOLD' ? 'underline' : 'none'
+                    }}
+                  >
+                    已成交: {allStatusCounts.SOLD || 0}
+                  </span>
+                  <span 
+                    onClick={() => handleStatusClick('CLOSED')} 
+                    style={{ 
+                      color: '#8c8c8c', 
+                      cursor: 'pointer',
+                      fontWeight: activeTab === 'CLOSED' ? 'bold' : 'normal',
+                      textDecoration: activeTab === 'CLOSED' ? 'underline' : 'none'
+                    }}
+                  >
+                    已结束: {allStatusCounts.CLOSED || 0}
+                  </span>
+                </div>
+              </div>
             </Col>
+            
+            {/* 可折叠的过滤器区域 */}
+            {!filtersCollapsed && (
+              <>
+                {(isAdmin || isManager || isSales) && (
+                  <Col span={12} style={{ marginBottom: 12 }}>
+                    <Select
+                      value={salesFilter}
+                      onChange={handleSalesFilterChange}
+                      style={{ width: '100%' }}
+                      placeholder={isSales ? (user?.nickname || user?.username || "当前用户") : "全部销售"}
+                      size="large"
+                      disabled={isSales}
+                    >
+                      {(isAdmin || isManager) ? (
+                        <>
+                          <Option value="all">全部销售</Option>
+                          {salesList.map(sales => (
+                            <Option key={sales.id} value={sales.id.toString()}>
+                              {sales.nickname || sales.username}
+                            </Option>
+                          ))}
+                        </>
+                      ) : (
+                        <Option value={user?.id?.toString()}>{user?.nickname || user?.username}</Option>
+                      )}
+                    </Select>
+                  </Col>
+                )}
+                
+                <Col span={(isAdmin || isManager || isSales) ? 12 : 24} style={{ marginBottom: 12 }}>
+                  <Select
+                    value={activeTab}
+                    onChange={handleActiveTabChange}
+                    style={{ width: '100%' }}
+                    placeholder="全部状态"
+                    size="large"
+                  >
+                    <Option value="all">全部状态</Option>
+                    <Option value="NEW">新建</Option>
+                    <Option value="CONTACTED">已联系</Option>
+                    <Option value="PENDING_CONFIRM">待确认</Option>
+                    <Option value="SCHEDULED">待体验</Option>
+                    <Option value="VISITED">已体验</Option>
+                    <Option value="RE_EXPERIENCE">待再体验</Option>
+                    <Option value="PENDING_SOLD">待成交</Option>
+                    <Option value="SOLD">已成交</Option>
+                    <Option value="CLOSED">已结束</Option>
+                  </Select>
+                </Col>
 
-            <Col span={12} style={{ marginBottom: 12, paddingRight: 6 }}>
-              <Input
-                placeholder="搜索姓名或电话"
-                value={searchInputValue}
-                onChange={handleSearchInputChange}
-                allowClear
-                size="large"
-                prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
-              />
-            </Col>
+                <Col span={12} style={{ marginBottom: 12, paddingRight: 6 }}>
+                  <Input
+                    placeholder="搜索姓名或电话"
+                    value={searchInputValue}
+                    onChange={handleSearchInputChange}
+                    allowClear
+                    size="large"
+                    prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
+                  />
+                </Col>
 
-            <Col span={12} style={{ marginBottom: 12, paddingLeft: 6 }}>
-              <DatePicker
-                value={selectedFilterDate}
-                onChange={(date) => {
-                  setSelectedFilterDate(date);
-                }}
-                placeholder="选择日期过滤"
-                style={{ width: '100%' }}
-                size="large"
-                allowClear
-                format="YYYY-MM-DD"
-                disabledDate={disabledDate}
-              />
-            </Col>
+                <Col span={12} style={{ marginBottom: 12, paddingLeft: 6 }}>
+                  <DatePicker
+                    value={selectedFilterDate}
+                    onChange={(date) => {
+                      setSelectedFilterDate(date);
+                    }}
+                    placeholder="选择日期过滤"
+                    style={{ width: '100%' }}
+                    size="large"
+                    allowClear
+                    format="YYYY-MM-DD"
+                    disabledDate={disabledDate}
+                  />
+                </Col>
+              </>
+            )}
             </Row>
           </div>
 
