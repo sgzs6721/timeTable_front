@@ -3554,7 +3554,9 @@ const Dashboard = ({ user }) => {
       isLoadingRulesRef.current = true;
       
       try {
-        const response = await getStudentOperationRecords(true);
+        // 传递当前教练的ID，只获取当前教练的操作记录
+        const coachId = user?.id;
+        const response = await getStudentOperationRecords(false, null, coachId);
         if (response && response.success) {
           const rules = response.data || [];
           setStudentOperationRules(rules);
@@ -3629,11 +3631,10 @@ const Dashboard = ({ user }) => {
       }
       hasInitializedRef.current = true;
       
-      // 先加载规则，再加载课表数据
+      // 初始化时只加载课表数据，不加载操作规则
+      // 操作规则将在需要时（例如切换到我的课表tab时）延迟加载
       const initData = async () => {
-        const rules = await fetchStudentOperationRules(); // 先加载学员操作规则并获取返回值
-        // 使用当前的viewMode而不是硬编码为'instance'，避免打开模态框时切换标签
-        await fetchWeeklyScheduleData(viewModeRef.current, rules); // 传递规则数据
+        await fetchWeeklyScheduleData(viewModeRef.current, []); // 先不传递规则数据
       };
       initData();
     }, []); // 移除viewMode依赖，改为手动调用
@@ -3648,8 +3649,16 @@ const Dashboard = ({ user }) => {
       isLoadingScheduleRef.current = true;
       lastScheduleFetchTimeRef.current = now;
       
-      // 使用传入的规则参数，如果没有则使用 state（避免 setState 异步问题）
-      const rules = rulesParam || studentOperationRules;
+      // 使用传入的规则参数，如果没有则尝试加载（懒加载）
+      let rules = rulesParam;
+      if (!rules || rules.length === 0) {
+        // 如果规则还没加载，先加载规则
+        if (!rulesLoadedRef.current) {
+          rules = await fetchStudentOperationRules();
+        } else {
+          rules = studentOperationRules;
+        }
+      }
       
       setWeeklyScheduleLoading(true);
       try {
@@ -5722,23 +5731,36 @@ const MyHours = ({ user }) => {
   const [sortOrder, setSortOrder] = React.useState('desc'); // 排序顺序：desc=倒序，asc=正序
   const [selectedMonth, setSelectedMonth] = React.useState(null); // 选择的月份
   const [availableMonths, setAvailableMonths] = React.useState([]); // 可用月份列表
-  const [salaryData, setSalaryData] = React.useState([]); // 工资数据（用于获取记薪周期）
   const isInitialized = React.useRef(false);
+  const salarySettingsCache = React.useRef(null); // 缓存记薪周期设置
+  const coachOptionsLoaded = React.useRef(false); // 标记教练列表是否已加载
+  const isInitializing = React.useRef(false); // 标记是否正在初始化中
+
+  // 只在初始化时加载教练列表
+  const loadCoachOptions = React.useCallback(async () => {
+    if (coachOptionsLoaded.current || user?.position?.toUpperCase() !== 'MANAGER') {
+      return;
+    }
+    
+    try {
+      const resp = await getCoachesWithTimetables();
+      const options = (resp?.data?.list || []).map(x => ({ value: String(x.id), label: x.name, createdAt: x.createdAt }));
+      setCoachOptions(options);
+      coachOptionsLoaded.current = true;
+      
+      if (!coachId && options.length > 0) {
+        const meId = user?.id ? String(user.id) : null;
+        const byId = meId ? options.find(o => String(o.value) === meId) : null;
+        setCoachId((byId || options[0]).value);
+      }
+    } catch (error) {
+      console.error('加载教练列表失败:', error);
+    }
+  }, [user, coachId]);
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     try {
-      // 管理员：加载教练下拉（后端已去重并按注册时间倒序）
-      if (user?.position?.toUpperCase() === 'MANAGER') {
-        const resp = await getCoachesWithTimetables();
-        const options = (resp?.data?.list || []).map(x => ({ value: String(x.id), label: x.name, createdAt: x.createdAt }));
-        setCoachOptions(options);
-        if (!coachId && options.length > 0) {
-          const meId = user?.id ? String(user.id) : null;
-          const byId = meId ? options.find(o => String(o.value) === meId) : null;
-          setCoachId((byId || options[0]).value);
-        }
-      }
 
       // 后端分页查询
       const params = {
@@ -5781,90 +5803,11 @@ const MyHours = ({ user }) => {
     }
   }, [startDate, endDate, coachId, page, sortOrder]);
 
-  // 获取可用月份和工资数据
-  const fetchAvailableMonthsAndSalary = React.useCallback(async () => {
-    try {
-      const salaryResp = await getAllSalaryCalculations();
-      
-      if (salaryResp && salaryResp.success) {
-        setSalaryData(salaryResp.data || []);
-      }
-      
-      // 获取记薪周期设置
-      const settingResp = await fetch(`${getApiBaseUrl()}/salary-system-settings/current`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      let startDay = 1;
-      let endDay = 31;
-      
-      if (settingResp.ok) {
-        const settingData = await settingResp.json();
-        if (settingData.success && settingData.data) {
-          startDay = settingData.data.salaryStartDay || 1;
-          endDay = settingData.data.salaryEndDay || 31;
-        }
-      }
-      
-      // 从课时记录中提取月份，并根据记薪周期计算归属月份
-      const params = {
-        coachId: user?.position?.toUpperCase() === 'MANAGER' ? (coachId ? String(coachId) : undefined) : undefined,
-        page: 1,
-        size: 1000 // 获取足够多的记录以提取所有月份
-      };
-      const hoursResp = await getMyHoursPaged(params);
-      if (hoursResp && hoursResp.success) {
-        const records = hoursResp.data?.list || [];
-        const monthsSet = new Set();
-        
-        records.forEach(record => {
-          if (record.scheduleDate) {
-            const recordDate = dayjs(record.scheduleDate);
-            const day = recordDate.date();
-            
-            // 根据记薪周期判断该日期属于哪个工资月份
-            let salaryMonth;
-            
-            if (startDay <= endDay) {
-              // 同月内：直接就是当月
-              salaryMonth = recordDate.format('YYYY-MM');
-            } else {
-              // 跨月：16-15
-              // 如果日期 >= startDay（例如16日），属于当月工资
-              // 如果日期 <= endDay（例如15日），属于上月工资
-              if (day >= startDay) {
-                salaryMonth = recordDate.format('YYYY-MM');
-              } else {
-                salaryMonth = recordDate.subtract(1, 'month').format('YYYY-MM');
-              }
-            }
-            
-            monthsSet.add(salaryMonth);
-          }
-        });
-        
-        // 转为数组并排序（降序）
-        const monthsArray = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
-        setAvailableMonths(monthsArray);
-        
-        // 如果还没有选择月份且有可用月份，自动选择第一个（最新）月份
-        if (!selectedMonth && monthsArray.length > 0) {
-          const latestMonth = monthsArray[0];
-          setSelectedMonth(latestMonth);
-          // 自动设置该月份对应的日期范围
-          await setDateRangeForMonth(latestMonth);
-        }
-      }
-    } catch (error) {
-      console.error('获取月份和工资数据失败:', error);
+  // 获取记薪周期设置（带缓存）
+  const getSalarySettings = React.useCallback(async () => {
+    if (salarySettingsCache.current) {
+      return salarySettingsCache.current;
     }
-  }, [coachId, user, selectedMonth]);
-
-  // 根据月份设置日期范围的通用函数
-  const setDateRangeForMonth = async (month) => {
-    if (!month) return;
     
     try {
       const settingResp = await fetch(`${getApiBaseUrl()}/salary-system-settings/current`, {
@@ -5876,39 +5819,191 @@ const MyHours = ({ user }) => {
       if (settingResp.ok) {
         const settingData = await settingResp.json();
         if (settingData.success && settingData.data) {
-          const setting = settingData.data;
-          const startDay = setting.salaryStartDay || 1;
-          const endDay = setting.salaryEndDay || 31;
-          
-          // 解析月份（例如："2025-10"）
-          const yearMonth = dayjs(month, 'YYYY-MM');
-          
-          let periodStart, periodEnd;
-          
-          // 如果开始日<=结束日，在同一个月内
-          if (startDay <= endDay) {
-            periodStart = yearMonth.date(startDay);
-            periodEnd = yearMonth.date(Math.min(endDay, yearMonth.daysInMonth()));
-          } else {
-            // 跨月：从本月开始日到次月结束日
-            // 例如：选择10月，记薪周期16-15，应该是10月16日到11月15日
-            periodStart = yearMonth.date(startDay);
-            const nextMonth = yearMonth.add(1, 'month');
-            const actualEndDay = endDay === 0 ? nextMonth.daysInMonth() : endDay;
-            periodEnd = nextMonth.date(Math.min(actualEndDay, nextMonth.daysInMonth()));
-          }
-          
-          console.log('选择月份:', month);
-          console.log('记薪周期设置:', startDay, '-', endDay);
-          console.log('计算结果:', periodStart.format('YYYY-MM-DD'), '到', periodEnd.format('YYYY-MM-DD'));
-          
-          setStartDate(periodStart);
-          setEndDate(periodEnd);
+          const settings = {
+            startDay: settingData.data.salaryStartDay || 1,
+            endDay: settingData.data.salaryEndDay || 31
+          };
+          salarySettingsCache.current = settings;
+          return settings;
         }
       }
     } catch (error) {
       console.error('获取记薪周期设置失败:', error);
-      message.error('获取记薪周期失败');
+    }
+    
+    return { startDay: 1, endDay: 31 };
+  }, []);
+
+  // 初始化数据：计算当前记薪周期并查询数据
+  const initializeDataOnce = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // 获取记薪周期设置
+      const settings = await getSalarySettings();
+      const startDay = settings.startDay;
+      const endDay = settings.endDay;
+      
+      // 计算当前记薪周期的月份和日期
+      const today = dayjs();
+      const currentDay = today.date();
+      
+      // 判断当前日期属于哪个记薪周期月份
+      let salaryMonth;
+      if (startDay <= endDay) {
+        // 同月内
+        salaryMonth = today.format('YYYY-MM');
+      } else {
+        // 跨月：如果今天 >= startDay，属于本月记薪周期；否则属于上月
+        if (currentDay >= startDay) {
+          salaryMonth = today.format('YYYY-MM');
+        } else {
+          salaryMonth = today.subtract(1, 'month').format('YYYY-MM');
+        }
+      }
+      
+      // 计算该记薪周期的起止日期
+      const yearMonth = dayjs(salaryMonth, 'YYYY-MM');
+      let periodStart, periodEnd;
+      
+      if (startDay <= endDay) {
+        periodStart = yearMonth.date(startDay);
+        periodEnd = yearMonth.date(Math.min(endDay, yearMonth.daysInMonth()));
+      } else {
+        periodStart = yearMonth.date(startDay);
+        const nextMonth = yearMonth.add(1, 'month');
+        const actualEndDay = endDay === 0 ? nextMonth.daysInMonth() : endDay;
+        periodEnd = nextMonth.date(Math.min(actualEndDay, nextMonth.daysInMonth()));
+      }
+      
+      // 第1次调用：获取所有数据提取月份列表
+      const allParams = {
+        coachId: user?.position?.toUpperCase() === 'MANAGER' ? (coachId ? String(coachId) : undefined) : undefined,
+        sortOrder,
+        page: 1,
+        size: 1000
+      };
+      const allResp = await getMyHoursPaged(allParams);
+      
+      if (allResp && allResp.success) {
+        const allRecords = allResp.data?.list || [];
+        const monthsSet = new Set();
+        
+        // 提取所有月份
+        allRecords.forEach(record => {
+          if (record.scheduleDate) {
+            const recordDate = dayjs(record.scheduleDate);
+            const day = recordDate.date();
+            
+            let recordSalaryMonth;
+            if (startDay <= endDay) {
+              recordSalaryMonth = recordDate.format('YYYY-MM');
+            } else {
+              if (day >= startDay) {
+                recordSalaryMonth = recordDate.format('YYYY-MM');
+              } else {
+                recordSalaryMonth = recordDate.subtract(1, 'month').format('YYYY-MM');
+              }
+            }
+            monthsSet.add(recordSalaryMonth);
+          }
+        });
+        
+        // 设置可用月份列表
+        const monthsArray = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+        setAvailableMonths(monthsArray);
+      }
+      
+      // 设置当前记薪周期的月份和日期
+      setSelectedMonth(salaryMonth);
+      setStartDate(periodStart);
+      setEndDate(periodEnd);
+      
+      // 第2次调用：带日期参数获取当前记薪周期的准确数据
+      const currentParams = {
+        startDate: periodStart.format('YYYY-MM-DD'),
+        endDate: periodEnd.format('YYYY-MM-DD'),
+        coachId: user?.position?.toUpperCase() === 'MANAGER' ? (coachId ? String(coachId) : undefined) : undefined,
+        sortOrder,
+        page: 1,
+        size: 10
+      };
+      const currentResp = await getMyHoursPaged(currentParams);
+      
+      if (currentResp && currentResp.success) {
+        const list = currentResp.data?.list || [];
+        const total = currentResp.data?.total || 0;
+        const currentPageHours = currentResp.data?.totalHours || 0;
+        const grandTotalHours = currentResp.data?.grandTotalHours || 0;
+        
+        // 规范字段
+        const selectedCoachName = user?.position?.toUpperCase() === 'MANAGER'
+          ? (coachOptions.find(o => String(o.value) === String(coachId))?.label || '')
+          : (user?.nickname || user?.username || '');
+        const mapped = list.map(s => ({
+          ...s,
+          scheduleDate: s.scheduleDate,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          studentName: s.studentName,
+          timetableOwner: s.coachName || selectedCoachName
+        }));
+        
+        setTotalCount(total);
+        setRecords(mapped);
+        setStats({ 
+          count: total, 
+          hours: currentPageHours,
+          grandTotalHours: grandTotalHours 
+        });
+      }
+    } catch (error) {
+      console.error('初始化数据失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [coachId, user, sortOrder, coachOptions, getSalarySettings]);
+
+  // 根据月份设置日期范围的通用函数
+  const setDateRangeForMonth = async (month) => {
+    if (!month) return null;
+    
+    try {
+      // 使用缓存的设置
+      const settings = await getSalarySettings();
+      const startDay = settings.startDay;
+      const endDay = settings.endDay;
+      
+      // 解析月份（例如："2025-10"）
+      const yearMonth = dayjs(month, 'YYYY-MM');
+      
+      let periodStart, periodEnd;
+      
+      // 如果开始日<=结束日，在同一个月内
+      if (startDay <= endDay) {
+        periodStart = yearMonth.date(startDay);
+        periodEnd = yearMonth.date(Math.min(endDay, yearMonth.daysInMonth()));
+      } else {
+        // 跨月：从本月开始日到次月结束日
+        // 例如：选择10月，记薪周期16-15，应该是10月16日到11月15日
+        periodStart = yearMonth.date(startDay);
+        const nextMonth = yearMonth.add(1, 'month');
+        const actualEndDay = endDay === 0 ? nextMonth.daysInMonth() : endDay;
+        periodEnd = nextMonth.date(Math.min(actualEndDay, nextMonth.daysInMonth()));
+      }
+      
+      console.log('选择月份:', month);
+      console.log('记薪周期设置:', startDay, '-', endDay);
+      console.log('计算结果:', periodStart.format('YYYY-MM-DD'), '到', periodEnd.format('YYYY-MM-DD'));
+      
+      setStartDate(periodStart);
+      setEndDate(periodEnd);
+      
+      return { periodStart, periodEnd };
+    } catch (error) {
+      console.error('设置日期范围失败:', error);
+      message.error('设置日期范围失败');
+      return null;
     }
   };
 
@@ -5920,37 +6015,79 @@ const MyHours = ({ user }) => {
       // 清空选择
       setStartDate(null);
       setEndDate(null);
+      setRecords([]);
+      setTotalCount(0);
       return;
     }
     
-    // 使用通用函数设置日期范围
-    await setDateRangeForMonth(month);
+    // 设置日期范围并立即查询
+    const dates = await setDateRangeForMonth(month);
+    if (dates) {
+      setPage(1);
+      // 使用计算好的日期查询，不依赖state更新
+      setLoading(true);
+      try {
+        const params = {
+          startDate: dates.periodStart.format('YYYY-MM-DD'),
+          endDate: dates.periodEnd.format('YYYY-MM-DD'),
+          coachId: user?.position?.toUpperCase() === 'MANAGER' ? (coachId ? String(coachId) : undefined) : undefined,
+          sortOrder,
+          page: 1,
+          size: pageSize
+        };
+        const resp = await getMyHoursPaged(params);
+        const list = resp?.data?.list || [];
+        const total = resp?.data?.total || 0;
+        const currentPageHours = resp?.data?.totalHours || 0;
+        const grandTotalHours = resp?.data?.grandTotalHours || 0;
+        
+        const selectedCoachName = user?.position?.toUpperCase() === 'MANAGER'
+          ? (coachOptions.find(o => String(o.value) === String(coachId))?.label || '')
+          : (user?.nickname || user?.username || '');
+        const mapped = list.map(s => ({
+          ...s,
+          scheduleDate: s.scheduleDate,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          studentName: s.studentName,
+          timetableOwner: s.coachName || selectedCoachName
+        }));
+        setTotalCount(total);
+        setRecords(mapped);
+        setStats({ 
+          count: total, 
+          hours: currentPageHours,
+          grandTotalHours: grandTotalHours 
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
-  // 初始化时加载数据
+  // 初始化时加载数据（只调用一次接口）
   React.useEffect(() => { 
-    const initializeData = async () => {
-      // 先获取月份数据，这会自动设置最新月份和对应的日期范围
-      await fetchAvailableMonthsAndSalary();
+    const initialize = async () => {
+      isInitializing.current = true;
+      // 如果是管理员，先加载教练列表
+      await loadCoachOptions();
+      // 一次性获取所有数据并初始化
+      await initializeDataOnce();
       isInitialized.current = true;
+      isInitializing.current = false;
     };
-    initializeData();
+    initialize();
   }, []); // 空依赖数组，只在组件挂载时执行一次
   
-  // 切换教练时重新获取月份
+  // 切换教练时重新加载数据
   React.useEffect(() => {
-    if (isInitialized.current && coachId) {
-      fetchAvailableMonthsAndSalary();
+    if (isInitialized.current && !isInitializing.current && coachId) {
+      initializeDataOnce();
     }
-  }, [coachId, fetchAvailableMonthsAndSalary]);
+  }, [coachId, initializeDataOnce]);
   
-  // 当日期范围设置后自动查询数据
-  React.useEffect(() => {
-    if (isInitialized.current && startDate && endDate) {
-      setPage(1); // 重置到第一页
-      fetchData();
-    }
-  }, [startDate, endDate, fetchData]);
+  // 当月份改变时查询数据（通过handleMonthChange触发）
+  // 注意：初始化时不触发，因为initializeDataOnce已经设置了数据
   
   // 分页时自动查询
   React.useEffect(() => { 
