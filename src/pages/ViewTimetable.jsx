@@ -3062,7 +3062,12 @@ const ViewTimetable = ({ user }) => {
             const timeKey = `${scheduleToDelete.startTime.substring(0,5)}-${scheduleToDelete.endTime.substring(0,5)}`;
             setLeaveSlotMap(prev => {
               const newMap = new Map(prev);
-              newMap.set(`${dayKey}|${timeKey}`, scheduleToDelete.studentName || '');
+              // 使用对象格式存储，保持和请假时的数据结构一致
+              newMap.set(`${dayKey}|${timeKey}`, { 
+                studentName: scheduleToDelete.studentName || '', 
+                scheduleId: scheduleToDelete.id,
+                type: '取消'
+              });
               return newMap;
             });
           }
@@ -3116,7 +3121,7 @@ const ViewTimetable = ({ user }) => {
         const timeKey = `${leaveSchedule.startTime.substring(0,5)}-${leaveSchedule.endTime.substring(0,5)}`;
         setLeaveSlotMap(prev => {
           const newMap = new Map(prev);
-          newMap.set(`${dayKey}|${timeKey}`, { studentName: leaveSchedule.studentName || '', scheduleId: leaveSchedule.id });
+          newMap.set(`${dayKey}|${timeKey}`, { studentName: leaveSchedule.studentName || '', scheduleId: leaveSchedule.id, type: '请假' });
           return newMap;
         });
         
@@ -3148,7 +3153,26 @@ const ViewTimetable = ({ user }) => {
         try {
           const response = await cancelLeave(cancelInfo.scheduleId);
           if (response.success && response.data) {
-            message.success('恢复成功');
+            // 先从leaveSlotMap中移除该记录
+            const timeInfoParts = cancelInfo.timeInfo.split(', ');
+            const chineseToEnglishDay = {
+              '星期一': 'monday',
+              '星期二': 'tuesday',
+              '星期三': 'wednesday',
+              '星期四': 'thursday',
+              '星期五': 'friday',
+              '星期六': 'saturday',
+              '星期日': 'sunday'
+            };
+            const dayKey = chineseToEnglishDay[timeInfoParts[0]] || (cancelInfo.timeInfo.includes('星期') ? timeInfoParts[0].toLowerCase() : null);
+            const timeKey = timeInfoParts[1];
+            if (dayKey && timeKey) {
+              setLeaveSlotMap(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(`${dayKey}|${timeKey}`);
+                return newMap;
+              });
+            }
             
             // 立即将恢复的课程添加到 allSchedules 中
             const restoredSchedule = response.data;
@@ -3166,27 +3190,10 @@ const ViewTimetable = ({ user }) => {
               setAllSchedules([...allSchedules, restoredSchedule]);
             }
             
+            message.success('恢复成功');
+            setOpenPopoverKey(null);
             // 清除缓存，确保下次获取最新数据
             invalidateTimetableCache(timetableId);
-            
-            // 重新获取包含请假课程的完整数据来更新leaveSlotMap
-            try {
-              const leaveResponse = await getCurrentWeekInstanceIncludingLeaves(timetableId);
-              if (leaveResponse && leaveResponse.success && leaveResponse.data && Array.isArray(leaveResponse.data.schedules)) {
-                const map = new Map();
-                leaveResponse.data.schedules.filter(s => s.isOnLeave).forEach(s => {
-                  const dayKey = (s.dayOfWeek || '').toLowerCase();
-                  const timeKey = `${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`;
-                  // 存储对象，包含学员名和实例课程ID
-                  map.set(`${dayKey}|${timeKey}`, { studentName: s.studentName || '', scheduleId: s.id });
-                });
-                setLeaveSlotMap(map);
-              }
-            } catch (leaveError) {
-              console.error('更新请假映射失败:', leaveError);
-            }
-            
-            setOpenPopoverKey(null);
           } else {
             message.error(response.message || '恢复失败');
           }
@@ -3289,13 +3296,7 @@ const ViewTimetable = ({ user }) => {
         );
         
         if (alreadyExists) {
-          message.success('恢复成功');
-          // 清除缓存，确保获取最新数据
-          invalidateTimetableCache(timetableId);
-          await fetchWeekInstanceSchedules();
-          setOpenPopoverKey(null);
-          
-          // 从leaveSlotMap中移除该记录
+          // 先从leaveSlotMap中移除该记录
           const timeInfoParts = cancelInfo.timeInfo.split(', ');
           const chineseToEnglishDay = {
             '星期一': 'monday',
@@ -3313,21 +3314,19 @@ const ViewTimetable = ({ user }) => {
             newMap.delete(`${dayKey}|${timeKey}`);
             return newMap;
           });
+          
+          message.success('恢复成功');
+          setOpenPopoverKey(null);
+          // 清除缓存，确保下次获取最新数据
+          invalidateTimetableCache(timetableId);
           return;
         }
         
         try {
           const response = await createInstanceSchedule(currentWeekInstance.id, payload);
           if (response.success) {
-            message.success('恢复成功');
-            // 清除缓存，确保获取最新数据
-            invalidateTimetableCache(timetableId);
-            await fetchWeekInstanceSchedules();
-            setOpenPopoverKey(null);
-            
-            // 恢复成功后，从leaveSlotMap中移除该记录
+            // 先从leaveSlotMap中移除该记录，避免重新获取数据时又被加回来
             const timeInfoParts = cancelInfo.timeInfo.split(', ');
-            // 将中文星期转换为英文小写
             const chineseToEnglishDay = {
               '星期一': 'monday',
               '星期二': 'tuesday',
@@ -3344,6 +3343,16 @@ const ViewTimetable = ({ user }) => {
               newMap.delete(`${dayKey}|${timeKey}`);
               return newMap;
             });
+            
+            // 手动将新创建的课程添加到allSchedules中，避免需要重新获取所有数据
+            if (response.data) {
+              setAllSchedules(prev => [...prev, response.data]);
+            }
+            
+            message.success('恢复成功');
+            setOpenPopoverKey(null);
+            // 清除缓存，下次获取时能拿到最新数据
+            invalidateTimetableCache(timetableId);
           } else {
             message.error(response.message || '恢复失败');
           }
@@ -3353,13 +3362,7 @@ const ViewTimetable = ({ user }) => {
           if (createError.response?.status === 409 ||
               (createError.response?.data?.message &&
                createError.response.data.message.includes('已存在'))) {
-            message.success('恢复成功');
-            // 清除缓存，确保获取最新数据
-            invalidateTimetableCache(timetableId);
-            await fetchWeekInstanceSchedules();
-            setOpenPopoverKey(null);
-            
-            // 从leaveSlotMap中移除该记录
+            // 先从leaveSlotMap中移除该记录
             const timeInfoParts = cancelInfo.timeInfo.split(', ');
             const chineseToEnglishDay = {
               '星期一': 'monday',
@@ -3377,6 +3380,13 @@ const ViewTimetable = ({ user }) => {
               newMap.delete(`${dayKey}|${timeKey}`);
               return newMap;
             });
+            
+            // 刷新数据以获取已存在的课程
+            invalidateTimetableCache(timetableId);
+            await fetchWeekInstanceSchedules();
+            
+            message.success('恢复成功');
+            setOpenPopoverKey(null);
           } else {
             message.error(createError.response?.data?.message || '创建课程失败');
           }
@@ -4582,7 +4592,7 @@ const ViewTimetable = ({ user }) => {
             response.data.schedules.filter(s => s.isOnLeave).forEach(s => {
               const dayKey = (s.dayOfWeek || '').toLowerCase();
               const timeKey = `${s.startTime.substring(0,5)}-${s.endTime.substring(0,5)}`;
-              map.set(`${dayKey}|${timeKey}`, { studentName: s.studentName || '', scheduleId: s.id });
+              map.set(`${dayKey}|${timeKey}`, { studentName: s.studentName || '', scheduleId: s.id, type: '请假' });
             });
             setLeaveSlotMap(map);
           } else {
@@ -5123,7 +5133,7 @@ const ViewTimetable = ({ user }) => {
             const leaveInfo = leaveSlotMap.get(slotKey);
             const cancelInfo = templateScheduleExists && templateScheduleForCell ? {
               studentName: leaveInfo ? leaveInfo.studentName : templateScheduleForCell.studentName,
-              type: leaveInfo ? '请假' : '取消',
+              type: leaveInfo ? (leaveInfo.type || '请假') : '取消',
               timeInfo,
               scheduleId: leaveInfo ? leaveInfo.scheduleId : templateScheduleForCell.id
             } : null;
