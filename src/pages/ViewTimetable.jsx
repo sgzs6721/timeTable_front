@@ -2325,20 +2325,9 @@ const ViewTimetable = ({ user }) => {
           const tpl = await getTemplateSchedules(timetableId);
           const finalSchedules = (tpl && tpl.success) ? (tpl.data || []) : [];
           
-          // 批量更新状态
-          setTimetable(timetableData);
-          setTimetableOwner(owner);
-          setAllSchedules(finalSchedules);
-          
-          // 使用 requestAnimationFrame 确保浏览器完成本次渲染后再关闭loading
-          // 双重 RAF 确保 DOM 已完全绘制
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setLoading(false);
-            });
-          });
-          
-          // 处理日期范围的周数计算
+          // 处理日期范围的周数计算，必须在设置allSchedules之前计算好
+          let finalCurrentWeek = 1;
+          let finalTotalWeeks = 1;
           if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
             const start = dayjs(timetableData.startDate);
             const end = dayjs(timetableData.endDate);
@@ -2350,11 +2339,9 @@ const ViewTimetable = ({ user }) => {
             // 计算总周数
             const totalDays = end.diff(anchorMonday, 'day') + 1;
             const weeks = Math.ceil(totalDays / 7);
-            setTotalWeeks(weeks > 0 ? weeks : 1);
+            finalTotalWeeks = weeks > 0 ? weeks : 1;
 
             // 计算当前应该显示的周数
-            let targetWeek = 1; // 默认第一周
-
             // 检查今天是否在课表日期范围内
             if (today.isSameOrAfter(start) && today.isSameOrBefore(end)) {
               // 计算今天是第几周
@@ -2363,12 +2350,25 @@ const ViewTimetable = ({ user }) => {
 
               // 确保周数在有效范围内
               if (weekNumber >= 1 && weekNumber <= weeks) {
-                targetWeek = weekNumber;
+                finalCurrentWeek = weekNumber;
               }
             }
-
-            setCurrentWeek(targetWeek);
           }
+          
+          // 批量更新状态，确保currentWeek在allSchedules之前或同时设置
+          setTimetable(timetableData);
+          setTimetableOwner(owner);
+          setTotalWeeks(finalTotalWeeks);
+          setCurrentWeek(finalCurrentWeek);
+          setAllSchedules(finalSchedules);
+          
+          // 使用 requestAnimationFrame 确保浏览器完成本次渲染后再关闭loading
+          // 双重 RAF 确保 DOM 已完全绘制
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setLoading(false);
+            });
+          });
           
           return; // 提前返回
         }
@@ -4802,7 +4802,18 @@ const ViewTimetable = ({ user }) => {
               return false;
             }
             
-            // 根据视图模式进行不同的过滤
+            // 根据课表类型进行不同的过滤（优先检查课表类型，而不是仅依赖viewMode）
+            // 日期范围课表：始终按实际日期过滤
+            if (!timetable.isWeekly) {
+              const weekDatesForFilter = getCurrentWeekDates();
+              if (weekDatesForFilter && weekDatesForFilter.start) {
+                const targetDate = weekDatesForFilter.start.add(index, 'day').format('YYYY-MM-DD');
+                return s.scheduleDate === targetDate;
+              }
+              return false;
+            }
+            
+            // 周固定课表：根据视图模式过滤
             if (displayViewMode === 'instance') {
               // 实例视图：优先按具体日期过滤
               if (s.scheduleDate && currentWeekInstance) {
@@ -4817,18 +4828,8 @@ const ViewTimetable = ({ user }) => {
               return dayMatch;
             } else {
               // 模板视图：按星期几过滤
-              if (timetable.isWeekly) {
-                const dayMatch = (s.dayOfWeek || '').toLowerCase() === day.key;
-                return dayMatch;
-              } else {
-                // 日期范围课表按日期过滤
-                const scheduleDate = dayjs(s.scheduleDate);
-                const dayIndex = scheduleDate.day();
-                const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                const scheduleDayKey = dayNames[dayIndex];
-                const dayMatch = scheduleDayKey === day.key;
-                return dayMatch;
-              }
+              const dayMatch = (s.dayOfWeek || '').toLowerCase() === day.key;
+              return dayMatch;
             }
           });
 

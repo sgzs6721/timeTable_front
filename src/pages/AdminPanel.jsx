@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Button, Space, Badge, Dropdown, Spin, message, Card, Alert, Modal, Select, Input, Radio, DatePicker, Row, Col } from 'antd';
-import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined, InboxOutlined, DownOutlined, ToolOutlined, WarningOutlined } from '@ant-design/icons';
+import { Tabs, Button, Space, Badge, Dropdown, Spin, message, Card, Alert, Modal, Select, Input, Radio, DatePicker, Row, Col, Switch, Typography } from 'antd';
+import { CalendarOutlined, LeftOutlined, CrownOutlined, UserAddOutlined, InboxOutlined, DownOutlined, ToolOutlined, WarningOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '../hooks/useMediaQuery';
 import UserManagement from './UserManagement';
@@ -9,7 +9,10 @@ import Footer from '../components/Footer';
 import './AdminPanel.css';
 import { getAllRegistrationRequests, emergencyFixWeeklyInstances, autoFixWeeklyInstances, cleanDuplicateSchedules, getAllUsers, createTimetableForUser } from '../services/admin';
 import { getCurrentUserPermissions } from '../services/rolePermission';
+import { getOrganizationNotificationSettings, updateOrganizationNotificationSettings } from '../services/organization';
 import dayjs from 'dayjs';
+
+const { Text } = Typography;
 
 const { Option } = Select;
 
@@ -36,6 +39,13 @@ const AdminPanel = ({ user }) => {
     startDate: null,
     endDate: null
   });
+  
+  // 课表设置相关状态
+  const [timetableSettings, setTimetableSettings] = useState({
+    weeklyInstanceAutoGenerate: true
+  });
+  const [timetableSettingsLoading, setTimetableSettingsLoading] = useState(false);
+  const [timetableSettingsSaving, setTimetableSettingsSaving] = useState(false);
 
   // 获取当前用户权限配置
   const fetchUserPermissions = async () => {
@@ -54,7 +64,61 @@ const AdminPanel = ({ user }) => {
     fetchUserPermissions();
     // 获取所有用户（教练）列表
     fetchCoaches();
-  }, []);
+    // 获取课表设置
+    if (user?.organizationId) {
+      fetchTimetableSettings();
+    }
+  }, [user?.organizationId]);
+  
+  // 获取课表设置
+  const fetchTimetableSettings = async () => {
+    if (!user?.organizationId) return;
+    
+    setTimetableSettingsLoading(true);
+    try {
+      const response = await getOrganizationNotificationSettings(user.organizationId);
+      if (response && response.success) {
+        setTimetableSettings({
+          weeklyInstanceAutoGenerate: response.data.weeklyInstanceAutoGenerate !== false
+        });
+      }
+    } catch (error) {
+      console.error('获取课表设置失败:', error);
+    } finally {
+      setTimetableSettingsLoading(false);
+    }
+  };
+  
+  // 保存课表设置
+  const handleSaveTimetableSettings = async (key, value) => {
+    if (!user?.organizationId) return;
+    
+    setTimetableSettingsSaving(true);
+    try {
+      // 先获取当前所有设置
+      const currentResponse = await getOrganizationNotificationSettings(user.organizationId);
+      const currentSettings = currentResponse?.success ? currentResponse.data : {};
+      
+      // 更新指定设置
+      const updatedSettings = {
+        ...currentSettings,
+        [key]: value
+      };
+      
+      const response = await updateOrganizationNotificationSettings(user.organizationId, updatedSettings);
+      if (response && response.success) {
+        setTimetableSettings(prev => ({ ...prev, [key]: value }));
+        message.success('设置已保存');
+      } else {
+        message.error(response?.message || '保存失败');
+      }
+    } catch (error) {
+      console.error('保存课表设置失败:', error);
+      message.error('保存失败');
+    } finally {
+      setTimetableSettingsSaving(false);
+    }
+  };
 
   // 基于权限拉取待审批数量
   useEffect(() => {
@@ -360,6 +424,49 @@ const AdminPanel = ({ user }) => {
         </span>
       ),
       children: <UserManagement activeTab="pending" />,
+    }] : []),
+    ...(canAdmin ? [{
+      key: 'settings',
+      label: '课表设置',
+      children: (
+        <div style={{ padding: '16px 0' }}>
+          <Card title={<Space><SettingOutlined />课表自动化设置</Space>} style={{ maxWidth: 600 }}>
+            {timetableSettingsLoading ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <Spin />
+              </div>
+            ) : (
+              <div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: '1px solid #f0f0f0'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 500, marginBottom: 4 }}>周课表自动创建实例</div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      开启后，系统每周日凌晨1点自动为周固定课表创建下周实例
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={timetableSettings.weeklyInstanceAutoGenerate}
+                    loading={timetableSettingsSaving}
+                    onChange={(checked) => handleSaveTimetableSettings('weeklyInstanceAutoGenerate', checked)}
+                  />
+                </div>
+                <div style={{ marginTop: 16, padding: '12px', backgroundColor: '#f5f5f5', borderRadius: 6 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    💡 提示：如果您使用日期范围课表，可以关闭此开关以停止周课表的自动实例生成。
+                    将来需要使用周课表时，再将此开关打开即可。
+                  </Text>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      ),
     }] : []),
   ];
 
