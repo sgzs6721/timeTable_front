@@ -24,6 +24,7 @@ import OrganizationRoleManagement from './pages/OrganizationRoleManagement';
 import OrganizationSalaryManagement from './pages/OrganizationSalaryManagement';
 import OrganizationNotificationSettings from './pages/OrganizationNotificationSettings';
 import MyOrganization from './pages/MyOrganization';
+import WeeklyInstancesList from './pages/WeeklyInstancesList';
 import { validateToken } from './services/auth';
 import './App.css';
 
@@ -235,6 +236,10 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
             element={
               !user ? <Navigate to="/login" /> : <OrganizationNotificationSettings />
             }
+          />
+          <Route
+            path="/weekly-instances"
+            element={user ? <WeeklyInstancesList /> : <Navigate to="/login" />}
           />
           <Route
             path="/"

@@ -175,3 +175,8 @@ export const swapInstanceSchedules = (scheduleId1, scheduleId2) => {
     scheduleId2
   });
 };
+
+// 删除周实例（管理员功能）
+export const deleteWeeklyInstance = (instanceId) => {
+  return api.delete(`/weekly-instances/${instanceId}`);
+};

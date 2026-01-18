@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button, message, Space, Tag, Tooltip, Checkbox, List, Spin, Modal, DatePicker, Select, Table, Dropdown, Input } from 'antd';
-import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined, RetweetOutlined, MoreOutlined, InboxOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined, ClearOutlined } from '@ant-design/icons';
+import { CalendarOutlined, UserOutlined, MergeOutlined, EyeOutlined, LeftOutlined, RightOutlined, StarFilled, CopyOutlined, RetweetOutlined, MoreOutlined, InboxOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined, ClearOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllTimetables, updateTimetableStatus, updateTimetableDetails, deleteTimetableByAdmin, clearTimetableSchedulesByAdmin } from '../services/admin';
 import CopyTimetableModal from '../components/CopyTimetableModal';
@@ -47,6 +47,7 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
   const [editingTimetableId, setEditingTimetableId] = useState(null);
   const [editingTimetableName, setEditingTimetableName] = useState('');
 
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -62,13 +63,30 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
     }
   }, [showArchived]);
 
+  // 查看实例列表
+  const handleViewInstances = (timetable) => {
+    navigate('/weekly-instances', { state: { timetable } });
+  };
+
   // 获取操作菜单
   const getActionMenu = (item) => {
     const hasSchedules = item.scheduleCount > 0;
     const isActive = item.isActive;
     const isArchived = item.isArchived === 1;
+    const isWeekly = item.isWeekly;
 
     const baseItems = [
+      // 查看实例（仅周固定课表）
+      isWeekly && {
+        key: 'viewInstances',
+        label: '查看实例',
+        icon: <UnorderedListOutlined style={{ color: '#1890ff' }} />,
+        onClick: () => handleViewInstances(item),
+        style: { 
+          color: '#262626',
+          fontWeight: '500'
+        },
+      },
       {
         key: 'copy',
         label: '复制课表',
@@ -126,7 +144,7 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
           fontWeight: '500'
         },
       },
-    ];
+    ].filter(Boolean);
 
     if (isArchived) {
       // 归档课表的操作菜单 - 只显示恢复和删除功能
@@ -970,7 +988,6 @@ const TimetableManagement = ({ user, showArchived = false, onLoadingChange, batc
           </div>
         )}
       </Modal>
-
 
     </div>
   );

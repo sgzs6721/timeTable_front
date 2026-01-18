@@ -26,7 +26,7 @@ import {
   requestLeave,
   cancelLeave
 } from '../services/weeklyInstance';
-import { deleteNextWeekInstance, getAllStudents } from '../services/weeklyInstance';
+import { deleteNextWeekInstance, getAllStudents, deleteWeeklyInstance } from '../services/weeklyInstance';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import weekday from 'dayjs/plugin/weekday';
@@ -6499,7 +6499,48 @@ const ViewTimetable = ({ user }) => {
                                   const resp = await deleteNextWeekInstance(timetableId);
                                   if (resp.success) {
                                     const refreshed = await getWeeklyInstances(timetableId);
-                                    if (refreshed.success) setWeeklyInstances(refreshed.data || []);
+                                    if (refreshed.success) {
+                                      // 按日期排序，确保索引顺序正确
+                                      const newInstances = (refreshed.data || []).sort((a, b) => 
+                                        dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))
+                                      );
+                                      setWeeklyInstances(newInstances);
+                                      
+                                      // 重新计算当前实例的索引并更新currentWeekInstance
+                                      if (currentWeekInstance?.id && newInstances.length > 0) {
+                                        const newIndex = newInstances.findIndex(inst => inst.id === currentWeekInstance.id);
+                                        if (newIndex >= 0) {
+                                          // 当前实例仍然存在（删除的不是当前实例）
+                                          setCurrentInstanceIndex(newIndex);
+                                          setCurrentWeekInstance(newInstances[newIndex]);
+                                          updateDisplayRange(newIndex, newInstances);
+                                        } else {
+                                          // 当前实例被删除了，查找本周实例
+                                          const today = dayjs();
+                                          const thisWeekStart = today.startOf('week');
+                                          const thisWeekEnd = thisWeekStart.add(6, 'day');
+                                          const thisWeekIndex = newInstances.findIndex(inst => {
+                                            const start = dayjs(inst.weekStartDate);
+                                            const end = dayjs(inst.weekEndDate);
+                                            return start.isSame(thisWeekStart, 'day') && end.isSame(thisWeekEnd, 'day');
+                                          });
+                                          
+                                          if (thisWeekIndex >= 0) {
+                                            // 有本周实例，切换过去
+                                            await switchToWeekInstanceByIndex(thisWeekIndex);
+                                          } else if (newInstances.length > 0) {
+                                            // 没有本周实例但有其他实例，切换到最后一个
+                                            await switchToWeekInstanceByIndex(newInstances.length - 1);
+                                          } else {
+                                            // 没有任何实例，切换到模板视图
+                                            await switchToTemplateView();
+                                          }
+                                        }
+                                      } else if (newInstances.length === 0) {
+                                        // 删除后没有任何实例，切换到模板视图
+                                        await switchToTemplateView();
+                                      }
+                                    }
                                     message.success('已删除下周课表');
                                   } else {
                                     message.error(resp.message || '删除下周课表失败');
@@ -6573,6 +6614,42 @@ const ViewTimetable = ({ user }) => {
                                   }
                                 } else {
                                   message.error(res2.message || '恢复失败');
+                                }
+                              }
+                            });
+                          }
+                        },
+                        // 删除当前周实例（管理员功能）
+                        currentWeekInstance?.id && user?.position === 'MANAGER' && {
+                          key: 'deleteInstance',
+                          label: '删除当前周实例',
+                          icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
+                          danger: true,
+                          onClick: async () => {
+                            Modal.confirm({
+                              title: '删除当前周实例',
+                              content: '确定删除当前周实例及其所有课程吗？删除后需要重新生成实例。此操作不可恢复。',
+                              okText: '删除',
+                              okType: 'danger',
+                              cancelText: '取消',
+                              onOk: async () => {
+                                try {
+                                  const resp = await deleteWeeklyInstance(currentWeekInstance.id);
+                                  if (resp.success) {
+                                    message.success('已删除当前周实例');
+                                    // 刷新实例列表
+                                    const refreshed = await getWeeklyInstances(timetableId);
+                                    if (refreshed.success) {
+                                      setWeeklyInstances(refreshed.data || []);
+                                    }
+                                    // 切换回固定课表视图
+                                    await switchToTemplateView();
+                                  } else {
+                                    message.error(resp.message || '删除失败');
+                                  }
+                                } catch (e) {
+                                  message.error('删除失败，请稍后重试');
+                                  console.error('删除当前周实例失败:', e);
                                 }
                               }
                             });
@@ -6888,7 +6965,9 @@ const ViewTimetable = ({ user }) => {
                     .slice()
                     .sort((a, b) => dayjs(a.weekStartDate).diff(dayjs(b.weekStartDate))) // 确保左到右日期递增
             ).map((instance, displayIndex) => {
-              const actualIndex = displayStartIndex + displayIndex;
+              // 找到该实例在原始列表中的真实索引
+              const actualIndex = displayWeeklyInstances.findIndex(inst => inst.id === instance.id);
+              const isSelected = instance.id === currentWeekInstance?.id;
               return (
                 <Button
                   key={instance.id}
@@ -6896,7 +6975,7 @@ const ViewTimetable = ({ user }) => {
                   size="small"
                   onClick={() => {
                     // 如果点击的是当前选中的实例，不做任何操作
-                    if (actualIndex === currentInstanceIndex) {
+                    if (isSelected) {
                       return;
                     }
                     switchToWeekInstanceByIndex(actualIndex);
@@ -6905,13 +6984,13 @@ const ViewTimetable = ({ user }) => {
                   style={{
                     minWidth: '80px',
                     fontSize: '12px',
-                    ...(actualIndex === currentInstanceIndex && {
+                    ...(isSelected && {
                       backgroundColor: '#fa8c16 !important',
                       borderColor: '#fa8c16 !important',
                       color: '#fff !important'
                     })
                   }}
-                  className={actualIndex === currentInstanceIndex ? 'selected-instance-btn' : ''}
+                  className={isSelected ? 'selected-instance-btn' : ''}
                 >
                   {dayjs(instance.weekStartDate).format('MM/DD')}
                 </Button>
