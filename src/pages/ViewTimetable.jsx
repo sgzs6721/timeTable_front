@@ -2415,7 +2415,7 @@ const ViewTimetable = ({ user }) => {
         const resp = await getCurrentWeekInstance(timetableId);
         return resp;
       }
-      return null;
+      return gen;
     } catch (error) {
       console.error('生成周实例失败:', error);
       return null;
@@ -2734,6 +2734,10 @@ const ViewTimetable = ({ user }) => {
             await switchToWeekInstanceByIndex(newThisWeekIndex);
             return;
           }
+        } else if (generateResponse && !generateResponse.success && generateResponse.message) {
+          message.error(generateResponse.message);
+          setSwitchToInstanceLoading(false);
+          return;
         }
       } catch (error) {
         console.error('生成本周实例失败:', error);
@@ -6462,7 +6466,8 @@ const ViewTimetable = ({ user }) => {
                                 message.error('无法找到或生成下周课表，请刷新重试');
                               }
                             } catch (e) {
-                              message.error('操作失败，请稍后重试');
+                              const errorMsg = e.response?.data?.message || e.message || '操作失败，请稍后重试';
+                              message.error(errorMsg);
                               console.error('Switch to next week failed:', e);
                             } finally {
                               setInstanceLoading(false);

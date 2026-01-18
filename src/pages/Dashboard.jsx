@@ -1621,20 +1621,36 @@ const Dashboard = ({ user }) => {
   };
 
   // 获取所有课表信息并建立教练课表映射
-  const fetchAllTimetablesInfo = useCallback(async () => {
+  const fetchAllTimetablesInfo = useCallback(async (coaches = null) => {
     try {
       const response = await getAllTimetablesAdmin(true); // 只获取活动课表
       if (response.success) {
         setAllTimetables(response.data);
         
-        // 建立教练和课表ID的映射关系（后端已过滤，只返回活动课表）
+        // 建立教练和课表ID的映射关系
         const coachMap = {};
+        
+        // 首先，将拥有课表的教练映射到他们自己的课表
         response.data.forEach(timetable => {
           const coachName = timetable.nickname || timetable.username;
           if (coachName) {
             coachMap[coachName] = timetable.id;
           }
         });
+        
+        // 然后，找到活动课表（isActive=1）并将所有教练映射到该活动课表
+        // 这样即使教练没有自己的课表，点击他们的名字也能跳转到活动课表
+        const activeTimetable = response.data.find(t => t.isActive === 1);
+        if (activeTimetable && coaches && coaches.length > 0) {
+          // 将所有教练映射到活动课表（如果他们还没有映射）
+          coaches.forEach(coach => {
+            const coachName = coach.nickname || coach.username;
+            if (coachName && !coachMap[coachName]) {
+              coachMap[coachName] = activeTimetable.id;
+            }
+          });
+        }
+        
         setCoachTimetableMap(coachMap);
       }
     } catch (error) {
@@ -1657,6 +1673,9 @@ const Dashboard = ({ user }) => {
           }))
         };
         setCoachesStatistics(dataWithKeys);
+        
+        // 在设置统计信息后，立即更新教练课表映射，传入教练数据
+        fetchAllTimetablesInfo(dataWithKeys.coaches);
       } else {
         message.error(response.message || '获取统计信息失败');
       }
@@ -1666,7 +1685,7 @@ const Dashboard = ({ user }) => {
     } finally {
       setStatisticsLoading(false);
     }
-  }, []);
+  }, [fetchAllTimetablesInfo]);
 
   // 当权限加载后，如果用户有dashboard权限，则加载统计数据
   useEffect(() => {
@@ -2252,7 +2271,7 @@ const Dashboard = ({ user }) => {
                 return;
               }
             } else {
-              message.error('生成当前周实例失败');
+              message.error(generateResponse.message || '生成当前周实例失败');
               return;
             }
           }
