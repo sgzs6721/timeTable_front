@@ -2322,10 +2322,8 @@ const ViewTimetable = ({ user }) => {
           return; // 提前返回，避免执行后续的setLoading(false)
         } else {
           setViewMode('template');
-          const tpl = await getTemplateSchedules(timetableId);
-          const finalSchedules = (tpl && tpl.success) ? (tpl.data || []) : [];
           
-          // 处理日期范围的周数计算，必须在设置allSchedules之前计算好
+          // 处理日期范围的周数计算，必须在获取课表数据之前计算好
           let finalCurrentWeek = 1;
           let finalTotalWeeks = 1;
           if (!timetableData.isWeekly && timetableData.startDate && timetableData.endDate) {
@@ -2354,6 +2352,12 @@ const ViewTimetable = ({ user }) => {
               }
             }
           }
+          
+          // 对于日期范围课表，使用计算出的周数获取对应周的数据
+          const tpl = !timetableData.isWeekly 
+            ? await getTimetableSchedules(timetableId, finalCurrentWeek)
+            : await getTemplateSchedules(timetableId);
+          const finalSchedules = (tpl && tpl.success) ? (tpl.data || []) : [];
           
           // 批量更新状态，确保currentWeek在allSchedules之前或同时设置
           setTimetable(timetableData);
@@ -3006,6 +3010,9 @@ const ViewTimetable = ({ user }) => {
         } else if (viewMode === 'tomorrow') {
           // 明日课程
           response = await getTomorrowSchedulesOnce(timetableId);
+        } else if (!timetable.isWeekly) {
+          // 日期范围课表：传递week参数获取指定周的数据
+          response = await getTimetableSchedules(timetableId, currentWeek);
         } else {
           // 默认：普通课表数据
           response = await getTimetableSchedules(timetableId);
@@ -3043,7 +3050,7 @@ const ViewTimetable = ({ user }) => {
 
     loadViewData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, timetableId]);
+  }, [viewMode, timetableId, currentWeek]);
 
   const handleDeleteSchedule = async (scheduleId) => {
     setDeleteLoading(true);
