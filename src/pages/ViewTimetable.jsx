@@ -2951,10 +2951,18 @@ const ViewTimetable = ({ user }) => {
       if (viewMode === 'template') {
         // 模板视图：清除模板缓存并刷新模板数据
         invalidateTimetableCache(timetableId);
-        const r = await getTimetableSchedules(timetableId, null, true);
-        if (r && r.success) {
-          setAllSchedules(r.data || []);
-          setTemplateSchedules(r.data || []);
+        // 日期范围课表需要传递当前周数
+        if (timetable && !timetable.isWeekly) {
+          const r = await getTimetableSchedules(timetableId, currentWeek);
+          if (r && r.success) {
+            setAllSchedules(r.data || []);
+          }
+        } else {
+          const r = await getTimetableSchedules(timetableId, null, true);
+          if (r && r.success) {
+            setAllSchedules(r.data || []);
+            setTemplateSchedules(r.data || []);
+          }
         }
       } else if (viewMode === 'instance') {
         // 实例视图：只刷新实例数据，不清除模板缓存
