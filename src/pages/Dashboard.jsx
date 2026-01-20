@@ -1305,8 +1305,17 @@ const Dashboard = ({ user }) => {
         try {
           const parsedTimetables = JSON.parse(cachedTimetables);
           const parsedScheduleCounts = JSON.parse(cachedScheduleCounts);
+          const activeTimetables = parsedTimetables.filter(t => !t.isArchived);
+          
+          // 活动课表排序：isActive为true的排在最前面
+          activeTimetables.sort((a, b) => {
+            if (a.isActive && !b.isActive) return -1;
+            if (!a.isActive && b.isActive) return 1;
+            return 0;
+          });
+          
           return {
-            timetables: parsedTimetables.filter(t => !t.isArchived),
+            timetables: activeTimetables,
             archivedTimetables: parsedTimetables.filter(t => t.isArchived),
             scheduleCounts: parsedScheduleCounts,
             hasValidCache: true
@@ -1784,6 +1793,13 @@ const Dashboard = ({ user }) => {
         const allTimetables = response.data;
         const activeTimetables = allTimetables.filter(t => !t.isArchived);
         const archivedTimetables = allTimetables.filter(t => t.isArchived);
+
+        // 活动课表排序：isActive为true的排在最前面
+        activeTimetables.sort((a, b) => {
+          if (a.isActive && !b.isActive) return -1;
+          if (!a.isActive && b.isActive) return 1;
+          return 0;
+        });
 
         setTimetables(activeTimetables);
         setArchivedTimetables(archivedTimetables);
