@@ -206,7 +206,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
           {timetable.isWeekly ? (
             `星期${dayMap[schedule.dayOfWeek.toUpperCase()] || schedule.dayOfWeek}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`
           ) : (
-            `${dayjs(schedule.scheduleDate).format('MM/DD')}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`
+            `${dayjs(schedule.scheduleDate).format('YYYY/MM/DD')}, ${schedule.startTime.substring(0, 5)}~${schedule.endTime.substring(0, 5)}`
           )}
         </div>
         <Button
@@ -587,45 +587,120 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
               return <div style={{ color: '#999' }}>暂无其他课程</div>;
             }
             
-            return studentSchedules.map((studentSchedule, index) => (
-              <div key={studentSchedule.id || index} style={{ 
-                marginBottom: '4px', 
-                padding: '4px', 
-                backgroundColor: 'white', 
-                borderRadius: '2px',
-                border: studentSchedule.id === schedule.id ? '1px solid #1890ff' : '1px solid #e8e8e8'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong>星期{dayMap[studentSchedule.dayOfWeek?.toUpperCase()] || studentSchedule.dayOfWeek}</strong>
-                    <span style={{ marginLeft: '8px' }}>
-                      {studentSchedule.startTime?.substring(0, 5)}~{studentSchedule.endTime?.substring(0, 5)}
-                    </span>
-                  </div>
-                  {studentSchedule.id === schedule.id && (
-                    <span style={{ 
-                      fontSize: '10px', 
-                      color: '#1890ff', 
-                      backgroundColor: '#e6f7ff', 
-                      padding: '1px 4px', 
-                      borderRadius: '2px' 
+            // 按日期排序（从早到晚）
+            const sortedSchedules = studentSchedules.sort((a, b) => {
+              if (!a.scheduleDate || !b.scheduleDate) return 0;
+              const dateA = dayjs(a.scheduleDate);
+              const dateB = dayjs(b.scheduleDate);
+              if (!dateA.isSame(dateB, 'day')) {
+                return dateA.isBefore(dateB) ? -1 : 1;
+              }
+              // 同一天按开始时间排序
+              return (a.startTime || '').localeCompare(b.startTime || '');
+            });
+            
+            // 按周分组
+            const weekGroups = {};
+            sortedSchedules.forEach(s => {
+              if (s.scheduleDate) {
+                const weekStart = dayjs(s.scheduleDate).startOf('week');
+                const weekKey = weekStart.format('YYYY-MM-DD');
+                if (!weekGroups[weekKey]) {
+                  weekGroups[weekKey] = {
+                    weekStart,
+                    schedules: []
+                  };
+                }
+                weekGroups[weekKey].schedules.push(s);
+              }
+            });
+            
+            const now = dayjs();
+            
+            // 按周顺序排列显示
+            return Object.keys(weekGroups)
+              .sort((a, b) => a.localeCompare(b))
+              .map((weekKey, weekIndex) => {
+                const group = weekGroups[weekKey];
+                const weekStart = group.weekStart;
+                const weekEnd = weekStart.add(6, 'day');
+                const weekLabel = `${weekStart.format('YYYY/MM/DD')}-${weekEnd.format('MM/DD')}`;
+                
+                return (
+                  <div key={weekKey} style={{ marginBottom: '8px' }}>
+                    {/* 周标签 */}
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#1890ff',
+                      fontWeight: 'bold',
+                      marginBottom: '4px',
+                      padding: '2px 6px',
+                      backgroundColor: '#e6f7ff',
+                      borderRadius: '3px',
+                      display: 'inline-block'
                     }}>
-                      当前
-                    </span>
-                  )}
-                </div>
-                {studentSchedule.subject && (
-                  <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                    科目：{studentSchedule.subject}
+                      {weekLabel}
+                    </div>
+                    
+                    {/* 该周的课程 */}
+                    {group.schedules.map((studentSchedule, index) => {
+                      // 判断课程是否已上（比较日期和时间）
+                      let isPast = false;
+                      if (studentSchedule.scheduleDate) {
+                        const scheduleDateTime = dayjs(`${studentSchedule.scheduleDate} ${studentSchedule.endTime}`);
+                        isPast = scheduleDateTime.isBefore(now);
+                      }
+                      
+                      // 获取显示的日期
+                      let displayDate = '';
+                      if (studentSchedule.scheduleDate) {
+                        displayDate = dayjs(studentSchedule.scheduleDate).format('YYYY/MM/DD');
+                      }
+                      
+                      return (
+                        <div key={studentSchedule.id || index} style={{ 
+                          marginBottom: '4px', 
+                          padding: '4px', 
+                          backgroundColor: isPast ? '#fff1f0' : 'white', 
+                          borderRadius: '2px',
+                          border: studentSchedule.id === schedule.id ? '1px solid #1890ff' : '1px solid #e8e8e8'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              {displayDate && <span style={{ marginRight: '8px', color: '#666' }}>{displayDate}</span>}
+                              <strong>星期{dayMap[studentSchedule.dayOfWeek?.toUpperCase()] || studentSchedule.dayOfWeek}</strong>
+                              <span style={{ marginLeft: '8px' }}>
+                                {studentSchedule.startTime?.substring(0, 5)}~{studentSchedule.endTime?.substring(0, 5)}
+                              </span>
+                            </div>
+                            {studentSchedule.id === schedule.id && (
+                              <span style={{ 
+                                fontSize: '10px', 
+                                color: '#1890ff', 
+                                backgroundColor: '#e6f7ff', 
+                                padding: '1px 4px', 
+                                borderRadius: '2px' 
+                              }}>
+                                当前
+                              </span>
+                            )}
+                          </div>
+                          {studentSchedule.subject && (
+                            <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                              科目：{studentSchedule.subject}
+                            </div>
+                          )}
+                          {studentSchedule.note && (
+                            <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                              备注：{studentSchedule.note}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-                {studentSchedule.note && (
-                  <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                    备注：{studentSchedule.note}
-                  </div>
-                )}
-              </div>
-            ));
+                );
+              });
           })()}
         </div>
       )}
@@ -5244,6 +5319,9 @@ const ViewTimetable = ({ user }) => {
               timeInfo,
               scheduleId: leaveInfo ? leaveInfo.scheduleId : templateScheduleForCell.id
             } : null;
+            
+            // 判断是否为固定可排课时段（在周实例视图且有模板课表时）
+            const isFixedTimeSlot = viewMode === 'instance' && timetable?.isWeekly && templateScheduleForCell;
 
             return (
               <Popover
@@ -5291,8 +5369,25 @@ const ViewTimetable = ({ user }) => {
                 <div style={{ 
                   ...emptyCellStyle,
                   cursor: deleteMode ? 'not-allowed' : 'pointer',
-                  opacity: deleteMode ? 0.5 : 1
-                }} />
+                  opacity: deleteMode ? 0.5 : 1,
+                  border: isFixedTimeSlot ? '2px dashed #52c41a' : emptyCellStyle.border,
+                  backgroundColor: isFixedTimeSlot ? 'rgba(82, 196, 26, 0.05)' : emptyCellStyle.backgroundColor,
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {isFixedTimeSlot && (
+                    <div style={{
+                      fontSize: '10px',
+                      color: '#52c41a',
+                      fontWeight: '500',
+                      opacity: 0.7
+                    }}>
+                      可排课
+                    </div>
+                  )}
+                </div>
               </Popover>
             );
           }
