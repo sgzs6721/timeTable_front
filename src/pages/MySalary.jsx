@@ -85,11 +85,6 @@ const MySalary = ({ user }) => {
         
         const uniqueData = Array.from(uniqueMap.values());
         
-        console.log('===== 调试信息 =====');
-        console.log('API原始返回:', data.length, '条');
-        console.log('去重后:', uniqueData.length, '条');
-        console.log('详细数据:', uniqueData);
-        
         setSalaryData(uniqueData);
       } else {
         message.error('获取工资数据失败：' + (response?.message || '未知错误'));
@@ -107,7 +102,7 @@ const MySalary = ({ user }) => {
 
     // 对于普通用户，只显示自己的数据
     if (!isAdmin && user?.id) {
-      filtered = filtered.filter(item => item.coachId === user.id);
+      filtered = filtered.filter(item => String(item.coachId) === String(user.id));
     }
 
     // 对于管理员，按月份过滤
@@ -115,13 +110,7 @@ const MySalary = ({ user }) => {
       filtered = filtered.filter(item => item.month === selectedMonth);
     }
     
-    // 对于普通用户，只显示当年的数据
-    if (!isAdmin) {
-      const currentYear = dayjs().format('YYYY');
-      filtered = filtered.filter(item => item.month.startsWith(currentYear));
-    }
-    
-    // 对于普通用户，只显示有课程的月份（课时数大于0）
+    // 对于普通用户，显示有课时的数据（不限制年份，因为后端已经只返回最近12个月的数据）
     if (!isAdmin) {
       filtered = filtered.filter(item => item.totalHours > 0);
     }
@@ -148,9 +137,8 @@ const MySalary = ({ user }) => {
     setFilteredData(filtered);
   };
 
-  // 处理表格分组数据
-  const getTableDataSource = () => {
-    // 先对filteredData进行最后一次去重
+  // 处理管理员表格分组数据（按月份）
+  const getAdminTableDataSource = () => {
     const uniqueMap = new Map();
     filteredData.forEach(item => {
       const key = `${item.coachId}-${item.month}`;
@@ -164,7 +152,6 @@ const MySalary = ({ user }) => {
       return uniqueFiltered;
     }
 
-    // 按月份分组
     const groupedData = [];
     const monthGroups = {};
     
@@ -175,13 +162,11 @@ const MySalary = ({ user }) => {
       monthGroups[item.month].push(item);
     });
 
-    // 按月份顺序添加数据
     Object.keys(monthGroups)
-      .sort((a, b) => b.localeCompare(a)) // 最新月份在前
+      .sort((a, b) => b.localeCompare(a))
       .forEach(month => {
         const monthData = monthGroups[month];
         
-        // 添加月份分组标题
         groupedData.push({
           id: `month-${month}`,
           isMonthHeader: true,
@@ -195,10 +180,8 @@ const MySalary = ({ user }) => {
           totalSalary: ''
         });
         
-        // 添加该月份的数据
         groupedData.push(...monthData);
         
-        // 计算该月份的小计
         const monthTotalBaseSalary = monthData.reduce((sum, row) => sum + (row.baseSalary || 0), 0);
         const monthTotalHours = monthData.reduce((sum, row) => sum + (row.totalHours || 0), 0);
         const monthTotalHourlyPay = monthData.reduce((sum, row) => sum + (row.hourlyPay || 0), 0);
@@ -206,7 +189,6 @@ const MySalary = ({ user }) => {
         const monthTotalSocialSecurity = monthData.reduce((sum, row) => sum + (row.socialSecurity || 0), 0);
         const monthTotalSalary = monthData.reduce((sum, row) => sum + (row.totalSalary || 0), 0);
         
-        // 添加该月份的小计行
         groupedData.push({
           id: `subtotal-${month}`,
           isMonthSubtotal: true,
@@ -224,6 +206,85 @@ const MySalary = ({ user }) => {
     return groupedData;
   };
 
+  // 处理普通用户表格分组数据（按年份）
+  const getUserTableDataSource = () => {
+    const uniqueMap = new Map();
+    filteredData.forEach(item => {
+      const key = `${item.coachId}-${item.month}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, item);
+      }
+    });
+    const uniqueFiltered = Array.from(uniqueMap.values());
+    
+    if (uniqueFiltered.length === 0) {
+      return [];
+    }
+
+    // 按年份分组
+    const groupedData = [];
+    const yearGroups = {};
+    
+    uniqueFiltered.forEach(item => {
+      const year = item.month.substring(0, 4);
+      if (!yearGroups[year]) {
+        yearGroups[year] = [];
+      }
+      yearGroups[year].push(item);
+    });
+
+    // 按年份顺序添加数据（最新年份在前）
+    Object.keys(yearGroups)
+      .sort((a, b) => b.localeCompare(a))
+      .forEach(year => {
+        const yearData = yearGroups[year];
+        
+        // 计算该年份的小计
+        const yearTotalBaseSalary = yearData.reduce((sum, row) => sum + (row.baseSalary || 0), 0);
+        const yearTotalHours = yearData.reduce((sum, row) => sum + (row.totalHours || 0), 0);
+        const yearTotalHourlyPay = yearData.reduce((sum, row) => sum + (row.hourlyPay || 0), 0);
+        const yearTotalCommission = yearData.reduce((sum, row) => sum + (row.commission || 0), 0);
+        const yearTotalSocialSecurity = yearData.reduce((sum, row) => sum + (row.socialSecurity || 0), 0);
+        const yearTotalSalary = yearData.reduce((sum, row) => sum + (row.totalSalary || 0), 0);
+        
+        // 添加年份标题（只作为背景，不显示文字）
+        groupedData.push({
+          id: `year-${year}`,
+          isYearHeader: true,
+          year: year,
+          month: '',
+          coachName: '',
+          baseSalary: '',
+          totalHours: '',
+          hourlyPay: '',
+          commission: '',
+          socialSecurity: '',
+          totalSalary: ''
+        });
+        
+        // 添加该年份的总计行（紧随年份标题）
+        groupedData.push({
+          id: `year-subtotal-${year}`,
+          isYearSubtotal: true,
+          year: year,
+          month: `${year}年总计`,
+          coachName: '',
+          baseSalary: yearTotalBaseSalary,
+          totalHours: yearTotalHours,
+          hourlyPay: yearTotalHourlyPay,
+          commission: yearTotalCommission,
+          socialSecurity: yearTotalSocialSecurity,
+          totalSalary: yearTotalSalary
+        });
+        
+        // 按月份排序该年的数据（最新月份在前）
+        const sortedYearData = yearData.sort((a, b) => b.month.localeCompare(a.month));
+        groupedData.push(...sortedYearData);
+      });
+
+    return groupedData;
+  };
+
 
   const columns = [
     {
@@ -233,6 +294,7 @@ const MySalary = ({ user }) => {
       width: 80,
       align: 'center',
       render: (text, record) => {
+        // 管理员的月份标题
         if (record.isMonthHeader) {
           return (
             <div style={{ 
@@ -246,8 +308,17 @@ const MySalary = ({ user }) => {
             </div>
           );
         }
+        // 管理员的月份小计
         if (record.isMonthSubtotal) {
           return <Text strong style={{ color: '#1890ff', whiteSpace: 'nowrap' }}>{text}</Text>;
+        }
+        // 普通用户的年份标题（只显示背景，不显示文字）
+        if (record.isYearHeader) {
+          return null;
+        }
+        // 普通用户的年份小计
+        if (record.isYearSubtotal) {
+          return <Text strong style={{ color: '#1890ff', fontSize: '14px', whiteSpace: 'nowrap' }}>{text}</Text>;
         }
         // 普通用户显示月份
         if (!isAdmin) {
@@ -255,15 +326,36 @@ const MySalary = ({ user }) => {
         }
         return <Text strong style={{ whiteSpace: 'nowrap' }}>{text}</Text>;
       },
-      onCell: (record) => ({
-        style: { 
-          whiteSpace: 'nowrap', 
-          textAlign: record.isMonthHeader ? 'left' : 'center',
-          backgroundColor: record.isMonthHeader ? '#f0f9ff' : (record.isMonthSubtotal ? '#fafafa' : 'transparent'),
-          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
-        },
-        colSpan: record.isMonthHeader ? 7 : 1
-      })
+      onCell: (record) => {
+        let backgroundColor = 'transparent';
+        let colSpan = 1;
+        let textAlign = 'center';
+        
+        if (record.isMonthHeader) {
+          backgroundColor = '#f0f9ff';
+          colSpan = 7;
+          textAlign = 'left';
+        } else if (record.isMonthSubtotal) {
+          backgroundColor = '#fafafa';
+        } else if (record.isYearHeader) {
+          backgroundColor = '#f0f9ff';
+          colSpan = 7;
+          textAlign = 'left';
+        } else if (record.isYearSubtotal) {
+          backgroundColor = '#fafafa';
+        }
+        
+        return {
+          style: { 
+            whiteSpace: 'nowrap', 
+            textAlign,
+            backgroundColor,
+            fontWeight: (record.isMonthSubtotal || record.isYearSubtotal) ? 'bold' : 'normal',
+            padding: record.isYearHeader ? '8px' : undefined
+          },
+          colSpan
+        };
+      }
     },
     {
       title: '应发工资',
@@ -272,9 +364,14 @@ const MySalary = ({ user }) => {
       width: 100,
       align: 'center',
       render: (value, record) => {
-        if (record.isMonthHeader) return null;
+        if (record.isMonthHeader || record.isYearHeader) return null;
         return (
-          <Text strong={record.isMonthSubtotal} style={{ fontSize: record.isMonthSubtotal ? '16px' : '16px', whiteSpace: 'nowrap' }}>
+          <Text strong={record.isMonthSubtotal || record.isYearSubtotal} 
+                style={{ 
+                  fontSize: (record.isMonthSubtotal || record.isYearSubtotal) ? '16px' : '16px', 
+                  whiteSpace: 'nowrap',
+                  color: record.isYearSubtotal ? '#1890ff' : 'inherit'
+                }}>
             ¥{Math.round(value)}
           </Text>
         );
@@ -283,10 +380,10 @@ const MySalary = ({ user }) => {
         style: { 
           whiteSpace: 'nowrap', 
           textAlign: 'center',
-          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
-          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+          backgroundColor: (record.isMonthSubtotal || record.isYearSubtotal) ? '#fafafa' : 'transparent',
+          fontWeight: (record.isMonthSubtotal || record.isYearSubtotal) ? 'bold' : 'normal'
         },
-        colSpan: record.isMonthHeader ? 0 : 1
+        colSpan: (record.isMonthHeader || record.isYearHeader) ? 0 : 1
       })
     },
     {
@@ -296,17 +393,17 @@ const MySalary = ({ user }) => {
       width: 80,
       align: 'center',
       render: (value, record) => {
-        if (record.isMonthHeader) return null;
-        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+        if (record.isMonthHeader || record.isYearHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap', fontWeight: record.isYearSubtotal ? 'bold' : 'normal' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
         style: { 
           whiteSpace: 'nowrap', 
           textAlign: 'center',
-          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
-          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+          backgroundColor: (record.isMonthSubtotal || record.isYearSubtotal) ? '#fafafa' : 'transparent',
+          fontWeight: (record.isMonthSubtotal || record.isYearSubtotal) ? 'bold' : 'normal'
         },
-        colSpan: record.isMonthHeader ? 0 : 1
+        colSpan: (record.isMonthHeader || record.isYearHeader) ? 0 : 1
       })
     },
     {
@@ -316,17 +413,17 @@ const MySalary = ({ user }) => {
       width: 70,
       align: 'center',
       render: (value, record) => {
-        if (record.isMonthHeader) return null;
-        return <span style={{ whiteSpace: 'nowrap' }}>{value}</span>;
+        if (record.isMonthHeader || record.isYearHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap', fontWeight: record.isYearSubtotal ? 'bold' : 'normal' }}>{value}</span>;
       },
       onCell: (record) => ({
         style: { 
           whiteSpace: 'nowrap', 
           textAlign: 'center',
-          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
-          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+          backgroundColor: (record.isMonthSubtotal || record.isYearSubtotal) ? '#fafafa' : 'transparent',
+          fontWeight: (record.isMonthSubtotal || record.isYearSubtotal) ? 'bold' : 'normal'
         },
-        colSpan: record.isMonthHeader ? 0 : 1
+        colSpan: (record.isMonthHeader || record.isYearHeader) ? 0 : 1
       })
     },
     {
@@ -336,17 +433,17 @@ const MySalary = ({ user }) => {
       width: 90,
       align: 'center',
       render: (value, record) => {
-        if (record.isMonthHeader) return null;
-        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+        if (record.isMonthHeader || record.isYearHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap', fontWeight: record.isYearSubtotal ? 'bold' : 'normal' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
         style: { 
           whiteSpace: 'nowrap', 
           textAlign: 'center',
-          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
-          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+          backgroundColor: (record.isMonthSubtotal || record.isYearSubtotal) ? '#fafafa' : 'transparent',
+          fontWeight: (record.isMonthSubtotal || record.isYearSubtotal) ? 'bold' : 'normal'
         },
-        colSpan: record.isMonthHeader ? 0 : 1
+        colSpan: (record.isMonthHeader || record.isYearHeader) ? 0 : 1
       })
     },
     {
@@ -356,17 +453,17 @@ const MySalary = ({ user }) => {
       width: 70,
       align: 'center',
       render: (value, record) => {
-        if (record.isMonthHeader) return null;
-        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+        if (record.isMonthHeader || record.isYearHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap', fontWeight: record.isYearSubtotal ? 'bold' : 'normal' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
         style: { 
           whiteSpace: 'nowrap', 
           textAlign: 'center',
-          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
-          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+          backgroundColor: (record.isMonthSubtotal || record.isYearSubtotal) ? '#fafafa' : 'transparent',
+          fontWeight: (record.isMonthSubtotal || record.isYearSubtotal) ? 'bold' : 'normal'
         },
-        colSpan: record.isMonthHeader ? 0 : 1
+        colSpan: (record.isMonthHeader || record.isYearHeader) ? 0 : 1
       })
     },
     {
@@ -376,17 +473,17 @@ const MySalary = ({ user }) => {
       width: 80,
       align: 'center',
       render: (value, record) => {
-        if (record.isMonthHeader) return null;
-        return <span style={{ whiteSpace: 'nowrap' }}>¥{Math.round(value)}</span>;
+        if (record.isMonthHeader || record.isYearHeader) return null;
+        return <span style={{ whiteSpace: 'nowrap', fontWeight: record.isYearSubtotal ? 'bold' : 'normal' }}>¥{Math.round(value)}</span>;
       },
       onCell: (record) => ({
         style: { 
           whiteSpace: 'nowrap', 
           textAlign: 'center',
-          backgroundColor: record.isMonthSubtotal ? '#fafafa' : 'transparent',
-          fontWeight: record.isMonthSubtotal ? 'bold' : 'normal'
+          backgroundColor: (record.isMonthSubtotal || record.isYearSubtotal) ? '#fafafa' : 'transparent',
+          fontWeight: (record.isMonthSubtotal || record.isYearSubtotal) ? 'bold' : 'normal'
         },
-        colSpan: record.isMonthHeader ? 0 : 1
+        colSpan: (record.isMonthHeader || record.isYearHeader) ? 0 : 1
       })
     }
   ];
@@ -453,8 +550,12 @@ const MySalary = ({ user }) => {
             ) : (
               <Table
                 columns={columns}
-                dataSource={isAdmin ? getTableDataSource() : filteredData}
-                rowKey={(record) => record.isMonthHeader ? record.id : `${record.coachId}-${record.month}`}
+                dataSource={isAdmin ? getAdminTableDataSource() : getUserTableDataSource()}
+                rowKey={(record) => {
+                  if (record.isMonthHeader || record.isYearHeader) return record.id;
+                  if (record.isMonthSubtotal || record.isYearSubtotal) return record.id;
+                  return `${record.coachId}-${record.month}`;
+                }}
                 pagination={!isAdmin ? false : (selectedMonth === 'all' ? false : {
                   pageSize: 10,
                   showSizeChanger: true,
@@ -467,13 +568,21 @@ const MySalary = ({ user }) => {
                 scroll={{ x: 570 }}
                 size={isMobile ? 'small' : 'middle'}
                 summary={(pageData) => {
-                  // 对于管理员在"全部月份"视图下，不显示底部总计（已有每月小计）
+                  // 普通用户不显示底部总计（已有每年小计）
+                  if (!isAdmin) {
+                    return null;
+                  }
+                  
+                  // 对于管理员在“全部月份”视图下，不显示底部总计（已有每月小计）
                   if (isAdmin && selectedMonth === 'all') {
                     return null;
                   }
                   
-                  // 过滤掉月份标题行和小计行
-                  const dataRows = pageData.filter(row => !row.isMonthHeader && !row.isMonthSubtotal);
+                  // 过滤掉标题行和小计行
+                  const dataRows = pageData.filter(row => 
+                    !row.isMonthHeader && !row.isMonthSubtotal && 
+                    !row.isYearHeader && !row.isYearSubtotal
+                  );
                   
                   if (dataRows.length === 0) return null;
                   

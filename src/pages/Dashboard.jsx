@@ -6114,12 +6114,12 @@ const MyHours = ({ user }) => {
     initialize();
   }, []); // 空依赖数组，只在组件挂载时执行一次
   
-  // 切换教练时重新加载数据
-  React.useEffect(() => {
-    if (isInitialized.current && !isInitializing.current && coachId) {
-      initializeDataOnce();
-    }
-  }, [coachId, initializeDataOnce]);
+  // 切换教练时不自动查询，用户需要点击查询按钮
+  // React.useEffect(() => {
+  //   if (isInitialized.current && !isInitializing.current && coachId) {
+  //     initializeDataOnce();
+  //   }
+  // }, [coachId, initializeDataOnce]);
   
   // 当月份改变时查询数据（通过handleMonthChange触发）
   // 注意：初始化时不触发，因为initializeDataOnce已经设置了数据
