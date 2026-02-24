@@ -576,16 +576,35 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
           fontSize: '12px',
           color: '#666'
         }}>
-          <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
-            {schedule.studentName} 本周课程安排：
-          </div>
           {(() => {
             // 获取该学员本周的所有课程
             const studentSchedules = allSchedules.filter(s => s.studentName === schedule.studentName);
             
             if (studentSchedules.length === 0) {
-              return <div style={{ color: '#999' }}>暂无其他课程</div>;
+              return (
+                <>
+                  <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                    {schedule.studentName} 本周课程安排：
+                  </div>
+                  <div style={{ color: '#999' }}>暂无其他课程</div>
+                </>
+              );
             }
+            
+            // 计算总时长
+            const totalMinutes = studentSchedules.reduce((sum, s) => {
+              const start = dayjs(`2000-01-01 ${s.startTime}`);
+              const end = dayjs(`2000-01-01 ${s.endTime}`);
+              return sum + end.diff(start, 'minute');
+            }, 0);
+            const totalHours = (totalMinutes / 60).toFixed(1);
+            
+            return (
+              <>
+                <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                  {schedule.studentName} 课程安排：{totalHours}H
+                </div>
+                {(() => {
             
             // 按日期排序（从早到晚）
             const sortedSchedules = studentSchedules.sort((a, b) => {
@@ -643,64 +662,101 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
                     </div>
                     
                     {/* 该周的课程 */}
-                    {group.schedules.map((studentSchedule, index) => {
-                      // 判断课程是否已上（比较日期和时间）
-                      let isPast = false;
-                      if (studentSchedule.scheduleDate) {
-                        const scheduleDateTime = dayjs(`${studentSchedule.scheduleDate} ${studentSchedule.endTime}`);
-                        isPast = scheduleDateTime.isBefore(now);
+                    {(() => {
+                      // 合并连续时间段
+                      const mergedSchedules = [];
+                      let i = 0;
+                      
+                      while (i < group.schedules.length) {
+                        const current = group.schedules[i];
+                        const merged = {
+                          ...current,
+                          segments: [current], // 存储所有合并的时间段
+                          mergedStartTime: current.startTime,
+                          mergedEndTime: current.endTime
+                        };
+                        
+                        // 检查后续课程是否连续
+                        let j = i + 1;
+                        while (j < group.schedules.length) {
+                          const next = group.schedules[j];
+                          // 同一天且时间连续
+                          if (next.scheduleDate === current.scheduleDate && 
+                              merged.mergedEndTime === next.startTime) {
+                            merged.segments.push(next);
+                            merged.mergedEndTime = next.endTime;
+                            j++;
+                          } else {
+                            break;
+                          }
+                        }
+                        
+                        mergedSchedules.push(merged);
+                        i = j;
                       }
                       
-                      // 获取显示的日期
-                      let displayDate = '';
-                      if (studentSchedule.scheduleDate) {
-                        displayDate = dayjs(studentSchedule.scheduleDate).format('YYYY/MM/DD');
-                      }
-                      
-                      return (
-                        <div key={studentSchedule.id || index} style={{ 
-                          marginBottom: '4px', 
-                          padding: '4px', 
-                          backgroundColor: isPast ? '#fff1f0' : 'white', 
-                          borderRadius: '2px',
-                          border: studentSchedule.id === schedule.id ? '1px solid #1890ff' : '1px solid #e8e8e8'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              {displayDate && <span style={{ marginRight: '8px', color: '#666' }}>{displayDate}</span>}
-                              <strong>星期{dayMap[studentSchedule.dayOfWeek?.toUpperCase()] || studentSchedule.dayOfWeek}</strong>
-                              <span style={{ marginLeft: '8px' }}>
-                                {studentSchedule.startTime?.substring(0, 5)}~{studentSchedule.endTime?.substring(0, 5)}
+                      return mergedSchedules.map((mergedSchedule, index) => {
+                        const isMerged = mergedSchedule.segments.length > 1;
+                        const hasCurrentSchedule = mergedSchedule.segments.some(s => s.id === schedule.id);
+                        
+                        // 计算总时长（分钟）
+                        const totalMinutes = mergedSchedule.segments.reduce((sum, seg) => {
+                          const start = dayjs(`2000-01-01 ${seg.startTime}`);
+                          const end = dayjs(`2000-01-01 ${seg.endTime}`);
+                          return sum + end.diff(start, 'minute');
+                        }, 0);
+                        const durationText = `${(totalMinutes / 60).toFixed(1)}H`;
+                        
+                        // 判断是否已上
+                        let isPast = false;
+                        if (mergedSchedule.scheduleDate) {
+                          const scheduleDateTime = dayjs(`${mergedSchedule.scheduleDate} ${mergedSchedule.mergedEndTime}`);
+                          isPast = scheduleDateTime.isBefore(now);
+                        }
+                        
+                        // 获取显示的日期
+                        let displayDate = '';
+                        if (mergedSchedule.scheduleDate) {
+                          displayDate = dayjs(mergedSchedule.scheduleDate).format('YYYY/MM/DD');
+                        }
+                        
+                        return (
+                          <div key={mergedSchedule.id || index} style={{ 
+                            marginBottom: '4px', 
+                            padding: '4px', 
+                            backgroundColor: isPast ? '#fff1f0' : 'white', 
+                            borderRadius: '2px',
+                            border: hasCurrentSchedule ? '1px solid #1890ff' : '1px solid #e8e8e8'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                {displayDate && <span style={{ marginRight: '8px', color: '#666' }}>{displayDate}</span>}
+                                <strong>星期{dayMap[mergedSchedule.dayOfWeek?.toUpperCase()] || mergedSchedule.dayOfWeek}</strong>
+                                <span style={{ marginLeft: '8px' }}>
+                                  {mergedSchedule.mergedStartTime?.substring(0, 5)}~{mergedSchedule.mergedEndTime?.substring(0, 5)}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '10px', color: '#999' }}>
+                                {durationText}
                               </span>
                             </div>
-                            {studentSchedule.id === schedule.id && (
-                              <span style={{ 
-                                fontSize: '10px', 
-                                color: '#1890ff', 
-                                backgroundColor: '#e6f7ff', 
-                                padding: '1px 4px', 
-                                borderRadius: '2px' 
-                              }}>
-                                当前
-                              </span>
+                            
+                            {/* 只显示科目，不显示备注 */}
+                            {!isMerged && mergedSchedule.subject && (
+                              <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                                科目：{mergedSchedule.subject}
+                              </div>
                             )}
                           </div>
-                          {studentSchedule.subject && (
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                              科目：{studentSchedule.subject}
-                            </div>
-                          )}
-                          {studentSchedule.note && (
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                              备注：{studentSchedule.note}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 );
               });
+                })()}
+              </>
+            );
           })()}
         </div>
       )}
@@ -774,6 +830,20 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
             </button>
           </div>
           <div style={{ fontSize: '11px', color: '#8c8c8c' }}>请假后该课程将从课表中移除</div>
+        </div>
+      )}
+      
+      {/* 添加时间显示 */}
+      {schedule.createdAt && (
+        <div style={{ 
+          marginTop: '12px', 
+          paddingTop: '8px', 
+          borderTop: '1px solid #f0f0f0',
+          fontSize: '11px', 
+          color: '#999',
+          textAlign: 'center'
+        }}>
+          添加时间：{dayjs(schedule.createdAt).format('YYYY-MM-DD HH:mm')}
         </div>
       )}
     </div>
