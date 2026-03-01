@@ -577,14 +577,14 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
           color: '#666'
         }}>
           {(() => {
-            // 获取该学员本周的所有课程
+            // 获取该学员的所有课程
             const studentSchedules = allSchedules.filter(s => s.studentName === schedule.studentName);
             
             if (studentSchedules.length === 0) {
               return (
                 <>
                   <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
-                    {schedule.studentName} 本周课程安排：
+                    {schedule.studentName} 课程安排：
                   </div>
                   <div style={{ color: '#999' }}>暂无其他课程</div>
                 </>
@@ -599,6 +599,46 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
             }, 0);
             const totalHours = (totalMinutes / 60).toFixed(1);
             
+            // 判断是否为固定课表视图（template view）
+            const isTemplateView = viewMode === 'template';
+            
+            // 固定课表视图：按星期几排序显示所有时间
+            if (isTemplateView) {
+              const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+              const sortedByDay = [...studentSchedules].sort((a, b) => {
+                const dayA = dayOrder.indexOf(a.dayOfWeek?.toLowerCase());
+                const dayB = dayOrder.indexOf(b.dayOfWeek?.toLowerCase());
+                if (dayA !== dayB) return dayA - dayB;
+                return (a.startTime || '').localeCompare(b.startTime || '');
+              });
+              
+              return (
+                <>
+                  <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                    {schedule.studentName} 课程安排：{totalHours}H
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    {sortedByDay.map((s, idx) => {
+                      const isCurrentSchedule = s.id === schedule.id;
+                      return (
+                        <div 
+                          key={s.id || idx} 
+                          style={{ 
+                            marginBottom: '4px',
+                            color: isCurrentSchedule ? '#1890ff' : '#666',
+                            fontWeight: isCurrentSchedule ? 'bold' : 'normal'
+                          }}
+                        >
+                          周{dayMap[s.dayOfWeek?.toUpperCase()] || s.dayOfWeek}, {s.startTime?.substring(0, 5)}-{s.endTime?.substring(0, 5)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            }
+            
+            // 实例视图：按日期分组显示
             return (
               <>
                 <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
@@ -1193,6 +1233,9 @@ const ViewTimetable = ({ user }) => {
   
   // 保存切换到固定课表前的实例状态
   const savedInstanceRef = useRef(null);
+  
+  // 标记是否已由switchToWeekInstanceByIndex加载了实例数据，避免useEffect重复加载
+  const instanceDataLoadedRef = useRef(false);
 
   
 
@@ -2863,6 +2906,8 @@ const ViewTimetable = ({ user }) => {
           schedules: response.data || []
         });
         setAllSchedules(response.data || []);
+        // 标记实例数据已加载，避免useEffect重复加载
+        instanceDataLoadedRef.current = true;
         setViewMode('instance');
       } else {
         message.error('获取周实例数据失败');
@@ -3215,6 +3260,12 @@ const ViewTimetable = ({ user }) => {
   // 简化视图切换数据加载，保持原有数据直到新数据加载完成
   React.useEffect(() => {
     if (!timetableId || !timetable) return;
+    
+    // 如果实例数据已由switchToWeekInstanceByIndex加载，跳过此次useEffect
+    if (viewMode === 'instance' && instanceDataLoadedRef.current) {
+      instanceDataLoadedRef.current = false; // 重置标记
+      return;
+    }
 
     const loadViewData = async () => {
       try {
@@ -5440,23 +5491,13 @@ const ViewTimetable = ({ user }) => {
                   ...emptyCellStyle,
                   cursor: deleteMode ? 'not-allowed' : 'pointer',
                   opacity: deleteMode ? 0.5 : 1,
-                  border: isFixedTimeSlot ? '2px dashed #52c41a' : emptyCellStyle.border,
-                  backgroundColor: isFixedTimeSlot ? 'rgba(82, 196, 26, 0.05)' : emptyCellStyle.backgroundColor,
+                  border: isFixedTimeSlot ? '2px dashed #fa8c16' : emptyCellStyle.border,
+                  backgroundColor: isFixedTimeSlot ? 'rgba(250, 140, 22, 0.05)' : emptyCellStyle.backgroundColor,
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  {isFixedTimeSlot && (
-                    <div style={{
-                      fontSize: '10px',
-                      color: '#52c41a',
-                      fontWeight: '500',
-                      opacity: 0.7
-                    }}>
-                      可排课
-                    </div>
-                  )}
                 </div>
               </Popover>
             );
