@@ -4499,7 +4499,7 @@ const Dashboard = ({ user }) => {
               
               schedules.forEach(s => {
                 // 过滤掉请假学员和占用时间段，不显示在今日课程中
-                if (s.isOnLeave || s.isTimeBlock === true) {
+                if (s.isOnLeave || s.isTimeBlock === true || (s.studentName && s.studentName.includes('占用'))) {
                   return;
                 }
                 const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
@@ -4543,7 +4543,7 @@ const Dashboard = ({ user }) => {
                     
                     schedules2.forEach(s => {
                       // 过滤掉请假学员和占用时间段，不显示在今日课程中
-                      if (s.isOnLeave || s.isTimeBlock === true) {
+                      if (s.isOnLeave || s.isTimeBlock === true || (s.studentName && s.studentName.includes('占用'))) {
                         return;
                       }
                       const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
@@ -4590,7 +4590,7 @@ const Dashboard = ({ user }) => {
               
               schedules.forEach(s => {
                 // 过滤掉占用时间段
-                if (s.isTimeBlock === true) {
+                if (s.isTimeBlock === true || (s.studentName && s.studentName.includes('占用'))) {
                   return;
                 }
                 const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
@@ -4630,7 +4630,7 @@ const Dashboard = ({ user }) => {
                     
                     schedules2.forEach(s => {
                       // 过滤掉占用时间段
-                      if (s.isTimeBlock === true) {
+                      if (s.isTimeBlock === true || (s.studentName && s.studentName.includes('占用'))) {
                         return;
                       }
                       const key = `${normalizeName(s.studentName)}_${hhmm(s.startTime)}_${hhmm(s.endTime)}`;
