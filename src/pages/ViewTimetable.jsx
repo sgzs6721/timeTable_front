@@ -2309,11 +2309,6 @@ const ViewTimetable = ({ user }) => {
         if (timetableInfo.timetableId.toString() === timetableId) {
           return;
         }
-        
-        // 始终跳过管理员的课程（不管谁登录）
-        if (timetableInfo.ownerRole === 'ADMIN') {
-          return;
-        }
 
         result += `\n${timetableInfo.ownerName}：`;
         
@@ -7597,14 +7592,7 @@ const ViewTimetable = ({ user }) => {
                   {otherCoachesDataInModal.timetables
                     .filter(timetableInfo => {
                       const notCurrentTimetable = timetableInfo.timetableId.toString() !== timetableId;
-                      console.log(`过滤1 - ${timetableInfo.ownerName}: timetableId=${timetableInfo.timetableId}, 当前ID=${timetableId}, 通过=${notCurrentTimetable}`);
                       return notCurrentTimetable;
-                    })
-                    .filter(timetableInfo => {
-                      const isOwnerAdmin = timetableInfo.ownerRole === 'ADMIN';
-                      const shouldShow = !isOwnerAdmin;
-                      console.log(`过滤2 - ${timetableInfo.ownerName}: 教练是管理员=${isOwnerAdmin}, 显示=${shouldShow}`);
-                      return shouldShow;
                     })
                     .map((timetableInfo, index) => (
                       <div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
