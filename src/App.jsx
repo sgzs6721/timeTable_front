@@ -123,6 +123,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
 
   const isDashboard = location.pathname === '/dashboard';
   const isViewTimetable = location.pathname.startsWith('/view-timetable/');
+  const hasOrgMgmtAuth = typeof window !== 'undefined' && sessionStorage.getItem('orgMgmtAuth') === 'true';
 
   return (
     <>
@@ -215,26 +216,26 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           <Route
             path="/organizations/:organizationId/permissions"
             element={
-              !user ? <Navigate to="/login" /> :
+              (!user && !hasOrgMgmtAuth) ? <Navigate to="/organization-management" /> :
               <RolePermissionSettings />
             }
           />
           <Route
             path="/organizations/:organizationId/roles"
             element={
-              !user ? <Navigate to="/login" /> : <OrganizationRoleManagement />
+              (!user && !hasOrgMgmtAuth) ? <Navigate to="/organization-management" /> : <OrganizationRoleManagement />
             }
           />
           <Route
             path="/organizations/:organizationId/salary"
             element={
-              !user ? <Navigate to="/login" /> : <OrganizationSalaryManagement />
+              (!user && !hasOrgMgmtAuth) ? <Navigate to="/organization-management" /> : <OrganizationSalaryManagement />
             }
           />
           <Route
             path="/organizations/:organizationId/notifications"
             element={
-              !user ? <Navigate to="/login" /> : <OrganizationNotificationSettings />
+              (!user && !hasOrgMgmtAuth) ? <Navigate to="/organization-management" /> : <OrganizationNotificationSettings />
             }
           />
           <Route

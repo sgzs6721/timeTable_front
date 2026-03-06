@@ -1,9 +1,5 @@
 .org-role-management {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-  background: #f5f7fa;
-  min-height: calc(100vh - 64px);
+  width: 100%;
 }
 
 .role-header {

@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { 
   Card, Button, message, Spin, Typography, Space, Modal, Form, Input, Tag, Popconfirm, Select, List, Avatar, Divider 
 } from 'antd';
 import { 
-  LeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
+  PlusOutlined, EditOutlined, DeleteOutlined,
   TrophyOutlined, ShoppingOutlined, CustomerServiceOutlined, ControlOutlined,
   UsergroupAddOutlined, UserAddOutlined, UserDeleteOutlined, TeamOutlined
 } from '@ant-design/icons';
 import { getOrganizationRoles, createRole, updateRole, deleteRole } from '../services/organizationRole';
-import { getOrganization, getOrganizationAdmins } from '../services/organization';
-import { getAllUsers, getUsersByOrganization, updateUserInfo } from '../services/admin';
+import { getOrganization, getUsersByOrganizationForOrgMgmt, updateUserInfoForOrgMgmt } from '../services/organization';
+import OrganizationManagementPageLayout from '../components/OrganizationManagementPageLayout';
 import './OrganizationRoleManagement.css';
-
-const { Title, Text } = Typography;
 
 // 获取职位显示信息
 const getPositionDisplay = (position, roles = []) => {
@@ -55,7 +53,6 @@ const COLOR_OPTIONS = [
 
 const OrganizationRoleManagement = () => {
   const { organizationId } = useParams();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [organization, setOrganization] = useState(null);
   const [roles, setRoles] = useState([]);
@@ -94,7 +91,7 @@ const OrganizationRoleManagement = () => {
       }
 
       // 获取指定机构的用户（若后端不支持该参数，会自动回退为全量，再前端过滤）
-      const usersResponse = await getUsersByOrganization(organizationId);
+      const usersResponse = await getUsersByOrganizationForOrgMgmt(organizationId);
       if (usersResponse.success) {
         // 不再过滤、全部展示
         const users = usersResponse.data || usersResponse?.data?.data || [];
@@ -186,7 +183,7 @@ const OrganizationRoleManagement = () => {
       setMemberLoading(true);
       
       // 重新获取最新的用户列表（按机构）
-      const usersResponse = await getUsersByOrganization(organizationId);
+      const usersResponse = await getUsersByOrganizationForOrgMgmt(organizationId);
       if (usersResponse.success) {
         const orgUsers = (usersResponse.data || usersResponse?.data?.data || []).filter(
           user => String(user.organizationId) === String(organizationId)
@@ -220,7 +217,7 @@ const OrganizationRoleManagement = () => {
     try {
       setAddingMember(true);
       // 调用更新用户接口，设置用户的 position 为职位代码
-      const response = await updateUserInfo(selectedUserId, { position: selectedRole.roleCode });
+      const response = await updateUserInfoForOrgMgmt(selectedUserId, { position: selectedRole.roleCode });
       if (response.success) {
         message.success('设置职位成功');
         setSelectedUserId(null);
@@ -255,7 +252,7 @@ const OrganizationRoleManagement = () => {
   const handleRemoveMember = async (userId) => {
     try {
       // 调用更新用户接口，清除用户的 position
-      const response = await updateUserInfo(userId, { position: null });
+      const response = await updateUserInfoForOrgMgmt(userId, { position: null });
       console.log('移除成员API响应:', response);
       
       if (response.success) {
@@ -374,57 +371,43 @@ const OrganizationRoleManagement = () => {
   };
 
   return (
-    <div className="org-role-management">
-      <div className="role-header">
-        <div className="header-content">
+    <>
+      <OrganizationManagementPageLayout
+        title="职位管理"
+        organization={organization}
+        headerAction={(
           <Button
-            type="text"
-            shape="circle"
-            icon={<LeftOutlined />}
-            onClick={() => navigate(-1)}
-            className="back-btn-circle"
-            size="large"
-          />
-          <div className="header-center">
-            <Title level={2} style={{ margin: 0 }}>
-              职位管理
-            </Title>
-            {organization && (
-              <Text type="secondary">
-                {organization.name} ({organization.code})
-              </Text>
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreate}
+            disabled={loading}
+          >
+            新建职位
+          </Button>
+        )}
+        contentClassName="org-role-management"
+      >
+
+        {loading ? (
+          <div className="loading-state">
+            <Spin size="large">
+              <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
+            </Spin>
+          </div>
+        ) : (
+          <div className="roles-grid">
+            {roles.length > 0 ? (
+              roles.map(role => renderRoleCard(role))
+            ) : (
+              <div className="empty-state">
+                <div className="empty-icon">👥</div>
+                <h3>暂无职位</h3>
+                <p>该机构还没有创建任何职位，点击上方"新建职位"按钮开始创建</p>
+              </div>
             )}
           </div>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleCreate}
-          disabled={loading}
-        >
-          新建职位
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="loading-state">
-          <Spin size="large">
-            <div style={{ height: 24, lineHeight: '24px', color: '#999' }}>加载中...</div>
-          </Spin>
-        </div>
-      ) : (
-        <div className="roles-grid">
-          {roles.length > 0 ? (
-            roles.map(role => renderRoleCard(role))
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">👥</div>
-              <h3>暂无职位</h3>
-              <p>该机构还没有创建任何职位，点击上方"新建职位"按钮开始创建</p>
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </OrganizationManagementPageLayout>
 
       {/* 新建/编辑职位Modal */}
       <Modal
@@ -502,7 +485,7 @@ const OrganizationRoleManagement = () => {
             name="description"
             label="描述"
           >
-            <Input.TextArea rows={3} placeholder="职位描述" />
+            <Input.TextArea rows={3} placeholder="请输入职位描述（可选）" />
           </Form.Item>
         </Form>
       </Modal>
@@ -638,7 +621,7 @@ const OrganizationRoleManagement = () => {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 };
 

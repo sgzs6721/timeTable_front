@@ -8,11 +8,19 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { getOrganizationAdmins } from '../services/organization';
 import { getOrganizationRoles } from '../services/organizationRole';
 import './OrganizationRequestManagement.css';
 
 const { TextArea } = Input;
 const { Option } = Select;
+
+const getOrgMgmtHeaders = () => {
+  const token = sessionStorage.getItem('orgMgmtToken') || localStorage.getItem('token');
+  return {
+    'Authorization': `Bearer ${token}`
+  };
+};
 
 /**
  * 机构申请管理页面（管理员）
@@ -38,12 +46,8 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
   const fetchPendingRequests = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
       const response = await axios.get(`${API_BASE_URL}/organization-requests/pending`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getOrgMgmtHeaders()
       });
 
       if (response.data.success) {
@@ -64,10 +68,6 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
         });
         
         setRequests(sortedRequests);
-        // 通知父组件更新数量
-        if (onUpdate) {
-          onUpdate();
-        }
       } else {
         message.error('获取申请列表失败');
       }
@@ -94,22 +94,11 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
   const checkOrganizationManager = async (organizationId) => {
     try {
       setCheckingManager(true);
-      const token = localStorage.getItem('token');
+      const response = await getOrganizationAdmins(organizationId);
       
-      const response = await axios.get(`${API_BASE_URL}/admin/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.data.success) {
-        const users = response.data.data || [];
-        // 检查该机构是否有MANAGER职位的用户
-        const hasManager = users.some(user => 
-          user.organizationId === organizationId && 
-          user.position === 'MANAGER' &&
-          user.status === 'APPROVED'
-        );
+      if (response.success) {
+        const admins = response.data || [];
+        const hasManager = admins.length > 0;
         setHasManagerInOrg(hasManager);
         
         // 如果没有管理职位成员，默认设置为MANAGER
@@ -161,8 +150,6 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
       // 总是从表单获取选择的职位
       const values = await approveForm.validateFields();
       const defaultPosition = values.defaultPosition || 'COACH';
-      
-      const token = localStorage.getItem('token');
 
       const response = await axios.post(
         `${API_BASE_URL}/organization-requests/approve`,
@@ -173,9 +160,7 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
           defaultPosition: defaultPosition
         },
         {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: getOrgMgmtHeaders()
         }
       );
 
@@ -199,8 +184,6 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-
       const response = await axios.post(
         `${API_BASE_URL}/organization-requests/approve`,
         {
@@ -209,9 +192,7 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
           rejectReason: rejectReason.trim()
         },
         {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: getOrgMgmtHeaders()
         }
       );
 
@@ -230,14 +211,10 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
 
   const handleDelete = async (record) => {
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await axios.delete(
         `${API_BASE_URL}/organization-requests/${record.id}`,
         {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: getOrgMgmtHeaders()
         }
       );
 
@@ -245,7 +222,6 @@ const OrganizationRequestManagement = ({ onUpdate }) => {
         message.success('申请已删除');
         // 从列表中移除该申请
         setRequests(prevRequests => prevRequests.filter(req => req.id !== record.id));
-        // 通知父组件更新数量
         if (onUpdate) {
           onUpdate();
         }

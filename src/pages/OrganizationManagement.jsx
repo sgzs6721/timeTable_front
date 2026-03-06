@@ -19,9 +19,9 @@ import {
   getOrganizationAdmins,
   setOrganizationAdmin,
   removeOrganizationAdmin,
-  getPendingRequestsCount
+  getPendingRequestsCount,
+  getAllUsersForOrgMgmt
 } from '../services/organization';
-import { getAllUsers } from '../services/admin';
 import OrganizationRequestManagement from './OrganizationRequestManagement';
 import './OrganizationManagement.css';
 
@@ -48,7 +48,6 @@ const OrganizationManagement = () => {
 
   useEffect(() => {
     fetchOrganizations();
-    fetchUsers();
     fetchPendingRequestsCount();
   }, []);
 
@@ -62,12 +61,6 @@ const OrganizationManagement = () => {
     }
   };
 
-  // 定期检查待审批数量（每30秒检查一次）
-  useEffect(() => {
-    const interval = setInterval(fetchPendingRequestsCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   const fetchOrganizations = async (showLoading = true) => {
     try {
       if (showLoading) {
@@ -77,11 +70,15 @@ const OrganizationManagement = () => {
       if (response.success) {
         setOrganizations(response.data || []);
       } else {
-        message.error('获取机构列表失败');
+        // 如果失败，显示详细错误信息
+        console.error('获取机构列表失败:', response);
+        message.error(response.message || '获取机构列表失败');
       }
     } catch (error) {
       console.error('获取机构列表失败:', error);
-      message.error(error.response?.data?.message || '获取机构列表失败');
+      // 显示更详细的错误信息
+      const errorMsg = error.response?.data?.message || error.message || '获取机构列表失败，请检查网络连接';
+      message.error(errorMsg);
     } finally {
       if (showLoading) {
         setLoading(false);
@@ -91,7 +88,7 @@ const OrganizationManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await getAllUsers();
+      const response = await getAllUsersForOrgMgmt();
       if (response.success) {
         const userData = response.data || [];
         setUsers(userData);
@@ -165,6 +162,7 @@ const OrganizationManagement = () => {
     setSelectedUserId(null);
     setAdmins([]); // 清空旧数据
     setAdminModalVisible(true);
+    fetchUsers();
     // 打开modal后再加载数据
     fetchAdmins(record.id);
   };
@@ -216,7 +214,6 @@ const OrganizationManagement = () => {
         message.success('✓ 设置管理员成功');
         setSelectedUserId(null);
         await fetchAdmins(selectedOrganization.id);
-        fetchUsers();
       } else {
         message.error(response.message || '设置管理员失败');
       }
@@ -234,7 +231,6 @@ const OrganizationManagement = () => {
       if (response.success) {
         message.success('移除管理员成功');
         await fetchAdmins(selectedOrganization.id);
-        fetchUsers();
       } else {
         message.error(response.message || '移除管理员失败');
       }
@@ -415,7 +411,12 @@ const OrganizationManagement = () => {
 
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={(key) => {
+            setActiveTab(key);
+            if (key === 'requests') {
+              fetchPendingRequestsCount();
+            }
+          }}
           items={tabItems}
           size="large"
         />

@@ -11,7 +11,7 @@ const api = axios.create({
 // 添加请求拦截器，自动添加token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('orgMgmtToken') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,13 +26,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // 处理401未授权错误
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-      return Promise.reject(error);
-    }
     return Promise.reject(error);
   }
 );

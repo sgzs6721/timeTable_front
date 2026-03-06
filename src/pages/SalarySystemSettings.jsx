@@ -89,7 +89,7 @@ const SalarySystemSettings = ({ organizationId }) => {
   };
 
   return (
-    <div style={{ padding: '12px 24px 24px 24px' }}>
+    <div style={{ padding: '8px 0 8px 0' }}>
       <div style={{ marginBottom: 20, fontSize: '16px', fontWeight: 500 }}>
         <SettingOutlined style={{ marginRight: 8 }} />
         工资系统设置

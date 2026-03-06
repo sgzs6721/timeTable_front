@@ -272,7 +272,7 @@ const SalarySettings = ({ organizationId }) => {
   }
 
   return (
-    <div style={{ padding: '8px 0 24px 0' }}>
+    <div style={{ padding: '8px 0 8px 0' }}>
       <div style={{ marginBottom: 16, fontSize: '16px', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>人员工资设定</span>
         {/* 添加人员按钮 */}

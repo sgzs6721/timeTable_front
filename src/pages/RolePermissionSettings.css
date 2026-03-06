@@ -1,38 +1,17 @@
 .role-permission-settings {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-  background: #f5f7fa;
-  min-height: calc(100vh - 64px);
+  width: 100%;
 }
 
 .settings-header {
-  margin-bottom: 24px;
-  padding: 24px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: none;
 }
 
 .header-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+  display: contents;
 }
 
 .back-btn-circle {
-  position: absolute;
-  left: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f0f0f0;
-  border: 1px solid #d9d9d9;
-  transition: all 0.3s;
-  color: #333;
+  display: none;
 }
 
 .back-btn-circle .anticon {
@@ -46,17 +25,11 @@
 }
 
 .header-left {
-  text-align: center;
+  display: contents;
 }
 
 .header-left h2 {
-  font-size: 24px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 
 .roles-container {

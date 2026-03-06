@@ -1,72 +1,37 @@
 .notification-settings {
-  min-height: 100vh;
-  padding: 24px;
+  width: 100%;
   position: relative;
-  /* 使用与其他页面一致的白色背景 */
-  background: #f5f5f5;
 }
 
 /* 移动端特殊处理 */
 @media (max-width: 768px) {
   .notification-settings {
-    padding: 16px;
-    /* 强制设置白色背景 */
-    background: #f5f5f5 !important;
+    width: 100%;
   }
 }
 
 .settings-header {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 16px 24px;
-  border-radius: 16px;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  margin-bottom: 24px;
-  position: relative;
-  overflow: hidden;
+  display: none;
 }
 
 .settings-header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(to right, #8a2be2, #4b0082);
-  pointer-events: none;
+  content: none;
 }
 
 .header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: relative;
-  z-index: 1;
+  display: contents;
 }
 
 .header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: contents;
 }
 
 .back-btn-circle {
-  border: none;
-  background: rgba(255, 255, 255, 0.8);
-  color: #667eea;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  display: none;
 }
 
 .back-btn-circle:hover {
-  background: rgba(255, 255, 255, 0.9);
-  color: #667eea;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: inherit;
 }
 
 .loading-state {

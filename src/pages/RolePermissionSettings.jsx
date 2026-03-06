@@ -12,6 +12,7 @@ import {
 import { getOrganizationPermissions, saveRolePermissions } from '../services/rolePermission';
 import { getOrganization } from '../services/organization';
 import { getOrganizationRoles } from '../services/organizationRole';
+import OrganizationManagementPageLayout from '../components/OrganizationManagementPageLayout';
 import './RolePermissionSettings.css';
 
 const { Title, Text } = Typography;
@@ -381,29 +382,11 @@ const RolePermissionSettings = () => {
   };
 
   return (
-    <div className="role-permission-settings">
-      <div className="settings-header">
-        <div className="header-content">
-          <Button
-            type="text"
-            shape="circle"
-            icon={<LeftOutlined />}
-            onClick={() => navigate(-1)}
-            className="back-btn-circle"
-            size="large"
-          />
-          <div className="header-left">
-            <Title level={2} style={{ margin: 0 }}>
-              职位权限设置
-            </Title>
-            {organization && (
-              <Text type="secondary">
-                {organization.name} ({organization.code})
-              </Text>
-            )}
-          </div>
-        </div>
-      </div>
+    <OrganizationManagementPageLayout
+      title="职位权限设置"
+      organization={organization}
+      contentClassName="role-permission-settings"
+    >
 
       {loading ? (
         <div className="loading-state">
@@ -429,7 +412,7 @@ const RolePermissionSettings = () => {
           {roles.map(role => renderRoleCard(role))}
         </div>
       )}
-    </div>
+    </OrganizationManagementPageLayout>
   );
 };
 

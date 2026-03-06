@@ -32,9 +32,10 @@ const OrganizationManagementAuth = () => {
       const response = await verifyOrgManagementAuth(values.username, values.password);
       
       if (response.success) {
-        // 验证成功，保存验证状态（不保存token）
+        // 验证成功，保存验证状态和 JWT token
         sessionStorage.setItem('orgMgmtAuth', 'true');
         sessionStorage.setItem('orgMgmtUsername', response.data.username);
+        sessionStorage.setItem('orgMgmtToken', response.data.token);
         setAuthenticated(true);
         message.success('✓ 验证成功');
       } else {
@@ -54,6 +55,7 @@ const OrganizationManagementAuth = () => {
   const handleLogout = () => {
     sessionStorage.removeItem('orgMgmtAuth');
     sessionStorage.removeItem('orgMgmtUsername');
+    sessionStorage.removeItem('orgMgmtToken');
     setAuthenticated(false);
     message.info('已退出机构管理');
   };

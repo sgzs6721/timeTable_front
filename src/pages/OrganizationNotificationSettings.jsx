@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { 
   Card, Switch, Button, message, Spin, 
   Typography, Space, Divider 
 } from 'antd';
 import { 
-  BellOutlined, SaveOutlined, LeftOutlined,
+  BellOutlined, SaveOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
 import { getOrganization, getOrganizationNotificationSettings, updateOrganizationNotificationSettings } from '../services/organization';
+import OrganizationManagementPageLayout from '../components/OrganizationManagementPageLayout';
 import './OrganizationNotificationSettings.css';
 
 const { Title, Text } = Typography;
 
 const OrganizationNotificationSettings = () => {
   const { organizationId } = useParams();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [organization, setOrganization] = useState(null);
@@ -100,38 +100,22 @@ const OrganizationNotificationSettings = () => {
   };
 
   return (
-    <div className="notification-settings">
-      <div className="settings-header">
-        <div className="header-content">
-          <Button
-            type="text"
-            shape="circle"
-            icon={<LeftOutlined />}
-            onClick={() => navigate(-1)}
-            className="back-btn-circle"
-            size="large"
-          />
-          <div className="header-left">
-            <Title level={2} style={{ margin: 0 }}>
-              通知设置
-            </Title>
-            {organization && (
-              <Text type="secondary">
-                {organization.name} ({organization.code})
-              </Text>
-            )}
-          </div>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            onClick={handleSave}
-            disabled={!hasSettingsChanged()}
-            loading={saving}
-          >
-            保存设置
-          </Button>
-        </div>
-      </div>
+    <OrganizationManagementPageLayout
+      title="通知设置"
+      organization={organization}
+      headerAction={(
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={handleSave}
+          disabled={!hasSettingsChanged()}
+          loading={saving}
+        >
+          保存设置
+        </Button>
+      )}
+      contentClassName="notification-settings"
+    >
 
       {loading ? (
         <div className="loading-state">
@@ -240,7 +224,7 @@ const OrganizationNotificationSettings = () => {
           </Card>
         </div>
       )}
-    </div>
+    </OrganizationManagementPageLayout>
   );
 };
 
