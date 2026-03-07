@@ -1352,20 +1352,16 @@ const Dashboard = ({ user }) => {
   const [showTrialsList, setShowTrialsList] = useState(false);
 
   const getFallbackMenuPermissions = useCallback(() => {
-    const isManager = user?.position?.toUpperCase() === 'MANAGER';
-    const isAdminRole = user?.role?.toUpperCase() === 'ADMIN';
-    const hasAdminView = isManager || isAdminRole;
-
     return {
-      dashboard: hasAdminView,
-      todo: hasAdminView,
-      customer: hasAdminView,
+      dashboard: false,
+      todo: false,
+      customer: false,
       mySchedule: true,
       myStudents: true,
       myHours: true,
       mySalary: true,
     };
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     try {
@@ -1610,9 +1606,17 @@ const Dashboard = ({ user }) => {
           } catch (_) {}
         } else {
           console.warn('[Dashboard] 权限API返回失败或无数据');
+          try {
+            sessionStorage.removeItem(permissionsCacheKey);
+          } catch (_) {}
+          setUserPermissions(null);
         }
       } catch (error) {
         console.error('[Dashboard] 获取用户权限失败:', error);
+        try {
+          sessionStorage.removeItem(permissionsCacheKey);
+        } catch (_) {}
+        setUserPermissions(null);
       } finally {
         setPermissionsLoaded(true);
       }
@@ -1621,7 +1625,7 @@ const Dashboard = ({ user }) => {
     if (user) {
       fetchUserPermissions();
     }
-  }, [user]);
+  }, [user, permissionsCacheKey]);
 
   // 监听权限更新事件
   useEffect(() => {
@@ -1636,9 +1640,18 @@ const Dashboard = ({ user }) => {
           try {
             sessionStorage.setItem(permissionsCacheKey, JSON.stringify(response.data));
           } catch (_) {}
+        } else {
+          try {
+            sessionStorage.removeItem(permissionsCacheKey);
+          } catch (_) {}
+          setUserPermissions(null);
         }
       } catch (error) {
         console.error('[Dashboard] 获取用户权限失败:', error);
+        try {
+          sessionStorage.removeItem(permissionsCacheKey);
+        } catch (_) {}
+        setUserPermissions(null);
       } finally {
         setPermissionsLoaded(true);
       }
@@ -1646,6 +1659,10 @@ const Dashboard = ({ user }) => {
 
     const handlePermissionsUpdate = () => {
       if (user) {
+        try {
+          sessionStorage.removeItem(permissionsCacheKey);
+        } catch (_) {}
+        setUserPermissions(null);
         setPermissionsLoaded(false);
         fetchUserPermissions();
       }
@@ -1653,7 +1670,7 @@ const Dashboard = ({ user }) => {
     
     window.addEventListener('permissionsUpdated', handlePermissionsUpdate);
     return () => window.removeEventListener('permissionsUpdated', handlePermissionsUpdate);
-  }, [user]);
+  }, [user, permissionsCacheKey]);
 
   // 当权限加载后，自动切换到第一个可见的tab
   useEffect(() => {
