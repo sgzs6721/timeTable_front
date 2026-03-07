@@ -110,7 +110,67 @@ const CancelledOrLeavePopoverContent = ({ info, onClose, onRestore, restoreLoadi
   );
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateField, onMove, onCopy, onSwap, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule, hasOtherHalf = false }) => {
+const normalizePopoverDay = (value) => {
+  if (!value) return '';
+  const dayStr = String(value).toLowerCase().trim();
+  const dayMap = {
+    '星期一': 'monday', '周一': 'monday', '一': 'monday',
+    '星期二': 'tuesday', '周二': 'tuesday', '二': 'tuesday',
+    '星期三': 'wednesday', '周三': 'wednesday', '三': 'wednesday',
+    '星期四': 'thursday', '周四': 'thursday', '四': 'thursday',
+    '星期五': 'friday', '周五': 'friday', '五': 'friday',
+    '星期六': 'saturday', '周六': 'saturday', '六': 'saturday',
+    '星期日': 'sunday', '周日': 'sunday', '日': 'sunday', '天': 'sunday',
+    'monday': 'monday', 'tuesday': 'tuesday', 'wednesday': 'wednesday',
+    'thursday': 'thursday', 'friday': 'friday', 'saturday': 'saturday', 'sunday': 'sunday'
+  };
+  return dayMap[dayStr] || dayStr;
+};
+
+const normalizePopoverTime = (value) => {
+  if (!value) return '';
+  const timeStr = String(value).trim();
+  return timeStr.length > 5 ? timeStr.substring(0, 5) : timeStr;
+};
+
+const findMatchingTemplateSchedule = (schedule, templateSchedules, timetable, viewMode) => {
+  if (!timetable || !timetable.isWeekly || viewMode !== 'instance' || !templateSchedules?.length || !schedule) {
+    return null;
+  }
+
+  const scheduleDay = normalizePopoverDay(schedule.dayOfWeek);
+  const scheduleStart = normalizePopoverTime(schedule.startTime);
+  const scheduleEnd = normalizePopoverTime(schedule.endTime);
+  const scheduleStartTime = dayjs(scheduleStart, 'HH:mm');
+  const scheduleEndTime = dayjs(scheduleEnd, 'HH:mm');
+  const isHalfHour = scheduleEndTime.diff(scheduleStartTime, 'minute') === 30;
+
+  return templateSchedules.find((template) => {
+    const templateDay = normalizePopoverDay(template.dayOfWeek);
+    const templateStart = normalizePopoverTime(template.startTime);
+    const templateEnd = normalizePopoverTime(template.endTime);
+
+    if (templateDay !== scheduleDay) {
+      return false;
+    }
+
+    if (templateStart === scheduleStart && templateEnd === scheduleEnd) {
+      return true;
+    }
+
+    if (!isHalfHour) {
+      return false;
+    }
+
+    const templateStartTime = dayjs(templateStart, 'HH:mm');
+    const templateEndTime = dayjs(templateEnd, 'HH:mm');
+    return scheduleStartTime.isSameOrAfter(templateStartTime)
+      && scheduleEndTime.isSameOrBefore(templateEndTime)
+      && templateEndTime.diff(templateStartTime, 'minute') === 60;
+  }) || null;
+};
+
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateField, onMove, onCopy, onSwap, onWriteToTemplate, writeToTemplateLoading, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule, hasOtherHalf = false }) => {
   const [name, setName] = React.useState(schedule.studentName);
   const [showAllInfo, setShowAllInfo] = React.useState(false);
   const [showLeaveForm, setShowLeaveForm] = React.useState(false);
@@ -178,18 +238,11 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
 
   // 获取对应的固定课表模板内容
   const getTemplateSchedule = () => {
-    if (!timetable || !timetable.isWeekly || viewMode !== 'instance' || !templateSchedules) {
-      return null;
-    }
-    
-    return templateSchedules.find(template => 
-      template.dayOfWeek === schedule.dayOfWeek &&
-      template.startTime === schedule.startTime &&
-      template.endTime === schedule.endTime
-    );
+    return findMatchingTemplateSchedule(schedule, templateSchedules, timetable, viewMode);
   };
 
   const templateSchedule = getTemplateSchedule();
+  const canWriteToTemplate = !isBlocked && !isArchived && viewMode === 'instance' && timetable?.isWeekly && !templateSchedule;
   const isModified = templateSchedule && (
     templateSchedule.studentName !== schedule.studentName ||
     templateSchedule.subject !== schedule.subject ||
@@ -290,7 +343,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
               style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', marginBottom: '4px' }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                 <div 
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   onClick={(e) => e.stopPropagation()}
@@ -320,6 +373,27 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
                     }}
                   />
                 </div>
+                {canWriteToTemplate && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!writeToTemplateLoading) {
+                        onWriteToTemplate(schedule);
+                      }
+                    }}
+                    style={{
+                      marginLeft: 'auto',
+                      color: writeToTemplateLoading ? '#bfbfbf' : '#fa8c16',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: writeToTemplateLoading ? 'not-allowed' : 'pointer',
+                      userSelect: 'none',
+                      lineHeight: 1
+                    }}
+                  >
+                    固
+                  </span>
+                )}
               </div>
               
               {/* 半小时位置选择按钮 - 当开关打开时显示 */}
@@ -1207,6 +1281,7 @@ const ViewTimetable = ({ user }) => {
   const [scheduleToCopy, setScheduleToCopy] = useState(null);
   const [selectedCopyTargets, setSelectedCopyTargets] = useState(new Set());
   const [copyLoading, setCopyLoading] = useState(false);
+  const [writeToTemplateLoading, setWriteToTemplateLoading] = useState(false);
 
   // 调换功能状态
   const [swapMode, setSwapMode] = useState(false);
@@ -1736,6 +1811,48 @@ const ViewTimetable = ({ user }) => {
       message.error('网络错误，添加失败');
     } finally {
       setAddLoading(false);
+    }
+  };
+
+  const handleWriteScheduleToTemplate = async (scheduleObj) => {
+    if (!timetable?.isWeekly || viewMode !== 'instance') {
+      return;
+    }
+
+    const existingTemplate = findMatchingTemplateSchedule(scheduleObj, templateSchedules, timetable, 'instance');
+    if (existingTemplate) {
+      message.info('固定课表该时段已有课程');
+      return;
+    }
+
+    const payload = {
+      studentName: scheduleObj.studentName,
+      dayOfWeek: scheduleObj.dayOfWeek,
+      startTime: scheduleObj.startTime,
+      endTime: scheduleObj.endTime,
+      note: scheduleObj.note,
+      isTrial: scheduleObj.isTrial === 1 || scheduleObj.isTrial === true,
+      isTimeBlock: scheduleObj.isTimeBlock === 1 || scheduleObj.isTimeBlock === true,
+    };
+
+    setWriteToTemplateLoading(true);
+    try {
+      const response = await createSchedule(timetableId, payload);
+      if (response?.success) {
+        const templateResponse = await getTemplateSchedules(timetableId);
+        if (templateResponse?.success) {
+          setTemplateSchedules(templateResponse.data || []);
+        }
+        message.success('已写入固定课表');
+        setOpenPopoverKey(null);
+        setOpenScheduleId(null);
+      } else {
+        message.error(response?.message || '写入固定课表失败');
+      }
+    } catch (error) {
+      message.error(error?.response?.data?.message || '写入固定课表失败');
+    } finally {
+      setWriteToTemplateLoading(false);
     }
   };
 
@@ -5522,6 +5639,8 @@ const ViewTimetable = ({ user }) => {
                     onMove={handleStartMove}
                     onCopy={handleStartCopy}
                     onSwap={handleStartSwap}
+                    onWriteToTemplate={handleWriteScheduleToTemplate}
+                    writeToTemplateLoading={writeToTemplateLoading}
                     timetable={timetable}
                     isArchived={timetable?.isArchived}
                     onClose={() => {
@@ -6117,6 +6236,8 @@ const ViewTimetable = ({ user }) => {
                                 onMove={handleStartMove}
                                 onCopy={handleStartCopy}
                                 onSwap={handleStartSwap}
+                                onWriteToTemplate={handleWriteScheduleToTemplate}
+                                writeToTemplateLoading={writeToTemplateLoading}
                                 timetable={timetable}
                                 isArchived={timetable?.isArchived}
                                 onClose={() => {
@@ -6258,6 +6379,8 @@ const ViewTimetable = ({ user }) => {
                                 onMove={handleStartMove}
                                 onCopy={handleStartCopy}
                                 onSwap={handleStartSwap}
+                                onWriteToTemplate={handleWriteScheduleToTemplate}
+                                writeToTemplateLoading={writeToTemplateLoading}
                                 timetable={timetable}
                                 isArchived={timetable?.isArchived}
                                 onClose={() => {
