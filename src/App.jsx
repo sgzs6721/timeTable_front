@@ -34,6 +34,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
   const location = useLocation();
   const navigate = useNavigate();
   const [isValidatingToken, setIsValidatingToken] = useState(false);
+  const canAccessAdmin = user?.role === 'ADMIN' || user?.position === 'MANAGER';
 
   useEffect(() => {
     // 检查 URL 参数中是否有 token（微信登录跳转）
@@ -121,7 +122,6 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
     );
   }
 
-  const isDashboard = location.pathname === '/dashboard';
   const isViewTimetable = location.pathname.startsWith('/view-timetable/');
   const hasOrgMgmtAuth = typeof window !== 'undefined' && sessionStorage.getItem('orgMgmtAuth') === 'true';
 
@@ -129,11 +129,6 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
     <>
       {user && <AppHeader user={user} onLogout={handleLogout} />}
       <Content>
-        {/* 保持Dashboard mounted，避免后退时白屏 */}
-        {user && <div style={{ display: isDashboard ? 'block' : 'none' }}>
-          <Dashboard user={user} />
-        </div>}
-        
         <Routes>
           <Route
             path="/login"
@@ -151,7 +146,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           />
           <Route
             path="/dashboard"
-            element={user ? null : <Navigate to="/login" />}
+            element={user ? <Dashboard user={user} /> : <Navigate to="/login" />}
           />
           <Route
             path="/create-timetable"
@@ -171,7 +166,7 @@ function AppContent({ user, setUser, handleLogout, textInputValue, setTextInputV
           />
           <Route
             path="/admin"
-            element={user ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />}
+            element={user ? (canAccessAdmin ? <AdminPanel user={user} /> : <Navigate to="/dashboard" />) : <Navigate to="/dashboard" />}
           />
           <Route
             path="/preview-merge"

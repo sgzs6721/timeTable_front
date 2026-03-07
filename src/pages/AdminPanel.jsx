@@ -137,8 +137,9 @@ const AdminPanel = ({ user }) => {
 
   // 获取教练列表
   const fetchCoaches = async () => {
+    if (!user?.organizationId) return;
     try {
-      const response = await getAllUsers();
+      const response = await getAllUsers(user.organizationId);
       if (response && response.success) {
         setCoaches(response.data || []);
       }
@@ -295,9 +296,11 @@ const AdminPanel = ({ user }) => {
     ],
   });
 
-  const canAdmin = userPermissions?.actionPermissions?.admin === true;
-  const canAdminTimetables = canAdmin && userPermissions?.actionPermissions?.admin_timetables === true;
-  const canAdminPending = canAdmin && userPermissions?.actionPermissions?.admin_pending === true;
+  const permissions = userPermissions?.actionPermissions || {};
+  const fallbackIsAdmin = user?.role === 'ADMIN' || user?.position === 'MANAGER';
+  const canAdmin = permissions.admin === true || (!userPermissions && fallbackIsAdmin);
+  const canAdminTimetables = canAdmin && (permissions.admin_timetables !== false || (!userPermissions && fallbackIsAdmin));
+  const canAdminPending = canAdmin && (permissions.admin_pending !== false || (!userPermissions && fallbackIsAdmin));
 
   const tabItems = [
     ...(canAdminTimetables ? [{
@@ -470,6 +473,8 @@ const AdminPanel = ({ user }) => {
     }] : []),
   ];
 
+  const defaultTabKey = tabItems[0]?.key;
+
   const renderTabBar = (props, DefaultTabBar) => (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', position: 'relative', marginTop: '1rem', marginBottom: '1rem'}}>
@@ -520,14 +525,22 @@ const AdminPanel = ({ user }) => {
     <div className={isMobile ? "page-container-mobile-admin" : "page-container"}>
       {!isMobile && <DesktopHeader />}
       <div className={isMobile ? "mobile-tabs-container with-gradient-border" : ""}>
-        <Tabs
-          defaultActiveKey="timetables"
-          items={tabItems}
-          size="large"
-          renderTabBar={isMobile ? renderTabBar : undefined}
-          className={!isMobile ? "desktop-tabs with-gradient-border" : ""}
-          onChange={(key) => setActiveTab(key)}
-        />
+        {tabItems.length > 0 ? (
+          <Tabs
+            defaultActiveKey={defaultTabKey}
+            items={tabItems}
+            size="large"
+            renderTabBar={isMobile ? renderTabBar : undefined}
+            className={!isMobile ? "desktop-tabs with-gradient-border" : ""}
+            onChange={(key) => setActiveTab(key)}
+          />
+        ) : (
+          <Card className={!isMobile ? "desktop-tabs with-gradient-border" : ""}>
+            <div style={{ textAlign: 'center', padding: '48px 16px', color: '#8c8c8c' }}>
+              当前账号暂无可显示的管理员功能。
+            </div>
+          </Card>
+        )}
       </div>
       
       {/* 创建课表模态框 */}

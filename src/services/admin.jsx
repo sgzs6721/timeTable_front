@@ -40,9 +40,11 @@ export const updateTimetableDetails = async (id, data) => {
 };
 
 // 获取所有用户列表
-export const getAllUsers = async () => {
+export const getAllUsers = async (organizationId) => {
   try {
-    const response = await api.get('/admin/users');
+    const response = await api.get('/admin/users', {
+      params: organizationId ? { organizationId } : {}
+    });
     return response;
   } catch (error) {
     throw error;

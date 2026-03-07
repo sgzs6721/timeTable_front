@@ -8,6 +8,30 @@ import './UserManagement.css';
 
 const { Option } = Select;
 
+const getCurrentOrganizationId = () => {
+  const orgMgmtUserRaw = sessionStorage.getItem('orgMgmtUser');
+  if (orgMgmtUserRaw) {
+    try {
+      const orgMgmtUser = JSON.parse(orgMgmtUserRaw);
+      if (orgMgmtUser?.organizationId) {
+        return orgMgmtUser.organizationId;
+      }
+    } catch (_) {}
+  }
+
+  const userRaw = localStorage.getItem('user');
+  if (userRaw) {
+    try {
+      const user = JSON.parse(userRaw);
+      if (user?.organizationId) {
+        return user.organizationId;
+      }
+    } catch (_) {}
+  }
+
+  return null;
+};
+
 const UserManagement = ({ activeTab = 'users' }) => {
   const [users, setUsers] = useState([]);
   const [registrationRequests, setRegistrationRequests] = useState([]);
@@ -25,6 +49,8 @@ const UserManagement = ({ activeTab = 'users' }) => {
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [checkingManager, setCheckingManager] = useState(false);
   const [hasManagerInOrg, setHasManagerInOrg] = useState(false);
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectingUserId, setRejectingUserId] = useState(null);
 
   const [editingUser, setEditingUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState('');
@@ -58,7 +84,8 @@ const UserManagement = ({ activeTab = 'users' }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await getAllUsers();
+      const organizationId = getCurrentOrganizationId();
+      const response = await getAllUsers(organizationId);
       if (response && response.success) {
         setUsers(response.data || []);
       } else {
@@ -97,11 +124,13 @@ const UserManagement = ({ activeTab = 'users' }) => {
     // 如果带有机构信息，拉取该机构职位并检查是否已有管理职位成员
     const organizationId = request?.organizationId;
     if (organizationId) {
+      let loadedRoles = [];
       try {
         setLoadingRoles(true);
         const res = await getOrganizationRoles(organizationId);
         if (res.success) {
           const roles = res.data || [];
+          loadedRoles = roles;
           setOrgRoles(roles);
           // 默认选中第一个或COACH
           setApprovePosition(roles[0]?.roleCode || 'COACH');
@@ -114,13 +143,36 @@ const UserManagement = ({ activeTab = 'users' }) => {
       // 检查是否已有管理职位
       try {
         setCheckingManager(true);
-        const usersRes = await getAllUsers();
+        const usersRes = await getAllUsers(organizationId);
         if (usersRes?.success) {
           const users = usersRes.data || [];
-          const exists = users.some(u => u.organizationId === organizationId && u.position === 'MANAGER' && u.status === 'APPROVED');
+          const managerRoleCodes = loadedRoles
+            .filter(role => {
+              const roleName = (role?.roleName || '').toLowerCase();
+              const roleCode = (role?.roleCode || '').toUpperCase();
+              return roleCode === 'MANAGER' || roleName.includes('管理');
+            })
+            .map(role => role.roleCode);
+
+          const exists = users.some(u => {
+            if (u.organizationId !== organizationId || u.status !== 'APPROVED') {
+              return false;
+            }
+
+            if (managerRoleCodes.length > 0) {
+              return managerRoleCodes.includes(u.position);
+            }
+
+            return u.position === 'MANAGER';
+          });
           setHasManagerInOrg(exists);
           if (!exists) {
-            setApprovePosition('MANAGER');
+            const preferredManagerRole = loadedRoles.find(role => {
+              const roleName = (role?.roleName || '').toLowerCase();
+              const roleCode = (role?.roleCode || '').toUpperCase();
+              return roleCode === 'MANAGER' || roleName.includes('管理');
+            });
+            setApprovePosition(preferredManagerRole?.roleCode || 'MANAGER');
           }
         }
       } catch (_) {
@@ -131,26 +183,25 @@ const UserManagement = ({ activeTab = 'users' }) => {
   };
 
   const handleRejectUser = async (userId) => {
-    Modal.confirm({
-      title: '确认拒绝用户注册申请',
-      content: '确定要拒绝该用户的注册申请吗？拒绝后用户将无法登录系统。',
-      okText: '拒绝',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          const response = await rejectUserRegistration(userId);
-          if (response.success) {
-            message.success('用户注册申请已拒绝');
-            fetchRegistrationRequests();
-          } else {
-            message.error(response.message || '拒绝失败');
-          }
-        } catch (error) {
-          message.error('拒绝失败，请检查网络连接');
-        }
-      },
-    });
+    setRejectingUserId(userId);
+    setRejectModalVisible(true);
+  };
+
+  const handleConfirmRejectUser = async () => {
+    if (!rejectingUserId) return;
+    try {
+      const response = await rejectUserRegistration(rejectingUserId);
+      if (response.success) {
+        message.success('用户注册申请已拒绝');
+        setRejectModalVisible(false);
+        setRejectingUserId(null);
+        fetchRegistrationRequests();
+      } else {
+        message.error(response.message || '拒绝失败');
+      }
+    } catch (error) {
+      message.error('拒绝失败，请检查网络连接');
+    }
   };
 
   const handleEditRole = (user) => {
@@ -664,16 +715,14 @@ const UserManagement = ({ activeTab = 'users' }) => {
     },
   ];
 
-  // 统计待审批数量
-  const pendingCount = registrationRequests.filter(r => r.status === 'PENDING').length;
-
   if (activeTab === 'pending') {
     return (
+      <>
       <Spin spinning={requestsLoading}>
-        <div style={{ minHeight: '200px' }}>
-          {!requestsLoading && registrationRequests.length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
+        <div style={{ padding: '8px 0' }}>
+          {registrationRequests.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
               padding: '60px 20px',
               color: '#999',
               fontSize: '16px'
@@ -825,8 +874,92 @@ const UserManagement = ({ activeTab = 'users' }) => {
               })}
             </div>
           )}
-        </div>
-      </Spin>
+          </div>
+        </Spin>
+
+        <Modal
+          title="确认批准用户注册申请"
+          open={approveModalVisible}
+          onOk={async () => {
+            if (!approvingRequest) return;
+            try {
+              const resp = await approveUserRegistration(approvingRequest.id, approvePosition || 'COACH');
+              if (resp.success) {
+                message.success('用户注册申请已批准');
+                setApproveModalVisible(false);
+                setApprovingRequest(null);
+                fetchRegistrationRequests();
+                fetchUsers();
+              } else {
+                message.error(resp.message || '批准失败');
+              }
+            } catch (_) {
+              message.error('批准失败，请检查网络连接');
+            }
+          }}
+          onCancel={() => {
+            setApproveModalVisible(false);
+            setApprovingRequest(null);
+          }}
+          okText="批准"
+          cancelText="取消"
+        >
+          <div>
+            <p style={{ marginBottom: 12 }}>批准后，用户将可以登录系统。</p>
+            {approvingRequest?.organizationName && (
+              <p style={{ marginBottom: 12 }}>
+                申请机构：<strong>{approvingRequest.organizationName}</strong>
+              </p>
+            )}
+            {!checkingManager && !hasManagerInOrg && (
+              <div style={{ 
+                padding: '10px', 
+                background: '#e6f7ff', 
+                border: '1px solid #91d5ff', 
+                borderRadius: 6, 
+                marginBottom: 12 
+              }}>
+                当前机构暂无管理职位成员，建议设置为<strong>管理</strong>
+              </div>
+            )}
+            <label>请选择职位：</label>
+            <Select
+              value={approvePosition}
+              onChange={setApprovePosition}
+              loading={loadingRoles || checkingManager}
+              style={{ width: '100%', marginTop: 8 }}
+            >
+              {orgRoles.length > 0 ? (
+                orgRoles.map(role => (
+                  <Option key={role.id} value={role.roleCode}>{role.roleName}</Option>
+                ))
+              ) : (
+                <>
+                  <Option value="COACH">教练</Option>
+                  <Option value="SALES">销售</Option>
+                  <Option value="RECEPTIONIST">前台</Option>
+                  <Option value="MANAGER">管理</Option>
+                </>
+              )}
+            </Select>
+          </div>
+        </Modal>
+
+        <Modal
+          title="确认拒绝用户注册申请"
+          open={rejectModalVisible}
+          onOk={handleConfirmRejectUser}
+          onCancel={() => {
+            setRejectModalVisible(false);
+            setRejectingUserId(null);
+          }}
+          okText="拒绝"
+          okButtonProps={{ danger: true }}
+          cancelText="取消"
+        >
+          <div>确定要拒绝该用户的注册申请吗？拒绝后用户将无法登录系统。</div>
+        </Modal>
+      </>
     );
   }
 
@@ -1063,72 +1196,6 @@ const UserManagement = ({ activeTab = 'users' }) => {
               <Option value="MANAGER">管理</Option>
             </Select>
           </div>
-        </div>
-      </Modal>
-      
-      {/* 批准注册：选择职位 */}
-      <Modal
-        title="确认批准用户注册申请"
-        open={approveModalVisible}
-        onOk={async () => {
-          if (!approvingRequest) return;
-          try {
-            const resp = await approveUserRegistration(approvingRequest.id, approvePosition || 'COACH');
-            if (resp.success) {
-              message.success('用户注册申请已批准');
-              setApproveModalVisible(false);
-              setApprovingRequest(null);
-              fetchRegistrationRequests();
-              fetchUsers();
-            } else {
-              message.error(resp.message || '批准失败');
-            }
-          } catch (_) {
-            message.error('批准失败，请检查网络连接');
-          }
-        }}
-        onCancel={() => setApproveModalVisible(false)}
-        okText="批准"
-        cancelText="取消"
-      >
-        <div>
-          <p style={{ marginBottom: 12 }}>批准后，用户将可以登录系统。</p>
-          {approvingRequest?.organizationName && (
-            <p style={{ marginBottom: 12 }}>
-              申请机构：<strong>{approvingRequest.organizationName}</strong>
-            </p>
-          )}
-          {!checkingManager && !hasManagerInOrg && (
-            <div style={{ 
-              padding: '10px', 
-              background: '#e6f7ff', 
-              border: '1px solid #91d5ff', 
-              borderRadius: 6, 
-              marginBottom: 12 
-            }}>
-              当前机构暂无管理职位成员，建议设置为<strong>管理</strong>
-            </div>
-          )}
-          <label>请选择职位：</label>
-          <Select
-            value={approvePosition}
-            onChange={setApprovePosition}
-            loading={loadingRoles || checkingManager}
-            style={{ width: '100%', marginTop: 8 }}
-          >
-            {orgRoles.length > 0 ? (
-              orgRoles.map(role => (
-                <Option key={role.id} value={role.roleCode}>{role.roleName}</Option>
-              ))
-            ) : (
-              <>
-                <Option value="COACH">教练</Option>
-                <Option value="SALES">销售</Option>
-                <Option value="RECEPTIONIST">前台</Option>
-                <Option value="MANAGER">管理</Option>
-              </>
-            )}
-          </Select>
         </div>
       </Modal>
     </>

@@ -25,7 +25,7 @@ const CopyTimetableModal = ({ visible, onCancel, onSuccess, timetable }) => {
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const response = await getAllUsers();
+      const response = await getAllUsers(timetable?.organizationId);
       if (response.success) {
         // 过滤掉当前课表的所有者
         const availableUsers = response.data.filter(user => user.id !== timetable?.userId);

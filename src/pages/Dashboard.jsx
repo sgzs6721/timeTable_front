@@ -1292,12 +1292,16 @@ const ActiveBadge = () => (
 
 const Dashboard = ({ user }) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const cacheUserKey = user?.id || user?.username || 'anonymous';
+  const timetablesCacheKey = `dashboard_timetables_${cacheUserKey}`;
+  const scheduleCountsCacheKey = `dashboard_schedule_counts_${cacheUserKey}`;
+  const cacheTimestampKey = `dashboard_cache_timestamp_${cacheUserKey}`;
   
   // 初始化时同步读取缓存，避免后退时白屏
   const initCache = () => {
-    const cachedTimetables = sessionStorage.getItem('dashboard_timetables');
-    const cachedScheduleCounts = sessionStorage.getItem('dashboard_schedule_counts');
-    const cacheTimestamp = sessionStorage.getItem('dashboard_cache_timestamp');
+    const cachedTimetables = sessionStorage.getItem(timetablesCacheKey);
+    const cachedScheduleCounts = sessionStorage.getItem(scheduleCountsCacheKey);
+    const cacheTimestamp = sessionStorage.getItem(cacheTimestampKey);
     
     if (cachedTimetables && cachedScheduleCounts && cacheTimestamp) {
       const cacheAge = Date.now() - parseInt(cacheTimestamp);
@@ -1335,8 +1339,65 @@ const Dashboard = ({ user }) => {
   const [loadingScheduleCounts, setLoadingScheduleCounts] = useState(false);
   const [timetableScheduleCounts, setTimetableScheduleCounts] = useState(cache.scheduleCounts);
   const [todaysCoursesModalVisible, setTodaysCoursesModalVisible] = useState(false);
-  const [userPermissions, setUserPermissions] = useState(null);
+  const permissionsCacheKey = `dashboard_permissions_${user?.id || user?.username || 'anonymous'}`;
+  const [userPermissions, setUserPermissions] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem(permissionsCacheKey);
+      return cached ? JSON.parse(cached) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [showTrialsList, setShowTrialsList] = useState(false);
+
+  const getFallbackMenuPermissions = useCallback(() => {
+    const isManager = user?.position?.toUpperCase() === 'MANAGER';
+    const isAdminRole = user?.role?.toUpperCase() === 'ADMIN';
+    const hasAdminView = isManager || isAdminRole;
+
+    return {
+      dashboard: hasAdminView,
+      todo: hasAdminView,
+      customer: hasAdminView,
+      mySchedule: true,
+      myStudents: true,
+      myHours: true,
+      mySalary: true,
+    };
+  }, [user]);
+
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(permissionsCacheKey);
+      setUserPermissions(cached ? JSON.parse(cached) : null);
+    } catch (_) {
+      setUserPermissions(null);
+    }
+    setPermissionsLoaded(false);
+  }, [permissionsCacheKey]);
+
+  const getEffectiveMenuPermissions = useCallback(() => {
+    if (!permissionsLoaded) {
+      return userPermissions?.menuPermissions || getFallbackMenuPermissions();
+    }
+
+    if (userPermissions?.menuPermissions) {
+      return userPermissions.menuPermissions;
+    }
+
+    try {
+      const cached = sessionStorage.getItem(permissionsCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.menuPermissions) {
+          return parsed.menuPermissions;
+        }
+      }
+    } catch (_) {}
+
+    return getFallbackMenuPermissions();
+  }, [permissionsLoaded, userPermissions, getFallbackMenuPermissions, permissionsCacheKey]);
   
   // 管理员概览相关状态
   const [activeTab, setActiveTab] = useState(() => {
@@ -1375,9 +1436,9 @@ const Dashboard = ({ user }) => {
           setArchivedTimetables(archivedTimetables);
           
           // 清除缓存
-          sessionStorage.removeItem('dashboard_timetables');
-          sessionStorage.removeItem('dashboard_schedule_counts');
-          sessionStorage.removeItem('dashboard_cache_timestamp');
+          sessionStorage.removeItem(timetablesCacheKey);
+          sessionStorage.removeItem(scheduleCountsCacheKey);
+          sessionStorage.removeItem(cacheTimestampKey);
 
           // 更新课程数量
           const scheduleCounts = {};
@@ -1544,11 +1605,16 @@ const Dashboard = ({ user }) => {
         if (response && response.success) {
           console.log('[Dashboard] 设置权限配置:', response.data);
           setUserPermissions(response.data);
+          try {
+            sessionStorage.setItem(permissionsCacheKey, JSON.stringify(response.data));
+          } catch (_) {}
         } else {
           console.warn('[Dashboard] 权限API返回失败或无数据');
         }
       } catch (error) {
         console.error('[Dashboard] 获取用户权限失败:', error);
+      } finally {
+        setPermissionsLoaded(true);
       }
     };
 
@@ -1567,14 +1633,20 @@ const Dashboard = ({ user }) => {
         if (response && response.success) {
           console.log('[Dashboard] 设置权限配置:', response.data);
           setUserPermissions(response.data);
+          try {
+            sessionStorage.setItem(permissionsCacheKey, JSON.stringify(response.data));
+          } catch (_) {}
         }
       } catch (error) {
         console.error('[Dashboard] 获取用户权限失败:', error);
+      } finally {
+        setPermissionsLoaded(true);
       }
     };
 
     const handlePermissionsUpdate = () => {
       if (user) {
+        setPermissionsLoaded(false);
         fetchUserPermissions();
       }
     };
@@ -1585,9 +1657,7 @@ const Dashboard = ({ user }) => {
 
   // 当权限加载后，自动切换到第一个可见的tab
   useEffect(() => {
-    if (!userPermissions || !userPermissions.menuPermissions) return;
-    
-    const menuPerms = userPermissions.menuPermissions;
+    const menuPerms = getEffectiveMenuPermissions();
     
     // 定义tab优先级顺序
     const tabPriority = [
@@ -1609,13 +1679,13 @@ const Dashboard = ({ user }) => {
       console.log('[Dashboard] 自动切换到第一个可见tab:', firstVisibleTab.key);
       setActiveTab(firstVisibleTab.key);
     }
-  }, [userPermissions, searchParams]);
+  }, [searchParams, getEffectiveMenuPermissions]);
 
   // 清除缓存数据
   const clearCache = () => {
-    sessionStorage.removeItem('dashboard_timetables');
-    sessionStorage.removeItem('dashboard_schedule_counts');
-    sessionStorage.removeItem('dashboard_cache_timestamp');
+    sessionStorage.removeItem(timetablesCacheKey);
+    sessionStorage.removeItem(scheduleCountsCacheKey);
+    sessionStorage.removeItem(cacheTimestampKey);
   };
 
   // 处理tab切换，同时更新URL参数
@@ -1698,9 +1768,7 @@ const Dashboard = ({ user }) => {
 
   // 当权限加载后，如果用户有dashboard权限，则加载统计数据
   useEffect(() => {
-    if (!userPermissions || !userPermissions.menuPermissions) return;
-    
-    const menuPerms = userPermissions.menuPermissions;
+    const menuPerms = getEffectiveMenuPermissions();
     
     // 如果用户有dashboard权限，获取教练统计信息和课表信息
     if (menuPerms.dashboard === true) {
@@ -1708,7 +1776,7 @@ const Dashboard = ({ user }) => {
       fetchCoachesStatistics();
       fetchAllTimetablesInfo();
     }
-  }, [userPermissions, fetchCoachesStatistics, fetchAllTimetablesInfo]);
+  }, [fetchCoachesStatistics, fetchAllTimetablesInfo, getEffectiveMenuPermissions]);
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((columnIndex) => {
@@ -1830,9 +1898,9 @@ const Dashboard = ({ user }) => {
           setTimetableScheduleCounts(scheduleCounts);
           setLoadingScheduleCounts(false);
           // 缓存数据
-          sessionStorage.setItem('dashboard_timetables', JSON.stringify(allTimetables));
-          sessionStorage.setItem('dashboard_schedule_counts', JSON.stringify(scheduleCounts));
-          sessionStorage.setItem('dashboard_cache_timestamp', Date.now().toString());
+          sessionStorage.setItem(timetablesCacheKey, JSON.stringify(allTimetables));
+          sessionStorage.setItem(scheduleCountsCacheKey, JSON.stringify(scheduleCounts));
+          sessionStorage.setItem(cacheTimestampKey, Date.now().toString());
         }).catch(() => {
           setLoadingScheduleCounts(false);
         });
@@ -5203,8 +5271,7 @@ const Dashboard = ({ user }) => {
     const isAdmin = user?.position?.toUpperCase() === 'MANAGER';
     const isSales = user?.position?.toUpperCase() === 'SALES';
     
-    // 获取菜单权限配置，如果未加载则使用默认值
-    const menuPerms = userPermissions?.menuPermissions || {};
+    const menuPerms = getEffectiveMenuPermissions();
     
     console.log('[Dashboard buildTabItems] userPermissions:', userPermissions);
     console.log('[Dashboard buildTabItems] menuPerms:', menuPerms);
@@ -5328,20 +5395,29 @@ const Dashboard = ({ user }) => {
   // 显示Tab界面（管理员和普通用户都显示）
   const customersRef = React.useRef();
   const tabItems = buildTabItems();
+  const effectiveActiveTab = tabItems.some(tab => tab.key === activeTab) ? activeTab : tabItems[0]?.key;
   
   return (
     <div className="page-container" style={{ paddingTop: '0.25rem', display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <Tabs
-        activeKey={activeTab}
-        onChange={handleTabChange}
-        items={tabItems}
-        size="large"
-        tabBarGutter={12}
-        style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-        tabBarStyle={{ flexShrink: 0 }}
-        className="dashboard-tabs"
-      />
+      {tabItems.length > 0 ? (
+        <Tabs
+          activeKey={effectiveActiveTab}
+          onChange={handleTabChange}
+          items={tabItems}
+          size="large"
+          tabBarGutter={12}
+          style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+          tabBarStyle={{ flexShrink: 0 }}
+          className="dashboard-tabs"
+        />
+      ) : (
+        <Card style={{ marginTop: 16 }}>
+          <div style={{ textAlign: 'center', padding: '48px 16px', color: '#8c8c8c' }}>
+            当前账号暂无可显示的首页功能。
+          </div>
+        </Card>
+      )}
       {/* 模态框等保持不变 */}
       {renderModals()}
       </div>

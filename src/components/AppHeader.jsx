@@ -117,6 +117,13 @@ const AppHeader = ({ user, onLogout }) => {
   console.log('[AppHeader] actionPermissions:', userPermissions?.actionPermissions);
   
   const permissions = userPermissions?.actionPermissions || {};
+  const fallbackIsAdmin = user?.role === 'ADMIN' || user?.position === 'MANAGER';
+  const fallbackCanOrganizationManage = user?.position === 'MANAGER';
+  const isAdmin = permissions.admin === true || (!userPermissions && fallbackIsAdmin);
+  const canOrganizationManage = permissions['organization-management'] === true || (!userPermissions && fallbackCanOrganizationManage);
+  const canArchived = permissions.archived !== false;
+  const canProfile = permissions.profile !== false;
+  const canGuide = permissions.guide !== false;
   
   // 刷新（默认显示，除非明确设置为false）
   if (permissions.refresh !== false) {
@@ -138,7 +145,7 @@ const AppHeader = ({ user, onLogout }) => {
   // 管理员相关菜单
   const adminMenus = [];
   
-  if (permissions.admin === true) {
+  if (isAdmin) {
     adminMenus.push({
       key: 'admin',
       icon: <SettingOutlined />,
@@ -165,7 +172,7 @@ const AppHeader = ({ user, onLogout }) => {
     });
   }
   
-  if (permissions['organization-management'] === true) {
+  if (canOrganizationManage) {
     adminMenus.push({
       key: 'organization-management',
       icon: <InboxOutlined />,
@@ -182,7 +189,7 @@ const AppHeader = ({ user, onLogout }) => {
   // 其他功能菜单
   const otherMenus = [];
   
-  if (permissions.archived === true) {
+  if (canArchived) {
     otherMenus.push({
       key: 'archived',
       icon: <InboxOutlined />,
@@ -195,7 +202,7 @@ const AppHeader = ({ user, onLogout }) => {
     });
   }
   
-  if (permissions.profile === true) {
+  if (canProfile) {
     otherMenus.push({
       key: 'profile',
       icon: <UserOutlined />,
@@ -204,7 +211,7 @@ const AppHeader = ({ user, onLogout }) => {
     });
   }
   
-  if (permissions.guide === true) {
+  if (canGuide) {
     otherMenus.push({
       key: 'guide',
       icon: <InboxOutlined />,
