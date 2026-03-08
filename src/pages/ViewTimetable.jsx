@@ -2481,7 +2481,8 @@ const ViewTimetable = ({ user }) => {
         }
         
         const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
-        const remarkText = schedule.note ? `（${schedule.note}）` : '';
+        const systemNotes = new Set(['调换课程', '恢复的课程', '修改排课']);
+        const remarkText = (schedule.note && !systemNotes.has(schedule.note)) ? `（${schedule.note}）` : '';
         return `${startTimeStr}-${endTimeStr} ${studentName}${remarkText}`;
       }).join('\n');
 
@@ -2534,7 +2535,8 @@ const ViewTimetable = ({ user }) => {
             }
             
             const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
-            const remarkText = schedule.note ? `（${schedule.note}）` : '';
+            const systemNotes = new Set(['调换课程', '恢复的课程', '修改排课']);
+            const remarkText = (schedule.note && !systemNotes.has(schedule.note)) ? `（${schedule.note}）` : '';
             return `${startTimeStr}-${endTimeStr} ${studentName}${remarkText}`;
           }).join('\n');
         result += `\n${otherCourseList}`;
