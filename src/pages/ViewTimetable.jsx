@@ -1694,8 +1694,7 @@ const ViewTimetable = ({ user }) => {
       dayOfWeek: dayKey.toUpperCase(),
       startTime: startTimeFormatted,
       endTime: endTimeFormatted,
-      note: `时间占用 (${scheduleInfo.isHalfHour ? '30分钟' : '1小时'})`,
-      isTimeBlock: true,
+      note: '',
     };
 
     if (scheduleDate) {
@@ -1718,7 +1717,7 @@ const ViewTimetable = ({ user }) => {
           dayOfWeek: dayKey.toUpperCase(),
           startTime: startTimeFormatted,
           endTime: endTimeFormatted,
-          note: payload.note,
+          note: '',
           scheduleDate: payload.scheduleDate,
           isTimeBlock: true
         };
@@ -1811,7 +1810,7 @@ const ViewTimetable = ({ user }) => {
       dayOfWeek: dayKey.toUpperCase(),
       startTime: startTimeFormatted,
       endTime: endTimeFormatted,
-      note: `手动添加 (${scheduleInfo.isHalfHour ? '30分钟' : '1小时'})`,
+      note: '',
     };
 
   // 仅当需要按日期写入（实例或日期范围课表）时，才设置 scheduleDate
@@ -5428,7 +5427,7 @@ const ViewTimetable = ({ user }) => {
                 dayOfWeek: day.key.toUpperCase(),
                 startTime: startTimeFormatted,
                 endTime: endTimeFormatted,
-                note: `手动添加 (${isHalfHour ? '30分钟' : '1小时'})`,
+                note: '',
               };
 
               if (scheduleDate) {

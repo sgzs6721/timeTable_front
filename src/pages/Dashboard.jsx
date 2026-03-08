@@ -2905,7 +2905,7 @@ const Dashboard = ({ user }) => {
       studentName: studentName.trim(),
       startTime,
       endTime,
-      note: '手动添加',
+      note: '',
     };
 
     if (currentTimetable.isWeekly) {
