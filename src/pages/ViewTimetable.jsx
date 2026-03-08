@@ -171,12 +171,27 @@ const findMatchingTemplateSchedule = (schedule, templateSchedules, timetable, vi
 };
 
 const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateField, onMove, onCopy, onSwap, onWriteToTemplate, writeToTemplateLoading, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule, hasOtherHalf = false }) => {
+  const systemNoteValues = React.useMemo(() => new Set(['调换课程', '恢复的课程', '修改排课']), []);
+  const effectiveRemark = React.useMemo(() => {
+    const note = schedule.note || '';
+    return systemNoteValues.has(note) ? '' : note;
+  }, [schedule.note, systemNoteValues]);
   const [name, setName] = React.useState(schedule.studentName);
+  const [remark, setRemark] = React.useState(effectiveRemark);
+  const [showRemarkInput, setShowRemarkInput] = React.useState(!!effectiveRemark);
   const [showAllInfo, setShowAllInfo] = React.useState(false);
   const [showLeaveForm, setShowLeaveForm] = React.useState(false);
   const [leaveReason, setLeaveReason] = React.useState('');
   const [leaveSubmitting, setLeaveSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    setName(schedule.studentName || '');
+    setRemark(effectiveRemark);
+    setShowRemarkInput(!!effectiveRemark);
+  }, [schedule.id, schedule.studentName, effectiveRemark]);
+
   const isNameChanged = name !== schedule.studentName;
+  const isRemarkChanged = remark !== effectiveRemark;
   const isBlocked = !!schedule.isTimeBlock; // 判断是否为占用时间段（支持true或1）
   
   // 根据开始和结束时间判断是否为半小时课程
@@ -246,7 +261,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
   const isModified = templateSchedule && (
     templateSchedule.studentName !== schedule.studentName ||
     templateSchedule.subject !== schedule.subject ||
-    templateSchedule.note !== schedule.note
+    templateSchedule.note !== effectiveRemark
   );
 
 
@@ -335,7 +350,59 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
                 修改
               </Button>
             )}
+            {/* 备注文字按钮 - 点击展开备注输入框 */}
+            {!isArchived && !showRemarkInput && (
+              <span
+                onClick={(e) => { e.stopPropagation(); setShowRemarkInput(true); }}
+                style={{
+                  fontSize: '12px',
+                  color: '#1890ff',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  marginLeft: '4px'
+                }}
+              >
+                备注
+              </span>
+            )}
           </div>
+
+          {/* 备注输入框 - 默认隐藏，点击"备注"后显示 */}
+          {showRemarkInput && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '6px 0 2px 0' }}>
+              <strong style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>备注:</strong>
+              <Input
+                size="small"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="特殊时间可标记"
+                disabled={isArchived}
+                style={{ flex: 1 }}
+              />
+              {!isArchived && (
+                <Button
+                  size="small"
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    onUpdateField('note', remark); 
+                  }}
+                  disabled={!isRemarkChanged || updateLoading}
+                  loading={updateLoading}
+                  style={{
+                    backgroundColor: isRemarkChanged ? '#faad14' : '#d9d9d9',
+                    borderColor: isRemarkChanged ? '#faad14' : '#d9d9d9',
+                    color: 'white',
+                    padding: '0 8px',
+                    height: '22px',
+                    fontSize: '12px',
+                    flexShrink: 0
+                  }}
+                >
+                  修改
+                </Button>
+              )}
+            </div>
+          )}
           
           {/* 半小时和体验开关 */}
           {!isArchived && onUpdateField && (
@@ -2414,7 +2481,8 @@ const ViewTimetable = ({ user }) => {
         }
         
         const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
-        return `${startTimeStr}-${endTimeStr} ${studentName}`;
+        const remarkText = schedule.note ? `（${schedule.note}）` : '';
+        return `${startTimeStr}-${endTimeStr} ${studentName}${remarkText}`;
       }).join('\n');
 
     let result = `${title}\n${coachName}：\n${courseList}`;
@@ -2466,7 +2534,8 @@ const ViewTimetable = ({ user }) => {
             }
             
             const studentName = schedule.isOnLeave ? `${schedule.studentName}（请假）` : schedule.studentName;
-            return `${startTimeStr}-${endTimeStr} ${studentName}`;
+            const remarkText = schedule.note ? `（${schedule.note}）` : '';
+            return `${startTimeStr}-${endTimeStr} ${studentName}${remarkText}`;
           }).join('\n');
         result += `\n${otherCourseList}`;
       });

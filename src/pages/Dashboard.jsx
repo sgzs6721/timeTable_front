@@ -106,9 +106,18 @@ const MyStudents = ({ onStudentClick, showAllCheckbox = true, currentUser }) => 
     }
   }, []);
 
+  // 使用ref防止首次挂载时重复加载
+  const hasInitialFetchRef = React.useRef(false);
+  
   useEffect(() => {
-    fetchStudents(showAllStudents);
-  }, [showAllStudents]);
+    // 首次挂载时加载，后续只在showAllStudents变化时加载
+    if (!hasInitialFetchRef.current) {
+      hasInitialFetchRef.current = true;
+      fetchStudents(showAllStudents);
+    } else {
+      fetchStudents(showAllStudents);
+    }
+  }, [showAllStudents, fetchStudents]);
 
   const handleStudentClick = React.useCallback((studentName) => {
     // 如果是"全部学员"模式，需要找到该学员所属的教练
@@ -1591,72 +1600,51 @@ const Dashboard = ({ user }) => {
     navigate(`?tab=customers&customerId=${customerId}&customerName=${encodeURIComponent(customerName)}`);
   }, [navigate]);
 
-  // 获取当前用户权限配置
-  useEffect(() => {
-    const fetchUserPermissions = async () => {
-      try {
-        console.log('[Dashboard] 开始获取用户权限配置...');
-        const response = await getCurrentUserPermissions();
-        console.log('[Dashboard] 权限API返回:', response);
-        if (response && response.success) {
-          console.log('[Dashboard] 设置权限配置:', response.data);
-          setUserPermissions(response.data);
-          try {
-            sessionStorage.setItem(permissionsCacheKey, JSON.stringify(response.data));
-          } catch (_) {}
-        } else {
-          console.warn('[Dashboard] 权限API返回失败或无数据');
-          try {
-            sessionStorage.removeItem(permissionsCacheKey);
-          } catch (_) {}
-          setUserPermissions(null);
-        }
-      } catch (error) {
-        console.error('[Dashboard] 获取用户权限失败:', error);
+  // 使用ref防止重复获取权限
+  const hasLoadedPermissionsRef = React.useRef(false);
+  
+  // 获取用户权限的共享函数
+  const fetchUserPermissions = useCallback(async (forceRefresh = false) => {
+    // 如果已经加载过且不是强制刷新，直接返回
+    if (hasLoadedPermissionsRef.current && !forceRefresh) {
+      return;
+    }
+    
+    try {
+      console.log('[Dashboard] 获取用户权限配置...');
+      const response = await getCurrentUserPermissions();
+      if (response && response.success) {
+        setUserPermissions(response.data);
+        try {
+          sessionStorage.setItem(permissionsCacheKey, JSON.stringify(response.data));
+        } catch (_) {}
+        hasLoadedPermissionsRef.current = true;
+      } else {
         try {
           sessionStorage.removeItem(permissionsCacheKey);
         } catch (_) {}
         setUserPermissions(null);
-      } finally {
-        setPermissionsLoaded(true);
       }
-    };
+    } catch (error) {
+      console.error('[Dashboard] 获取用户权限失败:', error);
+      try {
+        sessionStorage.removeItem(permissionsCacheKey);
+      } catch (_) {}
+      setUserPermissions(null);
+    } finally {
+      setPermissionsLoaded(true);
+    }
+  }, [permissionsCacheKey]);
 
-    if (user) {
+  // 获取当前用户权限配置（只在组件挂载时执行一次）
+  useEffect(() => {
+    if (user && !hasLoadedPermissionsRef.current) {
       fetchUserPermissions();
     }
-  }, [user, permissionsCacheKey]);
+  }, [user, fetchUserPermissions]);
 
   // 监听权限更新事件
   useEffect(() => {
-    const fetchUserPermissions = async () => {
-      try {
-        console.log('[Dashboard] 检测到权限更新，重新获取权限配置');
-        const response = await getCurrentUserPermissions();
-        console.log('[Dashboard] 权限API返回:', response);
-        if (response && response.success) {
-          console.log('[Dashboard] 设置权限配置:', response.data);
-          setUserPermissions(response.data);
-          try {
-            sessionStorage.setItem(permissionsCacheKey, JSON.stringify(response.data));
-          } catch (_) {}
-        } else {
-          try {
-            sessionStorage.removeItem(permissionsCacheKey);
-          } catch (_) {}
-          setUserPermissions(null);
-        }
-      } catch (error) {
-        console.error('[Dashboard] 获取用户权限失败:', error);
-        try {
-          sessionStorage.removeItem(permissionsCacheKey);
-        } catch (_) {}
-        setUserPermissions(null);
-      } finally {
-        setPermissionsLoaded(true);
-      }
-    };
-
     const handlePermissionsUpdate = () => {
       if (user) {
         try {
@@ -1664,13 +1652,14 @@ const Dashboard = ({ user }) => {
         } catch (_) {}
         setUserPermissions(null);
         setPermissionsLoaded(false);
-        fetchUserPermissions();
+        hasLoadedPermissionsRef.current = false;
+        fetchUserPermissions(true); // 强制刷新
       }
     };
     
     window.addEventListener('permissionsUpdated', handlePermissionsUpdate);
     return () => window.removeEventListener('permissionsUpdated', handlePermissionsUpdate);
-  }, [user, permissionsCacheKey]);
+  }, [user, permissionsCacheKey, fetchUserPermissions]);
 
   // 当权限加载后，自动切换到第一个可见的tab
   useEffect(() => {
@@ -1783,17 +1772,26 @@ const Dashboard = ({ user }) => {
     }
   }, [fetchAllTimetablesInfo]);
 
+  // 使用ref防止重复加载统计数据
+  const hasLoadedStatisticsRef = React.useRef(false);
+  
   // 当权限加载后，如果用户有dashboard权限，则加载统计数据
   useEffect(() => {
+    // 防止重复加载
+    if (hasLoadedStatisticsRef.current) {
+      return;
+    }
+    
     const menuPerms = getEffectiveMenuPermissions();
     
-    // 如果用户有dashboard权限，获取教练统计信息和课表信息
+    // 如果用户有dashboard权限，获取教练统计信息
+    // 注意：fetchAllTimetablesInfo 会在 fetchCoachesStatistics 成功后自动调用，无需单独调用
     if (menuPerms.dashboard === true) {
+      hasLoadedStatisticsRef.current = true;
       console.log('[Dashboard] 用户有dashboard权限，加载统计数据');
       fetchCoachesStatistics();
-      fetchAllTimetablesInfo();
     }
-  }, [fetchCoachesStatistics, fetchAllTimetablesInfo, getEffectiveMenuPermissions]);
+  }, [permissionsLoaded]); // 只依赖permissionsLoaded，避免函数引用变化导致重复触发
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((columnIndex) => {
@@ -1861,13 +1859,18 @@ const Dashboard = ({ user }) => {
     }
   };
 
+  // 使用ref防止课表数据重复加载
+  const hasLoadedTimetablesRef = React.useRef(false);
+  
   useEffect(() => {
     const fetchTimetables = async () => {
-      // 如果已经有数据（从初始化缓存加载），直接返回，不调用API
-      if (timetables.length > 0 || archivedTimetables.length > 0) {
-        console.log('使用初始化缓存数据，跳过API请求');
+      // 如果已经加载过或有缓存数据，直接返回
+      if (hasLoadedTimetablesRef.current || timetables.length > 0 || archivedTimetables.length > 0) {
+        console.log('使用初始化缓存数据或已加载，跳过API请求');
         return;
       }
+      
+      hasLoadedTimetablesRef.current = true;
       
       try {
         // 添加超时保护
