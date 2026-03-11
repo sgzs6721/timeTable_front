@@ -170,7 +170,7 @@ const findMatchingTemplateSchedule = (schedule, templateSchedules, timetable, vi
   }) || null;
 };
 
-const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateField, onMove, onCopy, onSwap, onWriteToTemplate, writeToTemplateLoading, timetable, isArchived, onClose, deleteLoading, updateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule, hasOtherHalf = false }) => {
+const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateField, onMove, onCopy, onSwap, onWriteToTemplate, writeToTemplateLoading, timetable, isArchived, onClose, deleteLoading, nameUpdateLoading, remarkUpdateLoading, templateSchedules, viewMode, allSchedules, onRemoveSchedule, hasOtherHalf = false }) => {
   const systemNoteValues = React.useMemo(() => new Set(['调换课程', '恢复的课程', '修改排课']), []);
   const effectiveRemark = React.useMemo(() => {
     const note = schedule.note || '';
@@ -335,8 +335,8 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
                   e.stopPropagation(); 
                   onUpdateName(name); 
                 }}
-                disabled={!isNameChanged || updateLoading}
-                loading={updateLoading}
+                disabled={!isNameChanged || nameUpdateLoading}
+                loading={nameUpdateLoading}
                 style={{
                   backgroundColor: isNameChanged ? '#faad14' : '#d9d9d9',
                   borderColor: isNameChanged ? '#faad14' : '#d9d9d9',
@@ -386,8 +386,8 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
                     e.stopPropagation(); 
                     onUpdateField('note', remark); 
                   }}
-                  disabled={!isRemarkChanged || updateLoading}
-                  loading={updateLoading}
+                  disabled={!isRemarkChanged || remarkUpdateLoading}
+                  loading={remarkUpdateLoading}
                   style={{
                     backgroundColor: isRemarkChanged ? '#faad14' : '#d9d9d9',
                     borderColor: isRemarkChanged ? '#faad14' : '#d9d9d9',
@@ -1361,7 +1361,8 @@ const ViewTimetable = ({ user }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   
   // 修改和添加功能状态
-  const [updateLoading, setUpdateLoading] = useState(false);
+  const [nameUpdateLoading, setNameUpdateLoading] = useState(false);
+  const [remarkUpdateLoading, setRemarkUpdateLoading] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   
   // 视图切换loading状态
@@ -1694,7 +1695,6 @@ const ViewTimetable = ({ user }) => {
       dayOfWeek: dayKey.toUpperCase(),
       startTime: startTimeFormatted,
       endTime: endTimeFormatted,
-      note: '',
     };
 
     if (scheduleDate) {
@@ -1717,7 +1717,6 @@ const ViewTimetable = ({ user }) => {
           dayOfWeek: dayKey.toUpperCase(),
           startTime: startTimeFormatted,
           endTime: endTimeFormatted,
-          note: '',
           scheduleDate: payload.scheduleDate,
           isTimeBlock: true
         };
@@ -1810,7 +1809,6 @@ const ViewTimetable = ({ user }) => {
       dayOfWeek: dayKey.toUpperCase(),
       startTime: startTimeFormatted,
       endTime: endTimeFormatted,
-      note: '',
     };
 
   // 仅当需要按日期写入（实例或日期范围课表）时，才设置 scheduleDate
@@ -1837,7 +1835,6 @@ const ViewTimetable = ({ user }) => {
           dayOfWeek: dayKey.toUpperCase(),
           startTime: startTimeFormatted,
           endTime: endTimeFormatted,
-          note: payload.note,
           scheduleDate: payload.scheduleDate
         };
         
@@ -1896,7 +1893,6 @@ const ViewTimetable = ({ user }) => {
       dayOfWeek: scheduleObj.dayOfWeek,
       startTime: scheduleObj.startTime,
       endTime: scheduleObj.endTime,
-      note: scheduleObj.note,
       isTrial: scheduleObj.isTrial === 1 || scheduleObj.isTrial === true,
       isTimeBlock: scheduleObj.isTimeBlock === 1 || scheduleObj.isTimeBlock === true,
     };
@@ -3747,7 +3743,6 @@ const ViewTimetable = ({ user }) => {
         dayOfWeek: dayOfWeek,
         startTime: startTime,
         endTime: endTime,
-        note: '恢复的课程',
         isManualAdded: false,  // 标记为非手动添加，因为是从固定课表恢复的
         isModified: false      // 标记为未修改，因为内容与固定课表一致
       };
@@ -3879,7 +3874,7 @@ const ViewTimetable = ({ user }) => {
     const payload = {
       studentName: newName.trim(),
     };
-    setUpdateLoading(true);
+    setNameUpdateLoading(true);
     try {
       let response;
       if (viewMode === 'instance') {
@@ -3921,7 +3916,7 @@ const ViewTimetable = ({ user }) => {
     } catch (error) {
       message.error('操作失败，请重试');
     } finally {
-      setUpdateLoading(false);
+      setNameUpdateLoading(false);
     }
   };
 
@@ -3981,7 +3976,8 @@ const ViewTimetable = ({ user }) => {
       }
     }
     
-    setUpdateLoading(true);
+    const setCurrentLoading = fieldName === 'note' ? setRemarkUpdateLoading : setNameUpdateLoading;
+    setCurrentLoading(true);
     try {
       let response;
       if (viewMode === 'instance') {
@@ -4021,7 +4017,7 @@ const ViewTimetable = ({ user }) => {
     } catch (error) {
       message.error('操作失败，请重试');
     } finally {
-      setUpdateLoading(false);
+      setCurrentLoading(false);
     }
   };
 
@@ -4361,7 +4357,6 @@ const ViewTimetable = ({ user }) => {
           dayOfWeek: dayKey.toUpperCase(),
           startTime,
           endTime,
-          note: '复制创建',
         };
 
         if (scheduleDate) {
@@ -4850,7 +4845,6 @@ const ViewTimetable = ({ user }) => {
         dayOfWeek: dayKey.toUpperCase(),
         startTime,
         endTime,
-        note: '批量添加',
       };
 
       if (scheduleDate) {
@@ -5427,7 +5421,6 @@ const ViewTimetable = ({ user }) => {
                 dayOfWeek: day.key.toUpperCase(),
                 startTime: startTimeFormatted,
                 endTime: endTimeFormatted,
-                note: '',
               };
 
               if (scheduleDate) {
@@ -5448,12 +5441,11 @@ const ViewTimetable = ({ user }) => {
                 if (resp.success) {
                   // 立即将新课程添加到当前状态
                   const newSchedule = resp.data || {
-                    id: Date.now(), // 临时ID
+                    id: Date.now(),
                     studentName: trimmedName,
                     dayOfWeek: day.key.toUpperCase(),
                     startTime: startTimeFormatted,
                     endTime: endTimeFormatted,
-                    note: payload.note,
                     scheduleDate: payload.scheduleDate
                   };
                   
@@ -5463,19 +5455,19 @@ const ViewTimetable = ({ user }) => {
                   // 异步刷新数据
                   const refreshData = async () => {
                     try {
-                  if (viewMode === 'instance' && currentWeekInstance) {
-                    const r = await getInstanceSchedules(currentWeekInstance.id);
-                    if (r && r.success) {
-                      setAllSchedules(r.data || []);
-                      setCurrentWeekInstance(prev => ({
-                        ...prev,
-                        schedules: r.data || []
-                      }));
-                    }
-                  } else {
-                    invalidateTimetableCache(timetableId);
-                    await refreshSchedulesQuietly();
-                  }
+                      if (viewMode === 'instance' && currentWeekInstance) {
+                        const r = await getInstanceSchedules(currentWeekInstance.id);
+                        if (r && r.success) {
+                          setAllSchedules(r.data || []);
+                          setCurrentWeekInstance(prev => ({
+                            ...prev,
+                            schedules: r.data || []
+                          }));
+                        }
+                      } else {
+                        invalidateTimetableCache(timetableId);
+                        await refreshSchedulesQuietly();
+                      }
                     } catch (error) {
                       console.error('异步刷新数据失败:', error);
                     }
@@ -5718,7 +5710,8 @@ const ViewTimetable = ({ user }) => {
                       setOpenScheduleId(null);
                     }}
                     deleteLoading={deleteLoading}
-                    updateLoading={updateLoading}
+                    nameUpdateLoading={nameUpdateLoading}
+                    remarkUpdateLoading={remarkUpdateLoading}
                     templateSchedules={templateSchedules}
                     viewMode={viewMode}
                     allSchedules={allSchedules}
@@ -6315,7 +6308,8 @@ const ViewTimetable = ({ user }) => {
                       setOpenScheduleId(null);
                     }}
                                 deleteLoading={deleteLoading}
-                                updateLoading={updateLoading}
+                                nameUpdateLoading={nameUpdateLoading}
+                                remarkUpdateLoading={remarkUpdateLoading}
                                 templateSchedules={templateSchedules}
                                 viewMode={viewMode}
                                 allSchedules={allSchedules}
@@ -6458,7 +6452,8 @@ const ViewTimetable = ({ user }) => {
                       setOpenScheduleId(null);
                     }}
                                 deleteLoading={deleteLoading}
-                                updateLoading={updateLoading}
+                                nameUpdateLoading={nameUpdateLoading}
+                                remarkUpdateLoading={remarkUpdateLoading}
                                 templateSchedules={templateSchedules}
                                 viewMode={viewMode}
                                 allSchedules={allSchedules}

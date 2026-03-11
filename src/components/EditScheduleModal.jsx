@@ -57,7 +57,6 @@ const EditScheduleModal = ({ visible, onCancel, onOk, schedule, timetable }) => 
         scheduleDate: !timetable.isWeekly && scheduleDate ? scheduleDate.format('YYYY-MM-DD') : null,
         startTime: start.format('HH:mm:ss'),
         endTime: end.format('HH:mm:ss'),
-        note: '',
       };
       onOk(payload);
     });
