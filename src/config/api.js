@@ -13,7 +13,7 @@ const ENVIRONMENTS = {
   
   // 测试环境
   testing: {
-    REMOTE_HOST: 'https://timetable.devtesting.top',
+    REMOTE_HOST: 'https://table.devtesting.top',
     API_BASE_PATH: '/timetable/api',
     USE_PROXY: false,
     PROTO: 'https',
