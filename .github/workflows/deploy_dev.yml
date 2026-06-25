@@ -28,7 +28,12 @@ jobs:
       - name: clean Server Old Files
         uses: fifsky/ssh-action@master
         with:
-          command: rm -rf ${{ secrets.TARGET_PATH_DEV }}/*
+          command: |
+            if [ -d "${{ secrets.TARGET_PATH_DEV }}" ]; then
+              rm -rf "${{ secrets.TARGET_PATH_DEV }}"/*
+            else
+              echo "skip clean: target path not found: ${{ secrets.TARGET_PATH_DEV }}"
+            fi
           host: ${{ secrets.HW_TEST_SERVER }}
           user: ${{ secrets.HW_SERVER_USERNAME }}
           pass: ${{ secrets.HW_SERVER_PWD }}

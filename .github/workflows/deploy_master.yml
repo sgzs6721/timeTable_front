@@ -31,7 +31,12 @@ jobs:
           host: ${{ secrets.HW_TEST_SERVER }}
           username: ${{ secrets.HW_SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: rm -rf ${{ secrets.TARGET_PATH }}/*
+          script: |
+            if [ -d "${{ secrets.TARGET_PATH }}" ]; then
+              rm -rf "${{ secrets.TARGET_PATH }}"/*
+            else
+              echo "skip clean: target path not found: ${{ secrets.TARGET_PATH }}"
+            fi
 
       - name: Scp dist To HW Server
         uses: appleboy/scp-action@master
