@@ -22,7 +22,7 @@ const ENVIRONMENTS = {
   
   // 生产环境
   production: {
-    REMOTE_HOST: 'https://timetable.devtesting.top',
+    REMOTE_HOST: 'https://table.devtesting.top',
     API_BASE_PATH: '/timetable/api',
     USE_PROXY: false,
     PROTO: 'https',
