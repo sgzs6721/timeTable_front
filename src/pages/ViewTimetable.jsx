@@ -1031,7 +1031,7 @@ const SchedulePopoverContent = ({ schedule, onDelete, onUpdateName, onUpdateFiel
   );
 };
 
-const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeInfo, hasHalfHourCourse = false, defaultHalfHourPosition = 'first', defaultIsHalfHour = false, fixedTimeSlot = null, studentOptions = [], disableHalfHourSwitch = false }) => {
+const NewSchedulePopoverContent = ({ onAdd, onCancel, addLoading, timeInfo, hasHalfHourCourse = false, defaultHalfHourPosition = 'first', defaultIsHalfHour = false, fixedTimeSlot = null, studentOptions = [], disableHalfHourSwitch = false }) => {
   const [name, setName] = React.useState('');
   const [isHalfHour, setIsHalfHour] = React.useState(defaultIsHalfHour);
   const [halfHourPosition, setHalfHourPosition] = React.useState(defaultHalfHourPosition); // first: 前半小时, second: 后半小时
@@ -1197,21 +1197,6 @@ const NewSchedulePopoverContent = ({ onAdd, onBlock, onCancel, addLoading, timeI
       )}
       
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, gap: '8px' }}>
-        {onBlock && (
-          <Button 
-            size="small" 
-            onClick={() => onBlock({ isHalfHour, halfHourPosition })}
-            disabled={addLoading}
-            style={{ 
-              backgroundColor: 'rgba(255, 77, 79, 0.15)', 
-              borderColor: 'rgba(255, 77, 79, 0.3)',
-              color: '#ff4d4f',
-              fontWeight: 500
-            }}
-          >
-            占用
-          </Button>
-        )}
         <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
           <Button size="small" onClick={onCancel} disabled={addLoading}>
             取消
@@ -1652,109 +1637,6 @@ const ViewTimetable = ({ user }) => {
     setAvailableTimeModalVisible(true);
   };
   
-  // 处理占用时间段
-  const handleBlockTime = async (dayKey, timeIndex, scheduleInfo) => {
-    const [startTimeStr, endTimeStr] = timeSlots[timeIndex].split('-');
-    let startTime = dayjs(startTimeStr, 'HH:mm');
-    
-    // 如果用户选择了半小时，根据位置调整开始时间
-    if (scheduleInfo.isHalfHour && scheduleInfo.halfHourPosition === 'second') {
-      startTime = startTime.add(30, 'minute');
-    }
-    
-    // 根据选择的时长计算结束时间
-    let endTime;
-    if (scheduleInfo.isHalfHour) {
-      endTime = startTime.add(30, 'minute');
-    } else {
-      endTime = startTime.add(60, 'minute');
-    }
-    
-    const startTimeFormatted = `${startTime.format('HH:mm')}:00`;
-    const endTimeFormatted = `${endTime.format('HH:mm')}:00`;
-
-    let scheduleDate = null;
-    if (timetable.isWeekly) {
-      if (viewMode === 'instance' && currentWeekInstance) {
-        const dayIndex = weekDays.findIndex(day => day.key === dayKey);
-        const base = dayjs(currentWeekInstance.weekStartDate);
-        const currentDate = base.add(dayIndex, 'day');
-        scheduleDate = currentDate.format('YYYY-MM-DD');
-      }
-    } else {
-      const weekDates = getCurrentWeekDates();
-      if (weekDates.start) {
-        const dayIndex = weekDays.findIndex(day => day.key === dayKey);
-        const currentDate = weekDates.start.add(dayIndex, 'day');
-        scheduleDate = currentDate.format('YYYY-MM-DD');
-      }
-    }
-
-    const payload = {
-      studentName: '【占用】',
-      dayOfWeek: dayKey.toUpperCase(),
-      startTime: startTimeFormatted,
-      endTime: endTimeFormatted,
-    };
-
-    if (scheduleDate) {
-      payload.scheduleDate = scheduleDate;
-    }
-
-    setAddLoading(true);
-    try {
-      let resp;
-      if (viewMode === 'instance' && currentWeekInstance) {
-        resp = await createInstanceSchedule(currentWeekInstance.id, payload);
-      } else {
-        resp = await createSchedule(timetableId, payload);
-      }
-      
-      if (resp.success) {
-        const newSchedule = resp.data || {
-          id: Date.now(),
-          studentName: '【占用】',
-          dayOfWeek: dayKey.toUpperCase(),
-          startTime: startTimeFormatted,
-          endTime: endTimeFormatted,
-          scheduleDate: payload.scheduleDate,
-          isTimeBlock: true
-        };
-        
-        setAllSchedules(prev => [...prev, newSchedule]);
-        handlePopoverVisibleChange(`popover-${dayKey}-${timeIndex}`, false);
-        
-        const refreshData = async () => {
-          try {
-            if (viewMode === 'instance' && currentWeekInstance) {
-              const r = await getInstanceSchedules(currentWeekInstance.id);
-              if (r && r.success) {
-                setAllSchedules(r.data || []);
-                setCurrentWeekInstance(prev => ({
-                  ...prev,
-                  schedules: r.data || []
-                }));
-              }
-            } else {
-              await refreshSchedulesQuietly();
-            }
-          } catch (error) {
-            console.error('异步刷新数据失败:', error);
-          }
-        };
-        
-        setTimeout(refreshData, 200);
-        message.success('占用时间段成功');
-      } else {
-        message.error(resp.message || '占用失败');
-      }
-    } catch (err) {
-      message.error('网络错误，占用失败');
-    } finally {
-      setAddLoading(false);
-    }
-  };
-
   const handleAddSchedule = async (dayKey, timeIndex, scheduleInfo) => {
     const trimmedName = scheduleInfo.studentName.trim();
     if (!trimmedName) {
@@ -1997,15 +1879,6 @@ const ViewTimetable = ({ user }) => {
           }
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-          <Button 
-            size="small" 
-            onClick={() => handleBlockTime(day.key, timeIndex, newScheduleInfo)}
-            loading={addLoading}
-            disabled={addLoading}
-            style={{ backgroundColor: '#f5f5f5', borderColor: '#d9d9d9' }}
-          >
-            占用
-          </Button>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button size="small" onClick={() => handlePopoverVisibleChange(popoverKey, false)} disabled={addLoading}>
               取消
@@ -5634,7 +5507,6 @@ const ViewTimetable = ({ user }) => {
                       <div style={{ padding: '0 8px' }}>
                         <NewSchedulePopoverContent 
                           onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
-                          onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, scheduleInfo)}
                           onCancel={() => handleOpenChange(false)} 
                           addLoading={addLoading} 
                           timeInfo={null} 
@@ -5646,7 +5518,6 @@ const ViewTimetable = ({ user }) => {
                   ) : (
                     <NewSchedulePopoverContent 
                       onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, scheduleInfo)} 
-                      onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, scheduleInfo)}
                       onCancel={() => handleOpenChange(false)} 
                       addLoading={addLoading} 
                       timeInfo={timeInfo} 
@@ -6377,7 +6248,6 @@ const ViewTimetable = ({ user }) => {
                       content={
                         <NewSchedulePopoverContent 
                           onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'first' })} 
-                          onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'first' })}
                           onCancel={() => setOpenPopoverKey(null)} 
                           addLoading={addLoading} 
                           timeInfo={`${record.time} 前半小时`}
@@ -6521,7 +6391,6 @@ const ViewTimetable = ({ user }) => {
                       content={
                         <NewSchedulePopoverContent 
                           onAdd={(scheduleInfo) => handleAddSchedule(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'second' })} 
-                          onBlock={(scheduleInfo) => handleBlockTime(day.key, record.key, { ...scheduleInfo, isHalfHour: true, halfHourPosition: 'second' })}
                           onCancel={() => setOpenPopoverKey(null)} 
                           addLoading={addLoading} 
                           timeInfo={`${record.time} 后半小时`}
