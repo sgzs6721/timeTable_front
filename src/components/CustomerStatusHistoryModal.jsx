@@ -4,6 +4,7 @@ import { ClockCircleOutlined, BellOutlined, EditOutlined, SaveOutlined, CloseOut
 import { changeCustomerStatus, getCustomerStatusHistory, updateCustomerStatusHistory, deleteCustomerStatusHistory, cancelTrialSchedule } from '../services/customerStatusHistory';
 import { createTodo, getLatestTodoByCustomer, updateTodo, updateTodoReminderTime, cancelTodo } from '../services/todo';
 import { getApiBaseUrl } from '../config/api';
+import { TIMETABLE_END_HOUR } from '../config/timetable';
 import { getCurrentUserPermissions } from '../services/rolePermission';
 import dayjs from 'dayjs';
 
@@ -855,16 +856,18 @@ const CustomerStatusHistoryModal = ({ visible, onCancel, customer, onSuccess, on
                     showNow={false}
                     inputReadOnly
                     use12Hours={false}
-                    disabledTime={() => ({
+                    disabledTime={(_, type) => ({
                       disabledHours: () => {
-                        // 禁用10点之前和20点之后的小时（保留10-20点）
-                        return [...Array(10).keys(), ...Array(4).keys().map(i => i + 21)];
+                        // 体验课最晚在课表结束时结束，开始时间必须早于结束小时。
+                        return Array.from({ length: 24 }, (_, hour) => hour).filter(hour =>
+                          hour < 10 || (type === 'start' ? hour >= TIMETABLE_END_HOUR : hour > TIMETABLE_END_HOUR)
+                        );
                       },
-                      disabledMinutes: () => {
-                        // 只允许00和30分钟，禁用其他所有分钟
+                      disabledMinutes: (hour) => {
+                        // 只允许00和30分钟，结束小时只允许整点。
                         const disabled = [];
                         for (let i = 0; i < 60; i++) {
-                          if (i !== 0 && i !== 30) {
+                          if (i !== 0 && (i !== 30 || hour === TIMETABLE_END_HOUR)) {
                             disabled.push(i);
                           }
                         }

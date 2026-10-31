@@ -39,6 +39,7 @@ import EditScheduleModal from '../components/EditScheduleModal';
 import LeaveRequestModal from '../components/LeaveRequestModal';
 import Footer from '../components/Footer';
 import { isWeChatBrowser } from '../utils/browserDetect';
+import { TIMETABLE_END_HOUR, TIMETABLE_TIME_SLOTS as timeSlots } from '../config/timetable';
 import './ViewTimetable.css';
 
 dayjs.extend(isBetween);
@@ -1376,7 +1377,7 @@ const ViewTimetable = ({ user }) => {
 
   // 智能弹框定位函数
   const getSmartPlacement = useCallback((dayIndex, timeIndex) => {
-    const totalTimeSlots = 11; // 固定的时间段数量：09:00-20:00，共11个时间段
+    const totalTimeSlots = timeSlots.length;
     const screenWidth = window.innerWidth;
 
     // 移动端优先使用上下方向
@@ -1534,7 +1535,6 @@ const ViewTimetable = ({ user }) => {
 
   // 根据日期和时间获取对应的课程
   const getScheduleForCell = (dayKey, timeIndex) => {
-    const timeSlots = ['09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00'];
     const timeSlot = timeSlots[timeIndex];
     if (!timeSlot) return null;
     
@@ -1575,17 +1575,11 @@ const ViewTimetable = ({ user }) => {
   const handleTimeCellClick = (timeSlot) => {
     const availableSlots = [];
     
-    // 定义时间段
-    const timeSlots = [
-      '09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00',
-      '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00'
-    ];
-    
     // 遍历每一天
     weekDays.forEach((day, dayIndex) => {
       const isWeekend = dayIndex >= 5; // 周六(5)和周日(6)
       const startHour = isWeekend ? 10 : 16; // 周末10点开始，工作日16点开始
-      const endHour = 20; // 都到20点结束
+      const endHour = TIMETABLE_END_HOUR;
       
       // 获取该天已排课的时间段
       const scheduledTimes = displaySchedules
@@ -1957,14 +1951,6 @@ const ViewTimetable = ({ user }) => {
     }
   };
 
-  // 时间段定义
-  const timeSlots = [
-    '09:00-10:00', '10:00-11:00', '11:00-12:00',
-    '12:00-13:00', '13:00-14:00', '14:00-15:00',
-    '15:00-16:00', '16:00-17:00', '17:00-18:00',
-    '18:00-19:00', '19:00-20:00'
-  ];
-
   // 星期定义
   const weekDays = [
     { key: 'monday', label: '周一' },
@@ -2105,7 +2091,7 @@ const ViewTimetable = ({ user }) => {
 
     const firstScheduleHour = parseInt(sortedSchedules[0].startTime.substring(0, 2));
     const timeSlotsForDay = [];
-    for (let hour = firstScheduleHour; hour <= 19; hour++) {
+    for (let hour = firstScheduleHour; hour < TIMETABLE_END_HOUR; hour++) {
       timeSlotsForDay.push({
         time: `${hour.toString().padStart(2, '0')}:00`,
         displayTime: `${hour}-${hour + 1}`,
@@ -3963,7 +3949,6 @@ const ViewTimetable = ({ user }) => {
     
     // 生成显示文本
     const dayText = dayMap[targetDayKey.toUpperCase()] || targetDayKey;
-    const timeSlots = ['09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00'];
     const timeText = timeSlots[targetTimeIndex] || `${targetTimeIndex + 9}:00-${targetTimeIndex + 10}:00`;
     
     setMoveTargetText(`移动到周${dayText}，${timeText}`);
@@ -6525,15 +6510,7 @@ const ViewTimetable = ({ user }) => {
 
   // 为初始加载状态准备空数据
   const displayTimetable = timetable || { name: '课表加载中...', isWeekly: true };
-  const displayTableDataSource = isInitialLoading ? 
-    // 生成空的时间表格结构
-    Array.from({ length: 11 }, (_, i) => {
-      const hour = 9 + i;
-      return {
-        key: i,
-        time: `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00`
-      };
-    }) : tableDataSource;
+  const displayTableDataSource = tableDataSource;
   
   // 为初始加载生成与实际列结构一致的列头
   const generateInitialColumns = () => {

@@ -13,6 +13,7 @@ import { getAllSalaryCalculations, getAvailableMonths } from '../services/salary
 import { getCustomerStatusHistory } from '../services/customerStatusHistory';
 import { getCurrentUserPermissions } from '../services/rolePermission';
 import { getApiBaseUrl } from '../config/api';
+import { TIMETABLE_END_HOUR, TIMETABLE_TIME_SLOTS } from '../config/timetable';
 import dayjs from 'dayjs';
 import EditScheduleModal from '../components/EditScheduleModal';
 import StudentDetailModal from '../components/StudentDetailModal';
@@ -2440,7 +2441,7 @@ const Dashboard = ({ user }) => {
         const firstScheduleHour = parseInt(sortedSchedules[0].startTime.substring(0, 2));
 
         const timeSlots = [];
-        for (let hour = firstScheduleHour; hour <= 19; hour++) {
+        for (let hour = firstScheduleHour; hour < TIMETABLE_END_HOUR; hour++) {
           timeSlots.push({
             time: `${hour.toString().padStart(2, '0')}:00`,
             displayTime: `${hour}-${hour + 1}`,
@@ -3936,11 +3937,9 @@ const Dashboard = ({ user }) => {
         // 如果没有数据，创建一个空的表格结构
         if (tableData.length === 0) {
           // 创建一个空的时间表作为占位
-          const emptyTimeSlots = [
-            '09:00-10:00', '10:00-11:00', '11:00-12:00',
-            '14:00-15:00', '15:00-16:00', '16:00-17:00',
-            '17:00-18:00', '18:00-19:00', '19:00-20:00'
-          ];
+          const emptyTimeSlots = TIMETABLE_TIME_SLOTS.filter(timeSlot =>
+            !['12:00-13:00', '13:00-14:00'].includes(timeSlot)
+          );
           
           emptyTimeSlots.forEach(timeSlot => {
             tableData.push({

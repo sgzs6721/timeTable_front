@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { copyConvertDateToWeeklyApi, copyConvertWeeklyToDateApi, deleteTimetable, getTimetableSchedules } from '../services/timetable';
 import dayjs from 'dayjs';
 import Footer from '../components/Footer';
+import { TIMETABLE_TIME_SLOTS as timeSlots } from '../config/timetable';
 import './ViewTimetable.css';
 
 const ConvertPreview = () => {
@@ -71,7 +72,6 @@ const ConvertPreview = () => {
           .filter(s => s.scheduleDate && dayjs(s.scheduleDate).isBetween(ws.subtract(1,'ms'), we.add(1,'ms'), null, '[]'))
           .sort((a,b)=>a.dayOfWeek?.localeCompare(b.dayOfWeek)||a.startTime.localeCompare(b.startTime));
         
-        const timeSlots = ['09:00-10:00','10:00-11:00','11:00-12:00','12:00-13:00','13:00-14:00','14:00-15:00','15:00-16:00','16:00-17:00','17:00-18:00','18:00-19:00','19:00-20:00'];
         const weekDays = [
           { key: 'monday', label: '周一' },
           { key: 'tuesday', label: '周二' },
@@ -216,7 +216,6 @@ const ConvertPreview = () => {
           }
         }
         
-        const timeSlots = ['09:00-10:00','10:00-11:00','11:00-12:00','12:00-13:00','13:00-14:00','14:00-15:00','15:00-16:00','16:00-17:00','17:00-18:00','18:00-19:00','19:00-20:00'];
         const weekDays = [
           { key: 'monday', label: '周一' },
           { key: 'tuesday', label: '周二' },
@@ -401,7 +400,6 @@ const ConvertPreview = () => {
           .filter(s => s.scheduleDate && dayjs(s.scheduleDate).isBetween(ws.subtract(1,'ms'), we.add(1,'ms'), null, '[]'))
           .sort((a,b)=>a.dayOfWeek?.localeCompare(b.dayOfWeek)||a.startTime.localeCompare(b.startTime));
         
-        const timeSlots = ['09:00-10:00','10:00-11:00','11:00-12:00','12:00-13:00','13:00-14:00','14:00-15:00','15:00-16:00','16:00-17:00','17:00-18:00','18:00-19:00','19:00-20:00'];
         const weekDays = [
           { key: 'monday', label: '周一' },
           { key: 'tuesday', label: '周二' },
@@ -543,7 +541,6 @@ const ConvertPreview = () => {
           }
         }
         
-        const timeSlots = ['09:00-10:00','10:00-11:00','11:00-12:00','12:00-13:00','13:00-14:00','14:00-15:00','15:00-16:00','16:00-17:00','17:00-18:00','18:00-19:00','19:00-20:00'];
         const weekDays = [
           { key: 'monday', label: '周一' },
           { key: 'tuesday', label: '周二' },

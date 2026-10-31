@@ -11,6 +11,7 @@ import localeData from 'dayjs/plugin/localeData';
 import html2canvas from 'html2canvas';
 import { isWeChatBrowser } from '../utils/browserDetect';
 import Footer from '../components/Footer';
+import { TIMETABLE_TIME_SLOTS as timeSlots } from '../config/timetable';
 import './ViewTimetable.css';
 
 // 扩展 dayjs 插件
@@ -79,14 +80,6 @@ const MergePreview = ({ user }) => {
       console.error('复制失败:', error);
     }
   };
-
-  // 时间段定义
-  const timeSlots = [
-    '09:00-10:00', '10:00-11:00', '11:00-12:00',
-    '12:00-13:00', '13:00-14:00', '14:00-15:00',
-    '15:00-16:00', '16:00-17:00', '17:00-18:00',
-    '18:00-19:00', '19:00-20:00'
-  ];
 
   // 星期定义 - 确保顺序和dayjs的映射一致
   const weekDays = [
