@@ -3930,19 +3930,16 @@ const Dashboard = ({ user }) => {
           allCoaches.add(coachName);
         });
         
-        // 转换为数组并按时间排序
-        const tableData = Array.from(timeSlotMap.values())
-          .sort((a, b) => a.time.localeCompare(b.time));
-        
-        // 如果没有数据，创建一个空的表格结构
-        if (tableData.length === 0) {
-          // 创建一个空的时间表作为占位
-          const emptyTimeSlots = TIMETABLE_TIME_SLOTS.filter(timeSlot =>
-            !['12:00-13:00', '13:00-14:00'].includes(timeSlot)
-          );
-          
-          emptyTimeSlots.forEach(timeSlot => {
-            tableData.push({
+        // 无课程时保留空表结构；有课程时也始终显示最后一小时（20:00–21:00）。
+        const emptyTimeSlots = timeSlotMap.size === 0
+          ? TIMETABLE_TIME_SLOTS.filter(timeSlot =>
+              !['12:00-13:00', '13:00-14:00'].includes(timeSlot)
+            )
+          : TIMETABLE_TIME_SLOTS.slice(-1);
+
+        emptyTimeSlots.forEach(timeSlot => {
+          if (!timeSlotMap.has(timeSlot)) {
+            timeSlotMap.set(timeSlot, {
               time: timeSlot,
               monday: [],
               tuesday: [],
@@ -3952,8 +3949,12 @@ const Dashboard = ({ user }) => {
               saturday: [],
               sunday: []
             });
-          });
-        }
+          }
+        });
+
+        // 转换为数组并按时间排序
+        const tableData = Array.from(timeSlotMap.values())
+          .sort((a, b) => a.time.localeCompare(b.time));
         
         const newCoachBgColorMap = new Map();
         Array.from(allCoaches).forEach((coach, index) => {
