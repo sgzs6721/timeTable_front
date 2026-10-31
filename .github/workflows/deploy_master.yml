@@ -25,17 +25,17 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.PROD_API_URL }}
       
-      - name: clean Server Old Files
+      - name: Verify deployment directory and back up entry page
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.HW_TEST_SERVER }}
           username: ${{ secrets.HW_SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            if [ -d "${{ secrets.TARGET_PATH }}" ]; then
-              rm -rf "${{ secrets.TARGET_PATH }}"/*
-            else
-              echo "skip clean: target path not found: ${{ secrets.TARGET_PATH }}"
+            set -eu
+            test -d /root/lesson/timetable_front
+            if [ -f /root/lesson/timetable_front/index.html ]; then
+              cp -p /root/lesson/timetable_front/index.html /root/lesson/timetable_front/index.html.previous
             fi
 
       - name: Scp dist To HW Server
@@ -44,6 +44,19 @@ jobs:
           host: ${{ secrets.HW_TEST_SERVER }}
           username: ${{ secrets.HW_SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: ${{ github.workspace }}/dist/*
-          target: ${{ secrets.TARGET_PATH }}
-          strip_components: ${{ secrets.STRIP_COMPONENTS }}
+          source: dist/*
+          target: /root/lesson/timetable_front
+          strip_components: 1
+          overwrite: true
+
+      - name: Verify published frontend
+        run: |
+          set -eu
+          curl --fail --silent --show-error --retry 3 --max-time 30 \
+            -H 'Cache-Control: no-cache' \
+            "https://table.devtesting.top/index.html?deploy=${GITHUB_SHA}" \
+            -o /tmp/timetable-published.html
+          if ! cmp -s dist/index.html /tmp/timetable-published.html; then
+            echo 'Published index.html does not match this build. Check the deployment host and Nginx root.'
+            exit 1
+          fi
